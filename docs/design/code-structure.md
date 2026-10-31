@@ -49,7 +49,7 @@ Outputs:
   - `awaySummary(summary)`: While you were away has settled after an initial login. Fired only when the popup setting is on and it isn't empty. App shows it once out of combat.
   - `notice(kind)`: one-off messages ("BFF is out of date", "receive-only on trial accounts", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
-- Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isReceiveOnly()`, `isPaused()`, `isMinimapShown()` and `isChatLinesOn()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
+- Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isReceiveOnly()`, `isPaused()`, `isMinimapShown()`, `isChatLinesOn()` and `isAwayPopupOn()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
 - Ready-to-render reads for UI: `rows()`, and `feed()` (the Feed tab's entries grouped by day, plus the unseen count). UI never sees a Member record.
 - `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` or `awaySummary`.
 

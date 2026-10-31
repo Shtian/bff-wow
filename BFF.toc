@@ -27,6 +27,7 @@ Game/ChannelLink.lua
 
 UI/Panel.lua
 UI/Minimap.lua
+UI/Away.lua
 
 #@do-not-package@
 Dev/FakeNet.lua
