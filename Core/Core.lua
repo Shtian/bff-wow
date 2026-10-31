@@ -17,6 +17,10 @@ local required = {
   maxLevel = "number",
 }
 
+-- For the UI's wording.
+Core.CAN_PLAY_LEVELS = ns.Roster.CAN_PLAY
+Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
+
 -- deps: db, now(), random(), link (with send(string)), listener(event, ...),
 -- receiveOnly, initialLogin and maxLevel.
 function Core.new(deps)
@@ -74,20 +78,21 @@ end
 -- The panel's rows, ready to render, sorted by order: "online" (default),
 -- "level" or "name". Your own row comes first. Each row is a Member whose
 -- Characters weren't all unseen for 30 days: memberId, displayName, own,
--- online, lastSeen, onAlt (playing a Character other than the Main),
+-- online, lastSeen, sinceSeen (seconds since lastSeen), onAlt (playing a Character other than the Main),
 -- mainSet (the Main was chosen, rather than the most recently played),
--- altsCanPlay, via (display name of the Member the news came through, if
--- not them) and alts, plus the shown Character: the one being played while
--- online, else the Main. A Character, shown or alt, has guid, name,
--- classFilename, level, xp, maxXp, zone, deaths, lastPlayed, main and
--- canPlay (within 3 levels of the Character you play).
+-- altsCanPlay, via (display name of the Member whose message brought their
+-- record, if not their own) and alts, plus the shown Character: the one
+-- being played while online, else the Main. A Character, shown or alt, has
+-- guid, name, classFilename, level, xp, maxXp, zone, deaths, lastPlayed,
+-- sinceSeen, playing (being played right now), main and canPlay (within
+-- Core.CAN_PLAY_LEVELS of the Character you play).
 function Core:rows(order)
   return ns.Roster.rows(self.ledger, self.now(), order)
 end
 
 -- Counts for the title and minimap button: online, members, canPlay (online
 -- Members whose Character being played can play with you) and hidden
--- (Characters unseen for 30 days).
+-- (Characters unseen for Core.HIDE_AFTER_DAYS).
 function Core:summary()
   return ns.Roster.summary(self.ledger, self.now())
 end
@@ -219,9 +224,7 @@ function Core:setMain(guid)
       return nil, "unknownCharacter"
     end
   end
-  local before = self.ledger:version(self.ledger:memberId())
-  self.ledger:writeOwn({ main = guid or false })
-  if self.ledger:version(self.ledger:memberId()) ~= before then
+  if self.ledger:writeOwn({ main = guid or false }) then
     sendOwnNow(self)
     self.listener("changed")
   end
@@ -250,8 +253,8 @@ end
 -- The removed Members, by display name: memberId and displayName.
 function Core:removed()
   local removed = {}
-  for id, displayName in self.ledger:removed() do
-    removed[#removed + 1] = { memberId = id, displayName = type(displayName) == "string" and displayName or nil }
+  for id, member in self.ledger:removed() do
+    removed[#removed + 1] = { memberId = id, displayName = member.displayName }
   end
   table.sort(removed, function(a, b)
     local x, y = (a.displayName or ""):lower(), (b.displayName or ""):lower()

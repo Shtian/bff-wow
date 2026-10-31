@@ -107,6 +107,7 @@ end
 
 -- Writes the given displayName, left flag and Main (a Character GUID) into
 -- the own record. A field not given is kept; false clears left or Main.
+-- Returns true if the record changed.
 function Ledger:writeOwn(fields)
   local record = ownRecord(self)
   local changed = false
@@ -118,6 +119,7 @@ function Ledger:writeOwn(fields)
     end
   end
   if changed then bump(self, record) end
+  return changed
 end
 
 -- What a Member who left publishes: no Characters.
@@ -148,7 +150,7 @@ end
 function Ledger:remove(id)
   local record = self.db.records[id]
   if not record or id == self.db.memberId then return false end
-  self.db.removed[id] = record.displayName or true
+  self.db.removed[id] = { displayName = record.displayName }
   self.db.records[id] = nil
   self.db.heard[id] = nil
   self.db.via[id] = nil
@@ -166,7 +168,7 @@ function Ledger:isRemoved(id)
   return self.db.removed[id] ~= nil
 end
 
--- The removed Members: for id, displayName (or true) in ledger:removed().
+-- The removed Members: for id, { displayName } in ledger:removed().
 function Ledger:removed()
   return pairs(self.db.removed)
 end

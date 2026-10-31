@@ -63,9 +63,9 @@ local function ago(seconds)
   return ("%dd"):format(math.floor(seconds / 86400 + 0.5))
 end
 
-local function lastSeenText(online, lastPlayed)
+local function lastSeenText(online, sinceSeen)
   if online then return "online" end
-  return ago(GetServerTime() - lastPlayed)
+  return ago(sinceSeen)
 end
 
 local function setColor(fontString, color)
@@ -112,19 +112,17 @@ local function showTooltip(owner)
     GameTooltip:AddLine(("XP %d%%"):format(math.floor(100 * (character.xp or 0) / character.maxXp)), MUTED[1], MUTED[2], MUTED[3])
   end
   GameTooltip:AddLine(("Deaths: %d"):format(character.deaths or 0), MUTED[1], MUTED[2], MUTED[3])
-  local online = row.online and character == row and not row.own
-  if row.own and character == row then
-    GameTooltip:AddLine("Playing now", ONLINE[1], ONLINE[2], ONLINE[3])
-  elseif online then
-    GameTooltip:AddLine("Online now", ONLINE[1], ONLINE[2], ONLINE[3])
+  if character.playing then
+    GameTooltip:AddLine(row.own and "Playing now" or "Online now", ONLINE[1], ONLINE[2], ONLINE[3])
   else
-    GameTooltip:AddLine("Last seen " .. ago(GetServerTime() - character.lastPlayed) .. " ago", MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:AddLine("Last seen " .. ago(character.sinceSeen) .. " ago", MUTED[1], MUTED[2], MUTED[3])
   end
   if not row.online and row.via then
-    GameTooltip:AddLine("News via " .. row.via, MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:AddLine("Heard via " .. row.via, MUTED[1], MUTED[2], MUTED[3])
   end
   if character.canPlay then
-    GameTooltip:AddLine("Within 3 levels of you: can play together", GOLD[1], GOLD[2], GOLD[3])
+    GameTooltip:AddLine(("Within %d levels of you: can play together"):format(ns.Core.CAN_PLAY_LEVELS),
+      GOLD[1], GOLD[2], GOLD[3])
   end
   GameTooltip:Show()
 end
@@ -147,9 +145,8 @@ local function showMenu(owner)
         root:CreateButton("Main: most recently played", function() core:setMain(nil) end)
       end
     else
-      local playing = row.online and character == row
-      root:CreateButton("Whisper", function() whisper(character.name) end):SetEnabled(playing)
-      root:CreateButton("Invite", function() invite(character.name) end):SetEnabled(playing)
+      root:CreateButton("Whisper", function() whisper(character.name) end):SetEnabled(character.playing)
+      root:CreateButton("Invite", function() invite(character.name) end):SetEnabled(character.playing)
       local name = row.displayName or character.name
       root:CreateButton(("Remove %s..."):format(name), function()
         StaticPopup_Show("BFF_REMOVE_MEMBER", name, nil, row.memberId)
@@ -275,7 +272,7 @@ local function drawRow(row, data)
   placeTags(row.level, { row.member, row.onAlt, row.canPlay })
   row.zone:SetText(data.zone or "")
 
-  row.seen:SetText(lastSeenText(data.online, data.lastSeen))
+  row.seen:SetText(lastSeenText(data.online, data.sinceSeen))
   setColor(row.seen, data.online and ONLINE or MUTED)
   if #data.alts > 0 then
     row.more:SetText(("%s %d more"):format(expanded[data.memberId] and "-" or "+", #data.alts))
@@ -325,7 +322,7 @@ local function drawAlt(alt, row, data)
   setTag(alt.canPlay, data.canPlay and "can play" or nil, GOLD)
   placeTags(alt.level, { alt.main, alt.canPlay })
   local zone = data.zone and data.zone .. " · " or ""
-  alt.right:SetText(zone .. ago(GetServerTime() - data.lastPlayed))
+  alt.right:SetText(zone .. ago(data.sinceSeen))
   alt:Show()
 end
 
@@ -491,7 +488,7 @@ local function showRemovedMenu(owner)
   MenuUtil.CreateContextMenu(owner, function(_, root)
     root:CreateTitle("Removed Members")
     for _, member in ipairs(core:removed()) do
-      root:CreateButton("Re-add " .. (member.displayName or member.memberId), function()
+      root:CreateButton("Re-add " .. (member.displayName or "a Member without a name"), function()
         core:readdMember(member.memberId)
       end)
     end
@@ -550,8 +547,8 @@ local function drawFooter(crew, summary)
   if not footer then createFooter() end
   footer.pause:SetChecked(core:isPaused())
   footer.pause:SetEnabled(not core:isReceiveOnly())
-  footer.hidden:SetText(("Hidden: %d Character%s (unseen 30d)"):format(summary.hidden,
-    summary.hidden == 1 and "" or "s"))
+  footer.hidden:SetText(("Hidden: %d Character%s (unseen %dd)"):format(summary.hidden,
+    summary.hidden == 1 and "" or "s", ns.Core.HIDE_AFTER_DAYS))
   local removed = #core:removed()
   footer.removed.text:SetText(removed > 0 and ("Removed: %d"):format(removed) or "")
   footer.removed:SetShown(removed > 0)

@@ -87,6 +87,8 @@ describe("Roster", function()
       assert.equal("Annalt", row.name)
       assert.is_true(row.onAlt)
       assert.is_false(row.main)
+      assert.is_true(row.playing)
+      assert.is_false(row.alts[1].playing)
 
       a:logout()
       net:run(2)
@@ -95,6 +97,7 @@ describe("Roster", function()
       assert.equal("Ann", row.name)
       assert.is_true(row.main)
       assert.is_false(row.onAlt)
+      assert.is_false(row.playing)
       assert.same({ "Annalt" }, altNames(row))
     end)
 
@@ -138,6 +141,7 @@ describe("Roster", function()
       assert.is_true(row.lastSeen <= loggedOut)
       assert.is_true(row.lastSeen >= loggedOut - 5 * 60)
       assert.equal(row.lastSeen, row.lastPlayed)
+      assert.equal(net:now() - row.lastSeen, row.sinceSeen)
     end)
   end)
 
@@ -285,6 +289,23 @@ describe("Roster", function()
       assert.equal("Bob", row.via)
       assert.is_nil(c:rowFor(b).via)
     end)
+
+    it("stops naming the relay once the owner's own copy arrives", function()
+      local net, clients = crew({ "Ann", "Bob", "Cid" })
+      local a, c = clients[1], clients[3]
+      c:logout()
+      a:play({ level = 11 })
+      net:run(5)
+      a:logout()
+      net:run(2)
+      c:login()
+      net:run(20)
+      assert.equal("Bob", c:rowFor(a).via)
+
+      a:login()
+      net:run(20)
+      assert.is_nil(c:rowFor(a).via)
+    end)
   end)
 
   describe("Remove", function()
@@ -316,6 +337,33 @@ describe("Roster", function()
           for _, record in ipairs(message.records) do
             assert.are_not.equal(b.memberId, record.id)
           end
+        end
+      end
+    end)
+
+    it("sends no DIGEST meant only to fetch a Member removed meanwhile", function()
+      local net, clients, ns = crew({ "Ann", "Bob", "Cid" })
+      local a, b, c = clients[1], clients[2], clients[3]
+      -- Only Cid hears Bob's ding.
+      a:logout()
+      b:play({ level = 11 })
+      net:run(5)
+      b:logout()
+      c:logout()
+      net:run(2)
+      a:login()
+      net:run(10)
+
+      -- Cid's DIGEST tells Ann about Bob's newer version; Ann removes Bob
+      -- before her own DIGEST asking for it goes out.
+      c:login()
+      net:step()
+      a.core:removeMember(b.memberId)
+      local mark = #net.wire
+      net:run(10)
+      for k = mark + 1, #net.wire do
+        if net.wire[k].from == "Ann" then
+          assert.are_not.equal("DIGEST", ns.Codec.decode(net.wire[k].message).type)
         end
       end
     end)

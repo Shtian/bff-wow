@@ -13,24 +13,24 @@ local DAY = 24 * 60 * 60
 -- How long after starting the offline Member logs out.
 local LOGOUT_AFTER = 20
 
--- Levels are relative to the Character you play, so "can play" shows up.
+-- levelOffset is relative to the Character you play, so "can play" shows up.
 -- The first Character is the one being played; the others were played
 -- `ago` seconds earlier. main picks the Character set as Main, if any.
 local MEMBERS = {
   -- Online on their Main, and can play with you.
   { name = "Simone", characters = {
-    { name = "Simone", classFilename = "MAGE", level = 2, zone = "Westfall" },
-    { name = "Simonette", classFilename = "PRIEST", level = -8, zone = "Darkshore", ago = 2 * DAY },
+    { name = "Simone", classFilename = "MAGE", levelOffset = 2, zone = "Westfall" },
+    { name = "Simonette", classFilename = "PRIEST", levelOffset = -8, zone = "Darkshore", ago = 2 * DAY },
   } },
   -- On an Alt, with a Main that can play with you.
   { name = "Simbad", main = 2, characters = {
-    { name = "Simbad", classFilename = "ROGUE", level = 10, zone = "Redridge Mountains" },
-    { name = "Simbadsson", classFilename = "WARRIOR", level = -1, zone = "Wetlands", ago = DAY },
+    { name = "Simbad", classFilename = "ROGUE", levelOffset = 10, zone = "Redridge Mountains" },
+    { name = "Simbadsson", classFilename = "WARRIOR", levelOffset = -1, zone = "Wetlands", ago = DAY },
   } },
   -- Logs out soon after, with an Alt unseen for 40 days (hidden).
   { name = "Simba", offline = true, characters = {
-    { name = "Simba", classFilename = "DRUID", level = 6, zone = "Teldrassil" },
-    { name = "Simbalina", classFilename = "HUNTER", level = -15, zone = "Durotar", ago = 40 * DAY },
+    { name = "Simba", classFilename = "DRUID", levelOffset = 6, zone = "Teldrassil" },
+    { name = "Simbalina", classFilename = "HUNTER", levelOffset = -15, zone = "Durotar", ago = 40 * DAY },
   } },
 }
 
@@ -38,10 +38,15 @@ local net
 local ticker
 local members
 
+-- The GUID of member i's Character j.
+local function guidFor(i, j)
+  return ("Player-0-Sim%d-%d"):format(i, j)
+end
+
 local function character(i, j, spec, yourLevel)
   return {
-    guid = ("Player-0-Sim%d-%d"):format(i, j), name = spec.name, classFilename = spec.classFilename,
-    level = math.max(1, yourLevel + spec.level), xp = 300 * j, maxXp = 1000 + 200 * i,
+    guid = guidFor(i, j), name = spec.name, classFilename = spec.classFilename,
+    level = math.max(1, yourLevel + spec.levelOffset), xp = 300 * j, maxXp = 1000 + 200 * i,
     zone = spec.zone, deaths = i + j,
   }
 end
@@ -60,7 +65,7 @@ local function playHistory(client, i, spec, yourLevel, now)
     if client.core then client:play() else client:login() end
   end
   net.clock = now
-  if spec.main then client.core:setMain(character(i, spec.main, spec.characters[spec.main], yourLevel).guid) end
+  if spec.main then client.core:setMain(guidFor(i, spec.main)) end
 end
 
 -- Starts the simulated Members. Returns true, or nil and "running" or

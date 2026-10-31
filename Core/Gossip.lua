@@ -192,7 +192,10 @@ end
 function Gossip:forget(id)
   self.owed[id] = nil
   if isEmpty(self.owed) then self.owedDue = nil end
-  if self.wanted then self.wanted[id] = nil end
+  if self.wanted and self.wanted[id] then
+    self.wanted[id] = nil
+    if isEmpty(self.wanted) then cancelDigest(self) end
+  end
 end
 
 -- Sends a DIGEST now, so whoever holds something we lack replies with it.
