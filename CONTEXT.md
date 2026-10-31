@@ -14,6 +14,18 @@ _Avoid_: Friend, player, user
 The set of Members who share BFF data with each other.
 _Avoid_: Group, guild, party, friends
 
+**Crew code**:
+The generated code that names a Crew and is the only key to it. Whoever has it can join; a Member is in at most one Crew at a time.
+_Avoid_: Invite code, password, Crew name
+
+**Leave (the Crew)**:
+What a Member does to themselves: their record is marked as left, so every other Member stops showing them. Unlike Remove, everyone sees it.
+_Avoid_: Quit, unsubscribe
+
+**Display name**:
+The name a Member chooses to be shown as, independent of their Characters' names.
+_Avoid_: Nickname, username
+
 **Character**:
 One in-game character owned by a Member.
 _Avoid_: Toon, player, alt (when meaning any character)
