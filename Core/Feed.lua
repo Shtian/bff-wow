@@ -206,6 +206,15 @@ function Feed:markAllSeen()
   return any
 end
 
+-- How many entries haven't been seen.
+function Feed:unseen()
+  local count = 0
+  for _, entry in ipairs(self.db.feed) do
+    if not entry.seen then count = count + 1 end
+  end
+  return count
+end
+
 -- The link came up in a Crew: settling starts, if it hasn't.
 function Feed:linkUp()
   self.upSince = self.upSince or self.now()
@@ -375,7 +384,7 @@ end
 -- to local time): { days = { { daysAgo, time, entries } }, unseen }.
 function Feed:view(utcOffset)
   local today = math.floor((self.now() + utcOffset) / DAY)
-  local days, unseen = {}, 0
+  local days = {}
   local log = self.db.feed
   for i = #log, 1, -1 do
     local entry = log[i]
@@ -386,8 +395,7 @@ function Feed:view(utcOffset)
       days[#days + 1] = group
     end
     group.entries[#group.entries + 1] = Feed.describe(entry)
-    if not entry.seen then unseen = unseen + 1 end
   end
   for _, group in ipairs(days) do group.day = nil end
-  return { days = days, unseen = unseen }
+  return { days = days, unseen = self:unseen() }
 end
