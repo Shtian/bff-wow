@@ -14,6 +14,7 @@ stds.wow = {
     "BINDING_HEADER_BFF",
     "BINDING_NAME_BFF_TOGGLE",
     "SLASH_BFF1",
+    "SLASH_BFFDEV1",
     "SlashCmdList",
     "StaticPopupDialogs",
   },
