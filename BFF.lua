@@ -18,6 +18,7 @@ local MESSAGES = {
   tooManyChannels = "BFF couldn't join its channel: leave a chat channel and /reload.",
   wrongPassword = "BFF couldn't join its channel: start a new Crew.",
   leftCrew = "You left the Crew.",
+  minimapHidden = "Minimap button hidden. Type /bff minimap to show it again.",
   outOfDate = "BFF is out of date: someone in your Crew has a newer version. Update to keep seeing them.",
 }
 ns.MESSAGES = MESSAGES

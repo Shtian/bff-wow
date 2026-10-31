@@ -15,6 +15,8 @@ local ICON = "Interface\\Icons\\INV_Misc_GroupNeedMore"
 local core
 local icons
 local badge
+-- Whether the button is shown, so refresh only calls LibDBIcon on a change.
+local shown
 
 -- "N of M online · K can play with you now", or how to get started.
 local function showTooltip(tooltip)
@@ -32,7 +34,7 @@ end
 
 local function hideButton()
   core:setMinimapShown(false)
-  ns.say("minimap button hidden. Type /bff minimap to show it again.")
+  ns.say(ns.MESSAGES.minimapHidden)
 end
 
 -- Settings comes once the settings page exists (ns.Settings).
@@ -69,7 +71,10 @@ end
 -- Shows or hides the button and redraws the badge, from Core.
 function Minimap.refresh()
   if not icons then return end
-  if core:isMinimapShown() then icons:Show(NAME) else icons:Hide(NAME) end
+  if core:isMinimapShown() ~= shown then
+    shown = core:isMinimapShown()
+    if shown then icons:Show(NAME) else icons:Hide(NAME) end
+  end
   if not badge then return end
   local online = core:crew() and core:summary().online or 0
   badge:SetText(online > 0 and online or "")

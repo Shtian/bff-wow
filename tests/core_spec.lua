@@ -16,6 +16,14 @@ local function newDeps()
   return deps
 end
 
+local function countEvents(deps, name)
+  local count = 0
+  for _, event in ipairs(deps.events) do
+    if event[1] == name then count = count + 1 end
+  end
+  return count
+end
+
 describe("Core", function()
   it("can be created and ticked", function()
     local ns = load()
@@ -42,14 +50,6 @@ describe("Core", function()
   end)
 
   describe("minimap button", function()
-    local function changes(deps)
-      local count = 0
-      for _, event in ipairs(deps.events) do
-        if event[1] == "changed" then count = count + 1 end
-      end
-      return count
-    end
-
     it("is shown by default", function()
       local core = load().Core.new(newDeps())
       assert.is_true(core:isMinimapShown())
@@ -61,7 +61,7 @@ describe("Core", function()
       local core = ns.Core.new(deps)
       core:setMinimapShown(false)
       assert.is_false(core:isMinimapShown())
-      assert.equal(1, changes(deps))
+      assert.equal(1, countEvents(deps, "changed"))
 
       local again = ns.Core.new(deps)
       assert.is_false(again:isMinimapShown())
@@ -73,7 +73,7 @@ describe("Core", function()
       local deps = newDeps()
       local core = load().Core.new(deps)
       core:setMinimapShown(true)
-      assert.equal(0, changes(deps))
+      assert.equal(0, countEvents(deps, "changed"))
     end)
 
     it("keeps the button's position in the same saved table every time", function()
@@ -98,11 +98,7 @@ describe("Core", function()
       core:setPaused(true)
       core:setPaused(true)
       core:setPaused(false)
-      local changed = 0
-      for _, event in ipairs(deps.events) do
-        if event[1] == "changed" then changed = changed + 1 end
-      end
-      assert.equal(2, changed)
+      assert.equal(2, countEvents(deps, "changed"))
     end)
   end)
 end)
