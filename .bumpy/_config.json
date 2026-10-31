@@ -1,8 +1,11 @@
 {
   "$schema": "../node_modules/@varlock/bumpy/config-schema.json",
   "baseBranch": "main",
+  // Bumpy (as of 1.19.0) replaces versionPr as a whole rather than merging
+  // it with its defaults, so the branch has to be named here too.
   "versionPr": {
-    "title": "Versioned release"
+    "title": "Versioned release",
+    "branch": "bumpy/version-packages"
   },
   "packages": {
     "bff": {

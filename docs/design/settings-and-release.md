@@ -67,6 +67,10 @@ Bumpy's tags are always `<name>@<version>` (`bff@0.1.0`); that isn't configurabl
 
 An optional `BUMPY_GH_TOKEN` secret (a fine-grained token with contents and pull-request write access on this repo) makes the Versioned release PR trigger the test and bumpy check workflows. Without it, that PR gets no checks, which is fine since `release.yml` runs the tests before publishing anyway.
 
+No `BUMPY_GH_TOKEN` is set today, so Settings → Actions → General → **Allow GitHub Actions to create and approve pull requests** must be on. Otherwise `version-pr` fails with "GitHub Actions is not permitted to create or approve pull requests".
+
+`.bumpy/_config.json` names `versionPr.branch` (`bumpy/version-packages`) explicitly: bumpy (as of 1.19.0) replaces the whole `versionPr` object instead of merging it with its defaults, so setting only the title left the branch `undefined`. The default preamble (bumpy's logo and blurb) is dropped the same way, which is fine.
+
 ### Building the zip: `scripts/package.sh <version>`
 
 Bumpy owns the tag, the GitHub release and its notes. The BigWigs packager only builds:
