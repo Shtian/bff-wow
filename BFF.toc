@@ -3,6 +3,5 @@
 ## Notes: Best Friends in Forever (hello-world spike)
 ## Author: Stian Haga
 ## Version: 0.0.0-spike
-## AllowLoadGameType: camelot
 
 HelloWorld.lua
