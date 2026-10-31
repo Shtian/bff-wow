@@ -105,13 +105,14 @@ function Ledger:displayName()
   return record and record.displayName
 end
 
--- Writes the given displayName, left flag and Main (a Character GUID) into
--- the own record. A field not given is kept; false clears left or Main.
--- Returns true if the record changed.
+-- Writes the given displayName, left flag, Main (a Character GUID) and
+-- joinedAt (when you started or joined the Crew) into the own record. A
+-- field not given is kept; false clears left or Main. Returns true if the
+-- record changed.
 function Ledger:writeOwn(fields)
   local record = ownRecord(self)
   local changed = false
-  for _, field in ipairs({ "displayName", "left", "main" }) do
+  for _, field in ipairs({ "displayName", "left", "main", "joinedAt" }) do
     local value = fields[field]
     if value ~= nil and (value or nil) ~= record[field] then
       record[field] = value or nil
@@ -228,6 +229,7 @@ local RECORD_SHAPE = {
   displayName = isOptional(isText),
   main = isOptional(isText),
   left = isOptional(function(value) return value == true end),
+  joinedAt = isOptional(isNumber),
 }
 local CHARACTER_SHAPE = {
   guid = isText,
@@ -262,15 +264,16 @@ end
 
 -- Keeps a copy of someone else's record, sent by the Member id `from`, if
 -- it is newer than the one held and the Member isn't removed. Returns true
--- if it was kept.
+-- if it was kept, and the copy held before (nil on first sight).
 function Ledger:merge(record, from)
   if not wellFormed(record) or record.id == self.db.memberId then return false end
   if self:isRemoved(record.id) then return false end
   if record.version <= self:version(record.id) then return false end
   if not record.characters then record.characters = {} end
+  local before = self.db.records[record.id]
   self.db.records[record.id] = record
   self.db.via[record.id] = from ~= record.id and from or nil
-  return true
+  return true, before
 end
 
 -- Notes that a message from this Member was just heard.

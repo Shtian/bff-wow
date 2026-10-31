@@ -23,6 +23,13 @@ local MESSAGES = {
 }
 ns.MESSAGES = MESSAGES
 
+-- A live Feed entry as a chat line: "BFF: Ana dinged 24."
+local function chatLine(entry)
+  local text = entry.text
+  if not text:find("[.!?]$") then text = text .. "." end
+  say(text)
+end
+
 local function onCoreEvent(event, kind)
   if event == "changed" then
     ns.Panel.refresh()
@@ -33,7 +40,16 @@ local function onCoreEvent(event, kind)
     ns.Minimap.refresh()
   elseif event == "notice" then
     say(MESSAGES[kind])
+  elseif event == "feedEntry" then
+    chatLine(kind)
   end
+end
+
+-- How far local time is ahead of server time, so the Feed's days start at
+-- local midnight.
+local function utcOffset()
+  local now = time()
+  return time(date("*t", now)) - time(date("!*t", now))
 end
 
 local function start(isInitialLogin)
@@ -47,6 +63,7 @@ local function start(isInitialLogin)
     receiveOnly = IsTrialAccount() or IsVeteranTrialAccount(),
     initialLogin = isInitialLogin,
     maxLevel = GetMaxLevelForPlayerExpansion(),
+    utcOffset = utcOffset(),
   })
   ns.ChannelLink.start(ns.core, function(kind) say(MESSAGES[kind]) end)
   ns.ChannelLink.setCrew(ns.core:crew())
@@ -116,6 +133,10 @@ function commands.name(name)
   if ok then say("your display name is " .. ns.core:displayName() .. ".") else say(MESSAGES[reason]) end
 end
 
+function commands.feed()
+  ns.Panel.show("feed")
+end
+
 function commands.minimap()
   ns.core:setMinimapShown(true)
   say("minimap button shown.")
@@ -157,7 +178,7 @@ SlashCmdList.BFF = function(input)
   elseif commands[command] then
     commands[command](rest)
   else
-    say("/bff, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff minimap, /bff leave")
+    say("/bff, /bff feed, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff minimap, /bff leave")
   end
 end
 
