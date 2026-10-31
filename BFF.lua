@@ -3,12 +3,31 @@
 
 local _, ns = ...
 
--- Stands in for the channel link until it exists: sends go nowhere.
-local noLink = { send = function() end }
+local function say(text)
+  print("|cff33ff99BFF|r: " .. text)
+end
 
-local function onCoreEvent(event)
+-- What Core's and the channel link's refusals and notices say.
+local MESSAGES = {
+  invalidCode = "That code doesn't look right.",
+  inCrew = "Leave your Crew first (/bff leave).",
+  invalidName = "A display name is 2 to 16 characters (/bff name <name>).",
+  receiveOnly = "Trial accounts can join a Crew but not start one.",
+  noCrew = "You're not in a Crew. Type /bff to start or join one.",
+  tooManyChannels = "BFF couldn't join its channel: leave a chat channel and /reload.",
+  wrongPassword = "BFF couldn't join its channel: start a new Crew.",
+  leftCrew = "You left the Crew.",
+}
+ns.MESSAGES = MESSAGES
+
+local function onCoreEvent(event, kind)
   if event == "changed" then
     ns.Panel.refresh()
+  elseif event == "crewChanged" then
+    ns.ChannelLink.setCrew(ns.core:crew())
+    ns.Panel.refresh()
+  elseif event == "notice" then
+    say(MESSAGES[kind])
   end
 end
 
@@ -18,15 +37,20 @@ local function start(isInitialLogin)
     db = BFF_DB,
     now = GetServerTime,
     random = math.random,
-    link = noLink,
+    link = ns.ChannelLink,
     listener = onCoreEvent,
     receiveOnly = IsTrialAccount() or IsVeteranTrialAccount(),
     initialLogin = isInitialLogin,
     maxLevel = GetMaxLevelForPlayerExpansion(),
   })
+  ns.ChannelLink.start(ns.core, function(kind) say(MESSAGES[kind]) end)
+  ns.ChannelLink.setCrew(ns.core:crew())
   ns.Panel.start(ns.core)
   ns.Snapshot.start(ns.core)
   C_Timer.NewTicker(1, function() ns.core:tick() end)
+  if isInitialLogin and not ns.core:crew() then
+    say("type /bff to start or join a Crew.")
+  end
 end
 
 local eventFrame = CreateFrame("Frame")
@@ -37,7 +61,69 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
   end
 end)
 
+StaticPopupDialogs.BFF_LEAVE_CREW = {
+  text = "Leave your Crew? The others will see that you left.",
+  button1 = YES,
+  button2 = NO,
+  OnAccept = function() ns.core:leaveCrew() end,
+  timeout = 0,
+  whileDead = true,
+  hideOnEscape = true,
+}
+
+-- Asks to confirm, then leaves.
+function ns.confirmLeave()
+  StaticPopup_Show("BFF_LEAVE_CREW")
+end
+
+-- The display name the setup view and slash commands start from: the one
+-- already set, or the current Character's first name (Forever Characters
+-- may also have a last name, which could push it past 16 characters).
+function ns.defaultDisplayName()
+  return ns.core:displayName() or (UnitName("player") or ""):match("^%S*")
+end
+local defaultName = ns.defaultDisplayName
+
+local function printCode(crew)
+  say("your Crew code is " .. crew.code .. ". Share it with the others outside the game.")
+end
+
+local commands = {}
+
+function commands.start()
+  local crew, reason = ns.core:startCrew(defaultName())
+  if crew then printCode(crew) else say(MESSAGES[reason]) end
+end
+
+function commands.join(code)
+  local crew, reason = ns.core:joinCrew(code, defaultName())
+  if crew then say("you're in the Crew " .. crew.code .. ".") else say(MESSAGES[reason]) end
+end
+
+function commands.code()
+  local crew = ns.core:crew()
+  if crew then printCode(crew) else say(MESSAGES.noCrew) end
+end
+
+function commands.name(name)
+  local ok, reason = ns.core:setDisplayName(name)
+  if ok then say("your display name is " .. ns.core:displayName() .. ".") else say(MESSAGES[reason]) end
+end
+
+function commands.leave()
+  if ns.core:crew() then ns.confirmLeave() else say(MESSAGES.noCrew) end
+end
+
 SLASH_BFF1 = "/bff"
-SlashCmdList.BFF = function()
-  if ns.core then ns.Panel.toggle() end
+SlashCmdList.BFF = function(input)
+  if not ns.core then return end
+  local command, rest = (input or ""):match("^%s*(%S*)%s*(.-)%s*$")
+  command = command:lower()
+  if command == "" then
+    ns.Panel.toggle()
+  elseif commands[command] then
+    commands[command](rest)
+  else
+    say("/bff, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff leave")
+  end
 end

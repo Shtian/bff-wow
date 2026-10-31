@@ -1,5 +1,5 @@
 -- Core/ is pure Lua and gets no WoW globals (docs/design/code-structure.md),
--- only LibStub for the pure libraries.
+-- only LibStub for the pure libraries and the bit library.
 std = "lua51"
 max_line_length = false
 self = false
@@ -12,17 +12,31 @@ stds.wow = {
     "BFF_DB",
     "SLASH_BFF1",
     "SlashCmdList",
+    "StaticPopupDialogs",
   },
   read_globals = {
+    "C_ChatInfo",
     "C_Timer",
+    "ChatFrame_AddMessageEventFilter",
+    "ChatFrameUtil",
+    "ChatThrottleLib",
     "CreateFrame",
+    "ERR_TOO_MANY_CHAT_CHANNELS",
+    "GetChannelList",
+    "GetChannelName",
     "GetMaxLevelForPlayerExpansion",
     "GetRealZoneText",
     "GetServerTime",
     "IsTrialAccount",
     "IsVeteranTrialAccount",
+    "JoinTemporaryChannel",
+    "LeaveChannelByName",
     "LOCALIZED_CLASS_NAMES_MALE",
+    "NO",
+    "NUM_CHAT_WINDOWS",
     "RAID_CLASS_COLORS",
+    "RemoveChatWindowChannel",
+    "StaticPopup_Show",
     "UIParent",
     "UISpecialFrames",
     "UnitClass",
@@ -31,15 +45,20 @@ stds.wow = {
     "UnitName",
     "UnitXP",
     "UnitXPMax",
+    "YES",
+    "issecretvalue",
   },
 }
 
 -- LibStub is how Core reaches the pure libraries (LibSerialize, LibDeflate).
 stds.libstub = { read_globals = { "LibStub" } }
 
-files["Core/"] = { std = "lua51+libstub" }
+-- WoW and LuaJIT both provide the bit library (CrewCode's hash).
+stds.bit = { read_globals = { "bit" } }
+
+files["Core/"] = { std = "lua51+libstub+bit" }
 files["BFF.lua"] = { std = "lua51+wow" }
-files["Game/"] = { std = "lua51+wow" }
+files["Game/"] = { std = "lua51+wow+libstub" }
 files["UI/"] = { std = "lua51+wow" }
 files["Dev/"] = { std = "lua51+wow" }
 files["tests/"] = { std = "lua51+busted" }

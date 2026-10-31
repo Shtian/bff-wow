@@ -57,7 +57,7 @@ The Member id stays the same across Crews, so leaving and rejoining keeps the sa
 
 1. **On first login** with BFF installed and no Crew, BFF prints one chat line: "BFF: type /bff to start or join a Crew." Nothing is sent and no channel is joined.
 2. **Opening the panel** (`/bff`, key binding or minimap button) without a Crew shows a setup view instead of the roster:
-   - **Display name:** prefilled with the current Character's name, which the Member can change. 2–16 characters, counted as UTF-8 characters rather than bytes. Display names don't have to be unique; Members are told apart by id. (The BattleTag was considered as the default and not taken: it would be published without the Member choosing it.)
+   - **Display name:** prefilled with the current Character's first name (Forever Characters can also have a last name), which the Member can change. 2–16 characters, counted as UTF-8 characters rather than bytes. Display names don't have to be unique; Members are told apart by id. (The BattleTag was considered as the default and not taken: it would be published without the Member choosing it.)
    - **Start a Crew:** generates a code and joins it. Not offered on Trial and Veteran accounts, which can't send.
    - **Join a Crew:** a code box and a Join button. An invalid code shows "That code doesn't look right" under the box.
 3. **Right after joining** the panel switches to the roster. It shows your own row, the Crew code to share, and while no one else is known: "Waiting for your Crew. Members show up when they or someone who has seen them is online."
