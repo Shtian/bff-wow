@@ -92,5 +92,5 @@ The README gets a short install section with both.
 
 ## Not decided here
 
-- The settings page layout beyond the sections above; it follows the Settings API's standard controls.
+- The settings page layout beyond the sections above. It's a canvas page (`Settings.RegisterCanvasLayoutCategory`) with standard-looking controls, since the vertical layout has no text box for the display name. The Defaults button leaves BFF's settings alone.
 - Forever's launch interface number and game type (map: "Forever launch day").

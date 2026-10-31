@@ -41,12 +41,23 @@ local function createCheckbox(text, set)
   return box
 end
 
--- Saves the typed display name, or says why it can't.
-local function saveName()
-  local box = frame.name
+-- Puts the current name back, without saving.
+local function showName()
+  frame.name.shown = ns.defaultDisplayName()
+  frame.name:SetText(frame.name.shown)
+  frame.nameError:SetText("")
+end
+
+-- Saves the typed display name when the box loses focus, or says why it
+-- can't. Escape cancels, and an untouched box saves nothing.
+local function nameFocusLost(box)
+  if box.cancelled then
+    box.cancelled = nil
+    return showName()
+  end
+  if box:GetText() == box.shown then return end
   local ok, reason = core:setDisplayName(box:GetText())
-  frame.nameError:SetText(ok and "" or ns.MESSAGES[reason])
-  if ok then box:SetText(core:displayName()) end
+  if ok then showName() else frame.nameError:SetText(ns.MESSAGES[reason]) end
 end
 
 local function createYou()
@@ -58,16 +69,12 @@ local function createYou()
   frame.name = createEditBox(180)
   frame.name:SetMaxLetters(16)
   frame.name:SetPoint("LEFT", nameLabel, "LEFT", 120, 0)
-  frame.name:SetScript("OnEnterPressed", function(box)
-    saveName()
-    box:ClearFocus()
-  end)
+  frame.name:SetScript("OnEnterPressed", frame.name.ClearFocus)
   frame.name:SetScript("OnEscapePressed", function(box)
-    frame.nameError:SetText("")
-    box:SetText(ns.defaultDisplayName())
+    box.cancelled = true
     box:ClearFocus()
   end)
-  frame.name:SetScript("OnEditFocusLost", saveName)
+  frame.name:SetScript("OnEditFocusLost", nameFocusLost)
   frame.nameError = createLabel(frame, "", "GameFontRedSmall")
   frame.nameError:SetPoint("LEFT", frame.name, "RIGHT", 10, 0)
 
@@ -93,11 +100,13 @@ local function createSharing()
   frame.pause = createCheckbox("Pause sharing: send nothing and appear offline", function(checked)
     core:setPaused(checked)
   end)
-  frame.pause:SetPoint("TOPLEFT", frame.sharing, "BOTTOMLEFT", INDENT - 4, -8)
+  frame.pause.inset = INDENT - 4
+  frame.pause:SetPoint("TOPLEFT", frame.sharing, "BOTTOMLEFT", frame.pause.inset, -8)
   frame.leave = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
   frame.leave:SetSize(120, 22)
   frame.leave:SetText("Leave Crew")
-  frame.leave:SetPoint("TOPLEFT", frame.pause, "BOTTOMLEFT", 4, -8)
+  frame.leave.inset = INDENT
+  frame.leave:SetPoint("TOPLEFT", frame.pause, "BOTTOMLEFT", frame.leave.inset - frame.pause.inset, -8)
   frame.leave:SetScript("OnClick", ns.confirmLeave)
 end
 
@@ -129,6 +138,8 @@ local function create()
   createSharing()
   createNotifications()
   frame:SetScript("OnShow", Page.refresh)
+  -- A refused name is forgotten once the page closes.
+  frame:SetScript("OnHide", function() frame.nameError:SetText("") end)
   frame.OnRefresh = Page.refresh
   frame.OnCommit = noop
   frame.OnDefault = noop
@@ -140,10 +151,11 @@ function Page.refresh()
   if not frame or not frame:IsShown() then return end
   local crew = core:crew()
 
-  if not frame.name:HasFocus() then frame.name:SetText(ns.defaultDisplayName()) end
+  if not frame.name:HasFocus() and frame.nameError:GetText() == "" then showName() end
   frame.codeLabel:SetShown(crew ~= nil)
   frame.code:SetShown(crew ~= nil)
-  if crew then
+  -- Left alone while focused, so the selection holds.
+  if crew and not frame.code:HasFocus() then
     frame.code.crewCode = crew.code
     frame.code:SetText(crew.code)
   end
@@ -152,25 +164,28 @@ function Page.refresh()
   frame.sharing:SetPoint("TOPLEFT", crew and frame.codeLabel or frame.nameLabel, "BOTTOMLEFT",
     -INDENT, -SECTION_GAP)
   frame.pause:SetChecked(core:isPaused())
-  frame.pause:SetEnabled(not core:isReceiveOnly())
+  frame.pause:SetEnabled(crew ~= nil and not core:isReceiveOnly())
   frame.leave:SetShown(crew ~= nil and not crew.leaving)
 
+  -- Under Leave Crew, or else Pause sharing, back at the section's left
+  -- edge (each sits a different inset in from it).
+  local under = frame.leave:IsShown() and frame.leave or frame.pause
   frame.notifications:ClearAllPoints()
-  frame.notifications:SetPoint("TOPLEFT", frame.leave:IsShown() and frame.leave or frame.pause,
-    "BOTTOMLEFT", frame.leave:IsShown() and -INDENT or -INDENT + 4, -SECTION_GAP)
+  frame.notifications:SetPoint("TOPLEFT", under, "BOTTOMLEFT", -under.inset, -SECTION_GAP)
   frame.chatLines:SetChecked(core:isChatLinesOn())
   frame.away:SetChecked(core:isAwayPopupOn())
   frame.minimap:SetChecked(core:isMinimapShown())
 end
 
--- Opens the game's Settings panel on this page. The panel can't open in
--- combat.
+-- Opens the game's Settings panel on this page. Returns true, or false in
+-- combat, where the panel can't open.
 function Page.open()
   if InCombatLockdown() then
     ns.say(ns.MESSAGES.settingsInCombat)
-    return
+    return false
   end
   Settings.OpenToCategory(category:GetID())
+  return true
 end
 
 function Page.start(theCore)

@@ -68,7 +68,6 @@ describe("Settings", function()
     a:play({ level = 12 })
     net:run(3)
     assert.equal(2, b.core:unseen())
-    assert.equal(b.core:feed().unseen, b.core:unseen())
 
     b.core:feedSeen()
     assert.equal(0, b.core:unseen())

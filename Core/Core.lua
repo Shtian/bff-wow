@@ -399,7 +399,7 @@ function Core:leaveCrew()
   if crew.leaving then return true end
   crew.leaving = true
   self.ledger:writeOwn({ left = true })
-  if self.linkUp then finishLeaving(self) end
+  if self.linkUp then finishLeaving(self) else self.listener("changed") end
   return true
 end
 

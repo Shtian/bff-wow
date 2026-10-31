@@ -551,9 +551,9 @@ local function create()
   gear:SetPoint("TOPRIGHT", -28, -4)
   gear:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
   gear:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+  -- The panel steps aside so it doesn't cover the settings.
   gear:SetScript("OnClick", function()
-    frame:Hide()
-    ns.Settings.open()
+    if ns.Settings.open() then frame:Hide() end
   end)
   gear:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
