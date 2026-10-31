@@ -15,6 +15,7 @@ stds.wow = {
     "StaticPopupDialogs",
   },
   read_globals = {
+    "Ambiguate",
     "C_ChatInfo",
     "C_Timer",
     "ChatFrame_AddMessageEventFilter",

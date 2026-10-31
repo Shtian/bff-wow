@@ -62,9 +62,15 @@ local function createRow(index)
   return row
 end
 
+-- Other Members show their display name too, and fade while offline.
 local function drawRow(row, data)
-  row.name:SetText(data.name)
+  if data.own or not data.displayName then
+    row.name:SetText(data.name)
+  else
+    row.name:SetText(("%s (%s)"):format(data.name, data.displayName))
+  end
   row.name:SetTextColor(classColor(data.classFilename))
+  row:SetAlpha(data.online and 1 or 0.5)
   row.class:SetText(LOCALIZED_CLASS_NAMES_MALE[data.classFilename] or data.classFilename or "")
   row.level:SetText(("Lv %d"):format(data.level or 0))
   row.zone:SetText(data.zone or "")

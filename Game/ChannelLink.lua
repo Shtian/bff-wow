@@ -21,6 +21,8 @@ local JOIN_TIMEOUT = 10
 -- longest wait.
 local LEAVE_DELAY = 3
 local LEAVE_MAX = 15
+-- After a refused send, how long the link stays down before coming back up.
+local REFUSED_PAUSE = 5
 
 -- Channel events whose system notices for our channels don't print.
 local FILTERED_EVENTS = {
@@ -39,6 +41,7 @@ local joined = false
 local failed = false
 local settled = false
 local isUp = false
+local refused = false
 local lastChannelUpdate
 -- Upper-cased names of channels BFF is in or leaving, for the chat filter.
 local ours = {}
@@ -55,7 +58,7 @@ end
 -- Tells Core whenever the link goes up or down. isUp is set first, since
 -- Core may react by changing the Crew, which comes back here.
 local function update()
-  local up = target ~= nil and joined and not lockdown()
+  local up = target ~= nil and joined and not lockdown() and not refused
   if up == isUp then return end
   isUp = up
   if up then core:up() else core:down() end
@@ -206,12 +209,41 @@ function events.UI_ERROR_MESSAGE(_, text)
   onError(text)
 end
 
+-- Someone left the Crew channel, i.e. logged out: a real logout leaves it
+-- before any goodbye could be sent.
+function events.CHAT_MSG_CHANNEL_LEAVE(_, sender, ...)
+  local name = select(7, ...)
+  if not target or not isOurs(name) or name:upper() ~= target.channel:upper() then return end
+  if readable(sender) then core:gone(Ambiguate(sender, "none")) end
+end
+
 function events.ADDON_RESTRICTION_STATE_CHANGED()
   update()
   tryJoin()
 end
 
--- Starts the link. core gets up(), down() and received(message); notice
+-- A send the game refused (throttled, or a general error): the link goes
+-- down, and back up a few seconds later, so Core's next up() sends a fresh
+-- DIGEST. The pause keeps a refusal that repeats from becoming a loop.
+local function onRefused()
+  if refused then return end
+  refused = true
+  update()
+  C_Timer.After(REFUSED_PAUSE, function()
+    refused = false
+    update()
+  end)
+end
+
+-- AceComm's callback, once per chunk. Through AceComm, ChatThrottleLib's
+-- didSend arrives fourth: false for a general error. ChatThrottleLib queues
+-- a throttled send again itself, so that one never gets here. Handled on
+-- the next frame, since it can run inside Core's own send.
+local function onSent(_, _, _, didSend)
+  if didSend == false then C_Timer.After(0, onRefused) end
+end
+
+-- Starts the link. core gets up(), down(), gone(name) and received(message); notice
 -- gets "tooManyChannels" or "wrongPassword" when the channel can't be joined.
 function ChannelLink.start(theCore, notice)
   core = theCore
@@ -247,9 +279,11 @@ function ChannelLink.setCrew(crew)
   tryJoin()
 end
 
--- Best-effort: dropped while the link is down.
+-- Best-effort: dropped while the link is down. ChannelLink.onSend, if set,
+-- also gets every message sent (for /bff sim).
 function ChannelLink.send(message)
   local index = isUp and channelIndex(target.channel)
   if not index then return end
-  ChannelLink:SendCommMessage(PREFIX, message, "CHANNEL", index)
+  if ChannelLink.onSend then ChannelLink.onSend(message) end
+  ChannelLink:SendCommMessage(PREFIX, message, "CHANNEL", index, nil, onSent)
 end

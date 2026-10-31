@@ -217,7 +217,7 @@ describe("Leaving the Crew", function()
     local decoded = ns.Codec.decode(message)
     assert.is_table(decoded)
     assert.equal("DATA", decoded.type)
-    return decoded.record
+    return decoded.records[1]
   end
 
   it("sends the tombstone right away when the link is up, then forgets the Crew", function()
@@ -270,6 +270,7 @@ describe("Leaving the Crew", function()
     core:startCrew("Stian")
     core:up()
     core:down()
+    deps.sent = {}
     core:leaveCrew()
     assert.same({}, deps.sent)
     assert.is_true(core:crew().leaving)
@@ -299,8 +300,8 @@ describe("Leaving the Crew", function()
     local deps = newDeps()
     local core = load().Core.new(deps)
     core:updateOwn(character())
-    local before = core:rows()
     local code = core:startCrew("Stian").code
+    local before = core:rows()
     core:leaveCrew()
     core:up()
 
@@ -319,14 +320,18 @@ describe("Leaving the Crew", function()
   end)
 
   it("is cancelled by rejoining the same Crew before it finished", function()
+    local ns = load()
     local deps = newDeps()
-    local core = load().Core.new(deps)
+    local core = ns.Core.new(deps)
     local code = core:startCrew("Stian").code
     core:leaveCrew()
     local crew = core:joinCrew(code)
     assert.is_nil(crew.leaving)
     core:up()
-    assert.same({}, deps.sent)
+    for _, message in ipairs(deps.sent) do
+      local decoded = ns.Codec.decode(message)
+      for _, record in ipairs(decoded.records or {}) do assert.is_nil(record.left) end
+    end
     assert.same(crew, core:crew())
   end)
 

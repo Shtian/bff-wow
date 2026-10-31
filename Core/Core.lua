@@ -29,7 +29,7 @@ function Core.new(deps)
     error("Core.new: link.send must be a function", 2)
   end
 
-  return setmetatable({
+  local self = setmetatable({
     db = deps.db,
     now = deps.now,
     random = deps.random,
@@ -38,27 +38,70 @@ function Core.new(deps)
     receiveOnly = deps.receiveOnly == true,
     initialLogin = deps.initialLogin == true,
     maxLevel = deps.maxLevel,
-    ledger = ns.Ledger.new(deps.db, deps.now, deps.random),
+    ledger = ns.Ledger.new(deps.db, deps.now, deps.random, deps.initialLogin == true),
+    linkUp = false,
   }, Core)
+  -- Every message carries the sender's Member id.
+  self.gossip = ns.Gossip.new(self.ledger, deps.now, deps.random, function(message)
+    message.from = self.ledger:memberId()
+    self.link.send(ns.Codec.encode(message))
+  end, self.receiveOnly)
+  self.gossip:setPaused(self:isPaused())
+  self.online = ns.Roster.online(self.ledger, deps.now())
+  return self
+end
+
+-- Gossip's link is up only while in a Crew.
+local function updateLink(self)
+  self.gossip:setLink(self.linkUp and self.db.crew ~= nil)
+end
+
+-- The own record's display name or left flag changed: it goes out now.
+local function sendOwnNow(self)
+  self.gossip:ownChanged("now")
 end
 
 -- The current state of the Character being played, from Snapshot: guid,
 -- name, classFilename, level, xp, maxXp, zone and deaths.
 function Core:updateOwn(character)
-  if self.ledger:updateOwn(character) then
+  local changed, before = self.ledger:updateOwn(character)
+  if changed then
+    self.gossip:ownChanged(ns.Gossip.urgency(before, character))
     self.listener("changed")
   end
 end
 
--- The panel's rows, ready to render. Each row is a Member: memberId, and the
--- shown Character's name, classFilename, level, xp, maxXp and zone, plus
--- alts (name, classFilename, level).
+-- The panel's rows, ready to render. Each row is a Member: memberId,
+-- displayName, online, own (your own row, which comes first), and the shown Character's name, classFilename,
+-- level, xp, maxXp and zone, plus alts (name, classFilename, level). Your
+-- own row comes first.
 function Core:rows()
-  return ns.Roster.rows(self.ledger)
+  return ns.Roster.rows(self.ledger, self.now())
+end
+
+-- Whether someone went online or offline since last checked.
+local function onlineChanged(self)
+  local online = ns.Roster.online(self.ledger, self.now())
+  local differs = false
+  for id in pairs(online) do
+    if not self.online[id] then differs = true end
+  end
+  for id in pairs(self.online) do
+    if not online[id] then differs = true end
+  end
+  self.online = online
+  return differs
+end
+
+-- Fires changed if someone went online or offline since last checked.
+local function checkOnline(self)
+  if onlineChanged(self) then self.listener("changed") end
 end
 
 -- Called once a second. Core decides what is due.
 function Core:tick()
+  self.gossip:tick()
+  checkOnline(self)
 end
 
 -- Your display name, or nil until one is set.
@@ -106,8 +149,10 @@ end
 
 local function enter(self, code, displayName)
   self.ledger:writeOwn({ displayName = displayName, left = false })
+  sendOwnNow(self)
   self.db.crew = { code = code }
   self.listener("crewChanged")
+  updateLink(self)
   return self:crew()
 end
 
@@ -136,6 +181,7 @@ function Core:joinCrew(code, displayName)
   if current.leaving then
     current.leaving = nil
     self.ledger:writeOwn({ displayName = name, left = false })
+    sendOwnNow(self)
   end
   return self:crew()
 end
@@ -144,16 +190,33 @@ end
 function Core:setDisplayName(displayName)
   local name = validName(displayName)
   if not name then return nil, "invalidName" end
-  self.ledger:writeOwn({ displayName = name })
+  if name ~= self.ledger:displayName() then
+    self.ledger:writeOwn({ displayName = name })
+    sendOwnNow(self)
+  end
   return true
 end
 
+-- Pause sharing: send nothing, still receive, and appear offline. Kept
+-- across reloads and logouts.
+function Core:setPaused(paused)
+  self.db.paused = paused and true or nil
+  self.gossip:setPaused(self:isPaused())
+end
+
+function Core:isPaused()
+  return self.db.paused == true
+end
+
 -- Hands the tombstone to the link, then forgets the Crew. Your own record
--- stays, so rejoining resumes where you left off.
+-- stays, so rejoining resumes where you left off. The Crew is forgotten
+-- before sending, so a link that reacts to the send can't finish it twice.
 local function finishLeaving(self)
-  self.link.send(ns.Codec.encode({ type = "DATA", record = self.ledger:tombstone() }))
   self.db.crew = nil
+  updateLink(self)
+  self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } })
   self.ledger:forgetOthers()
+  self.online = {}
   self.listener("crewChanged")
   self.listener("notice", "leftCrew")
 end
@@ -170,15 +233,62 @@ function Core:leaveCrew()
   return true
 end
 
--- The incoming half of the link port.
+-- The incoming half of the link port. Every up() sends a fresh DIGEST, plus
+-- own DATA if the own record changed while the link was down.
 function Core:up()
   self.linkUp = true
-  if self.db.crew and self.db.crew.leaving then finishLeaving(self) end
+  if self.db.crew and self.db.crew.leaving then
+    finishLeaving(self)
+  else
+    updateLink(self)
+  end
 end
 
 function Core:down()
   self.linkUp = false
+  updateLink(self)
 end
 
-function Core:received(_)
+-- A Character of this name left the channel, i.e. logged out: its Member
+-- shows offline right away.
+function Core:gone(name)
+  if type(name) == "string" and self.ledger:wentAway(name) then checkOnline(self) end
+end
+
+local function dataReceived(self, records)
+  local changed = false
+  for _, record in ipairs(records) do
+    if self.ledger:merge(record) then changed = true end
+    if type(record) == "table" and type(record.id) == "string" and type(record.version) == "number" then
+      self.gossip:recordSeen(record.id, record.version)
+    end
+  end
+  return changed
+end
+
+-- A message from the link. Your own, echoed back by the channel, and
+-- anything arriving outside a Crew are dropped.
+function Core:received(message)
+  if type(message) ~= "string" or not self.db.crew then return end
+  local decoded, reason = ns.Codec.decode(message)
+  if reason == "newer" then
+    if not self.toldOutOfDate then
+      self.toldOutOfDate = true
+      self.listener("notice", "outOfDate")
+    end
+    return
+  end
+  if type(decoded) ~= "table" or type(decoded.from) ~= "string"
+      or decoded.from == self.ledger:memberId() then
+    return
+  end
+
+  self.ledger:heard(decoded.from)
+  local changed = false
+  if decoded.type == "DIGEST" and type(decoded.versions) == "table" then
+    self.gossip:digestReceived(decoded.versions)
+  elseif decoded.type == "DATA" and type(decoded.records) == "table" then
+    changed = dataReceived(self, decoded.records)
+  end
+  if onlineChanged(self) or changed then self.listener("changed") end
 end

@@ -1,6 +1,6 @@
 -- Loads Core the way the game does: the pure libraries Core uses, then every
 -- Core/ file listed in BFF.toc, in order, called with the addon name and a
--- shared private namespace.
+-- shared private namespace. FakeNet comes along for the scenario tests.
 
 -- LibStub keeps one copy of each library per process, as in game.
 local libraries = {
@@ -29,5 +29,6 @@ return function()
   for _, path in ipairs(coreFiles()) do
     assert(loadfile(path))("BFF", ns)
   end
+  assert(loadfile("Dev/FakeNet.lua"))("BFF", ns)
   return ns
 end
