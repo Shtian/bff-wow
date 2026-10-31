@@ -35,7 +35,7 @@ Inputs:
 - `updateOwn(character)`: the current state of the Character being played, from Snapshot.
 - `tick()`: once a second. Core decides what is due (reply delays, debounced sends, heartbeat, online timeouts, pruning).
 - `received(string)`, `up()` and `down()`: the incoming half of the link port.
-- Commands: Set as Main, Remove and re-add a Member, Pause sharing, and settings.
+- Commands: start, join and leave a Crew, change the display name, Set as Main, Remove and re-add a Member, Pause sharing, and settings (see `docs/design/joining-a-crew.md`).
 
 Outputs:
 
@@ -44,6 +44,8 @@ Outputs:
   - `rowsChanged`: redraw from `core:rows()`. Also fires when a Member passes the 12-minute online timeout, even though no record changed.
   - `feedEntry(entry)`: a live Feed event. App prints the one-line chat message if that is turned on.
   - `notice(kind)`: one-off messages ("BFF is out of date", "receive-only on trial accounts", "you left the Crew").
+  - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
+- Reads: `crew()` (code, channel name and password, or nil).
 - Ready-to-render reads for UI: `rows()`, the While you were away summary, and recent Feed entries. UI never sees a Member record.
 
 When the While you were away popup appears is still open (Feed storage is still fog on the map), so it has no event yet.
@@ -56,6 +58,7 @@ These are internal seams: separate files for locality, tested only through Core'
 - **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, XP piggyback, 5-minute heartbeat, logout), the "record changed" and "reply owed" flags, Pause, and receive-only.
 - **Feed** (`Core/Feed.lua`): turns a before/after record pair from Ledger into Feed entries, including skipped versions such as 22 → 24. Also owns the capped log and While you were away.
 - **Roster** (`Core/Roster.lua`): builds panel rows from Ledger. Covers Main resolution, "on alt", online (heard within 12 min), Last seen, "can play with you" (±3 levels), the 30-day hide and sorting.
+- **CrewCode** (`Core/CrewCode.lua`): generates, normalises and checks Crew codes, and derives the channel name and password from them.
 - **Codec** (`Core/Codec.lua`): a plain-text protocol version header, then the LibSerialize + LibDeflate body (`1|<payload>`). A newer version is detected before anything is decoded.
 
 ## The link port
@@ -113,7 +116,7 @@ Not embedded: AceDB (Core owns plain SavedVariables), AceConsole and AceEvent (a
 ```
 BFF.toc
 BFF.lua
-Core/  Core.lua  Ledger.lua  Gossip.lua  Feed.lua  Roster.lua  Codec.lua
+Core/  Core.lua  Ledger.lua  Gossip.lua  Feed.lua  Roster.lua  CrewCode.lua  Codec.lua
 Game/  Snapshot.lua  ChannelLink.lua
 UI/    Panel.lua  Minimap.lua  Settings.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases
