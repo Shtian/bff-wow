@@ -1,9 +1,11 @@
 -- Panel: the BFF window, variant A "Roster" from the panel decision (#7).
 -- Without a Crew it shows the setup view (display name, Start or Join); in
--- one, your own row pinned on top, then a row per Member with expandable
--- Alts, sort buttons, a tooltip and right-click menu per Character, and a
--- footer with Pause sharing, the hidden count, removed Members and the Crew
--- code. It never sees a Member record.
+-- one, a Roster and a Feed tab. The Roster has your own row pinned on top,
+-- then a row per Member with expandable Alts, sort buttons, a tooltip and
+-- right-click menu per Character, and a footer with Pause sharing, the
+-- hidden count, removed Members and the Crew code. The Feed lists Core's
+-- entries by day and marks them seen while open. It never sees a Member
+-- record.
 
 local _, ns = ...
 
@@ -16,7 +18,11 @@ local ALT_HEIGHT = 18
 local DIVIDER = 18
 local PADDING = 12
 local TOP = 30
+local TABS = 26
 local SORTBAR = 24
+local FEED_HEIGHT = 320
+local FEED_LINE = 16
+local FEED_DAY = 22
 local FOOTER = 92
 local SETUP_HEIGHT = 230
 -- Last seen goes stale, so the open panel redraws this often.
@@ -25,23 +31,31 @@ local REDRAW_EVERY = 30
 local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
 local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
 local PAUSED = "Sharing is paused: the others see you as offline."
+local FEED_EMPTY = "Nothing yet. Dings, deaths and new Characters show up here."
 local RECEIVE_ONLY = "Trial accounts can join a Crew and see it, but the others won't see you."
 
 local GOLD = { 1, 0.82, 0 }
 local MUTED = { 0.6, 0.6, 0.6 }
+local WHITE = { 1, 1, 1 }
 local ONLINE = { 0.25, 1, 0.25 }
 
 local SORTS = { { "online", "Online" }, { "level", "Level" }, { "name", "Name" } }
+-- Entries shown in gold.
+local HIGHLIGHT = { maxLevel = true, joined = true, left = true }
 
 local core
 local frame
 local setup
+local tabBar
+local feedView
 local sortBar
 local footer
 local divider
 local rowFrames = {}
 local altFrames = {}
--- What the UI itself remembers: the sort, and which Members show Alts.
+-- What the UI itself remembers: the tab, the sort, and which Members show
+-- Alts.
+local tab = "roster"
 local order = "online"
 local expanded = {}
 
@@ -326,6 +340,10 @@ local function drawAlt(alt, row, data)
   alt:Show()
 end
 
+local function hideAll(lines, from)
+  for i = from, #lines do lines[i]:Hide() end
+end
+
 -- Places a line under the previous one, at y from the frame's top.
 local function place(line, y)
   line:ClearAllPoints()
@@ -336,8 +354,8 @@ end
 local function createSortBar()
   sortBar = CreateFrame("Frame", nil, frame)
   sortBar:SetHeight(SORTBAR)
-  sortBar:SetPoint("TOPLEFT", PADDING, -TOP)
-  sortBar:SetPoint("TOPRIGHT", -PADDING, -TOP)
+  sortBar:SetPoint("TOPLEFT", PADDING, -TOP - TABS)
+  sortBar:SetPoint("TOPRIGHT", -PADDING, -TOP - TABS)
   local label = createLabel(sortBar, "Sort", "GameFontNormalSmall")
   label:SetPoint("LEFT", 4, 0)
   local anchor = label
@@ -363,6 +381,125 @@ local function drawSortBar()
     button:SetEnabled(button.order ~= order)
   end
   sortBar:Show()
+end
+
+local function createTabBar()
+  tabBar = CreateFrame("Frame", nil, frame)
+  tabBar:SetHeight(TABS)
+  tabBar:SetPoint("TOPLEFT", PADDING, -TOP)
+  tabBar:SetPoint("TOPRIGHT", -PADDING, -TOP)
+  tabBar.buttons = {}
+  local anchor
+  for _, name in ipairs({ "roster", "feed" }) do
+    local button = CreateFrame("Button", nil, tabBar, "UIPanelButtonTemplate")
+    button:SetSize(90, 20)
+    if anchor then
+      button:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
+    else
+      button:SetPoint("LEFT", 0, 0)
+    end
+    button:SetScript("OnClick", function()
+      tab = name
+      Panel.refresh()
+    end)
+    button.tab = name
+    tabBar.buttons[name] = button
+    anchor = button
+  end
+  local line = tabBar:CreateTexture(nil, "ARTWORK")
+  line:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.3)
+  line:SetHeight(1)
+  line:SetPoint("BOTTOMLEFT", 0, 1)
+  line:SetPoint("BOTTOMRIGHT", 0, 1)
+end
+
+local function drawTabBar(unseen)
+  if not tabBar then createTabBar() end
+  tabBar.buttons.roster:SetText("Roster")
+  tabBar.buttons.feed:SetText(unseen > 0 and tab ~= "feed" and ("Feed (%d)"):format(unseen) or "Feed")
+  for name, button in pairs(tabBar.buttons) do button:SetEnabled(name ~= tab) end
+  tabBar:Show()
+end
+
+-- The Feed tab: a scrolling list of day headers and entry lines.
+local function createFeedView()
+  feedView = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+  feedView:SetPoint("TOPLEFT", PADDING, -TOP - TABS - 4)
+  feedView:SetPoint("RIGHT", frame, "RIGHT", -PADDING - 24, 0)
+  feedView:SetHeight(FEED_HEIGHT)
+  feedView.content = CreateFrame("Frame", nil, feedView)
+  feedView.content:SetSize(WIDTH - 2 * PADDING - 24, FEED_HEIGHT)
+  feedView:SetScrollChild(feedView.content)
+  feedView.days = {}
+  feedView.lines = {}
+  feedView.empty = createLabel(feedView.content, FEED_EMPTY, "GameFontHighlightSmall")
+  feedView.empty:SetPoint("TOPLEFT", 4, -8)
+  feedView.empty:SetPoint("RIGHT", -4, 0)
+  setColor(feedView.empty, MUTED)
+end
+
+local function createFeedDay()
+  local day = createLabel(feedView.content, "", "GameFontNormalSmall")
+  feedView.days[#feedView.days + 1] = day
+  return day
+end
+
+local function createFeedLine()
+  local line = CreateFrame("Frame", nil, feedView.content)
+  line:SetHeight(FEED_LINE)
+  line.time = createLabel(line, "", "GameFontHighlightSmall")
+  line.time:SetPoint("LEFT", 0, 0)
+  line.time:SetWidth(36)
+  setColor(line.time, MUTED)
+  line.text = createLabel(line, "", "GameFontHighlightSmall")
+  line.text:SetPoint("LEFT", line.time, "RIGHT", 4, 0)
+  line.text:SetPoint("RIGHT", -2, 0)
+  line.text:SetWordWrap(false)
+  feedView.lines[#feedView.lines + 1] = line
+  return line
+end
+
+local function dayTitle(day)
+  if day.daysAgo == 0 then return "Today" end
+  if day.daysAgo == 1 then return "Yesterday" end
+  return date("%A %d %B", day.time)
+end
+
+local function placeInFeed(item, y)
+  item:ClearAllPoints()
+  item:SetPoint("TOPLEFT", feedView.content, "TOPLEFT", 4, y)
+  item:SetPoint("RIGHT", feedView.content, "RIGHT", -4, 0)
+end
+
+-- Draws the Feed and marks it seen.
+local function drawFeed(feed)
+  if not feedView then createFeedView() end
+  local y, dayCount, lineCount = 0, 0, 0
+  for _, day in ipairs(feed.days) do
+    dayCount = dayCount + 1
+    local title = feedView.days[dayCount] or createFeedDay()
+    placeInFeed(title, y - 6)
+    title:SetText(dayTitle(day))
+    title:Show()
+    y = y - FEED_DAY
+    for _, entry in ipairs(day.entries) do
+      lineCount = lineCount + 1
+      local line = feedView.lines[lineCount] or createFeedLine()
+      placeInFeed(line, y)
+      line.time:SetText(date("%H:%M", entry.time))
+      line.text:SetText(entry.text)
+      setColor(line.text, HIGHLIGHT[entry.kind] and GOLD or entry.own and MUTED or WHITE)
+      line:Show()
+      y = y - FEED_LINE
+    end
+  end
+  hideAll(feedView.days, dayCount + 1)
+  hideAll(feedView.lines, lineCount + 1)
+  feedView.empty:SetShown(lineCount == 0)
+  feedView.content:SetHeight(math.max(-y, 1))
+  feedView:Show()
+  frame:SetHeight(TOP + TABS + FEED_HEIGHT + 2 * PADDING)
+  if feed.unseen > 0 then core:feedSeen() end
 end
 
 local function createDivider()
@@ -567,8 +704,12 @@ local function drawFooter(crew, summary)
   footer:Show()
 end
 
-local function hideAll(lines, from)
-  for i = from, #lines do lines[i]:Hide() end
+local function hideRoster()
+  hideAll(rowFrames, 1)
+  hideAll(altFrames, 1)
+  if sortBar then sortBar:Hide() end
+  if divider then divider:Hide() end
+  if footer then footer:Hide() end
 end
 
 -- Redraws from Core, if the panel is open.
@@ -576,11 +717,9 @@ function Panel.refresh()
   if not frame or not frame:IsShown() then return end
   local crew = core:crew()
   if not crew then
-    hideAll(rowFrames, 1)
-    hideAll(altFrames, 1)
-    if sortBar then sortBar:Hide() end
-    if divider then divider:Hide() end
-    if footer then footer:Hide() end
+    hideRoster()
+    if tabBar then tabBar:Hide() end
+    if feedView then feedView:Hide() end
     showSetup()
     return
   end
@@ -588,11 +727,20 @@ function Panel.refresh()
 
   local summary = core:summary()
   frame.title:SetText(("BFF  ·  %d/%d online"):format(summary.online, summary.members))
+  local feed = core:feed()
+  drawTabBar(feed.unseen)
+  if tab == "feed" then
+    hideRoster()
+    drawFeed(feed)
+    return
+  end
+  if feedView then feedView:Hide() end
+
   drawSortBar()
   if not divider then createDivider() end
   divider:Hide()
 
-  local y = -TOP - SORTBAR
+  local y = -TOP - TABS - SORTBAR
   local rowCount, altCount = 0, 0
   for i, data in ipairs(core:rows(order)) do
     if not data.own and not divider:IsShown() and i > 1 then
@@ -625,6 +773,13 @@ end
 function Panel.toggle()
   if not frame then create() end
   frame:SetShown(not frame:IsShown())
+end
+
+-- Opens the panel on a tab: "roster" or "feed".
+function Panel.show(name)
+  if not frame then create() end
+  tab = name
+  if frame:IsShown() then Panel.refresh() else frame:Show() end
 end
 
 function Panel.start(theCore)

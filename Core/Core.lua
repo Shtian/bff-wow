@@ -22,7 +22,8 @@ Core.CAN_PLAY_LEVELS = ns.Roster.CAN_PLAY
 Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
 
 -- deps: db, now(), random(), link (with send(string)), listener(event, ...),
--- receiveOnly, initialLogin and maxLevel.
+-- receiveOnly, initialLogin, maxLevel and utcOffset (seconds local time is
+-- ahead of server time, for the Feed's days; default 0).
 function Core.new(deps)
   for name, kind in pairs(required) do
     if type(deps[name]) ~= kind then
@@ -43,8 +44,10 @@ function Core.new(deps)
     initialLogin = deps.initialLogin == true,
     maxLevel = deps.maxLevel,
     ledger = ns.Ledger.new(deps.db, deps.now, deps.random, deps.initialLogin == true),
+    utcOffset = type(deps.utcOffset) == "number" and deps.utcOffset or 0,
     linkUp = false,
   }, Core)
+  self.log = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin)
   -- Every message carries the sender's Member id.
   self.gossip = ns.Gossip.new(self.ledger, deps.now, deps.random, function(message)
     message.from = self.ledger:memberId()
@@ -55,9 +58,22 @@ function Core.new(deps)
   return self
 end
 
--- Gossip's link is up only while in a Crew.
+-- Gossip's link is up only while in a Crew. Settling after login starts
+-- once it is.
 local function updateLink(self)
-  self.gossip:setLink(self.linkUp and self.db.crew ~= nil)
+  local up = self.linkUp and self.db.crew ~= nil
+  if up then self.log:linkUp() end
+  self.gossip:setLink(up)
+end
+
+-- New Feed entries from other Members each make a chat line once settled,
+-- if chat lines are on, and are seen once they have.
+local function announce(self, entries)
+  if not (self.log:isSettled() and self:isChatLinesOn()) then return end
+  for _, entry in ipairs(entries) do
+    self.log:markSeen(entry)
+    self.listener("feedEntry", ns.Feed.describe(entry))
+  end
 end
 
 -- The own record's display name or left flag changed: it goes out now.
@@ -70,6 +86,8 @@ end
 function Core:updateOwn(character)
   local changed, before = self.ledger:updateOwn(character)
   if changed then
+    -- Your own events go into the Feed only while in a Crew.
+    if self.db.crew then self.log:ownChanged(before, character.guid) end
     self.gossip:ownChanged(ns.Gossip.urgency(before, character))
     self.listener("changed")
   end
@@ -119,7 +137,34 @@ end
 -- Called once a second. Core decides what is due.
 function Core:tick()
   self.gossip:tick()
+  self.log:tick()
   checkOnline(self)
+end
+
+-- The Feed tab: { days = { { daysAgo, time, entries } }, unseen }, newest
+-- first, where unseen counts others' entries not yet shown. An entry has
+-- kind ("ding", "death", "newCharacter", "maxLevel", "joined" or "left"),
+-- time, memberId, guid (for Character events), text, from (the level
+-- before a ding or max level), level, count (deaths), own and seen.
+function Core:feed()
+  return self.log:view(self.utcOffset)
+end
+
+-- The Feed tab was opened: every entry is seen.
+function Core:feedSeen()
+  if self.log:markAllSeen() then self.listener("changed") end
+end
+
+-- Chat message for live events: on by default.
+function Core:setChatLines(on)
+  local off = not on or nil
+  if off == self.db.chatLinesOff then return end
+  self.db.chatLinesOff = off
+  self.listener("changed")
+end
+
+function Core:isChatLinesOn()
+  return not self.db.chatLinesOff
 end
 
 -- Your display name, or nil until one is set.
@@ -166,7 +211,7 @@ local function nameOrCurrent(self, displayName)
 end
 
 local function enter(self, code, displayName)
-  self.ledger:writeOwn({ displayName = displayName, left = false })
+  self.ledger:writeOwn({ displayName = displayName, left = false, joinedAt = self.now() })
   sendOwnNow(self)
   self.db.crew = { code = code }
   self.listener("crewChanged")
@@ -236,6 +281,7 @@ end
 function Core:removeMember(id)
   if not self.ledger:remove(id) then return nil, "unknownMember" end
   self.gossip:forget(id)
+  self.log:dropMember(id)
   self.online[id] = nil
   self.listener("changed")
   return true
@@ -307,6 +353,7 @@ local function finishLeaving(self)
   updateLink(self)
   self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } })
   self.ledger:forgetOthers()
+  self.log:clear()
   self.online = {}
   self.listener("crewChanged")
   self.listener("notice", "leftCrew")
@@ -349,7 +396,12 @@ end
 local function dataReceived(self, records, from)
   local changed = false
   for _, record in ipairs(records) do
-    if self.ledger:merge(record, from) then changed = true end
+    local kept, before = self.ledger:merge(record, from)
+    if kept then
+      changed = true
+      self.log:dataMerged()
+      announce(self, self.log:recordChanged(before, record))
+    end
     if type(record) == "table" and type(record.id) == "string" and type(record.version) == "number" then
       self.gossip:recordSeen(record.id, record.version)
     end

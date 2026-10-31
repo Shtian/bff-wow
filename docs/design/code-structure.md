@@ -31,6 +31,7 @@ Core is created with:
 - `receiveOnly`: true on Trial and Veteran accounts.
 - `initialLogin`: `isInitialLogin` from `PLAYER_ENTERING_WORLD`, so Core can tell a login from a reload (see `docs/design/feed.md`).
 - `maxLevel`: from `GetMaxLevelForPlayerExpansion()`, for max level Feed entries.
+- `utcOffset`: how many seconds local time is ahead of server time, so `feed()` starts each day at local midnight (default 0).
 
 Inputs:
 
@@ -48,7 +49,7 @@ Outputs:
   - `awaySummary(summary)`: While you were away has settled after an initial login. Fired only when the popup setting is on and it isn't empty. App shows it once out of combat.
   - `notice(kind)`: one-off messages ("BFF is out of date", "receive-only on trial accounts", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
-- Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isReceiveOnly()`, `isPaused()` and `isMinimapShown()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
+- Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isReceiveOnly()`, `isPaused()`, `isMinimapShown()` and `isChatLinesOn()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
 - Ready-to-render reads for UI: `rows()`, and `feed()` (the Feed tab's entries grouped by day, plus the unseen count). UI never sees a Member record.
 - `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` or `awaySummary`.
 
