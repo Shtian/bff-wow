@@ -28,7 +28,6 @@ Core is created with:
 - `now()` and `random()`: the clock (`GetServerTime` in game) and randomness, so tests are deterministic.
 - `link`: the outgoing half of the link port (`send(string)`).
 - `listener`: receives Core's events.
-- `receiveOnly`: true on Trial and Veteran accounts.
 - `initialLogin`: `isInitialLogin` from `PLAYER_ENTERING_WORLD`, so Core can tell a login from a reload (see `docs/design/feed.md`).
 - `maxLevel`: from `GetMaxLevelForPlayerExpansion()`, for max level Feed entries.
 - `utcOffset`: how many seconds local time is ahead of server time, so `feed()` starts each day at local midnight (default 0).
@@ -47,9 +46,9 @@ Outputs:
   - `changed`: re-read whatever you show (`rows()`, `feed()`, settings such as Pause sharing and Show minimap button). Also fires when a Member passes the 12-minute online timeout, even though no record changed.
   - `feedEntry(entry)`: a live Feed event, fired only when the chat-line setting is on. App prints `entry.text`.
   - `awaySummary(summary)`: While you were away has settled after an initial login. Fired only when the popup setting is on and it isn't empty. App shows it once out of combat.
-  - `notice(kind)`: one-off messages ("BFF is out of date", "receive-only on trial accounts", "you left the Crew").
+  - `notice(kind)`: one-off messages ("BFF is out of date", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
-- Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isReceiveOnly()`, `isPaused()`, `isMinimapShown()`, `isChatLinesOn()` and `isAwayPopupOn()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
+- Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isPaused()`, `isMinimapShown()`, `isChatLinesOn()` and `isAwayPopupOn()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
 - Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
 - `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` or `awaySummary`.
 
@@ -58,7 +57,7 @@ Outputs:
 These are internal seams: separate files for locality, tested only through Core's interface, with nothing swappable behind them.
 
 - **Ledger** (`Core/Ledger.lua`): what we know. Holds the own record and copies of everyone else's, the merge rule (a higher version wins), the Remove list, the "left" flag, last-heard times, and 180-day pruning. Removing a Member deletes their record and drops future copies. Re-adding takes them off the list and sends a DIGEST, and peers reply with DATA.
-- **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, XP piggyback, 5-minute heartbeat), the "record changed" and "reply owed" flags, Pause, and receive-only.
+- **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, XP piggyback, 5-minute heartbeat), the "record changed" and "reply owed" flags, and Pause.
 - **Feed** (`Core/Feed.lua`): turns a before/after record pair from Ledger into Feed entries, including skipped versions such as 22 → 24. Also owns the capped log, seen flags, and when While you were away is ready. See `docs/design/feed.md`.
 - **Roster** (`Core/Roster.lua`): builds panel rows from Ledger. Covers Main resolution, "on alt", online (heard within 12 min, and not seen leaving the channel since), Last seen, "can play with you" (±3 levels), the 30-day hide and sorting.
 - **CrewCode** (`Core/CrewCode.lua`): generates, normalises and checks Crew codes, and derives the channel name and password from them.
@@ -74,7 +73,7 @@ This is the only real seam in v1. Its adapters are the channel link, the fake li
 - A send the game refuses (`AddonMessageThrottle`, `GeneralError`) makes the channel link call `down()`, and `up()` again 5 s later, so the rule below recovers it. The pause keeps a refusal that repeats (such as sends during a logout) from becoming a send loop.
 - Each adapter decides what "down" means. For the channel link it is `C_ChatInfo.InChatMessagingLockdown()`, or not yet in the Crew channel, or having left it.
 - On every `up()`, Core sends a fresh DIGEST, plus its own DATA if its record changed while the link was down. This one rule covers first join, rejoin, lockdown clearing, and lost sends.
-- Lockdown, Pause and receive-only never appear in the port. Lockdown is the adapter's reason for being down. Pause and receive-only are Core policy; receive-only comes from `IsTrialAccount()` / `IsVeteranTrialAccount()` only, never `AreOutgoingAddonChatMessagesRestricted()`, which the spike saw return true on a full account.
+- Lockdown and Pause never appear in the port. Lockdown is the adapter's reason for being down. Pause is Core policy. Trial accounts send like any other (`docs/research/channel-spike.md`); don't gate sending on `AreOutgoingAddonChatMessagesRestricted()`, which the spike saw return true on accounts that sent fine.
 
 ## Loading pure code in game and in tests
 

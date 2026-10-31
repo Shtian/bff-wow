@@ -18,7 +18,7 @@ The channel transport holds up. Two clients joined the hidden channel automatica
 | Logout | A real logout leaves the channel *before* `PLAYER_LEAVING_WORLD` / `PLAYER_LOGOUT`; sends from them return `GeneralError` and never arrive. During `/reload` the same sends arrive. Others get a "X left channel" notice at the moment of logout. |
 | Faction | Custom channels don't cross factions: a Horde and an Alliance character in `BFFSpike6` never heard each other. |
 | Realm | A character on another (non-connected) realm never heard Kazzak. Connected realms untested (Kazzak has none). |
-| Account flags | `C_ChatInfo.AreOutgoingAddonChatMessagesRestricted()` returned `true` on a full account that sent fine; don't rely on it. `IsTrialAccount()` / `IsVeteranTrialAccount()` were false. |
+| Account flags | `C_ChatInfo.AreOutgoingAddonChatMessagesRestricted()` returned `true` on a full account that sent fine; don't rely on it. One of the two accounts was a Trial account (`IsTrialAccount()` true, confirmed later), and it sent and received like the other: Trial accounts aren't restricted from addon messages on a custom channel. |
 
 ## Design consequences
 
@@ -29,5 +29,5 @@ Applied in `docs/design/code-structure.md`:
 3. The channel link filters the Crew channel's system notices out of chat.
 4. Core ignores messages carrying its own Member id; echo mode is the link not dropping them.
 5. A send refused with `AddonMessageThrottle` or `GeneralError` makes the link go `down()` and straight back `up()`, so Core's usual "on `up()`, send a fresh DIGEST and own DATA if changed" rule recovers it.
-6. Receive-only comes from `IsTrialAccount()` / `IsVeteranTrialAccount()` only.
+6. No receive-only mode: Trial accounts send like any other. (BFF first made Trial and Veteran accounts receive-only, from a misread of this spike; removed once the Trial account was confirmed.)
 7. On retail a Crew needs one faction and one realm (connected realms untested). Forever's rulesets need re-checking at launch.

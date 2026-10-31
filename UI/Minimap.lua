@@ -50,7 +50,7 @@ local function showMenu(owner)
     root:CreateButton("Settings", ns.Settings.open)
     local pause = root:CreateCheckbox("Pause sharing", function() return core:isPaused() end,
       function() core:setPaused(not core:isPaused()) end)
-    pause:SetEnabled(core:crew() ~= nil and not core:isReceiveOnly())
+    pause:SetEnabled(core:crew() ~= nil)
     root:CreateButton("Hide minimap button", hideButton)
   end)
 end

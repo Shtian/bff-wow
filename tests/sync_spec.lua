@@ -280,18 +280,6 @@ describe("Gossip", function()
     assert.is_true(b:rowFor(a).online)
   end)
 
-  it("keeps a receive-only Member silent, while they still see the Crew", function()
-    local net, clients, ns = crew({ "Ann", "Bob" }, { Bob = { receiveOnly = true } })
-    local a, b = clients[1], clients[2]
-
-    assert.same({}, sentSince(net, ns, 0, "Bob"))
-    assert.is_nil(a:rowFor(b))
-    assert.is_table(b:rowFor(a))
-    a:play({ level = 11 })
-    net:run(2)
-    assert.equal(11, b:rowFor(a).level)
-  end)
-
   it("fits ten Members with three Characters each in one DIGEST", function()
     local names = {}
     for i = 1, 10 do names[i] = "Member" .. i end

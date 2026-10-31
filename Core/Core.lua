@@ -22,7 +22,7 @@ Core.CAN_PLAY_LEVELS = ns.Roster.CAN_PLAY
 Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
 
 -- deps: db, now(), random(), link (with send(string)), listener(event, ...),
--- receiveOnly, initialLogin, maxLevel and utcOffset (seconds local time is
+-- initialLogin, maxLevel and utcOffset (seconds local time is
 -- ahead of server time, for the Feed's days; default 0).
 function Core.new(deps)
   for name, kind in pairs(required) do
@@ -40,7 +40,6 @@ function Core.new(deps)
     random = deps.random,
     link = deps.link,
     listener = deps.listener,
-    receiveOnly = deps.receiveOnly == true,
     initialLogin = deps.initialLogin == true,
     maxLevel = deps.maxLevel,
     ledger = ns.Ledger.new(deps.db, deps.now, deps.random, deps.initialLogin == true),
@@ -52,7 +51,7 @@ function Core.new(deps)
   self.gossip = ns.Gossip.new(self.ledger, deps.now, deps.random, function(message)
     message.from = self.ledger:memberId()
     self.link.send(ns.Codec.encode(message))
-  end, self.receiveOnly)
+  end)
   self.gossip:setPaused(self:isPaused())
   self.online = ns.Roster.online(self.ledger, deps.now())
   return self
@@ -203,10 +202,6 @@ function Core:displayName()
   return self.ledger:displayName()
 end
 
-function Core:isReceiveOnly()
-  return self.receiveOnly
-end
-
 -- The Crew: code, channel and password, leaving while a leave hasn't
 -- reached the link yet, and alone while no other Member is known. Nil when
 -- not in a Crew.
@@ -250,11 +245,10 @@ local function enter(self, code, displayName)
   return self:crew()
 end
 
--- Starts a Crew with a new code. Returns crew(), or nil and "inCrew",
--- "receiveOnly" or "invalidName".
+-- Starts a Crew with a new code. Returns crew(), or nil and "inCrew" or
+-- "invalidName".
 function Core:startCrew(displayName)
   if self.db.crew then return nil, "inCrew" end
-  if self.receiveOnly then return nil, "receiveOnly" end
   local name = nameOrCurrent(self, displayName)
   if not name then return nil, "invalidName" end
   return enter(self, ns.CrewCode.generate(self.random), name)

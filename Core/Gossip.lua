@@ -2,9 +2,8 @@
 -- versions you hold, and DATA carries full records. Whoever holds something
 -- newer than a DIGEST shows replies with DATA, whoever lacks something
 -- replies with their own DIGEST, and a reply someone else already made is
--- dropped. Gossip talks only while the link is up (and in a Crew), not
--- paused, and not receive-only; a change made meanwhile goes out once it
--- talks again.
+-- dropped. Gossip talks only while the link is up (and in a Crew) and
+-- not paused; a change made meanwhile goes out once it talks again.
 -- See the sync resolution on #8 and docs/design/code-structure.md.
 
 local _, ns = ...
@@ -20,14 +19,13 @@ local HEARTBEAT = 5 * 60
 local DIGEST_SIZE = 10
 
 -- ledger; now() and random() from Core; send(message) encodes and hands a
--- message to the link; receiveOnly for Trial and Veteran accounts.
-function Gossip.new(ledger, now, random, send, receiveOnly)
+-- message to the link.
+function Gossip.new(ledger, now, random, send)
   return setmetatable({
     ledger = ledger,
     now = now,
     random = random,
     send = send,
-    receiveOnly = receiveOnly,
     linkUp = false,
     paused = false,
     open = false,
@@ -87,7 +85,7 @@ end
 -- the own record changed meanwhile. Stopping drops replies owed, since the
 -- DIGEST on starting again asks for whatever is still missing.
 local function update(self)
-  local open = self.linkUp and not self.paused and not self.receiveOnly
+  local open = self.linkUp and not self.paused
   if open == self.open then return end
   self.open = open
   cancelOwed(self)
@@ -111,9 +109,9 @@ function Gossip:setPaused(paused)
 end
 
 -- Sends a message right away whether or not Gossip is talking (leaving the
--- Crew), unless receive-only.
+-- Crew).
 function Gossip:sendNow(message)
-  if not self.receiveOnly then self.send(message) end
+  self.send(message)
 end
 
 -- The own record changed. urgency is "now" (ding, death, new Character,

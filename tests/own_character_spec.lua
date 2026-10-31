@@ -7,7 +7,6 @@ local function newDeps(db)
     db = db or {},
     clock = 1000,
     random = math.random,
-    receiveOnly = false,
     initialLogin = true,
     maxLevel = 60,
   }

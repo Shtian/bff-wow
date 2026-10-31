@@ -93,7 +93,7 @@ function FakeNet:run(seconds)
   for _ = 1, seconds do self:step() end
 end
 
--- A simulated Member's account. options: receiveOnly, random (default a
+-- A simulated Member's account. options: random (default a
 -- generator seeded by name), db (default empty) and character (the one it
 -- plays: guid, name, classFilename, level, xp, maxXp, zone, deaths).
 function FakeNet:add(name, options)
@@ -103,7 +103,6 @@ function FakeNet:add(name, options)
     name = name,
     db = options.db or {},
     random = options.random or seeded(seedFor(name)),
-    receiveOnly = options.receiveOnly == true,
     character = copy(options.character) or {
       guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
       level = 10, xp = 0, maxXp = 1000, zone = "Elwynn Forest", deaths = 0,
@@ -147,7 +146,6 @@ local function newCore(client, initialLogin)
       end,
     },
     listener = function(...) client.events[#client.events + 1] = { ... } end,
-    receiveOnly = client.receiveOnly,
     initialLogin = initialLogin,
     maxLevel = net.maxLevel,
   })

@@ -32,7 +32,6 @@ local WAITING = "Waiting for your Crew. Members show up when they or someone who
 local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
 local PAUSED = "Sharing is paused: the others see you as offline."
 local FEED_EMPTY = "Nothing yet. Dings, deaths and new Characters show up here."
-local RECEIVE_ONLY = "Trial accounts can join a Crew and see it, but the others won't see you."
 
 local GOLD = { 1, 0.82, 0 }
 local MUTED = { 0.6, 0.6, 0.6 }
@@ -600,9 +599,6 @@ local function createSetup()
     setup.nameError:SetText(reason and ns.MESSAGES[reason] or "")
   end)
   setup.start:SetPoint("TOPLEFT", startLabel, "BOTTOMLEFT", 0, -6)
-  setup.receiveOnly = createLabel(setup, RECEIVE_ONLY, "GameFontHighlightSmall")
-  setup.receiveOnly:SetPoint("TOPLEFT", startLabel, "BOTTOMLEFT", 0, -8)
-  setup.receiveOnly:SetPoint("RIGHT", setup, "RIGHT")
 
   local joinLabel = createLabel(setup, "Join a Crew")
   joinLabel:SetPoint("TOPLEFT", startLabel, "BOTTOMLEFT", 0, -48)
@@ -629,9 +625,6 @@ local function showSetup()
     setup.nameError:SetText("")
     setup.codeError:SetText("")
   end
-  local receiveOnly = core:isReceiveOnly()
-  setup.start:SetShown(not receiveOnly)
-  setup.receiveOnly:SetShown(receiveOnly)
   setup:Show()
   frame.title:SetText("BFF")
   frame:SetHeight(SETUP_HEIGHT)
@@ -699,7 +692,6 @@ end
 local function drawFooter(crew, summary)
   if not footer then createFooter() end
   footer.pause:SetChecked(core:isPaused())
-  footer.pause:SetEnabled(not core:isReceiveOnly())
   footer.hidden:SetText(("Hidden: %d Character%s (unseen %dd)"):format(summary.hidden,
     summary.hidden == 1 and "" or "s", ns.Core.HIDE_AFTER_DAYS))
   local removed = #core:removed()
