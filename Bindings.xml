@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="BFF_TOGGLE" header="BFF" category="ADDONS">
+    BFF_TogglePanel()
+  </Binding>
+</Bindings>
