@@ -534,7 +534,7 @@ local function createFooter()
   codeLabel:SetPoint("BOTTOMLEFT", 0, 6)
   footer.code = createEditBox(footer, 110)
   footer.code:SetPoint("LEFT", codeLabel, "RIGHT", 12, 0)
-  footer.code:SetScript("OnEditFocusGained", footer.code.HighlightText)
+  footer.code:SetScript("OnEditFocusGained", function(box) box:HighlightText() end)
   footer.code:SetScript("OnTextChanged", function(box, userInput)
     if userInput then
       box:SetText(box.crewCode)
