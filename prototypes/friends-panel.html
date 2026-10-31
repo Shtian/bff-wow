@@ -1,0 +1,441 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Answers ticket "What should the friends panel look and feel like?"
+  Four structurally different variants of the v1 friends panel, switchable via ?variant=A|B|C|D
+  (or ← / → keys, or the bar at the bottom). All data is fake and in memory; menu actions are stubs.
+  Run: python3 -m http.server 8765 --directory prototypes   then open /friends-panel.html
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE · BFF friends panel</title>
+<style>
+  :root { --gold:#f2c94c; --gold-dim:#b9a77d; --frame:#5a4a2a; --bg:#15110b; --ink:#e8dcc0; --muted:#8f8366; --online:#6fd36f; --xp:#8a52d6; --rested:#4f8fe0; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; }
+  body { font: 13px/1.35 "Friz Quadrata TT", Georgia, serif; color:var(--ink); overflow:hidden;
+    background: radial-gradient(ellipse at 60% 40%, #3b4a2c 0%, #1f2a18 45%, #0c0f09 100%); }
+  .world-note { position:absolute; left:50%; top:46%; transform:translateX(-50%); color:#ffffff22; font-size:42px; letter-spacing:.2em; pointer-events:none; }
+
+  /* Minimap + button */
+  .minimap { position:absolute; top:18px; right:22px; width:150px; height:150px; border-radius:50%;
+    background: radial-gradient(circle at 40% 40%, #6b7d4a, #2d3a1e 70%); border:4px solid #8a7444; box-shadow:0 0 0 2px #2a2215, 0 4px 18px #000a; }
+  .minimap .zone { position:absolute; top:-16px; left:0; right:0; text-align:center; color:var(--gold); font-size:12px; text-shadow:0 1px 2px #000; }
+  .mmbtn { position:absolute; left:-10px; top:96px; width:34px; height:34px; border-radius:50%; cursor:pointer;
+    background: radial-gradient(circle at 35% 35%, #f6dd86, #b8862b 60%, #6b4a12); border:2px solid #2a2215; box-shadow:0 2px 6px #000;
+    display:grid; place-items:center; font: bold 10px Georgia; color:#2a1a04; }
+  .mmbtn:hover { filter:brightness(1.2); }
+  .mmbtn .badge { position:absolute; right:-4px; top:-4px; background:#2a6b2a; color:#dfffdc; border:1px solid #000; border-radius:8px; font-size:9px; padding:0 4px; }
+
+  /* Panel frame shared by all variants */
+  .panel { position:absolute; left:40px; top:60px; background:linear-gradient(180deg,#1c170f,#120e09); border:2px solid var(--frame);
+    border-radius:8px; box-shadow: inset 0 0 0 1px #2a2215, 0 10px 40px #000c; max-height:calc(100vh - 140px); display:flex; flex-direction:column; }
+  .panel.hidden { display:none; }
+  .ptitle { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:10px 12px 8px; border-bottom:1px solid var(--frame); }
+  .ptitle .t { color:var(--gold); font-weight:bold; font-size:15px; }
+  .ptitle .t small { color:var(--gold-dim); font-weight:normal; font-size:11px; margin-left:6px; }
+  .ptitle .x { color:var(--muted); cursor:pointer; }
+  .ptitle .on { color:var(--online); font-size:11px; }
+  .pbody { overflow:auto; padding:6px 8px 10px; }
+  .pfoot { border-top:1px solid var(--frame); padding:6px 10px; font-size:11px; color:var(--muted); display:flex; justify-content:space-between; }
+
+  .c-Warrior{color:#C69B6D}.c-Rogue{color:#FFF468}.c-Druid{color:#FF7C0A}.c-Priest{color:#fff}.c-Mage{color:#3FC7EB}
+  .c-Hunter{color:#AAD372}.c-Warlock{color:#8788EE}
+  .bg-Warrior{background:#C69B6D}.bg-Rogue{background:#FFF468}.bg-Druid{background:#FF7C0A}.bg-Priest{background:#fff}.bg-Mage{background:#3FC7EB}
+  .bg-Hunter{background:#AAD372}.bg-Warlock{background:#8788EE}
+
+  .dot { width:8px; height:8px; border-radius:50%; background:#4a4a4a; flex:none; }
+  .dot.on { background:var(--online); box-shadow:0 0 6px var(--online); }
+  .xp { height:4px; background:#2e2618; border-radius:2px; overflow:hidden; position:relative; }
+  .xp i { position:absolute; left:0; top:0; bottom:0; background:linear-gradient(90deg,#6b3fb0,#b07cf0); }
+  .xp b { position:absolute; top:0; bottom:0; background:#4f8fe066; }
+  .muted { color:var(--muted); }
+  .tag { font-size:10px; border:1px solid #f2c94c66; color:var(--gold); border-radius:3px; padding:0 4px; white-space:nowrap; }
+  .tag.alt { border-color:#ffffff33; color:#bbb; }
+  .you { font-size:10px; color:#9fd0ff; border:1px solid #9fd0ff55; border-radius:3px; padding:0 3px; }
+  [data-char] { cursor:default; }
+
+  /* ---------- Variant A: Roster ---------- */
+  .A { width:340px; }
+  .A .sortbar { display:flex; gap:4px; padding:6px 10px 2px; font-size:11px; color:var(--muted); align-items:center; }
+  .A .sortbar button, .D .chips button { font:inherit; font-size:11px; background:#221b10; color:var(--gold-dim); border:1px solid #3d3220; border-radius:3px; padding:1px 6px; cursor:pointer; }
+  .A .sortbar button.sel, .D .chips button.sel { color:var(--gold); border-color:var(--gold); }
+  .A .row { display:grid; grid-template-columns:10px 22px 1fr auto; gap:6px; align-items:center; padding:5px 6px 4px; border-radius:4px; cursor:pointer; border-left:2px solid transparent; }
+  .A .row:hover { background:#ffffff0a; }
+  .A .row.hl { border-left-color:var(--gold); background:#f2c94c10; }
+  .A .row.off { opacity:.62; }
+  .A .icon { width:22px; height:22px; border-radius:3px; color:#000; font-weight:bold; display:grid; place-items:center; font-size:11px; border:1px solid #000; }
+  .A .l1 { display:flex; gap:6px; align-items:baseline; }
+  .A .l1 .n { font-weight:bold; }
+  .A .l2 { font-size:11px; color:var(--muted); }
+  .A .right { text-align:right; font-size:11px; color:var(--muted); }
+  .A .row .xp { grid-column:3/5; margin-top:2px; }
+  .A .alts { margin:0 0 4px 34px; border-left:1px solid #3d3220; padding-left:8px; }
+  .A .altrow { display:flex; gap:8px; align-items:center; font-size:11.5px; padding:2px 0; }
+  .A .altrow.hl .lv { color:var(--gold); }
+  .A .sep { color:var(--muted); font-size:10px; letter-spacing:.15em; text-transform:uppercase; margin:8px 6px 2px; }
+
+  /* ---------- Variant B: Level ladder ---------- */
+  .B { width:430px; }
+  .B .opts { padding:6px 12px; font-size:11px; color:var(--muted); display:flex; gap:12px; }
+  .B .ladder { position:relative; padding:4px 4px 4px 0; }
+  .B .rung { display:grid; grid-template-columns:44px 1fr; align-items:center; min-height:28px; border-top:1px dashed #2a2215; }
+  .B .rung .lv { text-align:right; padding-right:10px; color:var(--gold-dim); font-size:12px; }
+  .B .rung.band { background:linear-gradient(90deg,#f2c94c1c,#f2c94c08); }
+  .B .rung.band .lv { color:var(--gold); }
+  .B .rung.me { background:linear-gradient(90deg,#9fd0ff22,#9fd0ff05); }
+  .B .gap { text-align:center; color:#5a4f38; font-size:11px; padding:2px 0 2px 44px; }
+  .B .chips { display:flex; flex-wrap:wrap; gap:4px; padding:3px 0; }
+  .B .chip { display:inline-flex; align-items:center; gap:5px; padding:2px 7px 2px 5px; border-radius:11px; background:#221b10; border:1px solid #3d3220; font-size:12px; }
+  .B .chip.main { border-color:#6b5a32; }
+  .B .chip.alt { opacity:.7; font-size:11px; }
+  .B .chip.off .nm { filter:saturate(.5) brightness(.8); }
+  .B .chip small { color:var(--muted); }
+  .B .bandlabel { font-size:10px; color:var(--gold); margin-left:6px; }
+
+  /* ---------- Variant C: Portrait tiles ---------- */
+  .C { width:470px; }
+  .C .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:4px; }
+  .C .tile { border:1px solid #3d3220; border-radius:6px; padding:10px; background:#1a150d; display:grid; grid-template-columns:58px 1fr; gap:10px; position:relative; }
+  .C .tile.off { filter:grayscale(.75) brightness(.75); }
+  .C .tile.hl { border-color:var(--gold); box-shadow:0 0 10px #f2c94c44; }
+  .C .tile.me { border-color:#9fd0ff66; }
+  .C .ring { width:58px; height:58px; border-radius:50%; display:grid; place-items:center; }
+  .C .ring .face { width:48px; height:48px; border-radius:50%; display:grid; place-items:center; color:#000; font-weight:bold; font-size:18px; border:2px solid #000; position:relative; }
+  .C .ring .face .lvl { position:absolute; bottom:-6px; right:-6px; background:#120e09; color:var(--gold); border:1px solid var(--frame); border-radius:8px; font-size:10px; padding:0 4px; }
+  .C .who { font-weight:bold; font-size:13px; }
+  .C .meta { font-size:11px; color:var(--muted); }
+  .C .status { font-size:11px; margin-top:3px; }
+  .C .mini { display:flex; gap:4px; margin-top:6px; }
+  .C .mini span { width:20px; height:20px; border-radius:50%; color:#000; font-size:9px; display:grid; place-items:center; border:1px solid #000; cursor:pointer; opacity:.7; }
+  .C .mini span.hl { outline:2px solid var(--gold); opacity:1; }
+  .C .corner { position:absolute; top:6px; right:8px; }
+
+  /* ---------- Variant D: Ledger table ---------- */
+  .D { width:620px; }
+  .D .chips { display:flex; gap:4px; padding:6px 10px; }
+  .D table { width:100%; border-collapse:collapse; font-size:12px; }
+  .D th { text-align:left; color:var(--gold-dim); font-weight:normal; font-size:11px; padding:4px 6px; border-bottom:1px solid var(--frame); cursor:pointer; user-select:none; white-space:nowrap; }
+  .D th.sel { color:var(--gold); }
+  .D td { padding:3px 6px; border-bottom:1px solid #221b10; white-space:nowrap; }
+  .D tr.grp td { background:#1f190f; color:var(--gold-dim); font-size:11px; cursor:pointer; padding-top:6px; }
+  .D tr.hl td { background:#f2c94c12; }
+  .D tr.hl td.lv { color:var(--gold); font-weight:bold; }
+  .D tr.off td { color:#a99c7e; }
+  .D td .xp { width:70px; display:inline-block; vertical-align:middle; }
+
+  /* Tooltip & menu */
+  .tip { position:fixed; z-index:50; pointer-events:none; background:#0b0a12ee; border:1px solid #6b6b8a; border-radius:4px; padding:8px 10px; font-size:12px; min-width:200px; box-shadow:0 4px 14px #000; display:none; }
+  .tip .h { font-weight:bold; font-size:14px; }
+  .tip .g { color:#1eff00; } .tip .y { color:var(--gold); } .tip .w { color:#fff; } .tip .s { color:#9d9d9d; }
+  .menu { position:fixed; z-index:60; background:#0b0a12f2; border:1px solid #6b6b8a; border-radius:4px; padding:4px 0; font-size:12px; min-width:150px; display:none; }
+  .menu .mh { color:var(--gold); padding:2px 12px 4px; }
+  .menu div.i { padding:3px 12px; cursor:pointer; } .menu div.i:hover { background:#ffffff18; }
+  .menu div.i.dis { color:#666; cursor:default; } .menu div.i.dis:hover { background:none; }
+  .chat { position:absolute; left:40px; bottom:70px; width:420px; font-size:12px; text-shadow:0 1px 1px #000; }
+  .chat div { color:#ffb5f0; } .chat div.sys { color:#ffff00; }
+
+  /* Prototype chrome (not part of the design) */
+  .proto-bar { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:100; display:flex; align-items:center; gap:10px;
+    background:#fff; color:#111; font:600 13px system-ui, sans-serif; border-radius:999px; padding:6px 8px; box-shadow:0 6px 24px #0008; }
+  .proto-bar button { border:0; background:#111; color:#fff; width:28px; height:28px; border-radius:50%; cursor:pointer; font-size:14px; }
+  .proto-bar .lab { min-width:240px; text-align:center; }
+  .proto-state { position:fixed; right:16px; bottom:16px; z-index:100; background:#000c; color:#cfe; font:11px ui-monospace, Menlo, monospace; padding:8px 10px; border-radius:6px; max-width:380px; white-space:pre-wrap; border:1px dashed #6a8; }
+  .proto-help { position:fixed; right:16px; top:190px; z-index:100; background:#000a; color:#ddd; font:11.5px system-ui, sans-serif; padding:8px 10px; border-radius:6px; max-width:240px; border:1px dashed #888; }
+</style>
+</head>
+<body>
+<div class="world-note">AZEROTH</div>
+
+<div class="minimap"><div class="zone">Ashenvale</div>
+  <div class="mmbtn" id="mmbtn">BFF<span class="badge" id="mmbadge"></span></div>
+</div>
+
+<div class="panel" id="panel"></div>
+<div class="chat" id="chat"></div>
+
+<div class="tip" id="tip"></div>
+<div class="menu" id="menu"></div>
+
+<div class="proto-help"><b>PROTOTYPE</b> — fake data.<br>
+• Minimap button or <code>\</code> toggles the panel (stand-in for the key binding).<br>
+• Hover a Character for its tooltip; right-click for the menu.<br>
+• Click a Member to expand Alts.<br>
+• You are playing <b>Thornleaf, Druid 23</b>; "can play with you" = ±3 levels.</div>
+<div class="proto-bar"><button id="prev">←</button><span class="lab" id="lab"></span><button id="next">→</button></div>
+<div class="proto-state" id="state"></div>
+
+<script>
+// ---------- Fake Crew (in memory) ----------
+const MY_LEVEL = 23;
+// lastSeen in minutes ago (0 = online now). via = which Member last carried this data to us.
+const crew = [
+  { id:'stian', name:'Stian', you:true, mainId:'thornleaf', chars:[
+    { id:'thornleaf', name:'Thornleaf', cls:'Druid', level:23, xp:.41, rested:.2, zone:'Ashenvale', online:true, seen:0, deaths:3 },
+    { id:'stianlock', name:'Grimbell', cls:'Warlock', level:11, xp:.7, rested:.5, zone:'Darkshore', online:false, seen:60*24*4, deaths:1 },
+  ]},
+  { id:'kari', name:'Kari', mainId:'brakka', chars:[
+    { id:'brakka', name:'Brakka', cls:'Warrior', level:24, xp:.12, rested:0, zone:'Ashenvale', online:true, seen:0, deaths:7 },
+    { id:'karip', name:'Solveigh', cls:'Priest', level:12, xp:.55, rested:.3, zone:'Westfall', online:false, seen:60*24*2, deaths:0, via:'Kari' },
+  ]},
+  { id:'jonas', name:'Jonas', mainId:'emberwick', chars:[
+    { id:'emberwick', name:'Emberwick', cls:'Mage', level:31, xp:.66, rested:.1, zone:'Arathi Highlands', online:false, seen:60*20, deaths:12, via:'Kari' },
+    { id:'jonhunt', name:'Pawsome', cls:'Hunter', level:21, xp:.33, rested:.4, zone:'Stonetalon Mountains', online:true, seen:0, deaths:2 },
+  ]},
+  { id:'ola', name:'Ola', mainId:'shade', chars:[
+    { id:'shade', name:'Shadewhisper', cls:'Rogue', level:20, xp:.88, rested:.12, zone:'Redridge Mountains', online:false, seen:180, deaths:4, via:'Kari' },
+    { id:'olamage', name:'Frostbyte', cls:'Mage', level:8, xp:.2, rested:.8, zone:'Durotar', online:false, seen:60*24*9, deaths:0, via:'Emma' },
+    { id:'olawar', name:'Bonk', cls:'Warrior', level:5, xp:.5, rested:1, zone:'Elwynn Forest', online:false, seen:60*24*27, deaths:0, via:'Emma' },
+  ]},
+  { id:'emma', name:'Emma', mainId:'lumi', chars:[
+    { id:'lumi', name:'Lumi', cls:'Priest', level:38, xp:.05, rested:0, zone:'Stranglethorn Vale', online:false, seen:60*24*2, deaths:9, via:'Ola' },
+    { id:'emmahunt', name:'Arrowyn', cls:'Hunter', level:26, xp:.71, rested:.25, zone:'Hillsbrad Foothills', online:false, seen:60*24*5, deaths:3, via:'Ola' },
+  ]},
+  { id:'siri', name:'Siri', mainId:'nyx', chars:[
+    { id:'nyx', name:'Nyxara', cls:'Warlock', level:60, xp:1, rested:0, zone:'Orgrimmar', online:false, seen:60*24*12, deaths:21, via:'Jonas' },
+    { id:'sirdr', name:'Mosscap', cls:'Druid', level:19, xp:.15, rested:.6, zone:'Darkshore', online:false, seen:60*24*12, deaths:1, via:'Jonas' },
+    { id:'sirwar', name:'Tankgirl', cls:'Warrior', level:34, xp:.4, rested:0, zone:'Desolace', online:false, seen:60*24*18, deaths:5, via:'Jonas' },
+  ]},
+];
+const CREW_NAME = 'Kjeksklubben';
+
+// ---------- Helpers ----------
+const allChars = () => crew.flatMap(m => m.chars.map(c => ({ ...c, m })));
+const canPlay = (m, c) => !m.you && Math.abs(c.level - MY_LEVEL) <= 3;
+const main = m => m.chars.find(c => c.id === m.mainId);
+const alts = m => m.chars.filter(c => c.id !== m.mainId);
+const onlineChar = m => m.chars.find(c => c.online);
+const memberSeen = m => Math.min(...m.chars.map(c => c.seen));
+const memberCanPlay = m => m.chars.some(c => canPlay(m, c));
+const ago = min => min === 0 ? 'online' : min < 60 ? `${min}m` : min < 60*24 ? `${Math.round(min/60)}h` : `${Math.round(min/1440)}d`;
+const agoLong = min => min === 0 ? 'Online now' : 'Last seen ' + ago(min) + ' ago';
+const xpbar = c => c.level >= 60 ? `<div class="xp"><i style="width:100%;background:#7a6a40"></i></div>`
+  : `<div class="xp"><i style="width:${c.xp*100}%"></i><b style="left:${c.xp*100}%;width:${Math.min(c.rested,1-c.xp)*100}%"></b></div>`;
+const cname = c => `<span class="c-${c.cls}">${c.name}</span>`;
+const onlineCount = () => crew.filter(m => !m.you && onlineChar(m)).length;
+const othersCount = () => crew.filter(m => !m.you).length;
+
+// ---------- UI state ----------
+const ui = { variant: new URLSearchParams(location.search).get('variant') || 'A', open: true,
+  expanded: new Set(['ola']), sortA: 'online', showAltsB: true, sortD: { col:'member', dir:1 }, filtD: new Set(), collapsedD: new Set(), focusC: {} };
+const VARIANTS = { A:'Roster (friends-list style)', B:'Level ladder (who is near me)', C:'Portrait tiles (one per Member)', D:'Ledger (every Character, sortable)' };
+
+function title(extra='') {
+  return `<div class="ptitle"><span class="t">BFF<small>${CREW_NAME}</small></span>${extra}
+    <span><span class="on">${onlineCount()}/${othersCount()} online</span> &nbsp;<span class="x" data-act="close">✕</span></span></div>`;
+}
+
+// ---------- Variant A: Roster ----------
+function sortMembersA(list) {
+  const key = {
+    online: m => [onlineChar(m) ? 0 : 1, memberCanPlay(m) ? 0 : 1, memberSeen(m)],
+    level:  m => [-(onlineChar(m) || main(m)).level],
+    name:   m => [m.name.toLowerCase()],
+  }[ui.sortA];
+  return [...list].sort((a, b) => { const ka = key(a), kb = key(b); for (let i=0;i<ka.length;i++) if (ka[i] !== kb[i]) return ka[i] < kb[i] ? -1 : 1; return 0; });
+}
+function rowA(m) {
+  const shown = onlineChar(m) || main(m);           // stance: the row shows what they're playing right now
+  const onAlt = shown.id !== m.mainId;
+  const hl = canPlay(m, shown);
+  const exp = ui.expanded.has(m.id);
+  const others = m.chars.filter(c => c.id !== shown.id);
+  const otherHl = others.some(c => canPlay(m, c));
+  let h = `<div class="row ${hl?'hl':''} ${shown.online?'':'off'}" data-member="${m.id}" data-char="${shown.id}">
+    <span class="dot ${shown.online?'on':''}"></span>
+    <span class="icon bg-${shown.cls}">${shown.cls[0]}</span>
+    <div><div class="l1"><span class="n">${cname(shown)}</span><span class="muted">${shown.level}</span>
+      ${m.you?'<span class="you">you</span>':`<span class="muted" style="font-size:11px">${m.name}</span>`}
+      ${onAlt?'<span class="tag alt">on alt</span>':''}${hl?'<span class="tag">can play</span>':''}</div>
+      <div class="l2">${shown.zone}</div></div>
+    <div class="right">${shown.online?'<span style="color:var(--online)">online</span>':ago(shown.seen)}<br>
+      ${others.length?`<span style="${otherHl?'color:var(--gold)':''}">${exp?'▾':'▸'} ${others.length} more</span>`:''}</div>
+    ${xpbar(shown)}</div>`;
+  if (exp && others.length) {
+    h += `<div class="alts">` + others.map(c => `<div class="altrow ${canPlay(m,c)?'hl':''}" data-member="${m.id}" data-char="${c.id}">
+      <span class="dot ${c.online?'on':''}"></span>${cname(c)} <span class="lv muted">${c.level}</span>
+      ${c.id===m.mainId?'<span class="tag alt">main</span>':''}${canPlay(m,c)?'<span class="tag">can play</span>':''}
+      <span class="muted" style="margin-left:auto">${c.zone} · ${ago(c.seen)}</span></div>`).join('') + `</div>`;
+  }
+  return h;
+}
+function renderA() {
+  const me = crew.find(m => m.you), others = sortMembersA(crew.filter(m => !m.you));
+  const btn = k => `<button data-sorta="${k}" class="${ui.sortA===k?'sel':''}">${k}</button>`;
+  return `${title()}<div class="sortbar">Sort ${btn('online')}${btn('level')}${btn('name')}</div>
+    <div class="pbody">${rowA(me)}<div class="sep">Crew</div>${others.map(rowA).join('')}</div>
+    <div class="pfoot"><span>Pause sharing ☐</span><span>Hidden: 0 Characters (unseen 30d)</span></div>`;
+}
+
+// ---------- Variant B: Level ladder ----------
+function renderB() {
+  const chars = allChars().filter(c => ui.showAltsB || c.id === c.m.mainId || c.m.you && c.online);
+  const levels = [...new Set([...chars.map(c => c.level), MY_LEVEL-3, MY_LEVEL+3])].sort((a,b) => b-a);
+  let h = '', prev = null;
+  for (const lv of levels) {
+    if (prev !== null && prev - lv > 1) h += `<div class="gap">⋮ ${prev - lv - 1} levels</div>`;
+    const here = chars.filter(c => c.level === lv).sort((a,b) => (b.online-a.online) || (a.seen-b.seen));
+    const band = Math.abs(lv - MY_LEVEL) <= 3;
+    h += `<div class="rung ${band?'band':''} ${lv===MY_LEVEL?'me':''}"><div class="lv">${lv}</div><div class="chips">` +
+      here.map(c => { const isMain = c.id === c.m.mainId;
+        return `<span class="chip ${isMain?'main':'alt'} ${c.online?'':'off'}" data-member="${c.m.id}" data-char="${c.id}">
+          <span class="dot ${c.online?'on':''}"></span><span class="nm">${cname(c)}</span>
+          <small>${c.m.you?'you':c.m.name}${isMain?'':' · alt'}${c.online?'':' · '+ago(c.seen)}</small></span>`; }).join('') +
+      (lv===MY_LEVEL+3 ? `<span class="bandlabel">▲ can play with you (±3)</span>` : '') + `</div></div>`;
+    prev = lv;
+  }
+  return `${title()}<div class="opts"><label><input type="checkbox" data-act="altsB" ${ui.showAltsB?'checked':''}> Show Alts</label>
+    <span>Top = highest level · your level highlighted blue</span></div><div class="pbody"><div class="ladder">${h}</div></div>
+    <div class="pfoot"><span>Pause sharing ☐</span><span>${chars.length} Characters</span></div>`;
+}
+
+// ---------- Variant C: Portrait tiles ----------
+function tileC(m) {
+  const focus = m.chars.find(c => c.id === ui.focusC[m.id]) || onlineChar(m) || main(m);
+  const hl = memberCanPlay(m);
+  const ring = focus.level >= 60 ? '#7a6a40' : `conic-gradient(#b07cf0 ${focus.xp*360}deg, #2e2618 0)`;
+  return `<div class="tile ${hl?'hl':''} ${onlineChar(m)?'':'off'} ${m.you?'me':''}" data-member="${m.id}" data-char="${focus.id}">
+    <div class="ring" style="background:${ring}"><div class="face bg-${focus.cls}">${focus.cls[0]}<span class="lvl">${focus.level}</span></div></div>
+    <div><div class="who">${m.name} ${m.you?'<span class="you">you</span>':''}</div>
+      <div class="meta">${cname(focus)} · ${focus.cls}${focus.id===m.mainId?'':' <span class="tag alt">alt</span>'}</div>
+      <div class="meta">${focus.zone}</div>
+      <div class="status" style="color:${focus.online?'var(--online)':'var(--muted)'}">${agoLong(focus.seen)}</div>
+      <div class="mini">${m.chars.map(c => `<span class="bg-${c.cls} ${canPlay(m,c)?'hl':''}" data-focus="${m.id}:${c.id}" data-member="${m.id}" data-char="${c.id}" style="${c.id===focus.id?'opacity:1;outline:2px solid #fff':''}">${c.level}</span>`).join('')}</div>
+    </div>${hl?'<span class="corner tag">can play</span>':''}</div>`;
+}
+function renderC() {
+  const sorted = [...crew].sort((a,b) => (b.you?1:0)-(a.you?1:0) || (!!onlineChar(b))-(!!onlineChar(a)) || memberSeen(a)-memberSeen(b));
+  return `${title()}<div class="pbody"><div class="grid">${sorted.map(tileC).join('')}</div></div>
+    <div class="pfoot"><span>Pause sharing ☐</span><span>Click a small circle to look at that Character</span></div>`;
+}
+
+// ---------- Variant D: Ledger ----------
+function renderD() {
+  const cols = [['member','Member'],['name','Character'],['level','Lv'],['xp','XP'],['zone','Zone'],['seen','Seen'],['deaths','Deaths']];
+  let rows = allChars();
+  if (ui.filtD.has('online')) rows = rows.filter(c => c.online);
+  if (ui.filtD.has('canplay')) rows = rows.filter(c => canPlay(c.m, c));
+  if (ui.filtD.has('mains')) rows = rows.filter(c => c.id === c.m.mainId);
+  const { col, dir } = ui.sortD;
+  const val = c => col === 'member' ? c.m.name : c[col];
+  rows.sort((a,b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * dir || (a.id===a.m.mainId?-1:1); });
+  const grouped = col === 'member';
+  let body = '', last = null;
+  for (const c of rows) {
+    if (grouped && c.m !== last) {
+      body += `<tr class="grp" data-grp="${c.m.id}"><td colspan="7">${ui.collapsedD.has(c.m.id)?'▸':'▾'} ${c.m.name}${c.m.you?' (you)':''} · ${c.m.chars.length} Characters ${onlineChar(c.m)?'· <span style="color:var(--online)">online</span>':''}</td></tr>`;
+      last = c.m;
+    }
+    if (grouped && ui.collapsedD.has(c.m.id)) continue;
+    const isMain = c.id === c.m.mainId;
+    body += `<tr class="${canPlay(c.m,c)?'hl':''} ${c.online?'':'off'}" data-member="${c.m.id}" data-char="${c.id}">
+      <td>${grouped?'':c.m.name}</td><td><span class="dot ${c.online?'on':''}" style="display:inline-block"></span> ${cname(c)} ${isMain?'<span class="tag alt">main</span>':''}</td>
+      <td class="lv">${c.level}</td><td>${xpbar(c)}</td><td>${c.zone}</td><td>${ago(c.seen)}</td><td>${c.deaths}</td></tr>`;
+  }
+  const chip = (k, l) => `<button data-filtd="${k}" class="${ui.filtD.has(k)?'sel':''}">${l}</button>`;
+  return `${title()}<div class="chips">${chip('online','Online')}${chip('canplay','Can play with you')}${chip('mains','Mains only')}</div>
+    <div class="pbody"><table><tr>${cols.map(([k,l]) => `<th data-sortd="${k}" class="${col===k?'sel':''}">${l}${col===k?(dir>0?' ▴':' ▾'):''}</th>`).join('')}</tr>${body}</table></div>
+    <div class="pfoot"><span>Pause sharing ☐</span><span>${rows.length} of ${allChars().length} Characters</span></div>`;
+}
+
+// ---------- Render + wiring ----------
+const panel = document.getElementById('panel');
+function render() {
+  if (!VARIANTS[ui.variant]) ui.variant = 'A';
+  panel.className = 'panel ' + ui.variant + (ui.open ? '' : ' hidden');
+  panel.innerHTML = ({ A:renderA, B:renderB, C:renderC, D:renderD })[ui.variant]();
+  document.getElementById('lab').textContent = `${ui.variant} · ${VARIANTS[ui.variant]}`;
+  document.getElementById('mmbadge').textContent = onlineCount() || '';
+  document.getElementById('state').textContent =
+`variant: ${ui.variant}   panel: ${ui.open?'open':'closed'}
+you: Thornleaf (Druid ${MY_LEVEL}), band ${MY_LEVEL-3}–${MY_LEVEL+3}
+A sort=${ui.sortA} expanded=[${[...ui.expanded]}]
+B showAlts=${ui.showAltsB}   D sort=${ui.sortD.col}${ui.sortD.dir>0?'↑':'↓'} filters=[${[...ui.filtD]}]
+can play: ${allChars().filter(c => canPlay(c.m,c)).map(c => `${c.name} ${c.level}`).join(', ')}
+online: ${allChars().filter(c => c.online && !c.m.you).map(c => c.name + (c.id!==c.m.mainId?' (alt)':'')).join(', ')}`;
+}
+function setVariant(v) { ui.variant = v; const u = new URL(location); u.searchParams.set('variant', v); history.replaceState(null, '', u); render(); }
+const keys = Object.keys(VARIANTS);
+const cycle = d => setVariant(keys[(keys.indexOf(ui.variant) + d + keys.length) % keys.length]);
+document.getElementById('prev').onclick = () => cycle(-1);
+document.getElementById('next').onclick = () => cycle(1);
+const toggle = () => { ui.open = !ui.open; render(); };
+document.getElementById('mmbtn').onclick = toggle;
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,[contenteditable]')) return;
+  if (e.key === 'ArrowLeft') cycle(-1); else if (e.key === 'ArrowRight') cycle(1);
+  else if (e.key === '\\') toggle(); else if (e.key === 'Escape') { hideMenu(); if (ui.open) toggle(); }
+});
+
+panel.addEventListener('click', e => {
+  const t = e.target;
+  if (t.closest('[data-act="close"]')) return toggle();
+  if (t.dataset.sorta) { ui.sortA = t.dataset.sorta; return render(); }
+  if (t.dataset.act === 'altsB') { ui.showAltsB = t.checked; return render(); }
+  if (t.dataset.filtd) { const f = t.dataset.filtd; ui.filtD.has(f) ? ui.filtD.delete(f) : ui.filtD.add(f); return render(); }
+  if (t.dataset.sortd) { const k = t.dataset.sortd; ui.sortD = { col:k, dir: ui.sortD.col===k ? -ui.sortD.dir : 1 }; return render(); }
+  const grp = t.closest('[data-grp]'); if (grp) { const id = grp.dataset.grp; ui.collapsedD.has(id) ? ui.collapsedD.delete(id) : ui.collapsedD.add(id); return render(); }
+  const f = t.closest('[data-focus]'); if (f) { const [m, c] = f.dataset.focus.split(':'); ui.focusC[m] = c; return render(); }
+  if (ui.variant === 'A') { const row = t.closest('.row'); if (row) { const id = row.dataset.member; ui.expanded.has(id) ? ui.expanded.delete(id) : ui.expanded.add(id); render(); } }
+});
+
+// Tooltip
+const tip = document.getElementById('tip');
+function findChar(el) { const n = el && el.closest('[data-char]'); if (!n) return null;
+  const m = crew.find(x => x.id === n.dataset.member); return { m, c: m.chars.find(x => x.id === n.dataset.char) }; }
+document.addEventListener('mousemove', e => {
+  if (e.target.closest('#mmbtn')) {
+    const cp = allChars().filter(c => c.online && canPlay(c.m, c)).length;
+    tip.innerHTML = `<div class="h y">BFF</div><div class="w">${onlineCount()} of ${othersCount()} online · ${cp} can play with you now</div><div class="s">Click: open panel · Right-click: settings</div>`;
+  } else {
+    const hit = findChar(e.target); if (!hit) { tip.style.display = 'none'; return; }
+    const { m, c } = hit, isMain = c.id === m.mainId;
+    tip.innerHTML = `<div class="h c-${c.cls}">${c.name}</div>
+      <div class="w">Level ${c.level} ${c.cls} ${isMain?'<span class="y">(Main)</span>':'<span class="s">(Alt)</span>'}</div>
+      <div class="w">${m.you?'You':m.name}'s Character</div>
+      <div>${c.zone}</div>
+      ${c.level<60?`<div class="s">XP ${Math.round(c.xp*100)}%${c.rested?` · rested +${Math.round(c.rested*100)}%`:''}</div>`:'<div class="y">Max level</div>'}
+      <div class="s">Deaths: ${c.deaths}</div>
+      <div class="${c.online?'g':'s'}">${agoLong(c.seen)}</div>
+      ${!c.online && c.via ? `<div class="s">News via ${c.via}</div>` : ''}
+      ${canPlay(m,c)?`<div class="y">Within 3 levels of you — can play together</div>`:''}`;
+  }
+  tip.style.display = 'block';
+  tip.style.left = Math.min(e.clientX + 16, innerWidth - tip.offsetWidth - 8) + 'px';
+  tip.style.top = Math.min(e.clientY + 12, innerHeight - tip.offsetHeight - 8) + 'px';
+});
+
+// Right-click menu (stubs)
+const menu = document.getElementById('menu');
+function hideMenu() { menu.style.display = 'none'; }
+document.addEventListener('click', e => { if (!e.target.closest('#menu')) hideMenu(); });
+document.addEventListener('contextmenu', e => {
+  if (e.target.closest('#mmbtn')) {
+    e.preventDefault();
+    menu.innerHTML = `<div class="mh">BFF</div><div class="i" data-stub="Open settings">Settings…</div><div class="i" data-stub="Pause sharing">Pause sharing</div><div class="i" data-stub="Hide minimap button">Hide minimap button</div>`;
+  } else {
+    const hit = findChar(e.target); if (!hit) return; e.preventDefault();
+    const { m, c } = hit, isMain = c.id === m.mainId;
+    menu.innerHTML = `<div class="mh c-${c.cls}">${c.name}</div>` +
+      (m.you ? `<div class="i ${isMain?'dis':''}" data-stub="Set ${c.name} as Main">Set as Main</div>`
+             : `<div class="i ${c.online?'':'dis'}" data-stub="Whisper ${c.name}">Whisper</div>
+                <div class="i ${c.online?'':'dis'}" data-stub="Invite ${c.name}">Invite to group</div>
+                <div class="i" data-stub="Remove ${m.name} from Crew">Remove ${m.name}…</div>`) +
+      `<div class="i" data-stub="cancel">Cancel</div>`;
+  }
+  menu.style.display = 'block';
+  menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px';
+});
+menu.addEventListener('click', e => {
+  const s = e.target.dataset.stub; if (!s || e.target.classList.contains('dis')) return; hideMenu();
+  if (s !== 'cancel') chat(`[BFF] (stub) would: ${s}`, true);
+});
+function chat(text, sys) { const d = document.createElement('div'); d.className = sys ? 'sys' : ''; d.textContent = text;
+  const box = document.getElementById('chat'); box.appendChild(d); while (box.children.length > 5) box.firstChild.remove(); }
+chat('[BFF] Brakka (Kari) reached level 24!', true);
+chat('[BFF] Pawsome (Jonas) came online.', true);
+
+render();
+</script>
+</body>
+</html>
