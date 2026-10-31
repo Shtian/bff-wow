@@ -75,7 +75,8 @@ describe("The Feed", function()
     assert.equal(22, ding.from)
     assert.equal(24, ding.level)
     assert.equal(2, entries(c)[1].count)
-    assert.equal(2, c.core:feed().unseen)
+    -- While you were away showed them instead.
+    assert.equal(0, c.core:feed().unseen)
     assert.same({}, chatLines(c))
   end)
 
@@ -109,7 +110,8 @@ describe("The Feed", function()
     a:play({ level = 12 })
     net:run(3)
     assert.same({ "Ann dinged 12" }, chatLines(b))
-    assert.equal(1, b.core:feed().unseen)
+    -- The ding from settling went into While you were away.
+    assert.equal(0, b.core:feed().unseen)
   end)
 
   it("makes only a max level entry for a jump that reaches max level", function()

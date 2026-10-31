@@ -211,6 +211,13 @@ function Feed:linkUp()
   self.upSince = self.upSince or self.now()
 end
 
+-- The link went down before settling: a half-synced summary is never
+-- shown, so settling starts over at the next up().
+function Feed:linkDown()
+  if self.settled then return end
+  self.upSince, self.lastData = nil, nil
+end
+
 -- DATA changed a record.
 function Feed:dataMerged()
   self.lastData = self.now()
@@ -221,7 +228,7 @@ function Feed:isSettled()
 end
 
 -- Called once a second: prunes the log, and settles once sync has gone
--- quiet.
+-- quiet. Returns true on the tick it settles.
 function Feed:tick()
   local now = self.now()
   local log = self.db.feed
@@ -229,11 +236,123 @@ function Feed:tick()
     table.remove(log, 1)
   end
 
-  if self.settled or not self.upSince then return end
+  if self.settled or not self.upSince then return false end
   local quietSince = math.max(self.upSince, self.lastData or self.upSince)
   if now - quietSince >= QUIET_FOR or now - self.upSince >= SETTLE_WITHIN then
     self.settled = true
+    return true
   end
+  return false
+end
+
+-- Entries shown in the summary on their own highlighted line.
+local HIGHLIGHT = { maxLevel = true, joined = true, left = true }
+
+-- One Character's part of a Member's line: "18 → 24, died 3×" (max level
+-- counts towards the range too), prefixed
+-- with the Character's name for an Alt, or "new Character Jaina (12)".
+local function characterPart(entries, name, isMain)
+  local from, level, deaths, new
+  for _, entry in ipairs(entries) do
+    if entry.kind == "ding" or entry.kind == "maxLevel" then
+      from = math.min(from or entry.from, entry.from)
+      level = math.max(level or entry.level, entry.level)
+    elseif entry.kind == "death" then
+      deaths = (deaths or 0) + entry.count
+    elseif entry.kind == "newCharacter" then
+      new = entry
+    end
+  end
+
+  local parts = {}
+  if new then
+    parts[1] = ("new Character %s (%d)"):format(name, math.max(new.level, level or new.level))
+  elseif level then
+    parts[1] = ("%d → %d"):format(from, level)
+  end
+  if deaths then parts[#parts + 1] = deaths == 1 and "died" or ("died %d×"):format(deaths) end
+  if #parts == 0 then return nil end
+  local part = table.concat(parts, ", ")
+  if not (new or isMain) then part = name .. " " .. part end
+  return part
+end
+
+-- One Member's block: their Characters' events condensed onto one line,
+-- the Main's first, then the rest by latest activity.
+local function memberBlock(self, id, entries)
+  local record = self.ledger:record(id)
+  local main = record and ns.Roster.main(record, self.now())
+  local block = {
+    memberId = id,
+    displayName = record and memberName(self, record) or "Someone",
+    main = main and main.name,
+    classFilename = main and main.classFilename,
+    time = 0,
+    highlights = {},
+  }
+
+  local byCharacter, characters = {}, {}
+  for _, entry in ipairs(entries) do
+    block.time = math.max(block.time, entry.time)
+    if HIGHLIGHT[entry.kind] then
+      block.highlights[#block.highlights + 1] = { kind = entry.kind, text = entry.text }
+    end
+    if entry.guid then
+      local forCharacter = byCharacter[entry.guid]
+      if not forCharacter then
+        forCharacter = { guid = entry.guid, time = 0 }
+        byCharacter[entry.guid] = forCharacter
+        characters[#characters + 1] = forCharacter
+      end
+      forCharacter[#forCharacter + 1] = entry
+      forCharacter.time = math.max(forCharacter.time, entry.time)
+    end
+  end
+
+  local mainGuid = main and main.guid
+  table.sort(characters, function(a, b)
+    if (a.guid == mainGuid) ~= (b.guid == mainGuid) then return a.guid == mainGuid end
+    if a.time ~= b.time then return a.time > b.time end
+    return a.guid < b.guid
+  end)
+  local parts = {}
+  for _, forCharacter in ipairs(characters) do
+    local character = record and record.characters[forCharacter.guid]
+    local part = characterPart(forCharacter, character and character.name or "?",
+      forCharacter.guid == mainGuid)
+    if part then parts[#parts + 1] = part end
+  end
+  if #parts > 0 then block.line = table.concat(parts, "; ") end
+  return block
+end
+
+-- While you were away: the unseen entries from other Members, one block
+-- per Member, most recent activity first, as { members, count }. Marks
+-- them seen. Nil when there are none.
+function Feed:takeSummary()
+  local byMember, ids, count = {}, {}, 0
+  for _, entry in ipairs(self.db.feed) do
+    if not entry.seen then
+      entry.seen = true
+      count = count + 1
+      local memberEntries = byMember[entry.memberId]
+      if not memberEntries then
+        memberEntries = {}
+        byMember[entry.memberId] = memberEntries
+        ids[#ids + 1] = entry.memberId
+      end
+      memberEntries[#memberEntries + 1] = entry
+    end
+  end
+  if count == 0 then return nil end
+
+  local members = {}
+  for i, id in ipairs(ids) do members[i] = memberBlock(self, id, byMember[id]) end
+  table.sort(members, function(a, b)
+    if a.time ~= b.time then return a.time > b.time end
+    return a.memberId < b.memberId
+  end)
+  return { members = members, count = count }
 end
 
 -- An entry as handed out: a fresh table UI may keep.

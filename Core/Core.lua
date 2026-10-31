@@ -59,10 +59,10 @@ function Core.new(deps)
 end
 
 -- Gossip's link is up only while in a Crew. Settling after login starts
--- once it is.
+-- once it is, and starts over if it goes down first.
 local function updateLink(self)
   local up = self.linkUp and self.db.crew ~= nil
-  if up then self.log:linkUp() end
+  if up then self.log:linkUp() else self.log:linkDown() end
   self.gossip:setLink(up)
 end
 
@@ -134,10 +134,24 @@ local function checkOnline(self)
   if onlineChanged(self) then self.listener("changed") end
 end
 
+-- Sync has settled after an initial login: While you were away goes out
+-- if the popup is on and there's anything unseen, which is then seen. The
+-- summary is { members, count }: a Member has memberId, displayName, main
+-- and classFilename (their Main), time (latest activity), line (their
+-- Characters' events condensed, e.g. "18 → 24, died 3×; Jaina 10 → 12",
+-- or nil) and highlights ({ kind, text } for max level, joined and left).
+local function awaySummary(self)
+  if not self:isAwayPopupOn() then return end
+  local summary = self.log:takeSummary()
+  if not summary then return end
+  self.listener("awaySummary", summary)
+  self.listener("changed")
+end
+
 -- Called once a second. Core decides what is due.
 function Core:tick()
   self.gossip:tick()
-  self.log:tick()
+  if self.log:tick() then awaySummary(self) end
   checkOnline(self)
 end
 
@@ -165,6 +179,18 @@ end
 
 function Core:isChatLinesOn()
   return not self.db.chatLinesOff
+end
+
+-- Show While you were away on login: on by default.
+function Core:setAwayPopup(on)
+  local off = not on or nil
+  if off == self.db.awayPopupOff then return end
+  self.db.awayPopupOff = off
+  self.listener("changed")
+end
+
+function Core:isAwayPopupOn()
+  return not self.db.awayPopupOff
 end
 
 -- Your display name, or nil until one is set.

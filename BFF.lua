@@ -30,6 +30,19 @@ local function chatLine(entry)
   say(text)
 end
 
+-- While you were away waits for combat to end.
+local pendingAway
+local eventFrame = CreateFrame("Frame")
+
+local function showAway(summary)
+  if InCombatLockdown() then
+    pendingAway = summary
+    eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+  else
+    ns.Away.show(summary)
+  end
+end
+
 local function onCoreEvent(event, kind)
   if event == "changed" then
     ns.Panel.refresh()
@@ -42,6 +55,8 @@ local function onCoreEvent(event, kind)
     say(MESSAGES[kind])
   elseif event == "feedEntry" then
     chatLine(kind)
+  elseif event == "awaySummary" then
+    showAway(kind)
   end
 end
 
@@ -76,11 +91,15 @@ local function start(isInitialLogin)
   end
 end
 
-local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_ENTERING_WORLD" and not ns.core then
     start((...))
+  elseif event == "PLAYER_REGEN_ENABLED" then
+    eventFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+    local summary = pendingAway
+    pendingAway = nil
+    if summary then ns.Away.show(summary) end
   end
 end)
 
