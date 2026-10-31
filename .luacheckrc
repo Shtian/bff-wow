@@ -22,7 +22,6 @@ stds.wow = {
     "ChatFrameUtil",
     "ChatThrottleLib",
     "CreateFrame",
-    "Enum",
     "ERR_TOO_MANY_CHAT_CHANNELS",
     "GetChannelList",
     "GetChannelName",

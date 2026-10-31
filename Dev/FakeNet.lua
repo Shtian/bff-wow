@@ -126,7 +126,7 @@ function FakeNet:attach(core, name)
   return client
 end
 
--- The Member records and events a client's Core produced.
+-- How many times the client's Core fired this event (and notice kind).
 function Client:count(event, kind)
   local n = 0
   for _, e in ipairs(self.events) do
@@ -152,6 +152,7 @@ local function newCore(client, initialLogin)
     maxLevel = net.maxLevel,
   })
   client.core:updateOwn(copy(client.character))
+  client.memberId = client.core:rows()[1].memberId
 end
 
 local function bringUp(client)
@@ -243,7 +244,7 @@ end
 
 -- The row the client's Core shows for another client, or nil.
 function Client:rowFor(other)
-  local id = other.db.memberId
+  local id = other.memberId
   for _, row in ipairs(self.core:rows()) do
     if row.memberId == id then return row end
   end

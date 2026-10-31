@@ -2,8 +2,9 @@
 -- versions you hold, and DATA carries full records. Whoever holds something
 -- newer than a DIGEST shows replies with DATA, whoever lacks something
 -- replies with their own DIGEST, and a reply someone else already made is
--- dropped. Gossip is open only while Core may send (in a Crew, link up, not
--- paused or receive-only); a change made while closed goes out on opening.
+-- dropped. Gossip talks only while the link is up (and in a Crew), not
+-- paused, and not receive-only; a change made meanwhile goes out once it
+-- talks again.
 -- See the sync resolution on #8 and docs/design/code-structure.md.
 
 local _, ns = ...
@@ -19,13 +20,16 @@ local HEARTBEAT = 5 * 60
 local DIGEST_SIZE = 10
 
 -- ledger; now() and random() from Core; send(message) encodes and hands a
--- message to the link.
-function Gossip.new(ledger, now, random, send)
+-- message to the link; receiveOnly for Trial and Veteran accounts.
+function Gossip.new(ledger, now, random, send, receiveOnly)
   return setmetatable({
     ledger = ledger,
     now = now,
     random = random,
     send = send,
+    receiveOnly = receiveOnly,
+    linkUp = false,
+    paused = false,
     open = false,
     -- Own record changed since own DATA last went out, and when it's due.
     dirty = false,
@@ -49,8 +53,16 @@ local function isEmpty(set)
   return next(set) == nil
 end
 
-local function sendDigest(self)
+local function cancelDigest(self)
   self.digestDue, self.wanted = nil, nil
+end
+
+local function cancelOwed(self)
+  self.owed, self.owedDue = {}, nil
+end
+
+local function sendDigest(self)
+  cancelDigest(self)
   self.send({ type = "DIGEST", versions = self.ledger:digest(DIGEST_SIZE) })
 end
 
@@ -67,21 +79,41 @@ local function sendOwed(self)
     local record = self.ledger:record(id)
     if record then records[#records + 1] = record end
   end
-  self.owed, self.owedDue = {}, nil
+  cancelOwed(self)
   if #records > 0 then self.send({ type = "DATA", records = records }) end
 end
 
--- Starts or stops talking. Opening sends a fresh DIGEST, plus own DATA if
--- the own record changed while closed. Closing drops replies owed, since
--- the DIGEST on opening again asks for whatever is still missing.
-function Gossip:setOpen(open)
+-- Starts or stops talking. Starting sends a fresh DIGEST, plus own DATA if
+-- the own record changed meanwhile. Stopping drops replies owed, since the
+-- DIGEST on starting again asks for whatever is still missing.
+local function update(self)
+  local open = self.linkUp and not self.paused and not self.receiveOnly
   if open == self.open then return end
   self.open = open
-  self.owed, self.owedDue = {}, nil
-  self.digestDue, self.wanted = nil, nil
+  cancelOwed(self)
+  cancelDigest(self)
   if not open then return end
   sendDigest(self)
   if self.dirty then sendOwn(self) else self.lastOwnSent = self.now() end
+end
+
+-- Whether the link is up and Core is in a Crew. Every change to up sends a
+-- fresh DIGEST.
+function Gossip:setLink(up)
+  self.linkUp = up
+  update(self)
+end
+
+-- Pause sharing: fully silent, so others see you as offline.
+function Gossip:setPaused(paused)
+  self.paused = paused
+  update(self)
+end
+
+-- Sends a message right away whether or not Gossip is talking (leaving the
+-- Crew), unless receive-only.
+function Gossip:sendNow(message)
+  if not self.receiveOnly then self.send(message) end
 end
 
 -- The own record changed. urgency is "now" (ding, death, new Character,
@@ -120,7 +152,7 @@ function Gossip:digestReceived(versions)
       local theirs = versions[id] or 0
       if theirs > ledger:version(id) then covered = false end
     end
-    if covered then self.digestDue, self.wanted = nil, nil end
+    if covered then cancelDigest(self) end
   end
   if not self.open then return end
 
@@ -152,7 +184,7 @@ function Gossip:recordSeen(id, version)
   end
   if self.wanted and self.wanted[id] and held >= self.wanted[id] then
     self.wanted[id] = nil
-    if isEmpty(self.wanted) then self.digestDue, self.wanted = nil, nil end
+    if isEmpty(self.wanted) then cancelDigest(self) end
   end
 end
 

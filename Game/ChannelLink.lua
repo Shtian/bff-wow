@@ -235,12 +235,12 @@ local function onRefused()
   end)
 end
 
-local SUCCESS = Enum and Enum.SendAddonMessageResult and Enum.SendAddonMessageResult.Success or 0
-
--- AceComm's callback, once per chunk. Handled on the next frame, since it
--- can run inside Core's own send.
-local function onSent(_, _, _, result)
-  if result ~= nil and result ~= SUCCESS then C_Timer.After(0, onRefused) end
+-- AceComm's callback, once per chunk. Through AceComm, ChatThrottleLib's
+-- didSend arrives fourth: false for a general error. ChatThrottleLib queues
+-- a throttled send again itself, so that one never gets here. Handled on
+-- the next frame, since it can run inside Core's own send.
+local function onSent(_, _, _, didSend)
+  if didSend == false then C_Timer.After(0, onRefused) end
 end
 
 -- Starts the link. core gets up(), down(), gone(name) and received(message); notice

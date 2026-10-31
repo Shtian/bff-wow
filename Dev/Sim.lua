@@ -1,7 +1,8 @@
 -- Sim: /bff sim attaches a few simulated Members to your real Core through
--- FakeNet, so the panel can be tried without a friend online. Their records
--- are kept and relayed like real ones, so it only runs in a Crew where no
--- one else is known yet: start a test Crew for it. Left out of releases.
+-- FakeNet, so the panel can be tried without another Member online. Their
+-- records are kept and relayed like real ones, so it only runs in a Crew
+-- where no one else is known yet: start a test Crew for it. Left out of
+-- releases.
 
 local _, ns = ...
 
