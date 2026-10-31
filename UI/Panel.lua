@@ -1,62 +1,83 @@
--- Panel: the BFF window, variant A "Roster" from the panel decision (#7).
--- Without a Crew it shows the setup view (display name, Start or Join); in
--- one, a Roster and a Feed tab. The Roster has your own row pinned on top,
--- then a row per Member with expandable Alts, sort buttons, a tooltip and
+-- Panel: the BFF window, in the Skin's flat look. Without a Crew it shows
+-- the setup view (display name, Start or Join); in one, a sidebar with
+-- Roster, Feed and Settings. The Roster has your own row pinned on top,
+-- then a row per Member with expandable Alts, a sort menu, a tooltip and
 -- right-click menu per Character, and a footer with Pause sharing, the
--- hidden count, removed Members and the Crew code. The Feed lists Core's
--- entries by day and marks them seen while open. A gear in the title bar
--- opens the settings page. It never sees a Member record.
+-- hidden count, removed Members and the Crew code. The Feed is a timeline
+-- of Core's entries by day, an icon per kind, and marks them seen while
+-- open. It never sees a Member record.
 
 local _, ns = ...
 
 local Panel = {}
 ns.Panel = Panel
 
-local WIDTH = 360
-local ROW_HEIGHT = 38
-local ALT_HEIGHT = 18
-local DIVIDER = 18
-local PADDING = 12
-local TOP = 30
-local TABS = 26
-local SORTBAR = 24
-local FEED_HEIGHT = 320
-local FEED_LINE = 16
-local FEED_DAY = 22
-local FOOTER = 92
-local SETUP_HEIGHT = 230
+local Skin = ns.Skin
+
+local WIDTH = 440
+local SIDEBAR = 104
+local CONTENT_WIDTH = WIDTH - SIDEBAR - 1
+local HEADER = Skin.HEADER_HEIGHT
+local NAV_HEIGHT = 30
+local ROW_HEIGHT = 44
+local ALT_HEIGHT = 20
+local SECTION = 26
+local INSET = 12
+local MIN_HEIGHT = 200
+local FEED_HEIGHT = 340
+local FEED_ENTRY = 38
+local FEED_DAY = 26
+-- The timeline's line runs through the middle of the entry icons.
+local NODE = 24
+local LINE_X = INSET + NODE / 2 - 1
+local SETUP_HEIGHT = 250
 -- Last seen goes stale, so the open panel redraws this often.
 local REDRAW_EVERY = 30
+local SCROLL_STEP = 40
 
+local TITLE = "Best Friends in Forever"
 local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
 local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
 local PAUSED = "Sharing is paused: the others see you as offline."
 local FEED_EMPTY = "Nothing yet. Dings, deaths and new Characters show up here."
 
-local GOLD = { 1, 0.82, 0 }
-local MUTED = { 0.6, 0.6, 0.6 }
-local WHITE = { 1, 1, 1 }
-local ONLINE = { 0.25, 1, 0.25 }
+local GOLD = Skin.GOLD
+local MUTED = Skin.MUTED
+local DIM = Skin.DIM
+local TEXT = Skin.TEXT
+local ONLINE = Skin.ONLINE
+local ERROR = { 1, 0.42, 0.42 }
 
-local SORTS = { { "online", "Online" }, { "level", "Level" }, { "name", "Name" } }
+local SORTS = { { "online", "Online first" }, { "level", "Level" }, { "name", "Name" } }
 -- Entries shown in gold.
 local HIGHLIGHT = { maxLevel = true, joined = true, left = true }
+-- Each kind's timeline icon. The icons tell kinds apart, not colour: they
+-- are all drawn in the same grey.
+local ICONS = {
+  ding = "Interface\\Buttons\\Arrow-Up-Up",
+  maxLevel = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1",
+  death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
+  newCharacter = "Interface\\FriendsFrame\\UI-Toast-FriendRequestIcon",
+  joined = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
+  left = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
+}
 
 local core
 local frame
 local setup
-local tabBar
+local nav
+local section
 local feedView
-local sortBar
 local footer
-local divider
 local rowFrames = {}
 local altFrames = {}
--- What the UI itself remembers: the tab, the sort, and which Members show
--- Alts.
+-- What the UI itself remembers: the tab, the sort, which Members show
+-- Alts, and which Feed entries were unseen when the Feed was opened (they
+-- keep their "new" tag until you leave the Feed).
 local tab = "roster"
 local order = "online"
 local expanded = {}
+local fresh = {}
 
 local function classColor(classFilename)
   local color = classFilename and RAID_CLASS_COLORS[classFilename]
@@ -78,16 +99,7 @@ end
 
 local function lastSeenText(online, sinceSeen)
   if online then return "online" end
-  return ago(sinceSeen)
-end
-
-local function setColor(fontString, color)
-  fontString:SetTextColor(color[1], color[2], color[3])
-end
-
-local function setDot(texture, online)
-  texture:SetTexture(online and "Interface\\FriendsFrame\\StatusIcon-Online"
-    or "Interface\\FriendsFrame\\StatusIcon-Offline")
+  return ago(sinceSeen) .. " ago"
 end
 
 -- Whisper and Invite, guarded since Midnight moved some chat functions.
@@ -168,15 +180,8 @@ local function showMenu(owner)
   end)
 end
 
-local function createLabel(parent, text, template)
-  local label = parent:CreateFontString(nil, "OVERLAY", template or "GameFontNormal")
-  label:SetJustifyH("LEFT")
-  label:SetText(text)
-  return label
-end
-
 local function createTag(parent)
-  local tag = createLabel(parent, "", "GameFontNormalSmall")
+  local tag = Skin.label(parent, "small", MUTED)
   tag:Hide()
   return tag
 end
@@ -197,14 +202,14 @@ end
 
 local function setTag(tag, text, color)
   tag:SetText(text or "")
-  if text then setColor(tag, color) end
+  if text then Skin.color(tag, color) end
 end
 
 local function characterButton(height)
-  local button = CreateFrame("Button", nil, frame)
+  local button = CreateFrame("Button", nil, frame.content)
   button:SetHeight(height)
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  button:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+  Skin.fill(button, Skin.HOVER, "HIGHLIGHT")
   button:SetScript("OnEnter", showTooltip)
   button:SetScript("OnLeave", hideTooltip)
   return button
@@ -219,9 +224,31 @@ local function onRowClick(button, mouse)
   end
 end
 
+-- A round status dot with a ring in the window's colour, so it reads on
+-- top of a class icon.
+local function createDot(parent, size)
+  local ring = parent:CreateTexture(nil, "OVERLAY", nil, 1)
+  ring:SetSize(size + 4, size + 4)
+  ring:SetColorTexture(Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1)
+  Skin.round(parent, ring)
+  local dot = parent:CreateTexture(nil, "OVERLAY", nil, 2)
+  dot:SetSize(size, size)
+  dot:SetPoint("CENTER", ring)
+  dot:SetColorTexture(1, 1, 1, 1)
+  Skin.round(parent, dot)
+  dot.ring = ring
+  return dot
+end
+
+local function setDot(dot, online)
+  Skin.color(dot, online and ONLINE or Skin.OFFLINE)
+end
+
 local function createRow()
   local row = characterButton(ROW_HEIGHT)
   row:SetScript("OnClick", onRowClick)
+
+  row.ownBackground = Skin.fill(row, { GOLD[1], GOLD[2], GOLD[3], 0.05 })
 
   -- The gold left border for "can play with you".
   row.border = row:CreateTexture(nil, "ARTWORK")
@@ -230,42 +257,36 @@ local function createRow()
   row.border:SetPoint("BOTTOMLEFT")
   row.border:SetWidth(2)
 
-  row.dot = row:CreateTexture(nil, "ARTWORK")
-  row.dot:SetSize(12, 12)
-  row.dot:SetPoint("TOPLEFT", 6, -5)
-
   row.icon = row:CreateTexture(nil, "ARTWORK")
-  row.icon:SetSize(22, 22)
-  row.icon:SetPoint("TOPLEFT", 20, -3)
+  row.icon:SetSize(28, 28)
+  row.icon:SetPoint("TOPLEFT", INSET, -7)
+  row.dot = createDot(row, 8)
+  row.dot.ring:SetPoint("CENTER", row.icon, "BOTTOMRIGHT", -1, 1)
 
-  row.name = createLabel(row, "", "GameFontNormal")
-  row.name:SetPoint("TOPLEFT", 48, -4)
-  row.level = createLabel(row, "", "GameFontHighlightSmall")
-  row.level:SetPoint("LEFT", row.name, "RIGHT", 5, 0)
+  row.name = Skin.label(row, "body")
+  row.name:SetPoint("TOPLEFT", INSET + 38, -6)
+  row.level = Skin.badge(row)
+  row.level:SetPoint("LEFT", row.name, "RIGHT", 6, 0)
   row.member = createTag(row)
   row.onAlt = createTag(row)
   row.canPlay = createTag(row)
 
-  row.zone = createLabel(row, "", "GameFontHighlightSmall")
+  row.zone = Skin.label(row, "small", MUTED)
   row.zone:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -2)
-  setColor(row.zone, MUTED)
 
-  row.seen = createLabel(row, "", "GameFontHighlightSmall")
+  row.seen = Skin.label(row, "small")
   row.seen:SetJustifyH("RIGHT")
-  row.seen:SetPoint("TOPRIGHT", -4, -4)
-  row.more = createLabel(row, "", "GameFontHighlightSmall")
+  row.seen:SetPoint("TOPRIGHT", -INSET, -8)
+  row.more = Skin.label(row, "small")
   row.more:SetJustifyH("RIGHT")
-  row.more:SetPoint("TOPRIGHT", row.seen, "BOTTOMRIGHT", 0, -2)
+  row.more:SetPoint("TOPRIGHT", row.seen, "BOTTOMRIGHT", 0, -3)
 
   row.xp = CreateFrame("StatusBar", nil, row)
-  row.xp:SetPoint("BOTTOMLEFT", 48, 2)
-  row.xp:SetPoint("BOTTOMRIGHT", -4, 2)
-  row.xp:SetHeight(3)
-  row.xp:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-  row.xp:SetStatusBarColor(0.58, 0.0, 0.55)
-  local background = row.xp:CreateTexture(nil, "BACKGROUND")
-  background:SetAllPoints()
-  background:SetColorTexture(0, 0, 0, 0.5)
+  row.xp:SetPoint("BOTTOMLEFT", INSET + 38, 4)
+  row.xp:SetPoint("BOTTOMRIGHT", -INSET, 4)
+  row.xp:SetHeight(2)
+  row.xp:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+  Skin.fill(row.xp, { 1, 1, 1, 0.06 })
 
   rowFrames[#rowFrames + 1] = row
   return row
@@ -273,6 +294,7 @@ end
 
 local function drawRow(row, data)
   row.row, row.character = data, data
+  row.ownBackground:SetShown(data.own)
   row.border:SetShown(data.canPlay)
   setDot(row.dot, data.online)
   row.icon:SetAtlas("classicon-" .. (data.classFilename or ""):lower())
@@ -285,11 +307,11 @@ local function drawRow(row, data)
   placeTags(row.level, { row.member, row.onAlt, row.canPlay })
   row.zone:SetText(data.zone or "")
 
-  row.seen:SetText(lastSeenText(data.online, data.sinceSeen))
-  setColor(row.seen, data.online and ONLINE or MUTED)
+  row.seen:SetText(data.own and "" or lastSeenText(data.online, data.sinceSeen))
+  Skin.color(row.seen, data.online and ONLINE or DIM)
   if #data.alts > 0 then
-    row.more:SetText(("%s %d more"):format(expanded[data.memberId] and "-" or "+", #data.alts))
-    setColor(row.more, data.altsCanPlay and GOLD or MUTED)
+    row.more:SetText(("%s%d more"):format(expanded[data.memberId] and "- " or "+ ", #data.alts))
+    Skin.color(row.more, data.altsCanPlay and GOLD or MUTED)
   else
     row.more:SetText("")
   end
@@ -297,7 +319,9 @@ local function drawRow(row, data)
   local maxXp = data.maxXp or 0
   row.xp:SetMinMaxValues(0, math.max(maxXp, 1))
   row.xp:SetValue(maxXp > 0 and (data.xp or 0) or 0)
-  row:SetAlpha(data.online and 1 or 0.7)
+  row.xp:SetStatusBarColor(classColor(data.classFilename))
+  row.xp:SetShown(maxXp > 0)
+  row:SetAlpha(data.online and 1 or 0.75)
   row:Show()
 end
 
@@ -308,26 +332,21 @@ end
 local function createAlt()
   local alt = characterButton(ALT_HEIGHT)
   alt:SetScript("OnClick", onAltClick)
-  alt.dot = alt:CreateTexture(nil, "ARTWORK")
-  alt.dot:SetSize(10, 10)
-  alt.dot:SetPoint("LEFT", 30, 0)
-  alt.name = createLabel(alt, "", "GameFontNormalSmall")
-  alt.name:SetPoint("LEFT", 44, 0)
-  alt.level = createLabel(alt, "", "GameFontHighlightSmall")
-  alt.level:SetPoint("LEFT", alt.name, "RIGHT", 5, 0)
+  alt.name = Skin.label(alt, "text")
+  alt.name:SetPoint("LEFT", INSET + 38, 0)
+  alt.level = Skin.badge(alt)
+  alt.level:SetPoint("LEFT", alt.name, "RIGHT", 6, 0)
   alt.main = createTag(alt)
   alt.canPlay = createTag(alt)
-  alt.right = createLabel(alt, "", "GameFontHighlightSmall")
+  alt.right = Skin.label(alt, "small", DIM)
   alt.right:SetJustifyH("RIGHT")
-  alt.right:SetPoint("RIGHT", -4, 0)
-  setColor(alt.right, MUTED)
+  alt.right:SetPoint("RIGHT", -INSET, 0)
   altFrames[#altFrames + 1] = alt
   return alt
 end
 
 local function drawAlt(alt, row, data)
   alt.row, alt.character = row, data
-  setDot(alt.dot, false)
   alt.name:SetText(data.name)
   alt.name:SetTextColor(classColor(data.classFilename))
   alt.level:SetText(data.level)
@@ -335,7 +354,7 @@ local function drawAlt(alt, row, data)
   setTag(alt.canPlay, data.canPlay and "can play" or nil, GOLD)
   placeTags(alt.level, { alt.main, alt.canPlay })
   local zone = data.zone and data.zone .. " · " or ""
-  alt.right:SetText(zone .. ago(data.sinceSeen))
+  alt.right:SetText(zone .. ago(data.sinceSeen) .. " ago")
   alt:Show()
 end
 
@@ -343,187 +362,283 @@ local function hideAll(lines, from)
   for i = from, #lines do lines[i]:Hide() end
 end
 
--- Places a line under the previous one, at y from the frame's top.
+-- Places a line across the content area, at y from its top.
 local function place(line, y)
   line:ClearAllPoints()
-  line:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, y)
-  line:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PADDING, y)
+  line:SetPoint("TOPLEFT", frame.content, "TOPLEFT", 0, y)
+  line:SetPoint("TOPRIGHT", frame.content, "TOPRIGHT", 0, y)
 end
 
-local function createSortBar()
-  sortBar = CreateFrame("Frame", nil, frame)
-  sortBar:SetHeight(SORTBAR)
-  sortBar:SetPoint("TOPLEFT", PADDING, -TOP - TABS)
-  sortBar:SetPoint("TOPRIGHT", -PADDING, -TOP - TABS)
-  local label = createLabel(sortBar, "Sort", "GameFontNormalSmall")
-  label:SetPoint("LEFT", 4, 0)
-  local anchor = label
-  sortBar.buttons = {}
-  for _, sort in ipairs(SORTS) do
-    local button = CreateFrame("Button", nil, sortBar, "UIPanelButtonTemplate")
-    button:SetSize(60, 18)
-    button:SetText(sort[2])
-    button:SetPoint("LEFT", anchor, "RIGHT", 6, 0)
-    button:SetScript("OnClick", function()
-      order = sort[1]
-      Panel.refresh()
-    end)
-    button.order = sort[1]
-    sortBar.buttons[#sortBar.buttons + 1] = button
-    anchor = button
-  end
-end
-
-local function drawSortBar()
-  if not sortBar then createSortBar() end
-  for _, button in ipairs(sortBar.buttons) do
-    button:SetEnabled(button.order ~= order)
-  end
-  sortBar:Show()
-end
-
-local function createTabBar()
-  tabBar = CreateFrame("Frame", nil, frame)
-  tabBar:SetHeight(TABS)
-  tabBar:SetPoint("TOPLEFT", PADDING, -TOP)
-  tabBar:SetPoint("TOPRIGHT", -PADDING, -TOP)
-  tabBar.buttons = {}
-  local anchor
-  for _, name in ipairs({ "roster", "feed" }) do
-    local button = CreateFrame("Button", nil, tabBar, "UIPanelButtonTemplate")
-    button:SetSize(90, 20)
-    if anchor then
-      button:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
-    else
-      button:SetPoint("LEFT", 0, 0)
+local function showSortMenu(owner)
+  MenuUtil.CreateContextMenu(owner, function(_, root)
+    root:CreateTitle("Sort by")
+    for _, sort in ipairs(SORTS) do
+      root:CreateRadio(sort[2], function() return order == sort[1] end, function()
+        order = sort[1]
+        Panel.refresh()
+      end)
     end
-    button:SetScript("OnClick", function()
+  end)
+end
+
+-- "CREW ———— [Sort: Online first]" between your row and the Members'.
+local function createSection()
+  section = CreateFrame("Frame", nil, frame.content)
+  section:SetHeight(SECTION)
+  local label = Skin.label(section, "tiny", DIM)
+  label:SetPoint("LEFT", INSET, -2)
+  label:SetText("CREW")
+
+  section.sort = CreateFrame("Button", nil, section)
+  section.sort:SetHeight(18)
+  section.sort:SetPoint("RIGHT", -INSET, -2)
+  Skin.border(section.sort, Skin.BORDER)
+  Skin.fill(section.sort, Skin.HOVER, "HIGHLIGHT")
+  section.sort.label = Skin.label(section.sort, "small", MUTED)
+  section.sort.label:SetPoint("CENTER")
+  section.sort:SetScript("OnClick", showSortMenu)
+
+  local line = section:CreateTexture(nil, "ARTWORK")
+  line:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
+  line:SetHeight(1)
+  line:SetPoint("LEFT", label, "RIGHT", 8, 0)
+  line:SetPoint("RIGHT", section.sort, "LEFT", -8, 0)
+end
+
+local function drawSection()
+  if not section then createSection() end
+  for _, sort in ipairs(SORTS) do
+    if sort[1] == order then section.sort.label:SetText("Sort: " .. sort[2]) end
+  end
+  section.sort:SetWidth(section.sort.label:GetStringWidth() + 16)
+end
+
+-- The sidebar: Roster and Feed on top, Settings at the bottom.
+local function navButton(label, onClick)
+  local button = CreateFrame("Button", nil, frame.sidebar)
+  button:SetHeight(NAV_HEIGHT)
+  button.selected = Skin.fill(button, { GOLD[1], GOLD[2], GOLD[3], 0.07 })
+  button.bar = button:CreateTexture(nil, "ARTWORK")
+  button.bar:SetColorTexture(GOLD[1], GOLD[2], GOLD[3])
+  button.bar:SetPoint("TOPLEFT")
+  button.bar:SetPoint("BOTTOMLEFT")
+  button.bar:SetWidth(2)
+  Skin.fill(button, { 1, 1, 1, 0.03 }, "HIGHLIGHT")
+  button.label = Skin.label(button, "text", MUTED)
+  button.label:SetPoint("LEFT", 14, 0)
+  button.label:SetText(label)
+  button:SetScript("OnClick", onClick)
+  return button
+end
+
+local function setSelected(button, selected)
+  button.selected:SetShown(selected)
+  button.bar:SetShown(selected)
+  Skin.color(button.label, selected and TEXT or MUTED)
+end
+
+local function createNav()
+  nav = {}
+  local function open(name)
+    return function()
       tab = name
       Panel.refresh()
-    end)
-    button.tab = name
-    tabBar.buttons[name] = button
-    anchor = button
+    end
   end
-  local line = tabBar:CreateTexture(nil, "ARTWORK")
-  line:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.3)
-  line:SetHeight(1)
-  line:SetPoint("BOTTOMLEFT", 0, 1)
-  line:SetPoint("BOTTOMRIGHT", 0, 1)
+  nav.roster = navButton("Roster", open("roster"))
+  nav.roster:SetPoint("TOPLEFT", 0, -8)
+  nav.roster:SetPoint("TOPRIGHT", 0, -8)
+  nav.feed = navButton("Feed", open("feed"))
+  nav.feed:SetPoint("TOPLEFT", nav.roster, "BOTTOMLEFT")
+  nav.feed:SetPoint("TOPRIGHT", nav.roster, "BOTTOMRIGHT")
+  nav.feed.badge = Skin.badge(nav.feed, "tiny", { 0.1, 0.08, 0 }, GOLD)
+  nav.feed.badge:SetPoint("RIGHT", -10, 0)
+  -- The panel steps aside so it doesn't cover the settings.
+  nav.settings = navButton("Settings", function()
+    if ns.Settings.open() then frame:Hide() end
+  end)
+  nav.settings:SetPoint("BOTTOMLEFT", 0, 8)
+  nav.settings:SetPoint("BOTTOMRIGHT", 0, 8)
 end
 
-local function drawTabBar(unseen)
-  if not tabBar then createTabBar() end
-  tabBar.buttons.roster:SetText("Roster")
-  tabBar.buttons.feed:SetText(unseen > 0 and tab ~= "feed" and ("Feed (%d)"):format(unseen) or "Feed")
-  for name, button in pairs(tabBar.buttons) do button:SetEnabled(name ~= tab) end
-  tabBar:Show()
+local function drawNav(unseen)
+  if not nav then createNav() end
+  setSelected(nav.roster, tab == "roster")
+  setSelected(nav.feed, tab == "feed")
+  setSelected(nav.settings, false)
+  nav.feed.badge:SetText(unseen)
+  nav.feed.badge:SetShown(unseen > 0 and tab ~= "feed")
 end
 
--- The Feed tab: a scrolling list of day headers and entry lines.
+-- The Feed: a timeline in a scroll frame that scrolls with the mouse wheel,
+-- with a thin thumb on the right showing where you are.
+local function updateThumb()
+  local range = feedView:GetVerticalScrollRange()
+  local thumb = feedView.thumb
+  if range <= 0 then
+    thumb:Hide()
+    return
+  end
+  local visible = feedView:GetHeight()
+  local height = math.max(24, visible * visible / (visible + range))
+  thumb:SetHeight(height)
+  thumb:ClearAllPoints()
+  thumb:SetPoint("TOPRIGHT", feedView, "TOPRIGHT", 4, -(visible - height) * feedView:GetVerticalScroll() / range)
+  thumb:Show()
+end
+
+local function scrollFeed(_, delta)
+  local range = feedView:GetVerticalScrollRange()
+  local y = math.min(range, math.max(0, feedView:GetVerticalScroll() - delta * SCROLL_STEP))
+  feedView:SetVerticalScroll(y)
+  updateThumb()
+end
+
 local function createFeedView()
-  feedView = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-  feedView:SetPoint("TOPLEFT", PADDING, -TOP - TABS - 4)
-  feedView:SetPoint("RIGHT", frame, "RIGHT", -PADDING - 24, 0)
-  feedView:SetHeight(FEED_HEIGHT)
+  feedView = CreateFrame("ScrollFrame", nil, frame.content)
+  feedView:SetPoint("TOPLEFT")
+  feedView:SetPoint("BOTTOMRIGHT", -6, 0)
+  feedView:EnableMouseWheel(true)
+  feedView:SetScript("OnMouseWheel", scrollFeed)
   feedView.content = CreateFrame("Frame", nil, feedView)
-  feedView.content:SetSize(WIDTH - 2 * PADDING - 24, FEED_HEIGHT)
+  feedView.content:SetSize(CONTENT_WIDTH - 6, FEED_HEIGHT)
   feedView:SetScrollChild(feedView.content)
+  feedView.thumb = feedView:CreateTexture(nil, "OVERLAY")
+  feedView.thumb:SetColorTexture(1, 1, 1, 0.18)
+  feedView.thumb:SetWidth(3)
+
+  feedView.line = feedView.content:CreateTexture(nil, "BACKGROUND")
+  feedView.line:SetColorTexture(1, 1, 1, 0.08)
+  feedView.line:SetWidth(2)
   feedView.days = {}
-  feedView.lines = {}
-  feedView.empty = createLabel(feedView.content, FEED_EMPTY, "GameFontHighlightSmall")
-  feedView.empty:SetPoint("TOPLEFT", 4, -8)
-  feedView.empty:SetPoint("RIGHT", -4, 0)
-  setColor(feedView.empty, MUTED)
+  feedView.entries = {}
+  feedView.empty = Skin.label(feedView.content, "text", MUTED)
+  feedView.empty:SetPoint("TOPLEFT", INSET, -INSET)
+  feedView.empty:SetPoint("RIGHT", -INSET, 0)
+  feedView.empty:SetText(FEED_EMPTY)
 end
 
+-- A day's label in a chip on the timeline's line.
 local function createFeedDay()
-  local day = createLabel(feedView.content, "", "GameFontNormalSmall")
+  local day = CreateFrame("Frame", nil, feedView.content)
+  day:SetHeight(16)
+  Skin.fill(day, Skin.RAISED)
+  Skin.border(day, Skin.BORDER)
+  day.label = Skin.label(day, "tiny", DIM)
+  day.label:SetPoint("CENTER", 0, 0)
   feedView.days[#feedView.days + 1] = day
   return day
 end
 
-local function createFeedLine()
-  local line = CreateFrame("Frame", nil, feedView.content)
-  line:SetHeight(FEED_LINE)
-  line.time = createLabel(line, "", "GameFontHighlightSmall")
-  line.time:SetPoint("LEFT", 0, 0)
-  line.time:SetWidth(36)
-  setColor(line.time, MUTED)
-  line.text = createLabel(line, "", "GameFontHighlightSmall")
-  line.text:SetPoint("LEFT", line.time, "RIGHT", 4, 0)
-  line.text:SetPoint("RIGHT", -2, 0)
-  line.text:SetWordWrap(false)
-  feedView.lines[#feedView.lines + 1] = line
-  return line
+local function roundTexture(parent, size, color, sublevel)
+  local texture = parent:CreateTexture(nil, "ARTWORK", nil, sublevel)
+  texture:SetSize(size, size)
+  texture:SetPoint("CENTER")
+  texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+  return Skin.round(parent, texture)
+end
+
+-- An entry: a round node on the line with the kind's icon, the text, and
+-- the time under it.
+local function createFeedEntry()
+  local entry = CreateFrame("Frame", nil, feedView.content)
+  entry:SetHeight(FEED_ENTRY)
+  local node = CreateFrame("Frame", nil, entry)
+  node:SetSize(NODE + 2, NODE + 2)
+  node:SetPoint("TOPLEFT", INSET - 1, -3)
+  roundTexture(node, NODE + 2, { 1, 1, 1, 0.12 }, 1)
+  roundTexture(node, NODE, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3] }, 2)
+  roundTexture(node, NODE - 4, { 0.13, 0.12, 0.16 }, 3)
+  entry.icon = node:CreateTexture(nil, "OVERLAY")
+  entry.icon:SetSize(12, 12)
+  entry.icon:SetPoint("CENTER")
+
+  entry.text = Skin.label(entry, "text")
+  entry.text:SetPoint("TOPLEFT", node, "TOPRIGHT", 10, -2)
+  entry.text:SetPoint("RIGHT", -INSET - 36, 0)
+  entry.text:SetWordWrap(false)
+  entry.new = Skin.badge(entry, "tiny", { 0.1, 0.08, 0 }, GOLD)
+  entry.new:SetText("NEW")
+  entry.time = Skin.label(entry, "small", DIM)
+  entry.time:SetPoint("TOPLEFT", entry.text, "BOTTOMLEFT", 0, -2)
+  feedView.entries[#feedView.entries + 1] = entry
+  return entry
 end
 
 local function dayTitle(day)
-  if day.daysAgo == 0 then return "Today" end
-  if day.daysAgo == 1 then return "Yesterday" end
-  return date("%A %d %B", day.time)
+  if day.daysAgo == 0 then return "TODAY" end
+  if day.daysAgo == 1 then return "YESTERDAY" end
+  return date("%A %d %B", day.time):upper()
 end
 
-local function placeInFeed(item, y)
-  item:ClearAllPoints()
-  item:SetPoint("TOPLEFT", feedView.content, "TOPLEFT", 4, y)
-  item:SetPoint("RIGHT", feedView.content, "RIGHT", -4, 0)
+local function entryKey(entry)
+  return ("%d:%s:%s:%s"):format(entry.time, entry.memberId or "", entry.kind, entry.guid or "")
 end
 
--- Draws the Feed and marks it seen.
+local function drawFeedEntry(line, entry)
+  line.icon:SetTexture(ICONS[entry.kind] or ICONS.ding)
+  line.icon:SetDesaturated(true)
+  line.icon:SetVertexColor(0.82, 0.8, 0.86)
+  line.text:SetText(entry.text)
+  Skin.color(line.text, HIGHLIGHT[entry.kind] and GOLD or entry.own and MUTED or TEXT)
+  line.time:SetText(date("%H:%M", entry.time))
+  local isNew = fresh[entryKey(entry)]
+  line.new:ClearAllPoints()
+  line.new:SetPoint("LEFT", line.text, "LEFT", line.text:GetStringWidth() + 6, 0)
+  line.new:SetShown(isNew == true)
+end
+
+-- Draws the Feed and marks it seen; what was unseen keeps its tag while
+-- the Feed stays open.
 local function drawFeed(feed)
   if not feedView then createFeedView() end
-  local y, dayCount, lineCount = 0, 0, 0
+  for _, day in ipairs(feed.days) do
+    for _, entry in ipairs(day.entries) do
+      if not entry.seen then fresh[entryKey(entry)] = true end
+    end
+  end
+
+  local y, dayCount, entryCount = -INSET, 0, 0
   for _, day in ipairs(feed.days) do
     dayCount = dayCount + 1
-    local title = feedView.days[dayCount] or createFeedDay()
-    placeInFeed(title, y - 6)
-    title:SetText(dayTitle(day))
-    title:Show()
+    local chip = feedView.days[dayCount] or createFeedDay()
+    chip:ClearAllPoints()
+    chip:SetPoint("TOPLEFT", feedView.content, "TOPLEFT", INSET - 4, y)
+    chip.label:SetText(dayTitle(day))
+    chip:SetWidth(chip.label:GetStringWidth() + 16)
+    chip:Show()
     y = y - FEED_DAY
     for _, entry in ipairs(day.entries) do
-      lineCount = lineCount + 1
-      local line = feedView.lines[lineCount] or createFeedLine()
-      placeInFeed(line, y)
-      line.time:SetText(date("%H:%M", entry.time))
-      line.text:SetText(entry.text)
-      setColor(line.text, HIGHLIGHT[entry.kind] and GOLD or entry.own and MUTED or WHITE)
+      entryCount = entryCount + 1
+      local line = feedView.entries[entryCount] or createFeedEntry()
+      line:ClearAllPoints()
+      line:SetPoint("TOPLEFT", feedView.content, "TOPLEFT", 0, y)
+      line:SetPoint("RIGHT", feedView.content, "RIGHT")
+      drawFeedEntry(line, entry)
       line:Show()
-      y = y - FEED_LINE
+      y = y - FEED_ENTRY
     end
   end
   hideAll(feedView.days, dayCount + 1)
-  hideAll(feedView.lines, lineCount + 1)
-  feedView.empty:SetShown(lineCount == 0)
-  feedView.content:SetHeight(math.max(-y, 1))
+  hideAll(feedView.entries, entryCount + 1)
+  feedView.empty:SetShown(entryCount == 0)
+  feedView.line:ClearAllPoints()
+  feedView.line:SetPoint("TOPLEFT", LINE_X, -INSET - 8)
+  feedView.line:SetPoint("BOTTOMLEFT", LINE_X, INSET + 8)
+  feedView.line:SetShown(entryCount > 0)
+  feedView.content:SetHeight(math.max(-y + INSET, 1))
+  frame:SetHeight(HEADER + FEED_HEIGHT)
   feedView:Show()
-  frame:SetHeight(TOP + TABS + FEED_HEIGHT + 2 * PADDING)
+  updateThumb()
   if feed.unseen > 0 then core:feedSeen() end
 end
 
-local function createDivider()
-  divider = CreateFrame("Frame", nil, frame)
-  divider:SetHeight(DIVIDER)
-  local label = createLabel(divider, "Crew", "GameFontNormalSmall")
-  label:SetPoint("LEFT", 4, 0)
-  local line = divider:CreateTexture(nil, "ARTWORK")
-  line:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.3)
-  line:SetHeight(1)
-  line:SetPoint("LEFT", label, "RIGHT", 6, 0)
-  line:SetPoint("RIGHT", -4, 0)
-end
-
 local function create()
-  frame = CreateFrame("Frame", "BFFPanel", UIParent, "BasicFrameTemplateWithInset")
-  frame:SetSize(WIDTH, TOP + ROW_HEIGHT + PADDING)
+  frame = Skin.window("BFFPanel", WIDTH, TITLE)
   frame:SetPoint("CENTER")
-  frame:SetFrameStrata("DIALOG")
-  frame:SetMovable(true)
-  frame:EnableMouse(true)
-  frame:RegisterForDrag("LeftButton")
-  frame:SetScript("OnDragStart", frame.StartMoving)
-  frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+  frame:SetHeight(MIN_HEIGHT)
   frame:SetScript("OnShow", Panel.refresh)
+  frame:SetScript("OnHide", function() fresh = {} end)
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
     sinceRedraw = sinceRedraw + elapsed
@@ -532,89 +647,76 @@ local function create()
       Panel.refresh()
     end
   end)
-  frame:Hide()
-  -- Closes on Escape.
-  table.insert(UISpecialFrames, "BFFPanel")
 
-  local title = frame.TitleText
-  if not title then
-    title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    title:SetPoint("TOP", 0, -5)
-  end
-  frame.title = title
-  title:SetText("BFF")
+  -- "● 2 of 3 online", left of the close button.
+  frame.onlineDot = frame.header:CreateTexture(nil, "OVERLAY")
+  frame.onlineDot:SetSize(6, 6)
+  frame.onlineDot:SetColorTexture(1, 1, 1, 1)
+  Skin.color(frame.onlineDot, ONLINE)
+  Skin.round(frame.header, frame.onlineDot)
+  frame.onlineDot:SetPoint("RIGHT", frame.headerRight, "LEFT", -5, 0)
 
-  -- The gear, left of the close button, opens the settings page.
-  local gear = CreateFrame("Button", nil, frame)
-  gear:SetSize(16, 16)
-  gear:SetPoint("TOPRIGHT", -28, -4)
-  gear:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
-  gear:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
-  -- The panel steps aside so it doesn't cover the settings.
-  gear:SetScript("OnClick", function()
-    if ns.Settings.open() then frame:Hide() end
-  end)
-  gear:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText("Settings")
-    GameTooltip:Show()
-  end)
-  gear:SetScript("OnLeave", hideTooltip)
+  frame.sidebar = CreateFrame("Frame", nil, frame)
+  frame.sidebar:SetPoint("TOPLEFT", 1, -HEADER)
+  frame.sidebar:SetPoint("BOTTOMLEFT", 1, 1)
+  frame.sidebar:SetWidth(SIDEBAR - 1)
+  Skin.fill(frame.sidebar, Skin.SIDEBAR)
+  Skin.edge(frame.sidebar, "RIGHT", Skin.LINE)
+
+  frame.content = CreateFrame("Frame", nil, frame)
 end
 
-local function createEditBox(parent, width)
-  local box = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
-  box:SetSize(width, 20)
-  box:SetAutoFocus(false)
-  box:SetScript("OnEscapePressed", box.ClearFocus)
-  return box
-end
-
-local function createButton(parent, text, onClick)
-  local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-  button:SetSize(110, 22)
-  button:SetText(text)
-  button:SetScript("OnClick", onClick)
-  return button
+-- With a Crew the content sits right of the sidebar; without one it takes
+-- the whole window.
+local function layout(inCrew)
+  frame.sidebar:SetShown(inCrew)
+  frame.content:ClearAllPoints()
+  frame.content:SetPoint("TOPLEFT", inCrew and SIDEBAR or 1, -HEADER)
+  frame.content:SetPoint("BOTTOMRIGHT", -1, 1)
+  frame.onlineDot:SetShown(inCrew)
+  if not inCrew then frame.headerRight:SetText("") end
 end
 
 -- The setup view: display name, then Start a Crew or Join a Crew.
 local function createSetup()
-  setup = CreateFrame("Frame", nil, frame)
-  setup:SetPoint("TOPLEFT", PADDING + 4, -TOP)
-  setup:SetPoint("BOTTOMRIGHT", -PADDING - 4, PADDING)
+  setup = CreateFrame("Frame", nil, frame.content)
+  setup:SetPoint("TOPLEFT", INSET + 4, -INSET)
+  setup:SetPoint("BOTTOMRIGHT", -INSET - 4, INSET)
 
-  local nameLabel = createLabel(setup, "Display name")
+  local nameLabel = Skin.label(setup, "small", MUTED)
   nameLabel:SetPoint("TOPLEFT", 0, -4)
-  setup.name = createEditBox(setup, 200)
+  nameLabel:SetText("DISPLAY NAME")
+  setup.name = Skin.editBox(setup, 220)
   setup.name:SetMaxLetters(16)
-  setup.name:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 6, -6)
-  setup.nameError = createLabel(setup, "", "GameFontRedSmall")
-  setup.nameError:SetPoint("TOPLEFT", setup.name, "BOTTOMLEFT", -6, -4)
+  setup.name:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -6)
+  setup.nameError = Skin.label(setup, "small", ERROR)
+  setup.nameError:SetPoint("TOPLEFT", setup.name, "BOTTOMLEFT", 0, -4)
 
-  local startLabel = createLabel(setup, "Start a Crew")
-  startLabel:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -56)
-  setup.start = createButton(setup, "Start", function()
+  local startLabel = Skin.label(setup, "small", MUTED)
+  startLabel:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -62)
+  startLabel:SetText("START A CREW")
+  setup.start = Skin.button(setup, "Start", function()
     local _, reason = core:startCrew(setup.name:GetText())
     setup.nameError:SetText(reason and ns.MESSAGES[reason] or "")
-  end)
+  end, true)
   setup.start:SetPoint("TOPLEFT", startLabel, "BOTTOMLEFT", 0, -6)
 
-  local joinLabel = createLabel(setup, "Join a Crew")
-  joinLabel:SetPoint("TOPLEFT", startLabel, "BOTTOMLEFT", 0, -48)
-  setup.code = createEditBox(setup, 140)
+  local joinLabel = Skin.label(setup, "small", MUTED)
+  joinLabel:SetPoint("TOPLEFT", startLabel, "BOTTOMLEFT", 0, -50)
+  joinLabel:SetText("JOIN A CREW")
+  setup.code = Skin.editBox(setup, 140)
   setup.code:SetMaxLetters(12)
-  setup.code:SetPoint("TOPLEFT", joinLabel, "BOTTOMLEFT", 6, -6)
+  setup.code:SetPoint("TOPLEFT", joinLabel, "BOTTOMLEFT", 0, -6)
   local function join()
     local _, reason = core:joinCrew(setup.code:GetText(), setup.name:GetText())
     setup.nameError:SetText(reason == "invalidName" and ns.MESSAGES.invalidName or "")
     setup.codeError:SetText(reason and reason ~= "invalidName" and ns.MESSAGES[reason] or "")
   end
   setup.code:SetScript("OnEnterPressed", join)
-  setup.join = createButton(setup, "Join", join)
+  setup.join = Skin.button(setup, "Join", join)
   setup.join:SetPoint("LEFT", setup.code, "RIGHT", 8, 0)
-  setup.codeError = createLabel(setup, "", "GameFontRedSmall")
-  setup.codeError:SetPoint("TOPLEFT", setup.code, "BOTTOMLEFT", -6, -4)
+  setup.codeError = Skin.label(setup, "small", ERROR)
+  setup.codeError:SetPoint("TOPLEFT", setup.code, "BOTTOMLEFT", 0, -4)
 end
 
 local function showSetup()
@@ -626,8 +728,7 @@ local function showSetup()
     setup.codeError:SetText("")
   end
   setup:Show()
-  frame.title:SetText("BFF")
-  frame:SetHeight(SETUP_HEIGHT)
+  frame:SetHeight(HEADER + SETUP_HEIGHT)
 end
 
 -- Re-add a removed Member, from a menu of everyone removed.
@@ -642,44 +743,46 @@ local function showRemovedMenu(owner)
   end)
 end
 
--- Below the rows: Pause sharing and the hidden count, removed Members, the
--- waiting, leaving or paused line, and the Crew code in a read-only box
--- with the text selected, since addons can't copy to the clipboard.
+-- Below the rows: Pause sharing, then the hidden count and removed Members
+-- on the right, the waiting, leaving or paused line, and the Crew code in a
+-- read-only box with the text selected, since addons can't copy to the
+-- clipboard.
 local function createFooter()
-  footer = CreateFrame("Frame", nil, frame)
-  footer:SetHeight(FOOTER)
-  footer:SetPoint("BOTTOMLEFT", PADDING, PADDING)
-  footer:SetPoint("BOTTOMRIGHT", -PADDING, PADDING)
+  footer = CreateFrame("Frame", nil, frame.content)
+  footer:SetPoint("BOTTOMLEFT")
+  footer:SetPoint("BOTTOMRIGHT")
+  Skin.fill(footer, { 0, 0, 0, 0.2 })
+  Skin.edge(footer, "TOP", Skin.LINE)
 
-  footer.pause = CreateFrame("CheckButton", nil, footer, "UICheckButtonTemplate")
-  footer.pause:SetSize(22, 22)
-  footer.pause:SetPoint("TOPLEFT", 0, 0)
-  footer.pause:SetScript("OnClick", function(box)
+  footer.pause = Skin.checkbox(footer, "Pause sharing", function(box)
     core:setPaused(box:GetChecked())
   end)
-  local pauseLabel = createLabel(footer, "Pause sharing", "GameFontNormalSmall")
-  pauseLabel:SetPoint("LEFT", footer.pause, "RIGHT", 2, 0)
-
-  footer.hidden = createLabel(footer, "", "GameFontHighlightSmall")
-  footer.hidden:SetPoint("TOPRIGHT", -4, -5)
-  setColor(footer.hidden, MUTED)
+  footer.pause:SetPoint("TOPLEFT", INSET, -10)
 
   footer.removed = CreateFrame("Button", nil, footer)
-  footer.removed:SetSize(120, 14)
-  footer.removed:SetPoint("TOPRIGHT", footer.hidden, "BOTTOMRIGHT", 0, -4)
-  footer.removed.text = createLabel(footer.removed, "", "GameFontNormalSmall")
+  footer.removed:SetHeight(14)
+  footer.removed:SetPoint("TOPRIGHT", -INSET, -10)
+  footer.removed.text = Skin.label(footer.removed, "small", GOLD)
   footer.removed.text:SetPoint("RIGHT")
   footer.removed.text:SetJustifyH("RIGHT")
   footer.removed:SetScript("OnClick", showRemovedMenu)
 
-  footer.status = createLabel(footer, "", "GameFontHighlightSmall")
-  footer.status:SetPoint("TOPLEFT", footer.pause, "BOTTOMLEFT", 2, -18)
-  footer.status:SetPoint("RIGHT")
+  footer.hidden = Skin.label(footer, "small", DIM)
+  footer.hidden:SetJustifyH("RIGHT")
 
-  local codeLabel = createLabel(footer, "Crew code", "GameFontNormalSmall")
-  codeLabel:SetPoint("BOTTOMLEFT", 0, 6)
-  footer.code = createEditBox(footer, 110)
-  footer.code:SetPoint("LEFT", codeLabel, "RIGHT", 12, 0)
+  footer.status = Skin.label(footer, "small", MUTED)
+  footer.status:SetPoint("TOPLEFT", INSET, -32)
+  -- Set outright so the wrapped text has a height before layout.
+  footer.status:SetWidth(CONTENT_WIDTH - 2 * INSET)
+  footer.status:SetWordWrap(true)
+
+  local codeLabel = Skin.label(footer, "small", MUTED)
+  codeLabel:SetPoint("BOTTOMLEFT", INSET, 15)
+  codeLabel:SetText("Crew code")
+  footer.code = Skin.editBox(footer, 100)
+  footer.code:SetHeight(22)
+  footer.code:SetJustifyH("CENTER")
+  footer.code:SetPoint("LEFT", codeLabel, "RIGHT", 8, 0)
   footer.code:SetScript("OnEditFocusGained", function(box) box:HighlightText() end)
   footer.code:SetScript("OnTextChanged", function(box, userInput)
     if userInput then
@@ -687,75 +790,68 @@ local function createFooter()
       box:HighlightText()
     end
   end)
+  local hint = Skin.label(footer, "tiny", DIM)
+  hint:SetPoint("LEFT", footer.code, "RIGHT", 8, 0)
+  hint:SetText("Ctrl+C to copy")
 end
 
+-- Draws the footer and returns its height.
 local function drawFooter(crew, summary)
   if not footer then createFooter() end
   footer.pause:SetChecked(core:isPaused())
-  footer.hidden:SetText(("Hidden: %d Character%s (unseen %dd)"):format(summary.hidden,
-    summary.hidden == 1 and "" or "s", ns.Core.HIDE_AFTER_DAYS))
+
   local removed = #core:removed()
   footer.removed.text:SetText(removed > 0 and ("Removed: %d"):format(removed) or "")
+  footer.removed:SetWidth(footer.removed.text:GetStringWidth())
   footer.removed:SetShown(removed > 0)
+  footer.hidden:ClearAllPoints()
+  if removed > 0 then
+    footer.hidden:SetPoint("RIGHT", footer.removed, "LEFT", -10, 0)
+  else
+    footer.hidden:SetPoint("TOPRIGHT", -INSET, -10)
+  end
+  footer.hidden:SetText(summary.hidden > 0 and ("Hidden: %d (unseen %dd)"):format(summary.hidden,
+    ns.Core.HIDE_AFTER_DAYS) or "")
 
   footer.code.crewCode = crew.code
   footer.code:SetText(crew.code)
   footer.code:HighlightText()
+
+  local status = ""
   if crew.leaving then
-    footer.status:SetText(LEAVING)
+    status = LEAVING
   elseif core:isPaused() then
-    footer.status:SetText(PAUSED)
+    status = PAUSED
   elseif crew.alone then
-    footer.status:SetText(WAITING)
-  else
-    footer.status:SetText("")
+    status = WAITING
   end
+  footer.status:SetText(status)
+  local height = 32 + 46
+  if status ~= "" then height = height + footer.status:GetStringHeight() + 4 end
+  footer:SetHeight(height)
   footer:Show()
+  return height
 end
 
 local function hideRoster()
   hideAll(rowFrames, 1)
   hideAll(altFrames, 1)
-  if sortBar then sortBar:Hide() end
-  if divider then divider:Hide() end
+  if section then section:Hide() end
   if footer then footer:Hide() end
 end
 
--- Redraws from Core, if the panel is open.
-function Panel.refresh()
-  if not frame or not frame:IsShown() then return end
-  local crew = core:crew()
-  if not crew then
-    hideRoster()
-    if tabBar then tabBar:Hide() end
-    if feedView then feedView:Hide() end
-    showSetup()
-    return
-  end
-  if setup then setup:Hide() end
-
-  local summary = core:summary()
-  frame.title:SetText(("BFF  ·  %d/%d online"):format(summary.online, summary.members))
-  local feed = core:feed()
-  drawTabBar(feed.unseen)
-  if tab == "feed" then
-    hideRoster()
-    drawFeed(feed)
-    return
-  end
+local function drawRoster(crew, summary)
   if feedView then feedView:Hide() end
+  drawSection()
+  section:Hide()
 
-  drawSortBar()
-  if not divider then createDivider() end
-  divider:Hide()
-
-  local y = -TOP - TABS - SORTBAR
+  local y = -6
   local rowCount, altCount = 0, 0
   for i, data in ipairs(core:rows(order)) do
-    if not data.own and not divider:IsShown() and i > 1 then
-      place(divider, y)
-      divider:Show()
-      y = y - DIVIDER
+    if not data.own and not section:IsShown() and i > 1 then
+      place(section, y)
+      section:Show()
+      y = y - SECTION
     end
     rowCount = rowCount + 1
     local row = rowFrames[rowCount] or createRow()
@@ -775,8 +871,34 @@ function Panel.refresh()
   hideAll(rowFrames, rowCount + 1)
   hideAll(altFrames, altCount + 1)
 
-  drawFooter(crew, summary)
-  frame:SetHeight(-y + FOOTER + PADDING)
+  local footerHeight = drawFooter(crew, summary)
+  frame:SetHeight(math.max(MIN_HEIGHT, HEADER - y + 6 + footerHeight))
+end
+
+-- Redraws from Core, if the panel is open.
+function Panel.refresh()
+  if not frame or not frame:IsShown() then return end
+  local crew = core:crew()
+  layout(crew ~= nil)
+  if not crew then
+    hideRoster()
+    if feedView then feedView:Hide() end
+    showSetup()
+    return
+  end
+  if setup then setup:Hide() end
+
+  local summary = core:summary()
+  frame.headerRight:SetText(("%d of %d online"):format(summary.online, summary.members))
+  local feed = core:feed()
+  drawNav(feed.unseen)
+  if tab == "feed" then
+    hideRoster()
+    drawFeed(feed)
+  else
+    fresh = {}
+    drawRoster(crew, summary)
+  end
 end
 
 function Panel.toggle()

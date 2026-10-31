@@ -25,6 +25,7 @@ Core/Core.lua
 Game/Snapshot.lua
 Game/ChannelLink.lua
 
+UI/Skin.lua
 UI/Panel.lua
 UI/Minimap.lua
 UI/Away.lua

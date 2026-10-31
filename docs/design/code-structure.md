@@ -13,7 +13,7 @@ Almost all behaviour lives in one deep, pure-Lua module, **Core**, behind a smal
 | **Core** (`Core/`) | yes | Everything BFF knows and decides: Member records, sync, Feed, panel rows, saved-data layout. Details below. |
 | **Snapshot** (`Game/Snapshot.lua`) | no | Reads level, XP, zone, class and GUID, counts deaths (kept per Character in `BFF_CharacterDB`), and calls `core:updateOwn(character)`. |
 | **Channel link** (`Game/ChannelLink.lua`) | no | The production link adapter: joins and hides the Crew channel (including filtering its system notices out of chat), AceComm with ChatThrottleLib, decides when the link is up or down, reports Members leaving the channel, and has an echo mode. See `docs/research/channel-spike.md`. |
-| **UI** (`UI/Panel.lua`, `UI/Minimap.lua`, `UI/Away.lua`, `UI/Settings.lua`) | no | Renders Core's rows and summaries and sends user commands to Core. Shows no state it worked out itself. |
+| **UI** (`UI/Skin.lua`, `UI/Panel.lua`, `UI/Minimap.lua`, `UI/Away.lua`, `UI/Settings.lua`) | no | Renders Core's rows and summaries and sends user commands to Core. Shows no state it worked out itself. Skin is the shared flat look (colours, fonts, window, buttons) for the panel and the popup. |
 | **App** (`BFF.lua`) | no | Wiring only: creates Core, routes WoW events, runs a 1 s `C_Timer` ticker that calls `core:tick()`, and handles slash commands. |
 
 The first draft's Zones module is dropped from v1, because only the overlap finder needed it.

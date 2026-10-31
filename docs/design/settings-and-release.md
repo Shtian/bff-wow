@@ -8,7 +8,7 @@ Answers [What's in the settings panel, and how are releases cut?](https://github
 
 One page in the game's native Settings panel (Esc → Options → AddOns → **BFF**), built with the Settings API (no AceConfig, per #9). It opens from:
 
-- the gear button on the panel,
+- Settings in the panel's sidebar,
 - **Settings** in the minimap button's right-click menu (#7),
 - `/bff settings`.
 

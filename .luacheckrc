@@ -27,6 +27,7 @@ stds.wow = {
     "ChatFrameUtil",
     "ChatThrottleLib",
     "CLOSE",
+    "CreateFont",
     "CreateFrame",
     "date",
     "ERR_TOO_MANY_CHAT_CHANNELS",

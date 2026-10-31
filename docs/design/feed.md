@@ -25,14 +25,14 @@ Zone changes and Main changes make no entries: zones change too often and the pa
 
 Ledger hands Feed a before/after pair whenever a received copy wins (and when your own record changes). Feed compares them field by field:
 
-- **Skipped versions collapse.** A client that missed some versions only sees before and after, so each kind becomes at most one entry per Character: level 22 → 24 is one "dinged 24" entry that remembers it started at 22, and deaths 3 → 5 is one "died 2 times" entry.
+- **Skipped versions collapse.** A client that missed some versions only sees before and after, so each kind becomes at most one entry per Character: level 22 » 24 is one "dinged 24" entry that remembers it started at 22, and deaths 3 » 5 is one "died 2 times" entry.
 - **Max level replaces the ding.** A jump that reaches max level makes only the max level entry.
 - **Odd jumps make nothing.** A death count that goes down (a crash lost that session's count, see #9) makes no entry, and a level above your own `maxLevel` (you're behind on a patch) makes no ding or max level entry.
 - **Time** is the after record's version, which is the owner's `GetServerTime()` at the write. It's close to when the event happened, and every client orders entries the same way. For collapsed jumps the time is approximate.
 
 ### First sight of a Member
 
-When you join a Crew or reinstall, every record arrives as new. Counting that as "nothing → level 40" would flood the Feed, so **the first sight of a Member is a silent baseline**: their record is stored and no entries are made.
+When you join a Crew or reinstall, every record arrives as new. Counting that as "nothing » level 40" would flood the Feed, so **the first sight of a Member is a silent baseline**: their record is stored and no entries are made.
 
 The one exception is a Member who joined after you. The Member record gets one new field, **`joinedAt`**: the server time when that Member started or joined the Crew, rewritten on rejoin. On first sight, if their `joinedAt` is after your own, Feed makes one "joined the Crew" entry. A Member who was in the Crew before you and was just offline for weeks has an earlier `joinedAt`, so they stay a silent baseline.
 
@@ -75,7 +75,7 @@ Entries that arrive while settling go into the summary and print no chat line.
 
 A small frame in the panel's style (#7):
 
-- One block per Member, ordered by most recent activity. Each Member's events are condensed onto one line, e.g. "**Ana** (Main Thrall): 18 → 24, died 3×, new Character Jaina (12)". The level range goes from the lowest "before" to the highest "after" across that Member's unseen entries, per Character.
+- One block per Member, ordered by most recent activity. Each Member's events are condensed onto one line, e.g. "**Ana** (Main Thrall): 18 » 24, died 3×, new Character Jaina (12)". The level range goes from the lowest "before" to the highest "after" across that Member's unseen entries, per Character.
 - Max level, joined and left get their own highlighted line.
 - **Open Feed** and **Close** buttons.
 
@@ -87,7 +87,7 @@ After the summary has settled, every new entry from another Member prints one ch
 
 ## Feed tab
 
-A **Feed** tab in the panel next to the Roster: newest first, all kept entries (up to 200), grouped by day. Opening it marks everything as seen. `/bff feed` opens the panel on it.
+A **Feed** tab in the panel's sidebar, below the Roster: a timeline, newest first, of all kept entries (up to 200), grouped by day, with an icon per kind. Entries that were unseen when you opened it are tagged "new" until you leave it. Opening it marks everything as seen. `/bff feed` opens the panel on it.
 
 ## Settings
 
@@ -113,7 +113,7 @@ Kept deep: Core decides what is seen and what the settings allow, so UI and App 
 
 ## Scenarios to add to the FakeNet tests
 
-- C misses A's dings from 22 to 24 and two deaths; at C's next login the summary shows "22 → 24, died 2×" once, and nothing prints in chat.
+- C misses A's dings from 22 to 24 and two deaths; at C's next login the summary shows "22 » 24, died 2×" once, and nothing prints in chat.
 - A reaches max level from 59 in one jump: one max level entry, no ding.
 - D joins a Crew that already has A, B and C at various levels: D's Feed stays empty, and A, B and C each get one "D joined the Crew".
 - B returns after 200 days offline, so C pruned B's record at 180 days: C makes no "joined" entry.
