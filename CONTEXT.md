@@ -44,7 +44,7 @@ _Avoid_: Kick, ban
 ### What the Crew sees
 
 **Feed**:
-The log of noteworthy things that happened to the Crew's Characters, such as dings and zone changes.
+The log of noteworthy things that happened to the Crew's Characters, such as dings, deaths and new Characters.
 _Avoid_: News, timeline, activity log
 
 **While you were away**:

@@ -29,6 +29,8 @@ Core is created with:
 - `link`: the outgoing half of the link port (`send(string)`).
 - `listener`: receives Core's events.
 - `receiveOnly`: true on Trial and Veteran accounts.
+- `initialLogin`: `isInitialLogin` from `PLAYER_ENTERING_WORLD`, so Core can tell a login from a reload (see `docs/design/feed.md`).
+- `maxLevel`: from `GetMaxLevelForPlayerExpansion()`, for max level Feed entries.
 
 Inputs:
 
@@ -41,14 +43,14 @@ Outputs:
 
 - `link.send(string)`: best-effort (see the link port below).
 - Listener events:
-  - `rowsChanged`: redraw from `core:rows()`. Also fires when a Member passes the 12-minute online timeout, even though no record changed.
-  - `feedEntry(entry)`: a live Feed event. App prints the one-line chat message if that is turned on.
+  - `changed`: re-read whatever you show (`rows()`, `feed()`). Also fires when a Member passes the 12-minute online timeout, even though no record changed.
+  - `feedEntry(entry)`: a live Feed event, fired only when the chat-line setting is on. App prints `entry.text`.
+  - `awaySummary(summary)`: While you were away has settled after an initial login. Fired only when the popup setting is on and it isn't empty. App shows it once out of combat.
   - `notice(kind)`: one-off messages ("BFF is out of date", "receive-only on trial accounts", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
 - Reads: `crew()` (code, channel name and password, or nil).
-- Ready-to-render reads for UI: `rows()`, the While you were away summary, and recent Feed entries. UI never sees a Member record.
-
-When the While you were away popup appears is still open (Feed storage is still fog on the map), so it has no event yet.
+- Ready-to-render reads for UI: `rows()`, and `feed()` (the Feed tab's entries grouped by day, plus the unseen count). UI never sees a Member record.
+- `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` or `awaySummary`.
 
 ### Inside Core
 
@@ -56,7 +58,7 @@ These are internal seams: separate files for locality, tested only through Core'
 
 - **Ledger** (`Core/Ledger.lua`): what we know. Holds the own record and copies of everyone else's, the merge rule (a higher version wins), the Remove list, the "left" flag, last-heard times, and 180-day pruning. Removing a Member deletes their record and drops future copies. Re-adding takes them off the list and sends a DIGEST, and peers reply with DATA.
 - **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, XP piggyback, 5-minute heartbeat, logout), the "record changed" and "reply owed" flags, Pause, and receive-only.
-- **Feed** (`Core/Feed.lua`): turns a before/after record pair from Ledger into Feed entries, including skipped versions such as 22 → 24. Also owns the capped log and While you were away.
+- **Feed** (`Core/Feed.lua`): turns a before/after record pair from Ledger into Feed entries, including skipped versions such as 22 → 24. Also owns the capped log, seen flags, and when While you were away is ready. See `docs/design/feed.md`.
 - **Roster** (`Core/Roster.lua`): builds panel rows from Ledger. Covers Main resolution, "on alt", online (heard within 12 min), Last seen, "can play with you" (±3 levels), the 30-day hide and sorting.
 - **CrewCode** (`Core/CrewCode.lua`): generates, normalises and checks Crew codes, and derives the channel name and password from them.
 - **Codec** (`Core/Codec.lua`): a plain-text protocol version header, then the LibSerialize + LibDeflate body (`1|<payload>`). A newer version is detected before anything is decoded.
@@ -130,5 +132,4 @@ tests/ load.lua  wow_stubs.lua  *_spec.lua
 ## Not decided here
 
 - Snapshot keeps counting deaths, so a client crash loses that session's deaths, and peers see the count go down. Moving the count into Core was considered and not taken for now.
-- Feed storage and when the While you were away popup appears (fog on the map).
 - Release packaging details beyond the externals and ignores above (fog on the map).
