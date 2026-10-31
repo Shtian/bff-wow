@@ -17,6 +17,7 @@ local MESSAGES = {
   tooManyChannels = "BFF couldn't join its channel: leave a chat channel and /reload.",
   wrongPassword = "BFF couldn't join its channel: start a new Crew.",
   leftCrew = "You left the Crew.",
+  outOfDate = "BFF is out of date: someone in your Crew has a newer version. Update to keep seeing them.",
 }
 ns.MESSAGES = MESSAGES
 
@@ -112,6 +113,28 @@ end
 
 function commands.leave()
   if ns.core:crew() then ns.confirmLeave() else say(MESSAGES.noCrew) end
+end
+
+-- /bff sim, /bff sim ding and /bff sim stop, only in a dev checkout
+-- (Dev/ is left out of releases).
+function commands.sim(rest)
+  if not ns.Sim then return say("/bff sim is only in a dev checkout.") end
+  if rest == "stop" then
+    ns.Sim.stop()
+    say("simulated Members logged out.")
+  elseif rest == "ding" then
+    local name = ns.Sim.ding()
+    say(name and name .. " dinged." or "/bff sim isn't running.")
+  else
+    local ok, reason = ns.Sim.start(ns.core)
+    if ok then
+      say("three simulated Members joined. /bff sim ding, /bff sim stop.")
+    elseif reason == "running" then
+      say("/bff sim is already running.")
+    else
+      say("/bff sim needs a Crew no one else is in yet: /bff leave, then /bff start.")
+    end
+  end
 end
 
 SLASH_BFF1 = "/bff"

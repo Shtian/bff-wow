@@ -36,7 +36,7 @@ Inputs:
 
 - `updateOwn(character)`: the current state of the Character being played, from Snapshot.
 - `tick()`: once a second. Core decides what is due (reply delays, debounced sends, heartbeat, online timeouts, pruning).
-- `received(string)`, `up()` and `down()`: the incoming half of the link port.
+- `received(string)`, `up()`, `down()` and `gone(name)`: the incoming half of the link port.
 - Commands: start, join and leave a Crew, change the display name, Set as Main, Remove and re-add a Member, Pause sharing, and settings (see `docs/design/joining-a-crew.md`).
 
 Outputs:
@@ -70,7 +70,7 @@ This is the only real seam in v1. Its adapters are the channel link, the fake li
 - Core → link: `send(string)`. **Best-effort**: a message can be lost silently, including messages ChatThrottleLib had queued when lockdown began.
 - Link → Core: `received(string)`, `up()`, `down()` and `gone(name)`. The sender's name is never passed with a message; identity travels inside the payload. Core drops messages carrying its own Member id, since the channel echoes your own messages back.
 - `gone(name)`: a Character left the channel, i.e. logged out (a real logout leaves the channel before any goodbye could be sent, so there is none). The name is bare (`Ambiguate(sender, "none")`). Core marks the Member owning a Character of that name offline right away; the 12-minute timeout stays as the fallback. It is only a presence hint, never used to identify data.
-- A send the game refuses (`AddonMessageThrottle`, `GeneralError`) makes the channel link call `down()` and straight back `up()`, so the rule below recovers it.
+- A send the game refuses (`AddonMessageThrottle`, `GeneralError`) makes the channel link call `down()`, and `up()` again 5 s later, so the rule below recovers it. The pause keeps a refusal that repeats (such as sends during a logout) from becoming a send loop.
 - Each adapter decides what "down" means. For the channel link it is `C_ChatInfo.InChatMessagingLockdown()`, or not yet in the Crew channel, or having left it.
 - On every `up()`, Core sends a fresh DIGEST, plus its own DATA if its record changed while the link was down. This one rule covers first join, rejoin, lockdown clearing, and lost sends.
 - Lockdown, Pause and receive-only never appear in the port. Lockdown is the adapter's reason for being down. Pause and receive-only are Core policy; receive-only comes from `IsTrialAccount()` / `IsVeteranTrialAccount()` only, never `AreOutgoingAddonChatMessagesRestricted()`, which the spike saw return true on a full account.
@@ -99,7 +99,7 @@ Every file starts with `local _, ns = ...` and attaches itself to `ns`, the addo
   - Someone going quiet flips to offline after 12 minutes.
   - Ten Members with three Characters each: the DIGEST fits one message.
 - **WoW stand-ins** (`tests/wow_stubs.lua`): only for Snapshot and the channel link. UI frames aren't tested offline.
-- **In game:** `/bff sim` reuses FakeNet to attach a few simulated Members to your real Core, so the panel and Feed can be tested without a friend online. Echo mode on the channel link loops your own messages back to you.
+- **In game:** `/bff sim` reuses FakeNet to attach a few simulated Members to your real Core, so the panel and Feed can be tested without a friend online. Their records are kept and relayed like real ones, so it only runs in a Crew where no one else is known yet. `/bff sim ding` makes one ding, `/bff sim stop` logs them out. The `.toc` lists `Dev/` inside `#@do-not-package@`, so releases don't load it. Echo mode on the channel link loops your own messages back to you.
 - **GitHub Actions** (`test.yml`) on every push and PR: `leafo/gh-actions-lua` (LuaJIT) and `leafo/gh-actions-luarocks`, `luarocks install busted luacheck`, fetch libraries, `luacheck .`, `busted`.
 
 ## Libraries

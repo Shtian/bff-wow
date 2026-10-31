@@ -17,6 +17,7 @@ Libs/LibDBIcon-1.0/lib.xml
 Core/Codec.lua
 Core/CrewCode.lua
 Core/Ledger.lua
+Core/Gossip.lua
 Core/Roster.lua
 Core/Core.lua
 
@@ -24,5 +25,10 @@ Game/Snapshot.lua
 Game/ChannelLink.lua
 
 UI/Panel.lua
+
+#@do-not-package@
+Dev/FakeNet.lua
+Dev/Sim.lua
+#@end-do-not-package@
 
 BFF.lua
