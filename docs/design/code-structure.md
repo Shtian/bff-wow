@@ -111,25 +111,26 @@ Every file starts with `local _, ns = ...` and attaches itself to `ns`, the addo
 
 Not embedded: AceDB (Core owns plain SavedVariables), AceConsole and AceEvent (a few lines with `SlashCmdList` and an event frame), and AceConfig (the native Settings API).
 
-**Fetched, not committed**, as most addons do: libraries are declared as externals in `.pkgmeta`, which the BigWigs packager fetches at release time, and `Libs/` is in `.gitignore`. `scripts/fetch-libs.sh` checks out the same externals into `Libs/` for the dev loop (run once on the Windows PC from Git Bash, and again after a library bump) and in CI. `.pkgmeta` also leaves `tests/`, `Dev/` and `scripts/` out of releases.
+**Fetched, not committed**, as most addons do: libraries are declared as externals in `.pkgmeta`, which the BigWigs packager fetches at release time, and `Libs/` is in `.gitignore`. `scripts/fetch-libs.sh` checks out the same externals into `Libs/` for the dev loop (run once on the Windows PC from Git Bash, and again after a library bump) and in CI. `.pkgmeta` also leaves `tests/`, `Dev/`, `scripts/` and the bumpy files out of releases. Releases are cut with bumpy and built by `scripts/package.sh`; see `docs/design/settings-and-release.md`.
 
 ## Layout
 
 ```
 BFF.toc
 BFF.lua
+Bindings.xml                         -- key binding to open the panel
 Core/  Core.lua  Ledger.lua  Gossip.lua  Feed.lua  Roster.lua  CrewCode.lua  Codec.lua
 Game/  Snapshot.lua  ChannelLink.lua
 UI/    Panel.lua  Minimap.lua  Settings.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases
 Libs/                                -- fetched, gitignored
-scripts/ fetch-libs.sh
+scripts/ fetch-libs.sh  package.sh   -- package.sh builds the release zip
 tests/ load.lua  wow_stubs.lua  *_spec.lua
 .busted  .luacheckrc  .pkgmeta
+package.json  .bumpy/  CHANGELOG.md  -- release tooling (bumpy), left out of releases
 .github/workflows/ test.yml  release.yml
 ```
 
 ## Not decided here
 
 - Snapshot keeps counting deaths, so a client crash loses that session's deaths, and peers see the count go down. Moving the count into Core was considered and not taken for now.
-- Release packaging details beyond the externals and ignores above (fog on the map).
