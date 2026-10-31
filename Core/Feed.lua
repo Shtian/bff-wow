@@ -52,31 +52,19 @@ function Feed.new(db, ledger, now, maxLevel, initialLogin)
   }, Feed)
 end
 
--- The Main's GUID: the Character set as Main, or the most recently played.
-local function mainGuid(record)
-  if record.main and record.characters[record.main] then return record.main end
-  local main
-  for guid, character in pairs(record.characters) do
-    if not main or character.lastPlayed > main.lastPlayed
-        or (character.lastPlayed == main.lastPlayed and guid < main.guid) then
-      main = character
-    end
-  end
-  return main and main.guid
-end
-
-local function memberName(record)
+local function memberName(self, record)
   if record.displayName then return record.displayName end
-  local main = mainGuid(record)
-  return main and record.characters[main].name or "Someone"
+  local main = ns.Roster.main(record, self.now())
+  return main and main.name or "Someone"
 end
 
 -- Who an event happened to: "Ana", "Ana's Alt Jaina", "You" or "Your Alt
--- Jaina".
-local function subject(record, character, own)
-  local alt = character.guid ~= mainGuid(record)
+-- Jaina". The Main is the one the panel shows.
+local function subject(self, record, character, own)
+  local main = ns.Roster.main(record, self.now())
+  local alt = main ~= nil and character.guid ~= main.guid
   if own then return alt and "Your Alt " .. character.name or "You" end
-  local name = memberName(record)
+  local name = memberName(self, record)
   return alt and ("%s's Alt %s"):format(name, character.name) or name
 end
 
@@ -96,7 +84,7 @@ end
 -- The entries for one Character, from how it was (nil if new) to how it is.
 local function characterEntries(self, record, was, character, own, list)
   if not was then
-    local owner = own and "You have" or memberName(record) .. " has"
+    local owner = own and "You have" or memberName(self, record) .. " has"
     local entry = newEntry("newCharacter", record, own,
       ("%s a new Character: %s (%s)"):format(owner, character.name, className(character.classFilename)),
       character)
@@ -111,10 +99,10 @@ local function characterEntries(self, record, was, character, own, list)
     local entry
     if level == self.maxLevel then
       entry = newEntry("maxLevel", record, own,
-        subject(record, character, own) .. " reached max level!", character)
+        subject(self, record, character, own) .. " reached max level!", character)
     else
       entry = newEntry("ding", record, own,
-        ("%s dinged %d"):format(subject(record, character, own), level), character)
+        ("%s dinged %d"):format(subject(self, record, character, own), level), character)
     end
     entry.from, entry.level = from, level
     list[#list + 1] = entry
@@ -125,7 +113,7 @@ local function characterEntries(self, record, was, character, own, list)
   if deaths > 0 then
     local times = deaths == 1 and "" or (" %d times"):format(deaths)
     local entry = newEntry("death", record, own,
-      ("%s died%s"):format(subject(record, character, own), times), character)
+      ("%s died%s"):format(subject(self, record, character, own), times), character)
     entry.count = deaths
     list[#list + 1] = entry
   end
@@ -148,6 +136,11 @@ local function joinedAfterYou(self, record)
   return record.joinedAt ~= nil and yours ~= nil and record.joinedAt > yours
 end
 
+local function crewEntry(self, kind, record)
+  local verb = kind == "joined" and " joined the Crew" or " left the Crew"
+  return newEntry(kind, record, false, memberName(self, record) .. verb)
+end
+
 -- Someone else's record was kept: before is the copy held until now (nil
 -- on first sight) and after the new one. Returns the new entries.
 function Feed:recordChanged(before, after)
@@ -158,14 +151,12 @@ function Feed:recordChanged(before, after)
 
   if before == nil then
     if not after.left and joinedAfterYou(self, after) and after.joinedAt ~= announced then
-      list[1] = newEntry("joined", after, false, memberName(after) .. " joined the Crew")
+      list[1] = crewEntry(self, "joined", after)
     end
   elseif after.left then
-    if not before.left then
-      list[1] = newEntry("left", after, false, memberName(after) .. " left the Crew")
-    end
+    if not before.left then list[1] = crewEntry(self, "left", after) end
   elseif before.left then
-    list[1] = newEntry("joined", after, false, memberName(after) .. " joined the Crew")
+    list[1] = crewEntry(self, "joined", after)
   else
     for guid, character in pairs(after.characters) do
       characterEntries(self, after, before.characters[guid], character, false, list)
@@ -174,15 +165,14 @@ function Feed:recordChanged(before, after)
   return insert(self, list)
 end
 
--- The Character being played changed: was is how it was (nil if new),
--- character how it is in the own record now, and firstCharacter whether it
--- is the first one ever, which is a silent baseline. Returns the new
--- entries.
-function Feed:ownChanged(was, character, firstCharacter)
+-- The Character being played changed: was is how it was (nil if new), and
+-- guid names it in the own record. Your first Character ever is a silent
+-- baseline. Returns the new entries.
+function Feed:ownChanged(was, guid)
   local list = {}
-  if not firstCharacter then
-    characterEntries(self, self.ledger:own(), was, character, true, list)
-  end
+  local own = self.ledger:own()
+  local first = was == nil and next(own.characters, next(own.characters)) == nil
+  if not first then characterEntries(self, own, was, own.characters[guid], true, list) end
   return insert(self, list)
 end
 
@@ -231,7 +221,7 @@ function Feed:isSettled()
 end
 
 -- Called once a second: prunes the log, and settles once sync has gone
--- quiet. Returns true the moment it settles.
+-- quiet.
 function Feed:tick()
   local now = self.now()
   local log = self.db.feed
@@ -239,13 +229,11 @@ function Feed:tick()
     table.remove(log, 1)
   end
 
-  if self.settled or not self.upSince then return false end
+  if self.settled or not self.upSince then return end
   local quietSince = math.max(self.upSince, self.lastData or self.upSince)
   if now - quietSince >= QUIET_FOR or now - self.upSince >= SETTLE_WITHIN then
     self.settled = true
-    return true
   end
-  return false
 end
 
 -- An entry as handed out: a fresh table UI may keep.

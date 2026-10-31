@@ -53,12 +53,11 @@ local footer
 local divider
 local rowFrames = {}
 local altFrames = {}
--- What the UI itself remembers: the tab, the sort, which Members show
--- Alts, and which Feed entries were new when the Feed tab showed them.
+-- What the UI itself remembers: the tab, the sort, and which Members show
+-- Alts.
 local tab = "roster"
 local order = "online"
 local expanded = {}
-local fresh = {}
 
 local function classColor(classFilename)
   local color = classFilename and RAID_CLASS_COLORS[classFilename]
@@ -448,12 +447,8 @@ end
 local function createFeedLine()
   local line = CreateFrame("Frame", nil, feedView.content)
   line:SetHeight(FEED_LINE)
-  line.dot = line:CreateTexture(nil, "ARTWORK")
-  line.dot:SetSize(8, 8)
-  line.dot:SetPoint("LEFT", 0, 0)
-  line.dot:SetTexture("Interface\\FriendsFrame\\StatusIcon-Online")
   line.time = createLabel(line, "", "GameFontHighlightSmall")
-  line.time:SetPoint("LEFT", 12, 0)
+  line.time:SetPoint("LEFT", 0, 0)
   line.time:SetWidth(36)
   setColor(line.time, MUTED)
   line.text = createLabel(line, "", "GameFontHighlightSmall")
@@ -462,10 +457,6 @@ local function createFeedLine()
   line.text:SetWordWrap(false)
   feedView.lines[#feedView.lines + 1] = line
   return line
-end
-
-local function entryKey(entry)
-  return ("%d|%s|%s|%s"):format(entry.time, entry.memberId, entry.kind, entry.guid or "")
 end
 
 local function dayTitle(day)
@@ -480,8 +471,7 @@ local function placeInFeed(item, y)
   item:SetPoint("RIGHT", feedView.content, "RIGHT", -4, 0)
 end
 
--- Draws the Feed and marks it seen. Entries unseen until now keep a dot
--- while the panel stays open.
+-- Draws the Feed and marks it seen.
 local function drawFeed(feed)
   if not feedView then createFeedView() end
   local y, dayCount, lineCount = 0, 0, 0
@@ -493,12 +483,9 @@ local function drawFeed(feed)
     title:Show()
     y = y - FEED_DAY
     for _, entry in ipairs(day.entries) do
-      local key = entryKey(entry)
-      if not entry.seen then fresh[key] = true end
       lineCount = lineCount + 1
       local line = feedView.lines[lineCount] or createFeedLine()
       placeInFeed(line, y)
-      line.dot:SetShown(fresh[key] == true)
       line.time:SetText(date("%H:%M", entry.time))
       line.text:SetText(entry.text)
       setColor(line.text, HIGHLIGHT[entry.kind] and GOLD or entry.own and MUTED or WHITE)
@@ -538,7 +525,6 @@ local function create()
   frame:SetScript("OnDragStart", frame.StartMoving)
   frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
   frame:SetScript("OnShow", Panel.refresh)
-  frame:SetScript("OnHide", function() fresh = {} end)
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
     sinceRedraw = sinceRedraw + elapsed

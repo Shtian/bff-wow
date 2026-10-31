@@ -71,10 +71,8 @@ end
 local function announce(self, entries)
   if not (self.log:isSettled() and self:isChatLinesOn()) then return end
   for _, entry in ipairs(entries) do
-    if not entry.own then
-      self.log:markSeen(entry)
-      self.listener("feedEntry", ns.Feed.describe(entry))
-    end
+    self.log:markSeen(entry)
+    self.listener("feedEntry", ns.Feed.describe(entry))
   end
 end
 
@@ -86,14 +84,10 @@ end
 -- The current state of the Character being played, from Snapshot: guid,
 -- name, classFilename, level, xp, maxXp, zone and deaths.
 function Core:updateOwn(character)
-  local own = self.ledger:own()
-  local firstCharacter = own == nil or next(own.characters) == nil
   local changed, before = self.ledger:updateOwn(character)
   if changed then
     -- Your own events go into the Feed only while in a Crew.
-    if self.db.crew then
-      self.log:ownChanged(before, self.ledger:own().characters[character.guid], firstCharacter)
-    end
+    if self.db.crew then self.log:ownChanged(before, character.guid) end
     self.gossip:ownChanged(ns.Gossip.urgency(before, character))
     self.listener("changed")
   end

@@ -37,12 +37,19 @@ local function visibleCharacters(record, now)
   return characters, hidden
 end
 
--- The Main: the Character set as Main, or the most recently played one.
+-- The Main: the Character set as Main, or the most recently played one,
+-- among the given Characters (most recently played first).
 local function mainOf(record, characters)
   for _, character in ipairs(characters) do
     if character.guid == record.main then return character end
   end
   return characters[1]
+end
+
+-- The Main of a record as the panel shows it, or nil if every Character
+-- is hidden.
+function Roster.main(record, now)
+  return mainOf(record, (visibleCharacters(record, now)))
 end
 
 local function canPlay(character, yourLevel)
