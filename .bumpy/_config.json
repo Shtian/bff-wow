@@ -1,0 +1,23 @@
+{
+  "$schema": "../node_modules/@varlock/bumpy/config-schema.json",
+  "baseBranch": "main",
+  "versionPr": {
+    "title": "Versioned release"
+  },
+  "packages": {
+    "bff": {
+      // package.json is private, so opt in to versioning and tagging explicitly.
+      "managed": true,
+      // Builds the zip and release.json and uploads both to the draft release.
+      "publishCommand": "scripts/package.sh {{version}}",
+      "skipNpmPublish": true,
+      // Only shipped files need a bump file: the .toc, Lua and XML outside
+      // tests/, Dev/ and scripts/, and .pkgmeta (it pins the bundled libraries).
+      "changedFilePatterns": [
+        "*.{toc,lua,xml}",
+        "!(tests|Dev|scripts|node_modules)/**/*.{lua,xml}",
+        ".pkgmeta"
+      ]
+    }
+  }
+}

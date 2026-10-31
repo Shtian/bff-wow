@@ -3,6 +3,8 @@ name: test
 on:
   push:
   pull_request:
+  # release.yml runs this before publishing.
+  workflow_call:
 
 jobs:
   test:

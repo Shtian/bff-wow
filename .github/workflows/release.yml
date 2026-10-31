@@ -1,0 +1,86 @@
+name: release
+
+# Merging to main opens or updates the "Versioned release" PR. Merging that PR
+# publishes: bumpy creates a draft release for tag bff@X.Y.Z, runs
+# scripts/package.sh to build and upload the zip and release.json, then
+# finalises the release and pushes the tag. See
+# docs/design/settings-and-release.md.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # What would `ci release` do: version-pr, publish or nothing.
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      bumpy_version: ${{ steps.bumpy-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: bumpy-version
+        name: Resolve bumpy version
+        run: echo "version=$(jq -r '.devDependencies["@varlock/bumpy"]' package.json)" >> "$GITHUB_OUTPUT"
+
+      - id: plan
+        run: npx -y "@varlock/bumpy@$BUMPY_VERSION" ci plan
+        env:
+          BUMPY_VERSION: ${{ steps.bumpy-version.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+
+  version-pr:
+    needs: plan
+    if: needs.plan.outputs.mode == 'version-pr'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - run: npx -y "@varlock/bumpy@$BUMPY_VERSION" ci release --expect-mode version-pr
+        env:
+          BUMPY_VERSION: ${{ needs.plan.outputs.bumpy_version }}
+          GH_TOKEN: ${{ github.token }}
+          # Optional. Without it the Versioned release PR doesn't trigger the
+          # test and bumpy check workflows.
+          BUMPY_GH_TOKEN: ${{ secrets.BUMPY_GH_TOKEN }}
+
+  # Lint and tests before publishing, in their own job: bumpy won't publish
+  # from a working tree with untracked files, and the Lua setup leaves some.
+  test:
+    needs: plan
+    if: needs.plan.outputs.mode == 'publish'
+    uses: ./.github/workflows/test.yml
+
+  publish:
+    needs: [plan, test]
+    if: needs.plan.outputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # The packager checks out CurseForge externals with svn.
+      - name: Install svn
+        run: command -v svn || (sudo apt-get update && sudo apt-get install -y subversion)
+
+      - run: npx -y "@varlock/bumpy@$BUMPY_VERSION" ci release --expect-mode publish
+        env:
+          BUMPY_VERSION: ${{ needs.plan.outputs.bumpy_version }}
+          GH_TOKEN: ${{ github.token }}
+          BUMPY_GH_TOKEN: ${{ secrets.BUMPY_GH_TOKEN }}

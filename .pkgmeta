@@ -2,6 +2,11 @@ package-as: BFF
 
 enable-nolib-creation: no
 
+# Bumpy writes CHANGELOG.md; ship it instead of a generated changelog.
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
 # scripts/fetch-libs.sh reads this list too, so keep each external in the
 # block form below (url, tag, path), or a CurseForge svn URL pinned to a tag.
 externals:
@@ -38,4 +43,5 @@ ignore:
   - CLAUDE.md
   - CONTEXT.md
   - package.json
+  - package-lock.json
   - node_modules
