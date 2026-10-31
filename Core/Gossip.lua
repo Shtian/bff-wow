@@ -157,8 +157,8 @@ function Gossip:digestReceived(versions)
   if not self.open then return end
 
   for id, version in pairs(versions) do
-    if type(id) == "string" and type(version) == "number"
-        and id ~= ledger:memberId() and version > ledger:version(id) then
+    if type(id) == "string" and type(version) == "number" and id ~= ledger:memberId()
+        and not ledger:isRemoved(id) and version > ledger:version(id) then
       if not self.digestDue then
         self.digestDue, self.wanted = self.now() + replyDelay(self), {}
       end
@@ -186,6 +186,21 @@ function Gossip:recordSeen(id, version)
     self.wanted[id] = nil
     if isEmpty(self.wanted) then cancelDigest(self) end
   end
+end
+
+-- A removed Member: no reply is owed for them, nor a DIGEST to fetch them.
+function Gossip:forget(id)
+  self.owed[id] = nil
+  if isEmpty(self.owed) then self.owedDue = nil end
+  if self.wanted and self.wanted[id] then
+    self.wanted[id] = nil
+    if isEmpty(self.wanted) then cancelDigest(self) end
+  end
+end
+
+-- Sends a DIGEST now, so whoever holds something we lack replies with it.
+function Gossip:askAround()
+  if self.open then sendDigest(self) end
 end
 
 -- Called once a second: sends whatever is due.
