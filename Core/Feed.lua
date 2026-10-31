@@ -257,37 +257,38 @@ end
 -- Entries shown in the summary on their own highlighted line.
 local HIGHLIGHT = { maxLevel = true, joined = true, left = true }
 
--- One Character's part of a Member's line: "18 » 24, died 3×" (max level
--- counts towards the range too), prefixed
--- with the Character's name for an Alt, or "new Character Jaina (12)".
-local function characterPart(entries, name, isMain)
-  local from, level, deaths, new
+-- One Character's row in a Member's block: { name, main, from, level,
+-- deaths, new, maxLevel }. The level range runs from the
+-- lowest "before" to the highest "after" (max level counts towards it), a
+-- new Character has its level but no from, and deaths add up. Nil when the
+-- Character has none of these.
+local function characterRow(entries, character, isMain)
+  local row = {
+    name = character and character.name or "?",
+    main = isMain or nil,
+  }
+  local any = false
   for _, entry in ipairs(entries) do
     if entry.kind == "ding" or entry.kind == "maxLevel" then
-      from = math.min(from or entry.from, entry.from)
-      level = math.max(level or entry.level, entry.level)
+      row.from = math.min(row.from or entry.from, entry.from)
+      row.level = math.max(row.level or entry.level, entry.level)
+      if entry.kind == "maxLevel" then row.maxLevel = true end
+      any = true
     elseif entry.kind == "death" then
-      deaths = (deaths or 0) + entry.count
+      row.deaths = (row.deaths or 0) + entry.count
+      any = true
     elseif entry.kind == "newCharacter" then
-      new = entry
+      row.new = true
+      row.level = math.max(row.level or entry.level, entry.level)
+      any = true
     end
   end
-
-  local parts = {}
-  if new then
-    parts[1] = ("new Character %s (%d)"):format(name, math.max(new.level, level or new.level))
-  elseif level then
-    parts[1] = ("%d » %d"):format(from, level)
-  end
-  if deaths then parts[#parts + 1] = deaths == 1 and "died" or ("died %d×"):format(deaths) end
-  if #parts == 0 then return nil end
-  local part = table.concat(parts, ", ")
-  if not (new or isMain) then part = name .. " " .. part end
-  return part
+  if row.new then row.from = nil end
+  return any and row or nil
 end
 
--- One Member's block: their Characters' events condensed onto one line,
--- the Main's first, then the rest by latest activity.
+-- One Member's block: a row per Character with events, the Main's first,
+-- then the rest by latest activity.
 local function memberBlock(self, id, entries)
   local record = self.ledger:record(id)
   local main = record and ns.Roster.main(record, self.now())
@@ -297,6 +298,7 @@ local function memberBlock(self, id, entries)
     main = main and main.name,
     classFilename = main and main.classFilename,
     time = 0,
+    characters = {},
     highlights = {},
   }
 
@@ -324,14 +326,11 @@ local function memberBlock(self, id, entries)
     if a.time ~= b.time then return a.time > b.time end
     return a.guid < b.guid
   end)
-  local parts = {}
   for _, forCharacter in ipairs(characters) do
     local character = record and record.characters[forCharacter.guid]
-    local part = characterPart(forCharacter, character and character.name or "?",
-      forCharacter.guid == mainGuid)
-    if part then parts[#parts + 1] = part end
+    local row = characterRow(forCharacter, character, forCharacter.guid == mainGuid)
+    if row then block.characters[#block.characters + 1] = row end
   end
-  if #parts > 0 then block.line = table.concat(parts, "; ") end
   return block
 end
 
