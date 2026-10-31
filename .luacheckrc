@@ -19,6 +19,7 @@ stds.wow = {
   },
 }
 
+files["Core/"] = { std = "lua51" }
 files["BFF.lua"] = { std = "lua51+wow" }
 files["Game/"] = { std = "lua51+wow" }
 files["UI/"] = { std = "lua51+wow" }
