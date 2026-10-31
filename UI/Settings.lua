@@ -1,9 +1,11 @@
 -- Settings: the one page in the game's Settings panel (AddOns → BFF) from
 -- the settings decision (#16): You (display name, read-only Crew code),
--- Sharing (Appear offline, Leave Crew) and Notifications and display (chat
--- line, While you were away, minimap button). A canvas page, since the
+-- Sharing (Appear offline, Leave Crew), Notifications and display (chat
+-- line, While you were away, minimap button), and Toasts from the toasts
+-- decision (on or off, sound, Move toasts). A canvas page, since the
 -- standard controls have no text box. Everything is read and written
--- through Core. See docs/design/settings-and-release.md.
+-- through Core. See docs/design/settings-and-release.md and
+-- docs/design/toasts.md.
 
 local _, ns = ...
 
@@ -126,6 +128,46 @@ local function createNotifications()
   frame.minimap:SetPoint("TOPLEFT", frame.away, "BOTTOMLEFT", 0, -4)
 end
 
+-- The sound picker opens a menu of the sounds the client has; choosing one
+-- plays it.
+local function soundMenu(owner)
+  MenuUtil.CreateContextMenu(owner, function(_, root)
+    for _, sound in ipairs(ns.Toasts.sounds()) do
+      root:CreateRadio(sound.label, function() return core:toastSound() == sound.key end, function()
+        core:setToastSound(sound.key)
+        ns.Toasts.play(sound.key)
+      end)
+    end
+  end)
+end
+
+local function createToasts()
+  frame.toastsHeader = createLabel(frame, "Toasts", "GameFontNormalLarge")
+  frame.toastsHeader:SetPoint("TOPLEFT", frame.minimap, "BOTTOMLEFT", -(INDENT - 4), -SECTION_GAP)
+  frame.toasts = createCheckbox("Show toasts for live events", function(checked)
+    core:setToasts(checked)
+  end)
+  frame.toasts:SetPoint("TOPLEFT", frame.toastsHeader, "BOTTOMLEFT", INDENT - 4, -8)
+
+  frame.soundLabel = createLabel(frame, "Sound")
+  frame.soundLabel:SetPoint("TOPLEFT", frame.toasts, "BOTTOMLEFT", 4, -14)
+  frame.sound = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  frame.sound:SetSize(160, 22)
+  frame.sound:SetPoint("LEFT", frame.soundLabel, "LEFT", 116, 0)
+  frame.sound:SetScript("OnClick", soundMenu)
+  frame.play = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  frame.play:SetSize(60, 22)
+  frame.play:SetText("Play")
+  frame.play:SetPoint("LEFT", frame.sound, "RIGHT", 6, 0)
+  frame.play:SetScript("OnClick", function() ns.Toasts.play(core:toastSound()) end)
+
+  frame.move = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  frame.move:SetSize(120, 22)
+  frame.move:SetText("Move toasts")
+  frame.move:SetPoint("TOPLEFT", frame.soundLabel, "BOTTOMLEFT", 0, -14)
+  frame.move:SetScript("OnClick", ns.Toasts.move)
+end
+
 -- The settings panel calls these; nothing waits for Okay or Defaults.
 local function noop() end
 
@@ -137,6 +179,7 @@ local function create()
   createYou()
   createSharing()
   createNotifications()
+  createToasts()
   frame:SetScript("OnShow", Page.refresh)
   -- A refused name is forgotten once the page closes.
   frame:SetScript("OnHide", function() frame.nameError:SetText("") end)
@@ -175,6 +218,15 @@ function Page.refresh()
   frame.chatLines:SetChecked(core:isChatLinesOn())
   frame.away:SetChecked(core:isAwayPopupOn())
   frame.minimap:SetChecked(core:isMinimapShown())
+
+  -- The sound and Move toasts are greyed out while toasts are off.
+  local toasts = core:isToastsOn()
+  frame.toasts:SetChecked(toasts)
+  frame.sound:SetText(ns.Toasts.soundLabel(core:toastSound()))
+  frame.soundLabel:SetAlpha(toasts and 1 or 0.5)
+  frame.sound:SetEnabled(toasts)
+  frame.play:SetEnabled(toasts)
+  frame.move:SetEnabled(toasts)
 end
 
 -- Opens the game's Settings panel on this page. Returns true, or false in

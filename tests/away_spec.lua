@@ -88,6 +88,7 @@ describe("While you were away", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     b.core:setChatLines(false)
+    b.core:setToasts(false)
     a:play({ level = 11 })
     net:run(3)
 

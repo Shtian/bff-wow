@@ -5,8 +5,9 @@
 -- console (/bffdev, opened by /bff sim too): buttons that make each
 -- simulated Member ding, die, move or log out, one that plays out a stretch
 -- of you being away so While you were away shows, and a live log of what
--- your Core sends, receives and fires. Left out of releases; it lives here, not
--- in a file of its own, so the .toc (a shipped file) stays as it is.
+-- your Core sends, receives and fires. /bffdev toast [n] shows sample
+-- toasts. Left out of releases; it lives here, not in a file of its own,
+-- so the .toc (a shipped file) stays as it is.
 
 local _, ns = ...
 
@@ -544,6 +545,26 @@ function Console.toggle(core)
 end
 
 SLASH_BFFDEV1 = "/bffdev"
-SlashCmdList.BFFDEV = function()
-  if ns.core then Console.toggle(ns.core) end
+-- Sample toasts, one of each kind, for /bffdev toast.
+local SAMPLE_TOASTS = {
+  { kind = "ding", text = "Simone dinged 24" },
+  { kind = "death", text = "Simbad died 2 times" },
+  { kind = "maxLevel", text = "Simba reached max level!" },
+  { kind = "newCharacter", text = "Simone has a new Character: Simonette (Priest)" },
+  { kind = "joined", text = "Simbad joined the Crew" },
+  { kind = "left", text = "Simba left the Crew" },
+}
+
+-- /bffdev toggles the console; /bffdev toast [n] shows n sample toasts
+-- (default 1), straight to the toasts and not through Core.
+SlashCmdList.BFFDEV = function(input)
+  if not ns.core then return end
+  local command, count = (input or ""):match("^%s*(%S*)%s*(%d*)")
+  if command == "toast" then
+    for i = 1, tonumber(count) or 1 do
+      ns.Toasts.show(SAMPLE_TOASTS[(i - 1) % #SAMPLE_TOASTS + 1])
+    end
+    return
+  end
+  Console.toggle(ns.core)
 end

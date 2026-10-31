@@ -51,6 +51,10 @@ _Avoid_: News, timeline, activity log
 The summary of Feed entries a Member missed since their last logout, shown on login.
 _Avoid_: Digest, recap
 
+**Toast**:
+A small on-screen notice for a live Feed entry, with an optional sound. Shows the same entries as the chat line.
+_Avoid_: Popup, alert, notification (when meaning a toast)
+
 **Last seen**:
 When a Member or Character was last played, as reported by that Member's own client rather than observed by others.
 _Avoid_: Last online, last active

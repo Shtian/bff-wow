@@ -23,6 +23,9 @@ One page in the game's native Settings panel (Esc → Options → AddOns → **B
 | **Notifications and display** | Chat message for live events | on | #14 |
 | | Show While you were away on login | on | #14 |
 | | Show minimap button | on | #7 |
+| **Toasts** | Show toasts for live events | on | `docs/design/toasts.md` |
+| | Sound, with a Play button | Friend online | `docs/design/toasts.md` |
+| | Move toasts button | | `docs/design/toasts.md` |
 
 Not in a Crew: the Crew code and Leave Crew are hidden, and the panel's setup view handles joining.
 
@@ -30,7 +33,7 @@ The **key binding** to open the panel goes in the game's own Key Bindings screen
 
 ### Fixed in v1
 
-No other options: the "can play with you" range (±3), the 30-day hide, a chat line when a Member comes online, and Feed sounds all stay fixed or out. Revisit after playtesting; "Member came online" would be a new notification, so v2.
+No other options: the "can play with you" range (±3), the 30-day hide and a chat line when a Member comes online all stay fixed or out. Feed sounds came in with toasts (`docs/design/toasts.md`), as the toast's sound only. Revisit after playtesting; "Member came online" would be a new notification, so v2.
 
 ### Storage
 

@@ -25,6 +25,34 @@ Skin.HOVER = { 1, 1, 1, 0.05 }
 
 Skin.HEADER_HEIGHT = 30
 
+-- Feed entries shown in gold.
+Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, left = true }
+-- Each Feed kind's icon, on the Feed tab and on toasts. The icons tell kinds
+-- apart, not colour: they are all drawn in the same grey. A ding is a plus
+-- drawn as text, which centres better than any texture.
+Skin.FEED_ICON_COLOR = { 0.82, 0.8, 0.86 }
+Skin.FEED_GLYPHS = { ding = "+" }
+Skin.FEED_ICONS = {
+  maxLevel = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1",
+  death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
+  newCharacter = "Interface\\FriendsFrame\\UI-Toast-FriendRequestIcon",
+  joined = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
+  left = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
+}
+
+-- Draws a Feed kind's icon: the glyph as text, or else the icon texture.
+-- A kind with neither gets a plus.
+function Skin.feedIcon(icon, glyphLabel, kind)
+  local glyph = Skin.FEED_GLYPHS[kind] or not Skin.FEED_ICONS[kind] and "+" or nil
+  glyphLabel:SetText(glyph or "")
+  icon:SetShown(glyph == nil)
+  if not glyph then
+    icon:SetTexture(Skin.FEED_ICONS[kind])
+    icon:SetDesaturated(true)
+    Skin.color(icon, Skin.FEED_ICON_COLOR)
+  end
+end
+
 local NARROW = "Fonts\\ARIALN.TTF"
 local FRIZ = "Fonts\\FRIZQT__.TTF"
 local CIRCLE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"

@@ -60,6 +60,7 @@ describe("Settings", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     b.core:setChatLines(false)
+    b.core:setToasts(false)
     b.core:setAwayPopup(false)
     assert.equal(0, b.core:unseen())
 
