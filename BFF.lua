@@ -56,7 +56,8 @@ local function onCoreEvent(event, kind)
   elseif event == "notice" then
     say(MESSAGES[kind])
   elseif event == "feedEntry" then
-    chatLine(kind)
+    if ns.core:isChatLinesOn() then chatLine(kind) end
+    if ns.core:isToastsOn() then ns.Toasts.show(kind) end
   elseif event == "awaySummary" then
     showAway(kind)
   end
@@ -85,6 +86,7 @@ local function start(isInitialLogin)
   ns.ChannelLink.setCrew(ns.core:crew())
   ns.Panel.start(ns.core)
   ns.Minimap.start(ns.core)
+  ns.Toasts.start(ns.core)
   ns.Settings.start(ns.core)
   ns.Snapshot.start(ns.core)
   C_Timer.NewTicker(1, function() ns.core:tick() end)

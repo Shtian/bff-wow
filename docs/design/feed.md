@@ -83,7 +83,7 @@ The summary is marked as seen once Core has fired it.
 
 ## Live chat line
 
-After the summary has settled, every new entry from another Member prints one chat line, e.g. "BFF: Ana dinged 24.", and is marked as seen. If chat lines are turned off, those entries stay unseen and show up in the next login's popup and on the Feed tab.
+After the summary has settled, every new entry from another Member prints one chat line, e.g. "BFF: Ana dinged 24.", and is marked as seen. Toasts (`docs/design/toasts.md`) show the same entries on screen. If chat lines and toasts are both turned off, those entries stay unseen and show up in the next login's popup and on the Feed tab.
 
 ## Feed tab
 

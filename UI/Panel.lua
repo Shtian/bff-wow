@@ -49,20 +49,7 @@ local ONLINE = Skin.ONLINE
 local ERROR = { 1, 0.42, 0.42 }
 
 local SORTS = { { "online", "Online first" }, { "level", "Level" }, { "name", "Name" } }
--- Entries shown in gold.
-local HIGHLIGHT = { maxLevel = true, joined = true, left = true }
--- Each kind's timeline icon. The icons tell kinds apart, not colour: they
--- are all drawn in the same grey.
--- A ding is a plus drawn as text, which centres better than any texture.
-local ICON_COLOR = { 0.82, 0.8, 0.86 }
-local GLYPHS = { ding = "+" }
-local ICONS = {
-  maxLevel = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1",
-  death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
-  newCharacter = "Interface\\FriendsFrame\\UI-Toast-FriendRequestIcon",
-  joined = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
-  left = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
-}
+local HIGHLIGHT = Skin.FEED_HIGHLIGHT
 
 local core
 local frame
@@ -575,7 +562,7 @@ local function createFeedEntry()
   entry.icon = node:CreateTexture(nil, "OVERLAY")
   entry.icon:SetSize(16, 16)
   entry.icon:SetPoint("CENTER")
-  entry.glyph = Skin.label(node, "glyph", ICON_COLOR)
+  entry.glyph = Skin.label(node, "glyph", Skin.FEED_ICON_COLOR)
   entry.glyph:SetPoint("CENTER", 0, 0)
 
   entry.text = Skin.label(entry, "text")
@@ -601,14 +588,7 @@ local function entryKey(entry)
 end
 
 local function drawFeedEntry(line, entry)
-  local glyph = GLYPHS[entry.kind] or not ICONS[entry.kind] and "+" or nil
-  line.glyph:SetText(glyph or "")
-  line.icon:SetShown(glyph == nil)
-  if not glyph then
-    line.icon:SetTexture(ICONS[entry.kind])
-    line.icon:SetDesaturated(true)
-    Skin.color(line.icon, ICON_COLOR)
-  end
+  Skin.feedIcon(line.icon, line.glyph, entry.kind)
   line.text:SetText(entry.text)
   Skin.color(line.text, HIGHLIGHT[entry.kind] and GOLD or entry.own and MUTED or TEXT)
   line.time:SetText(date("%H:%M", entry.time))

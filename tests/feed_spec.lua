@@ -222,13 +222,14 @@ describe("The Feed", function()
     assert.equal(0, c.core:feed().unseen)
   end)
 
-  it("leaves entries unseen when chat lines are off", function()
+  it("leaves entries unseen when chat lines and toasts are off", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
 
     assert.is_true(b.core:isChatLinesOn())
     b.core:setChatLines(false)
     assert.is_false(b.core:isChatLinesOn())
+    b.core:setToasts(false)
     a:play({ level = 11 })
     net:run(3)
     assert.same({}, chatLines(b))
@@ -237,6 +238,7 @@ describe("The Feed", function()
 
     b:reload()
     assert.is_false(b.core:isChatLinesOn())
+    assert.is_false(b.core:isToastsOn())
   end)
 
   it("still prints chat lines right after a reload", function()
@@ -253,6 +255,7 @@ describe("The Feed", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     b.core:setChatLines(false)
+    b.core:setToasts(false)
     a:play({ level = 11 })
     net:run(3)
 

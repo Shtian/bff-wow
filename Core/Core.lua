@@ -65,10 +65,10 @@ local function updateLink(self)
   self.gossip:setLink(up)
 end
 
--- New Feed entries from other Members each make a chat line once settled,
--- if chat lines are on, and are seen once they have.
+-- New Feed entries from other Members each make a chat line, a toast or
+-- both once settled, if either is on, and are seen once they have.
 local function announce(self, entries)
-  if not (self.log:isSettled() and self:isChatLinesOn()) then return end
+  if not (self.log:isSettled() and (self:isChatLinesOn() or self:isToastsOn())) then return end
   for _, entry in ipairs(entries) do
     self.log:markSeen(entry)
     self.listener("feedEntry", ns.Feed.describe(entry))
@@ -195,6 +195,49 @@ end
 
 function Core:isAwayPopupOn()
   return not self.db.awayPopupOff
+end
+
+-- Toasts for live events: on by default.
+function Core:setToasts(on)
+  local off = not on or nil
+  if off == self.db.toastsOff then return end
+  self.db.toastsOff = off
+  self.listener("changed")
+end
+
+function Core:isToastsOn()
+  return not self.db.toastsOff
+end
+
+-- The toast sound: the name UI plays it by, or "none". Nil goes back to
+-- the default.
+Core.DEFAULT_TOAST_SOUND = "UI_BNET_TOAST"
+
+function Core:setToastSound(name)
+  if name == Core.DEFAULT_TOAST_SOUND then name = nil end
+  if name == self.db.toastSound then return end
+  self.db.toastSound = name
+  self.listener("changed")
+end
+
+function Core:toastSound()
+  return self.db.toastSound or Core.DEFAULT_TOAST_SOUND
+end
+
+-- Where toasts appear: the centre of the first toast, as x and y from the
+-- screen's bottom left. Nil x goes back to the default, where this returns
+-- nil.
+function Core:setToastPosition(x, y)
+  local saved = self.db.toastPosition
+  if x == (saved and saved.x) and y == (saved and saved.y) then return end
+  self.db.toastPosition = x and { x = x, y = y } or nil
+  self.listener("changed")
+end
+
+function Core:toastPosition()
+  local position = self.db.toastPosition
+  if not position then return nil end
+  return position.x, position.y
 end
 
 -- Your display name, or nil until one is set.
