@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: BFF
+## Notes: Best Friends in Forever (hello-world spike)
+## Author: Stian Haga
+## Version: 0.0.0-spike
+## AllowLoadGameType: camelot
+
+HelloWorld.lua
