@@ -37,8 +37,6 @@ stds.wow = {
     "GetRealZoneText",
     "GetServerTime",
     "InCombatLockdown",
-    "IsTrialAccount",
-    "IsVeteranTrialAccount",
     "JoinTemporaryChannel",
     "LeaveChannelByName",
     "LOCALIZED_CLASS_NAMES_MALE",

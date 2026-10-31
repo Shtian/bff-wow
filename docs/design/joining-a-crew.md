@@ -58,7 +58,7 @@ The Member id stays the same across Crews, so leaving and rejoining keeps the sa
 1. **On first login** with BFF installed and no Crew, BFF prints one chat line: "BFF: type /bff to start or join a Crew." Nothing is sent and no channel is joined.
 2. **Opening the panel** (`/bff`, key binding or minimap button) without a Crew shows a setup view instead of the roster:
    - **Display name:** prefilled with the current Character's first name (Forever Characters can also have a last name), which the Member can change. 2–16 characters, counted as UTF-8 characters rather than bytes. Display names don't have to be unique; Members are told apart by id. (The BattleTag was considered as the default and not taken: it would be published without the Member choosing it.)
-   - **Start a Crew:** generates a code and joins it. Not offered on Trial and Veteran accounts, which can't send.
+   - **Start a Crew:** generates a code and joins it.
    - **Join a Crew:** a code box and a Join button. An invalid code shows "That code doesn't look right" under the box.
 3. **Right after joining** the panel switches to the roster. It shows your own row, the Crew code to share, and while no one else is known: "Waiting for your Crew. Members show up when they or someone who has seen them is online."
 4. The channel link joins the channel, and the usual `up()` sends a DIGEST (code structure, link port), so any online Member replies with what they know.
@@ -76,7 +76,7 @@ Slash commands do the same without the panel:
 
 The default display name for slash commands is the current Character's name, as in the setup view. It can also be changed in Settings. Changing it writes your own record, so it spreads like any other change.
 
-**Trial and Veteran accounts** can join and see the Crew, but stay receive-only (#8), so others never see them. The setup view says so up front.
+**Trial accounts** start, join and send like any other: the channel spike's Trial account sent fine. (#8 first made Trial and Veteran accounts receive-only; that was reversed.)
 
 ## Leaving
 

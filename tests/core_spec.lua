@@ -7,7 +7,6 @@ local function newDeps()
     db = {},
     now = function() return 1000 end,
     random = function() return 0.5 end,
-    receiveOnly = false,
     initialLogin = true,
     maxLevel = 60,
   }

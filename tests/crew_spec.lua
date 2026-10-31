@@ -9,7 +9,6 @@ local function newDeps(db)
     db = db or {},
     clock = 1000,
     random = math.random,
-    receiveOnly = false,
     initialLogin = true,
     maxLevel = 60,
   }
@@ -198,17 +197,6 @@ describe("Display name", function()
   it("is needed to start or join", function()
     local core = load().Core.new(newDeps())
     assert.same({ nil, "invalidName" }, { core:startCrew() })
-  end)
-end)
-
-describe("Receive-only accounts", function()
-  it("can join a Crew but not start one", function()
-    local deps = newDeps()
-    deps.receiveOnly = true
-    local core = load().Core.new(deps)
-    assert.is_true(core:isReceiveOnly())
-    assert.same({ nil, "receiveOnly" }, { core:startCrew("AA") })
-    assert.is_table(core:joinCrew(withCheck("K3F9A2Q"), "AA"))
   end)
 end)
 

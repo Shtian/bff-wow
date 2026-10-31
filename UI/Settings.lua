@@ -164,7 +164,7 @@ function Page.refresh()
   frame.sharing:SetPoint("TOPLEFT", crew and frame.codeLabel or frame.nameLabel, "BOTTOMLEFT",
     -INDENT, -SECTION_GAP)
   frame.pause:SetChecked(core:isPaused())
-  frame.pause:SetEnabled(crew ~= nil and not core:isReceiveOnly())
+  frame.pause:SetEnabled(crew ~= nil)
   frame.leave:SetShown(crew ~= nil and not crew.leaving)
 
   -- Under Leave Crew, or else Pause sharing, back at the section's left
