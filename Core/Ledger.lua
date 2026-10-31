@@ -1,6 +1,7 @@
--- Ledger: what we know. For now only the own record: one per Member, all
--- their Characters inside, keyed by GUID. The version is the clock at the
--- last write, and always moves forward (docs/adr/0001).
+-- Ledger: what we know. For now only the own record: one per Member, with
+-- the display name, the left flag and all their Characters inside, keyed by
+-- GUID. The version is the clock at the last write, and always moves
+-- forward (docs/adr/0001).
 
 local _, ns = ...
 
@@ -39,6 +40,19 @@ function Ledger:own()
   return self.db.records[self.db.memberId]
 end
 
+local function ownRecord(self)
+  local record = self:own()
+  if not record then
+    record = { id = self.db.memberId, version = 0, characters = {} }
+    self.db.records[record.id] = record
+  end
+  return record
+end
+
+local function bump(self, record)
+  record.version = math.max(self.now(), record.version + 1)
+end
+
 -- Records the current state of the Character being played. Returns true if
 -- the record changed. Switching to a Character counts as a change even if
 -- nothing else did, so it becomes the most recently played one.
@@ -47,12 +61,7 @@ function Ledger:updateOwn(character)
     error("updateOwn: character.guid must be a string", 2)
   end
 
-  local record = self:own()
-  if not record then
-    record = { id = self.db.memberId, version = 0, characters = {} }
-    self.db.records[record.id] = record
-  end
-
+  local record = ownRecord(self)
   local saved = record.characters[character.guid]
   local changed = saved == nil or self.playingGuid ~= character.guid
   if saved then
@@ -68,6 +77,44 @@ function Ledger:updateOwn(character)
   local now = self.now()
   saved.lastPlayed = now
   record.characters[character.guid] = saved
-  record.version = math.max(now, record.version + 1)
+  bump(self, record)
   return true
+end
+
+function Ledger:displayName()
+  local record = self:own()
+  return record and record.displayName
+end
+
+-- Writes the given displayName and left flag (true or false) into the own
+-- record; a field not given is kept.
+function Ledger:writeOwn(fields)
+  local record = ownRecord(self)
+  local displayName = fields.displayName or record.displayName
+  local left = record.left
+  if fields.left ~= nil then left = fields.left or nil end
+  if record.displayName == displayName and record.left == left then return end
+  record.displayName = displayName
+  record.left = left
+  bump(self, record)
+end
+
+-- What a Member who left publishes: no Characters.
+function Ledger:tombstone()
+  local record = ownRecord(self)
+  return { id = record.id, version = record.version, displayName = record.displayName, left = true }
+end
+
+function Ledger:knowsOthers()
+  for id in pairs(self.db.records) do
+    if id ~= self.db.memberId then return true end
+  end
+  return false
+end
+
+-- Drops every record but the own one.
+function Ledger:forgetOthers()
+  for id in pairs(self.db.records) do
+    if id ~= self.db.memberId then self.db.records[id] = nil end
+  end
 end

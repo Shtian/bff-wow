@@ -48,7 +48,7 @@ Outputs:
   - `awaySummary(summary)`: While you were away has settled after an initial login. Fired only when the popup setting is on and it isn't empty. App shows it once out of combat.
   - `notice(kind)`: one-off messages ("BFF is out of date", "receive-only on trial accounts", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
-- Reads: `crew()` (code, channel name and password, or nil).
+- Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()` and `isReceiveOnly()`.
 - Ready-to-render reads for UI: `rows()`, and `feed()` (the Feed tab's entries grouped by day, plus the unseen count). UI never sees a Member record.
 - `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` or `awaySummary`.
 
@@ -77,7 +77,7 @@ This is the only real seam in v1. Its adapters are the channel link, the fake li
 
 ## Loading pure code in game and in tests
 
-Every file starts with `local _, ns = ...` and attaches itself to `ns`, the addon's private table. Files in `Core/` only touch `ns`, Lua builtins and the pure libraries (LibSerialize, LibDeflate). The test loader mimics the `.toc` with `loadfile("Core/Ledger.lua")("BFF", ns)`. A luacheck rule bans WoW globals in `Core/`.
+Every file starts with `local _, ns = ...` and attaches itself to `ns`, the addon's private table. Files in `Core/` only touch `ns`, Lua builtins, the `bit` library (WoW and LuaJIT both have it) and the pure libraries (LibSerialize, LibDeflate). The test loader mimics the `.toc` with `loadfile("Core/Ledger.lua")("BFF", ns)`. A luacheck rule bans WoW globals in `Core/`.
 
 ## Tests
 
