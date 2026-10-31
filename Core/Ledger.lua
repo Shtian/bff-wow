@@ -2,7 +2,8 @@
 -- left flag and all their Characters inside, keyed by GUID: the own record,
 -- which only this client writes, and copies of everyone else's. The version
 -- is the owner's clock at the last write and always moves forward, so a
--- higher version wins (docs/adr/0001). Also when each Member was last heard.
+-- higher version wins (docs/adr/0001). Also when each Member was last heard,
+-- who each copy came from, and the Members removed from your own view.
 
 local _, ns = ...
 
@@ -25,12 +26,14 @@ local function newMemberId(random)
   return table.concat(chars)
 end
 
--- db is the whole saved table; the Ledger keeps `memberId`, `records` and
--- `heard`. Last-heard times survive a reload but not a logout, since nobody
--- was heard while you were logged out.
+-- db is the whole saved table; the Ledger keeps `memberId`, `records`,
+-- `heard`, `via` and `removed`. Last-heard times survive a reload but not a
+-- logout, since nobody was heard while you were logged out.
 function Ledger.new(db, now, random, initialLogin)
   db.memberId = db.memberId or newMemberId(random)
   db.records = db.records or {}
+  db.via = db.via or {}
+  db.removed = db.removed or {}
   if initialLogin or not db.heard then db.heard = {} end
   return setmetatable({ db = db, now = now }, Ledger)
 end
@@ -102,17 +105,19 @@ function Ledger:displayName()
   return record and record.displayName
 end
 
--- Writes the given displayName and left flag (true or false) into the own
--- record; a field not given is kept.
+-- Writes the given displayName, left flag and Main (a Character GUID) into
+-- the own record. A field not given is kept; false clears left or Main.
 function Ledger:writeOwn(fields)
   local record = ownRecord(self)
-  local displayName = fields.displayName or record.displayName
-  local left = record.left
-  if fields.left ~= nil then left = fields.left or nil end
-  if record.displayName == displayName and record.left == left then return end
-  record.displayName = displayName
-  record.left = left
-  bump(self, record)
+  local changed = false
+  for _, field in ipairs({ "displayName", "left", "main" }) do
+    local value = fields[field]
+    if value ~= nil and (value or nil) ~= record[field] then
+      record[field] = value or nil
+      changed = true
+    end
+  end
+  if changed then bump(self, record) end
 end
 
 -- What a Member who left publishes: no Characters.
@@ -128,12 +133,48 @@ function Ledger:knowsOthers()
   return false
 end
 
--- Drops every record but the own one, and who was heard.
+-- Drops every record but the own one, who was heard, and who was removed.
 function Ledger:forgetOthers()
   for id in pairs(self.db.records) do
     if id ~= self.db.memberId then self.db.records[id] = nil end
   end
   self.db.heard = {}
+  self.db.via = {}
+  self.db.removed = {}
+end
+
+-- Removes a Member from your own view: their record is dropped, and later
+-- copies are too. Returns false for yourself or a Member not held.
+function Ledger:remove(id)
+  local record = self.db.records[id]
+  if not record or id == self.db.memberId then return false end
+  self.db.removed[id] = record.displayName or true
+  self.db.records[id] = nil
+  self.db.heard[id] = nil
+  self.db.via[id] = nil
+  return true
+end
+
+-- Takes a Member off the Remove list. Returns false if they weren't on it.
+function Ledger:readd(id)
+  if not self.db.removed[id] then return false end
+  self.db.removed[id] = nil
+  return true
+end
+
+function Ledger:isRemoved(id)
+  return self.db.removed[id] ~= nil
+end
+
+-- The removed Members: for id, displayName (or true) in ledger:removed().
+function Ledger:removed()
+  return pairs(self.db.removed)
+end
+
+-- The Member id whose message brought this Member's record, if it wasn't
+-- their own.
+function Ledger:via(id)
+  return self.db.via[id]
 end
 
 -- The record with this Member id, or nil. Not to be changed.
@@ -183,6 +224,7 @@ local RECORD_SHAPE = {
   id = isText,
   version = isNumber,
   displayName = isOptional(isText),
+  main = isOptional(isText),
   left = isOptional(function(value) return value == true end),
 }
 local CHARACTER_SHAPE = {
@@ -216,18 +258,22 @@ local function wellFormed(record)
   return true
 end
 
--- Keeps a copy of someone else's record if it is newer than the one held.
--- Returns true if it was kept.
-function Ledger:merge(record)
+-- Keeps a copy of someone else's record, sent by the Member id `from`, if
+-- it is newer than the one held and the Member isn't removed. Returns true
+-- if it was kept.
+function Ledger:merge(record, from)
   if not wellFormed(record) or record.id == self.db.memberId then return false end
+  if self:isRemoved(record.id) then return false end
   if record.version <= self:version(record.id) then return false end
   if not record.characters then record.characters = {} end
   self.db.records[record.id] = record
+  self.db.via[record.id] = from ~= record.id and from or nil
   return true
 end
 
 -- Notes that a message from this Member was just heard.
 function Ledger:heard(id)
+  if self:isRemoved(id) then return end
   self.db.heard[id] = self.now()
 end
 

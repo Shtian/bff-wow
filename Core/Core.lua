@@ -71,12 +71,25 @@ function Core:updateOwn(character)
   end
 end
 
--- The panel's rows, ready to render. Each row is a Member: memberId,
--- displayName, online, own (your own row, which comes first), and the shown Character's name, classFilename,
--- level, xp, maxXp and zone, plus alts (name, classFilename, level). Your
--- own row comes first.
-function Core:rows()
-  return ns.Roster.rows(self.ledger, self.now())
+-- The panel's rows, ready to render, sorted by order: "online" (default),
+-- "level" or "name". Your own row comes first. Each row is a Member whose
+-- Characters weren't all unseen for 30 days: memberId, displayName, own,
+-- online, lastSeen, onAlt (playing a Character other than the Main),
+-- mainSet (the Main was chosen, rather than the most recently played),
+-- altsCanPlay, via (display name of the Member the news came through, if
+-- not them) and alts, plus the shown Character: the one being played while
+-- online, else the Main. A Character, shown or alt, has guid, name,
+-- classFilename, level, xp, maxXp, zone, deaths, lastPlayed, main and
+-- canPlay (within 3 levels of the Character you play).
+function Core:rows(order)
+  return ns.Roster.rows(self.ledger, self.now(), order)
+end
+
+-- Counts for the title and minimap button: online, members, canPlay (online
+-- Members whose Character being played can play with you) and hidden
+-- (Characters unseen for 30 days).
+function Core:summary()
+  return ns.Roster.summary(self.ledger, self.now())
 end
 
 -- Whether someone went online or offline since last checked.
@@ -197,6 +210,57 @@ function Core:setDisplayName(displayName)
   return true
 end
 
+-- Set as Main: one of your own Characters by GUID, or nil for the most
+-- recently played. Returns true, or nil and "unknownCharacter".
+function Core:setMain(guid)
+  if guid ~= nil then
+    local own = self.ledger:own()
+    if not (own and type(guid) == "string" and own.characters[guid]) then
+      return nil, "unknownCharacter"
+    end
+  end
+  local before = self.ledger:version(self.ledger:memberId())
+  self.ledger:writeOwn({ main = guid or false })
+  if self.ledger:version(self.ledger:memberId()) ~= before then
+    sendOwnNow(self)
+    self.listener("changed")
+  end
+  return true
+end
+
+-- Remove: hides a Member from your own view only, and stops relaying them.
+-- Returns true, or nil and "unknownMember".
+function Core:removeMember(id)
+  if not self.ledger:remove(id) then return nil, "unknownMember" end
+  self.gossip:forget(id)
+  self.online[id] = nil
+  self.listener("changed")
+  return true
+end
+
+-- Re-adds a removed Member: a DIGEST without them goes out, and whoever
+-- holds them replies with DATA. Returns true, or nil and "unknownMember".
+function Core:readdMember(id)
+  if not self.ledger:readd(id) then return nil, "unknownMember" end
+  self.gossip:askAround()
+  self.listener("changed")
+  return true
+end
+
+-- The removed Members, by display name: memberId and displayName.
+function Core:removed()
+  local removed = {}
+  for id, displayName in self.ledger:removed() do
+    removed[#removed + 1] = { memberId = id, displayName = type(displayName) == "string" and displayName or nil }
+  end
+  table.sort(removed, function(a, b)
+    local x, y = (a.displayName or ""):lower(), (b.displayName or ""):lower()
+    if x ~= y then return x < y end
+    return a.memberId < b.memberId
+  end)
+  return removed
+end
+
 -- Pause sharing: send nothing, still receive, and appear offline. Kept
 -- across reloads and logouts.
 function Core:setPaused(paused)
@@ -255,10 +319,10 @@ function Core:gone(name)
   if type(name) == "string" and self.ledger:wentAway(name) then checkOnline(self) end
 end
 
-local function dataReceived(self, records)
+local function dataReceived(self, records, from)
   local changed = false
   for _, record in ipairs(records) do
-    if self.ledger:merge(record) then changed = true end
+    if self.ledger:merge(record, from) then changed = true end
     if type(record) == "table" and type(record.id) == "string" and type(record.version) == "number" then
       self.gossip:recordSeen(record.id, record.version)
     end
@@ -288,7 +352,7 @@ function Core:received(message)
   if decoded.type == "DIGEST" and type(decoded.versions) == "table" then
     self.gossip:digestReceived(decoded.versions)
   elseif decoded.type == "DATA" and type(decoded.records) == "table" then
-    changed = dataReceived(self, decoded.records)
+    changed = dataReceived(self, decoded.records, decoded.from)
   end
   if onlineChanged(self) or changed then self.listener("changed") end
 end

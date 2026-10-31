@@ -32,6 +32,15 @@ local function character(overrides)
   return c
 end
 
+-- Each alt's name, classFilename and level.
+local function alts(row)
+  local result = {}
+  for i, alt in ipairs(row.alts) do
+    result[i] = { name = alt.name, classFilename = alt.classFilename, level = alt.level }
+  end
+  return result
+end
+
 local function countEvents(deps, name)
   local n = 0
   for _, e in ipairs(deps.events) do
@@ -122,7 +131,7 @@ describe("Your own Character", function()
     assert.equal(1, #rows)
     assert.equal(memberId, rows[1].memberId)
     assert.equal("Healbot", rows[1].name)
-    assert.same({ { name = "Thrallbane", classFilename = "WARRIOR", level = 24 } }, rows[1].alts)
+    assert.same({ { name = "Thrallbane", classFilename = "WARRIOR", level = 24 } }, alts(rows[1]))
   end)
 
   it("gives each new account a different Member id", function()
@@ -145,7 +154,7 @@ describe("Your own Character", function()
     local rows = core:rows()
     assert.equal("Renamed", rows[1].name)
     assert.equal(24, rows[1].level)
-    assert.same({ { name = "Thrallbane", classFilename = "WARRIOR", level = 5 } }, rows[1].alts)
+    assert.same({ { name = "Thrallbane", classFilename = "WARRIOR", level = 5 } }, alts(rows[1]))
   end)
 
   it("shows the Character just switched to, even if nothing about it changed", function()
