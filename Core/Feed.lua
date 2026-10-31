@@ -257,7 +257,7 @@ end
 -- Entries shown in the summary on their own highlighted line.
 local HIGHLIGHT = { maxLevel = true, joined = true, left = true }
 
--- One Character's part of a Member's line: "18 → 24, died 3×" (max level
+-- One Character's part of a Member's line: "18 » 24, died 3×" (max level
 -- counts towards the range too), prefixed
 -- with the Character's name for an Alt, or "new Character Jaina (12)".
 local function characterPart(entries, name, isMain)
@@ -277,7 +277,7 @@ local function characterPart(entries, name, isMain)
   if new then
     parts[1] = ("new Character %s (%d)"):format(name, math.max(new.level, level or new.level))
   elseif level then
-    parts[1] = ("%d → %d"):format(from, level)
+    parts[1] = ("%d » %d"):format(from, level)
   end
   if deaths then parts[#parts + 1] = deaths == 1 and "died" or ("died %d×"):format(deaths) end
   if #parts == 0 then return nil end

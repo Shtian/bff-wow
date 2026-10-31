@@ -8,7 +8,7 @@ Answers [What's in the settings panel, and how are releases cut?](https://github
 
 One page in the game's native Settings panel (Esc → Options → AddOns → **BFF**), built with the Settings API (no AceConfig, per #9). It opens from:
 
-- the gear button on the panel,
+- Settings in the panel's sidebar,
 - **Settings** in the minimap button's right-click menu (#7),
 - `/bff settings`.
 
@@ -18,7 +18,7 @@ One page in the game's native Settings panel (Esc → Options → AddOns → **B
 |---|---|---|---|
 | **You** | Display name (2–16 characters) | Character name at setup | #10 |
 | | Crew code, read-only, text selected for copying | | #10 |
-| **Sharing** | Pause sharing | off | #8 |
+| **Sharing** | Appear offline (Pause sharing) | off | #8 |
 | | Leave Crew button (asks to confirm) | | #10 |
 | **Notifications and display** | Chat message for live events | on | #14 |
 | | Show While you were away on login | on | #14 |

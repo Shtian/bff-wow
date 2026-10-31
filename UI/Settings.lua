@@ -1,6 +1,6 @@
 -- Settings: the one page in the game's Settings panel (AddOns → BFF) from
 -- the settings decision (#16): You (display name, read-only Crew code),
--- Sharing (Pause sharing, Leave Crew) and Notifications and display (chat
+-- Sharing (Appear offline, Leave Crew) and Notifications and display (chat
 -- line, While you were away, minimap button). A canvas page, since the
 -- standard controls have no text box. Everything is read and written
 -- through Core. See docs/design/settings-and-release.md.
@@ -97,7 +97,7 @@ end
 
 local function createSharing()
   frame.sharing = createLabel(frame, "Sharing", "GameFontNormalLarge")
-  frame.pause = createCheckbox("Pause sharing: send nothing and appear offline", function(checked)
+  frame.pause = createCheckbox("Appear offline: send nothing, so your Crew sees you as offline", function(checked)
     core:setPaused(checked)
   end)
   frame.pause.inset = INDENT - 4
@@ -167,7 +167,7 @@ function Page.refresh()
   frame.pause:SetEnabled(crew ~= nil)
   frame.leave:SetShown(crew ~= nil and not crew.leaving)
 
-  -- Under Leave Crew, or else Pause sharing, back at the section's left
+  -- Under Leave Crew, or else Appear offline, back at the section's left
   -- edge (each sits a different inset in from it).
   local under = frame.leave:IsShown() and frame.leave or frame.pause
   frame.notifications:ClearAllPoints()
