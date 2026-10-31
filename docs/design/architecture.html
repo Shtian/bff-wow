@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BFF – Architecture</title>
+<style>
+  :root {
+    --background:#0f0d0a; --foreground:#ece6da; --muted-foreground:#a39a88;
+    --card:#18150f; --card-foreground:#ece6da; --border:#2d281f;
+    --code-background:#120f0b; --code-foreground:#e6dfd0;
+    --destructive:#ef6b5b; --destructive-surface:rgba(239,107,91,.15);
+    --warning:#e9b44c; --warning-surface:rgba(233,180,76,.15); --success:#6fcf7f;
+    --chart-1:#6ea8fe; --chart-2:#5fd4b0; --chart-3:#f2a65a; --chart-4:#c58af9; --chart-5:#f27ea9; --chart-6:#e0c45c;
+    --radius:10px;
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  html { background: var(--background); }
+  body { margin: 0 auto !important; max-width: 920px; padding: 32px 20px 60px; }
+  :root {
+    --gold: #c9a227;
+    --gold-soft: color-mix(in srgb, #c9a227 14%, transparent);
+    --gold-line: color-mix(in srgb, #c9a227 45%, transparent);
+    --horde: #b33a2e;
+    --alli: #3a6fb3;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: var(--font-sans); color: var(--foreground); line-height: 1.55; font-size: 14.5px; }
+  .wrap { max-width: 100%; }
+  h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; letter-spacing: .01em; }
+  h1 { font-size: 30px; margin: 0; }
+  h2 { font-size: 20px; margin: 0 0 12px; display: flex; align-items: center; gap: 10px; }
+  h2 .n { font-family: var(--font-mono); font-size: 12px; color: var(--gold); border: 1px solid var(--gold-line); border-radius: 999px; padding: 1px 8px; }
+  h3 { font-size: 15px; margin: 0 0 6px; }
+  p { margin: 0 0 10px; }
+  .muted { color: var(--muted-foreground); }
+  code, .mono { font-family: var(--font-mono); font-size: 12.5px; }
+  :not(pre) > code { background: var(--code-background); color: var(--code-foreground); padding: 1px 5px; border-radius: 4px; }
+  section { margin: 34px 0; }
+  hr.rule { border: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--gold-line), transparent); margin: 0; }
+
+  .hero { padding: 6px 0 4px; }
+  .hero .tag { font-family: var(--font-mono); font-size: 11px; color: var(--gold); text-transform: uppercase; letter-spacing: .14em; }
+  .hero h1 span { color: var(--gold); }
+  .hero .sub { color: var(--muted-foreground); margin-top: 6px; font-size: 15px; }
+
+  .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .card { background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .card.gold { border-color: var(--gold-line); background: linear-gradient(180deg, var(--gold-soft), transparent 70%), var(--card); }
+  .card .ico { font-size: 20px; margin-bottom: 6px; }
+  .card p { margin: 0; color: var(--muted-foreground); font-size: 13.5px; }
+
+  /* Layer stack */
+  .stack { display: flex; flex-direction: column; gap: 6px; }
+  .layer { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; background: var(--card); }
+  .layer .name { font-weight: 600; font-family: Georgia, serif; }
+  .layer .desc { color: var(--muted-foreground); font-size: 13px; }
+  .layer.split { grid-template-columns: 1fr 1fr; padding: 0; border: 0; background: none; gap: 6px; }
+  .layer.split > div { display: grid; grid-template-columns: 90px 1fr; gap: 12px; align-items: center; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; background: var(--card); }
+  .l1 { border-left: 3px solid var(--chart-1) !important; }
+  .l2 { border-left: 3px solid var(--chart-2) !important; }
+  .l3 { border-left: 3px solid var(--chart-3) !important; }
+  .l4 { border-left: 3px solid var(--chart-4) !important; }
+  .l5 { border-left: 3px solid var(--chart-5) !important; }
+  .l6 { border-left: 3px solid var(--chart-6) !important; }
+  @media (max-width: 560px) {
+    .layer, .layer.split > div { grid-template-columns: 1fr; gap: 2px; }
+    .layer.split { grid-template-columns: 1fr; }
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td:first-child { white-space: nowrap; }
+  .tbl { border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; background: var(--card); }
+
+  pre { background: var(--code-background); color: var(--code-foreground); border-radius: var(--radius); padding: 16px; overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; margin: 0; border: 1px solid var(--border); }
+  .c { color: var(--muted-foreground); }
+  .k { color: var(--gold); }
+  .s { color: var(--chart-2); }
+  .nm { color: var(--chart-4); }
+
+  .callout { border: 1px solid var(--gold-line); background: var(--gold-soft); border-radius: var(--radius); padding: 12px 16px; font-size: 13.5px; }
+  .callout b { color: var(--gold); }
+
+  /* sequence */
+  .seq { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 16px; overflow-x: auto; }
+  .seq svg { display: block; width: 100%; min-width: 520px; height: auto; }
+
+  .msgs { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  .msg { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; background: var(--card); }
+  .msg .badge { font-family: var(--font-mono); font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-bottom: 6px; }
+  .msg p { margin: 0; font-size: 13px; color: var(--muted-foreground); }
+  .msg .when { font-size: 12px; margin-top: 6px; color: var(--foreground); }
+
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill { font-size: 12.5px; border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; background: var(--card); }
+  .pill b { color: var(--gold); font-weight: 600; }
+
+  /* Panel mock */
+  .mock { background: #17130d; color: #e8dcc0; border: 2px solid #5a4a2a; border-radius: var(--radius); padding: 16px; box-shadow: inset 0 0 0 1px #2a2215; font-size: 13px; max-width: 560px; }
+  .mock .top { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #5a4a2a; padding-bottom: 8px; margin-bottom: 8px; }
+  .mock .title { font-family: Georgia, serif; color: #f2c94c; font-size: 16px; font-weight: bold; }
+  .mock .title small { color: #b9a77d; font-weight: normal; font-size: 12px; }
+  .mock .on { color: #6fd36f; font-size: 12px; }
+  .row { display: grid; grid-template-columns: 12px 62px 1fr 130px; gap: 8px; align-items: center; padding: 6px 4px; border-radius: 4px; }
+  .row.hl { background: rgba(242,201,76,.08); outline: 1px solid rgba(242,201,76,.25); }
+  .row .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
+  .row .dot.g { background: #6fd36f; box-shadow: 0 0 6px #6fd36f; }
+  .row .who { font-weight: bold; }
+  .row .char { display: flex; flex-direction: column; gap: 3px; }
+  .row .char .line { display: flex; gap: 8px; align-items: baseline; }
+  .row .lv { color: #b9a77d; font-size: 12px; }
+  .bar { height: 5px; background: #2e2618; border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, #8a52d6, #b07cf0); }
+  .row .where { font-size: 12px; color: #b9a77d; text-align: right; }
+  .alt { grid-column: 3 / 5; font-size: 12px; color: #9a8c6a; padding-left: 0; }
+  .alt .ok { color: #f2c94c; }
+  .cls-war { color: #c69b6d; } .cls-rog { color: #fff468; } .cls-dru { color: #ff7c0a; } .cls-pri { color: #ffffff; }
+  @media (max-width: 480px) { .row { grid-template-columns: 12px 50px 1fr; } .row .where { grid-column: 3; text-align: left; } .alt { grid-column: 3; } }
+
+  /* risks */
+  .risks { display: grid; gap: 10px; }
+  .risk { display: grid; grid-template-columns: 54px 1fr; gap: 12px; align-items: start; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; background: var(--card); }
+  .lvl { font-family: var(--font-mono); font-size: 11px; font-weight: 700; text-align: center; border-radius: 4px; padding: 3px 0; }
+  .hi { background: var(--destructive-surface, rgba(220,60,60,.15)); color: var(--destructive); }
+  .md { background: var(--warning-surface, rgba(230,170,40,.15)); color: var(--warning); }
+  .lo { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
+  .risk p { margin: 0; font-size: 13.5px; color: var(--muted-foreground); }
+  .risk h3 { margin-bottom: 2px; }
+
+  /* roadmap */
+  .road { position: relative; display: grid; gap: 0; }
+  .step { display: grid; grid-template-columns: 36px 1fr; gap: 14px; position: relative; padding-bottom: 16px; }
+  .step:not(:last-child)::before { content: ""; position: absolute; left: 17px; top: 34px; bottom: 0; width: 2px; background: var(--border); }
+  .step .num { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-family: Georgia, serif; font-weight: bold; border: 2px solid var(--gold-line); color: var(--gold); background: var(--card); }
+  .step.key .num { background: var(--gold); color: #1a1408; border-color: var(--gold); }
+  .step h3 { margin: 6px 0 2px; }
+  .step p { margin: 0; font-size: 13.5px; color: var(--muted-foreground); }
+  .step .flag { font-size: 11px; font-family: var(--font-mono); color: var(--gold); margin-left: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="tag">WoW: Forever addon · Architecture draft</div>
+    <h1><span>BFF</span> — Best Friends in Forever</h1>
+    <div class="sub">A shared friends panel for a group that doesn't always play at the same time. It works across guilds and alts, with no server.</div>
+  </header>
+
+  <section>
+    <h2><span class="n">01</span> Core ideas</h2>
+    <div class="grid3">
+      <div class="card gold">
+        <div class="ico">✍️</div>
+        <h3>Each player writes only their own data</h3>
+        <p>Clients pass friends' data along but never edit it. A higher <code>seq</code> wins, so there are no conflicts and no clock problems.</p>
+      </div>
+      <div class="card gold">
+        <div class="ico">🕊️</div>
+        <h3>Gossip sync</h3>
+        <p>Any two clients online at the same time swap everything they know. A plays Monday, C plays Tuesday, and B carries the news in between.</p>
+      </div>
+      <div class="card gold">
+        <div class="ico">✨</div>
+        <h3>Events come from comparing data</h3>
+        <p>"Kari dinged 24" is never sent as a message. Each client works it out by comparing old and new data.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="n">02</span> Module layers</h2>
+    <div class="stack">
+      <div class="layer l1"><div class="name">UI</div><div class="desc">Panel · login summary popup · overlap finder. Only reads from the Store and re-renders when it changes.</div></div>
+      <div class="layer l2"><div class="name">Feed</div><div class="desc">Compares old and new data to produce ding, zone, death and alt events, plus the "while you were away" summary.</div></div>
+      <div class="layer l3"><div class="name">Store</div><div class="desc">Owns the saved data. <code>upsertChar()</code>, <code>merge()</code>, change callbacks. The only module that writes to the database.</div></div>
+      <div class="layer split">
+        <div class="l4"><div class="name">Snapshot</div><div class="desc">Reads your own character's state from game events.</div></div>
+        <div class="l5"><div class="name">Sync</div><div class="desc">The protocol: HELLO, WANT, DATA, PING, with jitter.</div></div>
+      </div>
+      <div class="layer l6"><div class="name">Transport</div><div class="desc">One <code>send(msg, scope)</code> call over Channel · Guild · Whisper · Battle.net.</div></div>
+    </div>
+
+    <div class="tbl" style="margin-top:14px">
+      <table>
+        <tr><th>File</th><th>Responsibility</th></tr>
+        <tr><td><code>BFF.toc</code></td><td>Metadata, saved data, load order</td></tr>
+        <tr><td><code>Core.lua</code></td><td>Startup, event dispatch, <code>/bff</code>, first-run setup (pick your name)</td></tr>
+        <tr><td><code>Store.lua</code></td><td>Database owner, merge rule, change callbacks</td></tr>
+        <tr><td><code>Snapshot.lua</code></td><td><code>PLAYER_LEVEL_UP</code>, <code>PLAYER_XP_UPDATE</code>, <code>ZONE_CHANGED_NEW_AREA</code>, login and logout</td></tr>
+        <tr><td><code>Sync.lua</code></td><td>Digests, requests, replies, heartbeats, batching</td></tr>
+        <tr><td><code>Transport.lua</code></td><td>Swappable backends behind one interface</td></tr>
+        <tr><td><code>Feed.lua</code></td><td>Comparing data, capped event log, login summary</td></tr>
+        <tr><td><code>Zones.lua</code></td><td>Static zone and dungeon level ranges</td></tr>
+        <tr><td><code>UI/*.lua</code></td><td>Panel, rows, tooltips</td></tr>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:10px;font-size:13px">Embedded libraries: <b>AceComm-3.0</b> and <b>ChatThrottleLib</b> (splitting large messages, staying under send limits), and <b>LibSerialize</b> with <b>LibDeflate</b> (smaller messages).</p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="n">03</span> Data model</h2>
+    <p>The saved data is <b>account-wide</b>, so every character on one account belongs to the same person automatically. Alts link with no setup.</p>
+<pre><span class="nm">BFF_DB</span> = {
+  me    = { pid = <span class="s">"k3f9a2"</span>, name = <span class="s">"Stian"</span> },  <span class="c">-- random id + display name</span>
+  group = <span class="s">"broskis"</span>,                         <span class="c">-- namespace; ignore other groups</span>
+
+  people = {
+    k3f9a2 = {
+      name  = <span class="s">"Stian"</span>,
+      main  = <span class="s">"Thrallbane-Realm"</span>,
+      chars = {
+        [<span class="s">"Thrallbane-Realm"</span>] = {
+          <span class="k">seq</span>   = 412,          <span class="c">-- owner's counter; higher wins</span>
+          <span class="k">t</span>     = 1793481234,   <span class="c">-- GetServerTime() at last write</span>
+          class = <span class="s">"WARRIOR"</span>, faction = <span class="s">"Horde"</span>,
+          level = 24, xp = 8120, xpMax = 13600,
+          zone  = <span class="s">"Stranglethorn Vale"</span>,
+          deaths = 7, played = 191233,
+        },
+      },
+    },
+    <span class="c">-- …friends' records, gossiped in</span>
+  },
+
+  seen = { … },  <span class="c">-- copy from last logout, used for "while you were away"</span>
+}</pre>
+    <div class="callout" style="margin-top:12px"><b>Merge rule:</b> a received record replaces your copy only if its <code>seq</code> is higher. People who play on several accounts can link them with a short code that reuses the same <code>pid</code>.</div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="n">04</span> Sync protocol</h2>
+    <div class="msgs">
+      <div class="msg"><span class="badge" style="background:color-mix(in srgb,var(--chart-1) 20%,transparent);color:var(--chart-1)">HELLO</span><p>Digest: <code>{charKey → seq}</code> for every character you know about. A few hundred bytes.</p><div class="when">On login or reload, and when a new peer appears</div></div>
+      <div class="msg"><span class="badge" style="background:color-mix(in srgb,var(--chart-3) 20%,transparent);color:var(--chart-3)">WANT</span><p>List of character keys where the other side has newer data than you.</p><div class="when">After reading a digest</div></div>
+      <div class="msg"><span class="badge" style="background:color-mix(in srgb,var(--chart-2) 20%,transparent);color:var(--chart-2)">DATA</span><p>Full records the other side is missing or has old versions of.</p><div class="when">In reply to a digest or WANT, or when your own data changes</div></div>
+      <div class="msg"><span class="badge" style="background:color-mix(in srgb,var(--chart-4) 20%,transparent);color:var(--chart-4)">PING</span><p>Your character key and seq. Presence heartbeat and cheap change check.</p><div class="when">Every ~5 minutes while online</div></div>
+    </div>
+
+    <h3 style="margin-top:20px">Example: C logs in after missing A</h3>
+    <div class="seq">
+      <svg viewBox="0 0 640 300" font-family="ui-sans-serif, system-ui" font-size="12">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+        </defs>
+        <g style="color:var(--muted-foreground)">
+          <g text-anchor="middle" font-weight="700" fill="var(--foreground)">
+            <text x="110" y="20">C (just logged in)</text>
+            <text x="320" y="20">B (online)</text>
+            <text x="530" y="20">D (online)</text>
+          </g>
+          <g stroke="var(--border)" stroke-dasharray="4 4">
+            <line x1="110" y1="30" x2="110" y2="290"/><line x1="320" y1="30" x2="320" y2="290"/><line x1="530" y1="30" x2="530" y2="290"/>
+          </g>
+          <!-- HELLO broadcast -->
+          <g style="color:var(--chart-1)" stroke="currentColor" stroke-width="1.6">
+            <line x1="110" y1="60" x2="316" y2="60" marker-end="url(#ar)"/>
+            <line x1="110" y1="64" x2="526" y2="64" marker-end="url(#ar)" opacity=".55"/>
+          </g>
+          <text x="200" y="52" fill="var(--chart-1)" font-weight="700">HELLO {A:3, B:9, C:12}</text>
+          <!-- jitter -->
+          <rect x="300" y="78" width="40" height="38" rx="4" fill="none" stroke="var(--gold-line)"/>
+          <text x="348" y="94" fill="var(--muted-foreground)">waits 1–4 s at random…</text>
+          <text x="348" y="110" fill="var(--muted-foreground)">B has A:5, so it's newer</text>
+          <rect x="510" y="78" width="40" height="38" rx="4" fill="none" stroke="var(--gold-line)"/>
+          <text x="558" y="98" fill="var(--muted-foreground)" text-anchor="start">also waits</text>
+          <!-- DATA -->
+          <g style="color:var(--chart-2)" stroke="currentColor" stroke-width="1.6">
+            <line x1="320" y1="140" x2="114" y2="140" marker-end="url(#ar)"/>
+            <line x1="320" y1="144" x2="526" y2="144" marker-end="url(#ar)" opacity=".55"/>
+          </g>
+          <text x="140" y="132" fill="var(--chart-2)" font-weight="700">DATA {A: seq 5, level 24…}</text>
+          <text x="400" y="164" fill="var(--muted-foreground)">D sees the data already sent → stays quiet</text>
+          <!-- Feed -->
+          <rect x="20" y="180" width="180" height="46" rx="6" fill="var(--gold-soft)" stroke="var(--gold-line)"/>
+          <text x="110" y="200" text-anchor="middle" fill="var(--foreground)" font-weight="600">Store.merge → Feed compares</text>
+          <text x="110" y="217" text-anchor="middle" fill="var(--gold)">"A dinged 24 while you were away"</text>
+          <!-- PING -->
+          <g style="color:var(--chart-4)" stroke="currentColor" stroke-width="1.6">
+            <line x1="110" y1="260" x2="316" y2="260" marker-end="url(#ar)"/>
+          </g>
+          <text x="140" y="252" fill="var(--chart-4)" font-weight="700">PING every ~5 min</text>
+        </g>
+      </svg>
+    </div>
+
+    <h3 style="margin-top:18px">Batching your own updates</h3>
+    <div class="pills">
+      <span class="pill">Level up → <b>immediately</b></span>
+      <span class="pill">Zone change → <b>~10 s</b></span>
+      <span class="pill">XP → <b>at most every 60 s</b></span>
+      <span class="pill">Online → <b>PING within 6 min</b> or game friend list</span>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="n">05</span> Transport</h2>
+    <div class="tbl">
+      <table>
+        <tr><th>Backend</th><th>Reaches</th><th>Notes</th></tr>
+        <tr><td><b>Custom channel</b></td><td>Same realm group and faction</td><td>Main bus. Auto-joined and hidden from chat. Doesn't need a guild.</td></tr>
+        <tr><td>Guild</td><td>Guild members</td><td>Bonus route when some of you share a guild</td></tr>
+        <tr><td>Whisper</td><td>A specific known online character</td><td>Direct replies</td></tr>
+        <tr><td>Battle.net game data</td><td>Battle.net friends on any realm or faction</td><td>Fallback across realms and factions. Requires everyone to be Battle.net friends.</td></tr>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:10px;font-size:13px">Duplicates arriving over more than one route are harmless, because the merge ignores records with an equal or lower <code>seq</code>.</p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="n">06</span> Friends panel</h2>
+    <div class="mock">
+      <div class="top"><div class="title">BFF <small>· Broski's</small></div><div class="on">● 2 online</div></div>
+
+      <div class="row">
+        <span class="dot g"></span><span class="who">Stian</span>
+        <div class="char"><div class="line"><span class="cls-war">Thrallbane</span><span class="lv">Lv 24</span></div><div class="bar"><i style="width:60%"></i></div></div>
+        <span class="where">Stranglethorn</span>
+        <span class="alt">+ 2 alts</span>
+      </div>
+
+      <div class="row hl">
+        <span class="dot"></span><span class="who">Erik</span>
+        <div class="char"><div class="line"><span class="cls-rog">Gnomeslice</span><span class="lv">Lv 19</span></div><div class="bar"><i style="width:30%"></i></div></div>
+        <span class="where">Redridge · 3d ago</span>
+        <span class="alt">↳ <span class="cls-pri">Healbot</span> Lv 23 — <span class="ok">can play with you</span></span>
+      </div>
+
+      <div class="row">
+        <span class="dot g"></span><span class="who">Kari</span>
+        <div class="char"><div class="line"><span class="cls-dru">Moonfire</span><span class="lv">Lv 26</span></div><div class="bar"><i style="width:55%"></i></div></div>
+        <span class="where">Duskwood</span>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:10px;font-size:13px">One row per person showing their main or most recently played character. Expand to see alts. Characters within ±3 levels of yours are highlighted. Open with <code>/bff</code>, a key binding, or later a minimap button.</p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="n">07</span> Risks to check in the client</h2>
+    <div class="risks">
+      <div class="risk"><span class="lvl hi">HIGH</span><div><h3>Channel restrictions</h3><p>Modern WoW requires a real key press or click for some channel and chat calls. Joining automatically, or sending addon messages over custom channels, might be blocked. That's why Transport is swappable.</p></div></div>
+      <div class="risk"><span class="lvl md">MED</span><div><h3>Forever API gaps</h3><p>There's no official API reference. Check that the XP, level and zone events fire as expected.</p></div></div>
+      <div class="risk"><span class="lvl md">MED</span><div><h3>Battle.net messages</h3><p>Only work between Battle.net friends, and need the receiver's account linked to a character.</p></div></div>
+      <div class="risk"><span class="lvl lo">LOW</span><div><h3>Message limits</h3><p>Each addon message is capped at 255 bytes and sending is throttled. Fine for a small group with AceComm. Keep full syncs rare.</p></div></div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="n">08</span> Build order</h2>
+    <div class="road">
+      <div class="step"><div class="num">1</div><div><h3>Snapshot + Store (local only)</h3><p>The panel shows your own characters, including alts.</p></div></div>
+      <div class="step key"><div class="num">2</div><div><h3>Transport (channel) + PING <span class="flag">← tests the biggest risk</span></h3><p>Two clients can see each other online.</p></div></div>
+      <div class="step"><div class="num">3</div><div><h3>HELLO / WANT / DATA</h3><p>Test passing data along with three people, or two accounts and a reload.</p></div></div>
+      <div class="step"><div class="num">4</div><div><h3>Feed + login summary</h3><p>Dings, deaths, zones, and "while you were away".</p></div></div>
+      <div class="step"><div class="num">5</div><div><h3>Overlap finder → competitions</h3><p>More views of the same synced data.</p></div></div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
