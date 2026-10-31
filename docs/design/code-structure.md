@@ -12,7 +12,7 @@ Almost all behaviour lives in one deep, pure-Lua module, **Core**, behind a smal
 |---|---|---|
 | **Core** (`Core/`) | yes | Everything BFF knows and decides: Member records, sync, Feed, panel rows, saved-data layout. Details below. |
 | **Snapshot** (`Game/Snapshot.lua`) | no | Reads level, XP, zone, class and GUID, counts deaths, and calls `core:updateOwn(character)`. |
-| **Channel link** (`Game/ChannelLink.lua`) | no | The production link adapter: joins and hides the Crew channel, AceComm with ChatThrottleLib, decides when the link is up or down, and has an echo mode. |
+| **Channel link** (`Game/ChannelLink.lua`) | no | The production link adapter: joins and hides the Crew channel (including filtering its system notices out of chat), AceComm with ChatThrottleLib, decides when the link is up or down, reports Members leaving the channel, and has an echo mode. See `docs/research/channel-spike.md`. |
 | **UI** (`UI/Panel.lua`, `UI/Minimap.lua`, `UI/Settings.lua`) | no | Renders Core's rows and summaries and sends user commands to Core. Shows no state it worked out itself. |
 | **App** (`BFF.lua`) | no | Wiring only: creates Core, routes WoW events, runs a 1 s `C_Timer` ticker that calls `core:tick()`, and handles slash commands. |
 
@@ -57,21 +57,23 @@ Outputs:
 These are internal seams: separate files for locality, tested only through Core's interface, with nothing swappable behind them.
 
 - **Ledger** (`Core/Ledger.lua`): what we know. Holds the own record and copies of everyone else's, the merge rule (a higher version wins), the Remove list, the "left" flag, last-heard times, and 180-day pruning. Removing a Member deletes their record and drops future copies. Re-adding takes them off the list and sends a DIGEST, and peers reply with DATA.
-- **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, XP piggyback, 5-minute heartbeat, logout), the "record changed" and "reply owed" flags, Pause, and receive-only.
+- **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, XP piggyback, 5-minute heartbeat), the "record changed" and "reply owed" flags, Pause, and receive-only.
 - **Feed** (`Core/Feed.lua`): turns a before/after record pair from Ledger into Feed entries, including skipped versions such as 22 → 24. Also owns the capped log, seen flags, and when While you were away is ready. See `docs/design/feed.md`.
-- **Roster** (`Core/Roster.lua`): builds panel rows from Ledger. Covers Main resolution, "on alt", online (heard within 12 min), Last seen, "can play with you" (±3 levels), the 30-day hide and sorting.
+- **Roster** (`Core/Roster.lua`): builds panel rows from Ledger. Covers Main resolution, "on alt", online (heard within 12 min, and not seen leaving the channel since), Last seen, "can play with you" (±3 levels), the 30-day hide and sorting.
 - **CrewCode** (`Core/CrewCode.lua`): generates, normalises and checks Crew codes, and derives the channel name and password from them.
 - **Codec** (`Core/Codec.lua`): a plain-text protocol version header, then the LibSerialize + LibDeflate body (`1|<payload>`). A newer version is detected before anything is decoded.
 
 ## The link port
 
-This is the only real seam in v1. Its adapters are the channel link, the fake link, and later perhaps the whisper mesh if **Spike: do two clients see each other over the Crew channel?** fails.
+This is the only real seam in v1. Its adapters are the channel link, the fake link, and the whisper mesh is not needed: **Spike: do two clients see each other over the Crew channel?** showed the channel works (`docs/research/channel-spike.md`).
 
 - Core → link: `send(string)`. **Best-effort**: a message can be lost silently, including messages ChatThrottleLib had queued when lockdown began.
-- Link → Core: `received(string)`, `up()` and `down()`. The sender's name is never passed; identity travels inside the payload.
+- Link → Core: `received(string)`, `up()`, `down()` and `gone(name)`. The sender's name is never passed with a message; identity travels inside the payload. Core drops messages carrying its own Member id, since the channel echoes your own messages back.
+- `gone(name)`: a Character left the channel, i.e. logged out (a real logout leaves the channel before any goodbye could be sent, so there is none). The name is bare (`Ambiguate(sender, "none")`). Core marks the Member owning a Character of that name offline right away; the 12-minute timeout stays as the fallback. It is only a presence hint, never used to identify data.
+- A send the game refuses (`AddonMessageThrottle`, `GeneralError`) makes the channel link call `down()` and straight back `up()`, so the rule below recovers it.
 - Each adapter decides what "down" means. For the channel link it is `C_ChatInfo.InChatMessagingLockdown()`, or not yet in the Crew channel, or having left it.
 - On every `up()`, Core sends a fresh DIGEST, plus its own DATA if its record changed while the link was down. This one rule covers first join, rejoin, lockdown clearing, and lost sends.
-- Lockdown, Pause and receive-only never appear in the port. Lockdown is the adapter's reason for being down. Pause and receive-only are Core policy.
+- Lockdown, Pause and receive-only never appear in the port. Lockdown is the adapter's reason for being down. Pause and receive-only are Core policy; receive-only comes from `IsTrialAccount()` / `IsVeteranTrialAccount()` only, never `AreOutgoingAddonChatMessagesRestricted()`, which the spike saw return true on a full account.
 
 ## Loading pure code in game and in tests
 
@@ -86,6 +88,7 @@ Every file starts with `local _, ns = ...` and attaches itself to `ns`, the addo
   - Each simulated client is a real Core with a fake link and its own `db`.
   - Per client: online or offline (link up or down), lockdown (link down while still online), Pause, reload (a new Core over the same `db`), and crash (a new Core over a copy of `db` taken at the last logout or reload).
   - Delivery is a broadcast to every client whose link is up, after a small delay, with optional drops to test the best-effort contract.
+  Delivery includes the sender itself, as the real channel does. A client going offline fires `gone(name)` on the others; a crash can skip it.
   - Messages go through the real Codec.
 - **Scenarios** include:
   - C logs in after missing A's ding, learns it from B, and D stays quiet.
