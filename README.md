@@ -3,3 +3,23 @@
 A World of Warcraft: Forever addon for friend groups who don't always play at the same time. It shows everyone's characters, levels and whereabouts, and tells you what your friends did while you were away.
 
 Work in progress. Design notes: [`docs/design/architecture.html`](docs/design/architecture.html).
+
+## Development
+
+Libraries aren't committed. Fetch the ones `.pkgmeta` declares into `Libs/` once, and again after a library bump:
+
+```sh
+scripts/fetch-libs.sh
+```
+
+Tests run under LuaJIT, like WoW's Lua 5.1:
+
+```sh
+brew install luajit luarocks
+luarocks --lua-version 5.1 --lua-dir "$(brew --prefix luajit)" --local install busted
+luarocks --lua-version 5.1 --lua-dir "$(brew --prefix luajit)" --local install luacheck
+export PATH="$HOME/.luarocks/bin:$PATH"
+
+luacheck .
+busted
+```

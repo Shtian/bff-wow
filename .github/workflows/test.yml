@@ -1,0 +1,31 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: leafo/gh-actions-lua@v13
+        with:
+          luaVersion: "luajit-2.1"
+
+      - uses: leafo/gh-actions-luarocks@v6
+
+      - name: Install busted and luacheck
+        run: |
+          luarocks install busted
+          luarocks install luacheck
+
+      - name: Fetch libraries
+        run: scripts/fetch-libs.sh
+
+      - name: Lint
+        run: luacheck .
+
+      - name: Test
+        run: busted

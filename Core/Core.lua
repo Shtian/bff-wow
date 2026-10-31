@@ -1,0 +1,46 @@
+-- Core: everything BFF knows and decides, in pure Lua. It never touches the
+-- game; App hands it the clock, randomness, the link and saved data.
+-- See docs/design/code-structure.md.
+
+local _, ns = ...
+
+local Core = {}
+Core.__index = Core
+ns.Core = Core
+
+local required = {
+  db = "table",
+  now = "function",
+  random = "function",
+  link = "table",
+  listener = "function",
+  maxLevel = "number",
+}
+
+-- deps: db, now(), random(), link (with send(string)), listener(event, ...),
+-- receiveOnly, initialLogin and maxLevel.
+function Core.new(deps)
+  for name, kind in pairs(required) do
+    if type(deps[name]) ~= kind then
+      error(("Core.new: %s must be a %s"):format(name, kind), 2)
+    end
+  end
+  if type(deps.link.send) ~= "function" then
+    error("Core.new: link.send must be a function", 2)
+  end
+
+  return setmetatable({
+    db = deps.db,
+    now = deps.now,
+    random = deps.random,
+    link = deps.link,
+    listener = deps.listener,
+    receiveOnly = deps.receiveOnly == true,
+    initialLogin = deps.initialLogin == true,
+    maxLevel = deps.maxLevel,
+  }, Core)
+end
+
+-- Called once a second. Core decides what is due.
+function Core:tick()
+end
