@@ -416,8 +416,15 @@ local function drawSection()
   section.sort:SetWidth(section.sort.label:GetStringWidth() + 16)
 end
 
--- The sidebar: Roster and Feed on top, Settings at the bottom.
-local function navButton(label, onClick)
+-- The sidebar: Roster and Feed on top, Settings at the bottom, each with a
+-- greyed game icon tinted like its label.
+local NAV_ICONS = {
+  roster = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
+  feed = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon",
+  settings = "Interface\\Buttons\\UI-OptionsButton",
+}
+
+local function navButton(label, icon, onClick)
   local button = CreateFrame("Button", nil, frame.sidebar)
   button:SetHeight(NAV_HEIGHT)
   button.selected = Skin.fill(button, { GOLD[1], GOLD[2], GOLD[3], 0.07 })
@@ -427,8 +434,13 @@ local function navButton(label, onClick)
   button.bar:SetPoint("BOTTOMLEFT")
   button.bar:SetWidth(2)
   Skin.fill(button, { 1, 1, 1, 0.03 }, "HIGHLIGHT")
+  button.icon = button:CreateTexture(nil, "ARTWORK")
+  button.icon:SetSize(14, 14)
+  button.icon:SetPoint("LEFT", 12, 0)
+  button.icon:SetTexture(icon)
+  button.icon:SetDesaturated(true)
   button.label = Skin.label(button, "text", MUTED)
-  button.label:SetPoint("LEFT", 14, 0)
+  button.label:SetPoint("LEFT", button.icon, "RIGHT", 7, 0)
   button.label:SetText(label)
   button:SetScript("OnClick", onClick)
   return button
@@ -438,6 +450,7 @@ local function setSelected(button, selected)
   button.selected:SetShown(selected)
   button.bar:SetShown(selected)
   Skin.color(button.label, selected and TEXT or MUTED)
+  Skin.color(button.icon, selected and GOLD or MUTED)
 end
 
 local function createNav()
@@ -448,16 +461,16 @@ local function createNav()
       Panel.refresh()
     end
   end
-  nav.roster = navButton("Roster", open("roster"))
+  nav.roster = navButton("Roster", NAV_ICONS.roster, open("roster"))
   nav.roster:SetPoint("TOPLEFT", 0, -8)
   nav.roster:SetPoint("TOPRIGHT", 0, -8)
-  nav.feed = navButton("Feed", open("feed"))
+  nav.feed = navButton("Feed", NAV_ICONS.feed, open("feed"))
   nav.feed:SetPoint("TOPLEFT", nav.roster, "BOTTOMLEFT")
   nav.feed:SetPoint("TOPRIGHT", nav.roster, "BOTTOMRIGHT")
   nav.feed.badge = Skin.badge(nav.feed, "tiny", { 0.1, 0.08, 0 }, GOLD)
   nav.feed.badge:SetPoint("RIGHT", -10, 0)
   -- The panel steps aside so it doesn't cover the settings.
-  nav.settings = navButton("Settings", function()
+  nav.settings = navButton("Settings", NAV_ICONS.settings, function()
     if ns.Settings.open() then frame:Hide() end
   end)
   nav.settings:SetPoint("BOTTOMLEFT", 0, 8)
