@@ -3,8 +3,9 @@
 -- records are kept and relayed like real ones, so it only runs in a Crew
 -- where no one else is known yet: start a test Crew for it. Also the dev
 -- console (/bffdev, opened by /bff sim too): buttons that make each
--- simulated Member ding, die, move or log out, and a live log of what your
--- Core sends, receives and fires. Left out of releases; it lives here, not
+-- simulated Member ding, die, move or log out, one that plays out a stretch
+-- of you being away so While you were away shows, and a live log of what
+-- your Core sends, receives and fires. Left out of releases; it lives here, not
 -- in a file of its own, so the .toc (a shipped file) stays as it is.
 
 local _, ns = ...
@@ -175,6 +176,79 @@ function Sim.act(i, action)
   return true
 end
 
+-- How long after Sim.away an offline Member who played logs out again.
+local AWAY_LOGOUT_AFTER = 5
+
+local function levelUp(client, levels)
+  return { level = math.min(net.maxLevel, client.character.level + levels), xp = 0 }
+end
+
+local function playCharacter(client, j)
+  client.current = j
+  client.character = client.characters[j]
+  client:play()
+end
+
+-- What each simulated Member gets up to while you're away, by index.
+local AWAY = {
+  -- Rolls a new Character and plays it a little, then dings and dies on
+  -- the one they were on.
+  function(client, i)
+    local was = client.current
+    local j
+    for k, c in ipairs(client.characters) do
+      if c.name == "Simonetta" then j = k end
+    end
+    if not j then
+      j = #client.characters + 1
+      client.characters[j] = {
+        guid = guidFor(i, j), name = "Simonetta", classFilename = "WARLOCK",
+        level = 1, xp = 0, maxXp = 400, zone = "Elwynn Forest", deaths = 0,
+      }
+    end
+    playCharacter(client, j)
+    client:play(levelUp(client, 4))
+    playCharacter(client, was)
+    client:play(levelUp(client, 3))
+    client:play({ deaths = (client.character.deaths or 0) + 2 })
+  end,
+  -- Dings and dies on the one they're on, then dings on the other.
+  function(client)
+    client:play(levelUp(client, 2))
+    client:play({ deaths = (client.character.deaths or 0) + 1 })
+    playCharacter(client, client.current % #client.characters + 1)
+    client:play(levelUp(client, 1))
+  end,
+  -- Reaches max level.
+  function(client)
+    client:play({ level = net.maxLevel, xp = 0 })
+  end,
+}
+
+-- Plays out a stretch of you being away: core goes back to how it is
+-- right after logging in, so what happens next isn't announced, then each
+-- simulated Member plays (logging in first if offline, and out again
+-- after). Once sync settles, Core sends While you were away as on a real
+-- login. Returns true, or nil and "notRunning".
+function Sim.away(core)
+  if not net then return nil, "notRunning" end
+  local log = core.log
+  log.settled, log.upSince, log.lastData = false, nil, nil
+  if core.linkUp then log:linkUp() end
+  local current = members
+  for i, client in ipairs(members) do
+    local wasOffline = not client.core
+    if wasOffline then client:login() end
+    AWAY[i](client, i)
+    if wasOffline then
+      C_Timer.After(AWAY_LOGOUT_AFTER, function()
+        if members == current and client.core then client:logout() end
+      end)
+    end
+  end
+  return true
+end
+
 -- Logs the simulated Members out; you see them go offline.
 function Sim.stop()
   if not net then return end
@@ -331,6 +405,8 @@ local function refreshMembers()
   frame.start:SetAlpha(running and 0.4 or 1)
   frame.stop:SetEnabled(running)
   frame.stop:SetAlpha(running and 1 or 0.4)
+  frame.away:SetEnabled(running)
+  frame.away:SetAlpha(running and 1 or 0.4)
   frame.empty:SetShown(not running)
   for i, row in ipairs(frame.rows) do
     local member = list[i]
@@ -405,10 +481,17 @@ local function create()
   frame.stop:SetPoint("LEFT", frame.start, "RIGHT", 6, 0)
   local clear = Skin.button(frame, "Clear log", function() frame.log:Clear() end)
   clear:SetPoint("LEFT", frame.stop, "RIGHT", 6, 0)
+  frame.away = Skin.button(frame, "Away", function()
+    if not Sim.away(watched) then return end
+    log(color(DIM, watched:isAwayPopupOn()
+      and "sim  you were away: the popup shows once sync settles (about 10 s)"
+      or "sim  you were away, but the popup is off in Settings"))
+  end)
+  frame.away:SetPoint("LEFT", clear, "RIGHT", 6, 0)
   local changed = Skin.checkbox(frame, "Log every \"changed\"", function(self)
     showChanged = self:GetChecked()
   end)
-  changed:SetPoint("LEFT", clear, "RIGHT", 12, 0)
+  changed:SetPoint("LEFT", frame.away, "RIGHT", 12, 0)
 
   frame.empty = Skin.label(frame, "small", Skin.MUTED)
   frame.empty:SetPoint("TOPLEFT", INSET, top - 38)
