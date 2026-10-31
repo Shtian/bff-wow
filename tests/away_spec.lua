@@ -118,6 +118,29 @@ describe("While you were away", function()
     assert.equal("10 → 11", summaries(b)[1].members[1].line)
   end)
 
+  it("starts settling over when the link drops before it settles", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b:logout()
+    net:run(5)
+    a:play({ level = 11 })
+    net:run(5)
+
+    b.events = {}
+    a:lockdown(true)
+    b:login()
+    net:run(5)
+    b:lockdown(true)
+    a:lockdown(false)
+    net:run(60)
+    assert.same({}, summaries(b))
+
+    b:lockdown(false)
+    net:run(40)
+    assert.equal(1, #summaries(b))
+    assert.equal("10 → 11", summaries(b)[1].members[1].line)
+  end)
+
   it("takes in entries that arrive while settling", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
@@ -203,8 +226,7 @@ describe("While you were away", function()
     assert.is_nil(members[1].line)
     assert.equal("died", members[2].line)
     assert.same({ { kind = "left", text = "Cid left the Crew" } }, members[3].highlights)
-    -- A jump to max level is only the max level line.
-    assert.is_nil(members[4].line)
+    assert.equal("58 → 60", members[4].line)
     assert.same({ { kind = "maxLevel", text = "Ann reached max level!" } }, members[4].highlights)
     assert.equal(4, summaries(d)[1].count)
   end)

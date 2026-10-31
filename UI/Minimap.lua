@@ -28,9 +28,6 @@ local function showTooltip(tooltip)
     tooltip:AddLine(("%d of %d online · %d can play with you now"):format(summary.online,
       summary.members, summary.canPlay), 1, 1, 1)
     if core:isPaused() then tooltip:AddLine("Sharing is paused.", 0.6, 0.6, 0.6) end
-    -- Without the popup, this is where unseen entries show.
-    local unseen = not core:isAwayPopupOn() and core:feed().unseen or 0
-    if unseen > 0 then tooltip:AddLine(("%d new in Feed"):format(unseen), 1, 0.82, 0) end
   end
   tooltip:AddLine("Click: open BFF. Right-click: options.", 0.6, 0.6, 0.6)
 end

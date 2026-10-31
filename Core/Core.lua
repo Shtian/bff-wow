@@ -59,10 +59,10 @@ function Core.new(deps)
 end
 
 -- Gossip's link is up only while in a Crew. Settling after login starts
--- once it is.
+-- once it is, and starts over if it goes down first.
 local function updateLink(self)
   local up = self.linkUp and self.db.crew ~= nil
-  if up then self.log:linkUp() end
+  if up then self.log:linkUp() else self.log:linkDown() end
   self.gossip:setLink(up)
 end
 

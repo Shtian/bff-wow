@@ -211,6 +211,13 @@ function Feed:linkUp()
   self.upSince = self.upSince or self.now()
 end
 
+-- The link went down before settling: a half-synced summary is never
+-- shown, so settling starts over at the next up().
+function Feed:linkDown()
+  if self.settled then return end
+  self.upSince, self.lastData = nil, nil
+end
+
 -- DATA changed a record.
 function Feed:dataMerged()
   self.lastData = self.now()
@@ -241,12 +248,13 @@ end
 -- Entries shown in the summary on their own highlighted line.
 local HIGHLIGHT = { maxLevel = true, joined = true, left = true }
 
--- One Character's part of a Member's line: "18 → 24, died 3×", prefixed
+-- One Character's part of a Member's line: "18 → 24, died 3×" (max level
+-- counts towards the range too), prefixed
 -- with the Character's name for an Alt, or "new Character Jaina (12)".
 local function characterPart(entries, name, isMain)
   local from, level, deaths, new
   for _, entry in ipairs(entries) do
-    if entry.kind == "ding" then
+    if entry.kind == "ding" or entry.kind == "maxLevel" then
       from = math.min(from or entry.from, entry.from)
       level = math.max(level or entry.level, entry.level)
     elseif entry.kind == "death" then
@@ -288,15 +296,16 @@ local function memberBlock(self, id, entries)
     block.time = math.max(block.time, entry.time)
     if HIGHLIGHT[entry.kind] then
       block.highlights[#block.highlights + 1] = { kind = entry.kind, text = entry.text }
-    elseif entry.guid then
-      local list = byCharacter[entry.guid]
-      if not list then
-        list = { guid = entry.guid, time = 0 }
-        byCharacter[entry.guid] = list
-        characters[#characters + 1] = list
+    end
+    if entry.guid then
+      local forCharacter = byCharacter[entry.guid]
+      if not forCharacter then
+        forCharacter = { guid = entry.guid, time = 0 }
+        byCharacter[entry.guid] = forCharacter
+        characters[#characters + 1] = forCharacter
       end
-      list[#list + 1] = entry
-      list.time = math.max(list.time, entry.time)
+      forCharacter[#forCharacter + 1] = entry
+      forCharacter.time = math.max(forCharacter.time, entry.time)
     end
   end
 
@@ -307,9 +316,10 @@ local function memberBlock(self, id, entries)
     return a.guid < b.guid
   end)
   local parts = {}
-  for _, list in ipairs(characters) do
-    local character = record and record.characters[list.guid]
-    local part = characterPart(list, character and character.name or "?", list.guid == mainGuid)
+  for _, forCharacter in ipairs(characters) do
+    local character = record and record.characters[forCharacter.guid]
+    local part = characterPart(forCharacter, character and character.name or "?",
+      forCharacter.guid == mainGuid)
     if part then parts[#parts + 1] = part end
   end
   if #parts > 0 then block.line = table.concat(parts, "; ") end
@@ -325,13 +335,13 @@ function Feed:takeSummary()
     if not entry.seen then
       entry.seen = true
       count = count + 1
-      local list = byMember[entry.memberId]
-      if not list then
-        list = {}
-        byMember[entry.memberId] = list
+      local memberEntries = byMember[entry.memberId]
+      if not memberEntries then
+        memberEntries = {}
+        byMember[entry.memberId] = memberEntries
         ids[#ids + 1] = entry.memberId
       end
-      list[#list + 1] = entry
+      memberEntries[#memberEntries + 1] = entry
     end
   end
   if count == 0 then return nil end
