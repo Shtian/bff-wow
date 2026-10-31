@@ -1,0 +1,8 @@
+## Interface: 16001, 120105
+## Title: BFF
+## Notes: Best Friends in Forever (channel spike, #6)
+## Author: Stian Haga
+## Version: 0.0.0-spike
+## SavedVariables: BFFSpikeLog
+
+Spike.lua
