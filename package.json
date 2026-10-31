@@ -1,0 +1,10 @@
+{
+  "name": "bff",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Best Friends in Forever, a World of Warcraft: Forever addon",
+  "repository": "github:Shtian/bff-wow",
+  "devDependencies": {
+    "@varlock/bumpy": "1.19.0"
+  }
+}

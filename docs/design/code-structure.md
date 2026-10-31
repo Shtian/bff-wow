@@ -131,8 +131,9 @@ Libs/                                -- fetched, gitignored
 scripts/ fetch-libs.sh  package.sh   -- package.sh builds the release zip
 tests/ load.lua  wow_stubs.lua  *_spec.lua
 .busted  .luacheckrc  .pkgmeta
-package.json  .bumpy/  CHANGELOG.md  -- release tooling (bumpy), left out of releases
-.github/workflows/ test.yml  release.yml
+package.json  .bumpy/               -- release tooling (bumpy), left out of releases
+CHANGELOG.md                         -- written by bumpy, ships in the zip
+.github/workflows/ test.yml  bumpy-check.yml  release.yml
 ```
 
 ## Not decided here

@@ -4,6 +4,11 @@ A World of Warcraft: Forever addon for friend groups who don't always play at th
 
 Work in progress. Design notes: [`docs/design/architecture.html`](docs/design/architecture.html).
 
+## Install
+
+- **WowUp:** Get Addons → Install from URL, and paste `https://github.com/Shtian/bff-wow`. WowUp picks up new releases from there.
+- **By hand:** download `BFF-vX.Y.Z.zip` from the [latest release](https://github.com/Shtian/bff-wow/releases/latest) and unzip it into the game's `Interface\AddOns` folder, so you get `AddOns\BFF\BFF.toc`.
+
 ## Development
 
 Libraries aren't committed. Fetch the ones `.pkgmeta` declares into `Libs/` once, and again after a library bump:
@@ -23,3 +28,14 @@ export PATH="$HOME/.luarocks/bin:$PATH"
 luacheck .
 busted
 ```
+
+## Releasing
+
+Releases are cut with [bumpy](https://github.com/dmno-dev/bumpy) (see `docs/design/settings-and-release.md`). A PR that changes shipped files (`changedFilePatterns` in `.bumpy/_config.json`) needs a bump file:
+
+```sh
+npm install
+npx bumpy add --packages "bff:patch" --message "What changed, for the changelog."
+```
+
+Merging to `main` opens or updates the "Versioned release" PR. Merging that publishes the GitHub release `bff@X.Y.Z` with the zip and `release.json`.

@@ -2,3 +2,5 @@
 *.zip
 .claude/worktrees/
 Libs/
+node_modules/
+.release/

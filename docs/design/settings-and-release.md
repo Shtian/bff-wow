@@ -43,19 +43,19 @@ Everything is **account-wide** in `BFF_DB`, including the minimap button positio
 Releases and the changelog are managed by [`@varlock/bumpy`](https://github.com/dmno-dev/bumpy/).
 
 - **Bump files:** a PR that changes shipped files carries `.bumpy/<name>.md`, naming `bff` with `patch`, `minor` or `major` and one changelog line. Agents create them with `bumpy add` (non-interactive); the repo gets bumpy's `add-change` agent skill.
-- **Which PRs need one:** `changedFilePatterns` covers only shipped files (`*.toc`, `*.lua`, `*.xml`), excluding `tests/`, `Dev/` and `scripts/`. Docs, tests and tooling PRs need none.
-- **Repo files:** a minimal root `package.json` (`"name": "bff"`, `"version": "0.1.0"`, `"private": true`, bumpy as a dev dependency) and `.bumpy/_config.json` with the package's `publishCommand`, `skipNpmPublish` and `changedFilePatterns`. `"private": true` keeps npm out of it; bumpy still runs a custom `publishCommand` for private packages.
-- **Versions:** semver, starting at `0.1.0` and staying `0.x` until v1 is complete. No prerelease channels.
+- **Which PRs need one:** `changedFilePatterns` covers only shipped files (`*.toc`, `*.lua`, `*.xml`), excluding `tests/`, `Dev/` and `scripts/`, plus `.pkgmeta`, since it pins the libraries that ship. Docs, tests and tooling PRs need none. The patterns can't use `!` exclusions (any one matching pattern counts), so the folders are left out with an extglob.
+- **Repo files:** a minimal root `package.json` (`"name": "bff"`, `"version": "0.0.0"`, `"private": true`, bumpy pinned as a dev dependency) and `.bumpy/_config.json` with the package's `managed`, `publishCommand`, `skipNpmPublish` and `changedFilePatterns`. `"private": true` keeps npm out of it; bumpy skips private packages unless they're marked `managed`, and then runs their custom `publishCommand`.
+- **Versions:** semver, staying `0.x` until v1 is complete. No prerelease channels. `package.json` starts at `0.0.0`, which bumpy treats as never released, and the first bump file is a `minor`, so the first Versioned release PR makes it `0.1.0`.
 - **Changelog:** bumpy writes `CHANGELOG.md` from the bump files. It also ships in the zip (`.pkgmeta`: `manual-changelog` with `filename: CHANGELOG.md`, `markup-type: markdown`); the packager's generated changelog isn't used.
 
 ### Flow
 
 ```text
-PR with a bump file        -> test.yml (luacheck, busted) + bumpy ci check (comments the release plan)
+PR with a bump file        -> test.yml (luacheck, busted) + bumpy-check.yml (comments the release plan)
 merge to main              -> bumpy ci release opens/updates the "Versioned release" PR
                               (bumps package.json, writes CHANGELOG.md)
 merge the Versioned release PR
-  -> release.yml: luacheck + busted, then bumpy ci release publishes:
+  -> release.yml: test.yml (luacheck, busted), then bumpy ci release publishes:
        draft GitHub release for tag bff@X.Y.Z (notes from the bump files)
        publishCommand: scripts/package.sh X.Y.Z
        tag pushed, release finalised
@@ -63,16 +63,22 @@ merge the Versioned release PR
 
 Bumpy's tags are always `<name>@<version>` (`bff@0.1.0`); that isn't configurable.
 
+`release.yml` follows bumpy's split-job layout: a `plan` job decides between `version-pr` and `publish`, and only the publish path runs the tests and the packager. The tests run in their own job because bumpy won't publish from a working tree with untracked files, and the Lua setup leaves some.
+
+An optional `BUMPY_GH_TOKEN` secret (a fine-grained token with contents and pull-request write access on this repo) makes the Versioned release PR trigger the test and bumpy check workflows. Without it, that PR gets no checks, which is fine since `release.yml` runs the tests before publishing anyway.
+
 ### Building the zip: `scripts/package.sh <version>`
 
 Bumpy owns the tag, the GitHub release and its notes. The BigWigs packager only builds:
 
 1. Create a local tag `v<version>`, so the packager's `@project-version@` (used in `## Version:`) becomes `v0.1.0` rather than `bff@0.1.0`. It's never pushed.
-2. Run the packager in build-only mode (`-d`): fetch the `.pkgmeta` externals and write `BFF-v<version>.zip`, leaving out `tests/`, `Dev/`, `scripts/`, `.bumpy/`, `package.json` and `node_modules/`.
-3. Write `release.json` with `jq` in the packager's format (one entry for the zip, with metadata for interfaces `16001` and `120105`). The packager only writes it in its own upload step, which `-d` skips.
+2. Run the packager (pinned to a release tag) in build-only mode (`-d`): fetch the `.pkgmeta` externals and write `BFF-v<version>.zip`, leaving out `tests/`, `Dev/`, `scripts/`, `.bumpy/`, `package.json`, `package-lock.json` and `node_modules/`.
+3. Write `release.json` with `jq` in the packager's format: one entry for the zip, with a metadata row per interface in the `.toc` (`forever` for `16001`, `mainline` for `120105`). The packager only writes it in its own upload step, which `-d` skips.
 4. `gh release upload bff@<version>` with the zip and `release.json`.
 
-**To prove when this is built:** that `gh release upload` attaches to bumpy's **draft** release by tag. Do a dry run before the first real release. If it can't, the script waits until bumpy has finalised the release and uploads then.
+Bumpy creates the draft release, runs the `publishCommand`, then finalises the release and pushes the tag, so the upload goes to a **draft** release whose tag doesn't exist on the remote yet. A dry run on 2026-10-31 proved that works: `gh release upload` found a draft by its pending tag name and attached both files, and no tag was created.
+
+`scripts/package.sh <version> --no-upload` builds into `.release/` without uploading. The packager needs bash 4, so on the Mac run it in a Linux container.
 
 ### The `.toc`
 
