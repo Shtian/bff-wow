@@ -25,6 +25,10 @@ _Avoid_: Primary
 **Alt**:
 Any of a Member's Characters other than their Main.
 
+**Remove (a Member)**:
+To hide a Member from your own view of the Crew. It never affects what other Members see; nobody removes a Member for the whole Crew.
+_Avoid_: Kick, ban
+
 ### What the Crew sees
 
 **Feed**:
@@ -34,3 +38,7 @@ _Avoid_: News, timeline, activity log
 **While you were away**:
 The summary of Feed entries a Member missed since their last logout, shown on login.
 _Avoid_: Digest, recap
+
+**Last seen**:
+When a Member or Character was last played, as reported by that Member's own client rather than observed by others.
+_Avoid_: Last online, last active
