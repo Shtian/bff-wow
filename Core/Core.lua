@@ -137,7 +137,7 @@ end
 -- if the popup is on and there's anything unseen, which is then seen. The
 -- summary is { members, count }: a Member has memberId, displayName, main
 -- and classFilename (their Main), time (latest activity), line (their
--- Characters' events condensed, e.g. "18 → 24, died 3×; Jaina 10 → 12",
+-- Characters' events condensed, e.g. "18 » 24, died 3×; Jaina 10 » 12",
 -- or nil) and highlights ({ kind, text } for max level, joined and left).
 local function awaySummary(self)
   if not self:isAwayPopupOn() then return end
