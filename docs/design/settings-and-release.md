@@ -65,6 +65,10 @@ Bumpy's tags are always `<name>@<version>` (`bff@0.1.0`); that isn't configurabl
 
 `release.yml` follows bumpy's split-job layout: a `plan` job decides between `version-pr` and `publish`, and only the publish path runs the tests and the packager. The tests run in their own job because bumpy won't publish from a working tree with untracked files, and the Lua setup leaves some.
 
+Without `BUMPY_GH_TOKEN`, the repository setting **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** must be on, or `version-pr` fails with "GitHub Actions is not permitted to create or approve pull requests".
+
+`.bumpy/_config.json` names `versionPr.branch` (`bumpy/version-packages`) explicitly: bumpy replaces the whole `versionPr` object instead of merging it with its defaults, so setting only the title leaves the branch `undefined`.
+
 An optional `BUMPY_GH_TOKEN` secret (a fine-grained token with contents and pull-request write access on this repo) makes the Versioned release PR trigger the test and bumpy check workflows. Without it, that PR gets no checks, which is fine since `release.yml` runs the tests before publishing anyway.
 
 ### Building the zip: `scripts/package.sh <version>`
