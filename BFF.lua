@@ -19,6 +19,7 @@ local MESSAGES = {
   wrongPassword = "BFF couldn't join its channel: start a new Crew.",
   leftCrew = "You left the Crew.",
   minimapHidden = "Minimap button hidden. Type /bff minimap to show it again.",
+  settingsInCombat = "BFF's settings open once you're out of combat.",
   outOfDate = "BFF is out of date: someone in your Crew has a newer version. Update to keep seeing them.",
 }
 ns.MESSAGES = MESSAGES
@@ -47,10 +48,12 @@ local function onCoreEvent(event, kind)
   if event == "changed" then
     ns.Panel.refresh()
     ns.Minimap.refresh()
+    ns.Settings.refresh()
   elseif event == "crewChanged" then
     ns.ChannelLink.setCrew(ns.core:crew())
     ns.Panel.refresh()
     ns.Minimap.refresh()
+    ns.Settings.refresh()
   elseif event == "notice" then
     say(MESSAGES[kind])
   elseif event == "feedEntry" then
@@ -84,6 +87,7 @@ local function start(isInitialLogin)
   ns.ChannelLink.setCrew(ns.core:crew())
   ns.Panel.start(ns.core)
   ns.Minimap.start(ns.core)
+  ns.Settings.start(ns.core)
   ns.Snapshot.start(ns.core)
   C_Timer.NewTicker(1, function() ns.core:tick() end)
   if isInitialLogin and not ns.core:crew() then
@@ -156,6 +160,10 @@ function commands.feed()
   ns.Panel.show("feed")
 end
 
+function commands.settings()
+  ns.Settings.open()
+end
+
 function commands.minimap()
   ns.core:setMinimapShown(true)
   say("minimap button shown.")
@@ -197,7 +205,7 @@ SlashCmdList.BFF = function(input)
   elseif commands[command] then
     commands[command](rest)
   else
-    say("/bff, /bff feed, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff minimap, /bff leave")
+    say("/bff, /bff feed, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
   end
 end
 

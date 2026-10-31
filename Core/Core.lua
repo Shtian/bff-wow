@@ -164,6 +164,11 @@ function Core:feed()
   return self.log:view(self.utcOffset)
 end
 
+-- How many of others' Feed entries haven't been shown yet.
+function Core:unseen()
+  return self.log:unseen()
+end
+
 -- The Feed tab was opened: every entry is seen.
 function Core:feedSeen()
   if self.log:markAllSeen() then self.listener("changed") end
@@ -282,6 +287,7 @@ function Core:setDisplayName(displayName)
   if name ~= self.ledger:displayName() then
     self.ledger:writeOwn({ displayName = name })
     sendOwnNow(self)
+    self.listener("changed")
   end
   return true
 end

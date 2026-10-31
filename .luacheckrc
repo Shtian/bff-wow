@@ -47,6 +47,7 @@ stds.wow = {
     "NUM_CHAT_WINDOWS",
     "RAID_CLASS_COLORS",
     "RemoveChatWindowChannel",
+    "Settings",
     "StaticPopup_Show",
     "time",
     "UIParent",

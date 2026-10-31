@@ -206,6 +206,15 @@ function Feed:markAllSeen()
   return any
 end
 
+-- How many entries haven't been seen.
+function Feed:unseen()
+  local count = 0
+  for _, entry in ipairs(self.db.feed) do
+    if not entry.seen then count = count + 1 end
+  end
+  return count
+end
+
 -- The link came up in a Crew: settling starts, if it hasn't.
 function Feed:linkUp()
   self.upSince = self.upSince or self.now()

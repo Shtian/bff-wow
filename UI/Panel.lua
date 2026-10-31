@@ -4,8 +4,8 @@
 -- then a row per Member with expandable Alts, sort buttons, a tooltip and
 -- right-click menu per Character, and a footer with Pause sharing, the
 -- hidden count, removed Members and the Crew code. The Feed lists Core's
--- entries by day and marks them seen while open. It never sees a Member
--- record.
+-- entries by day and marks them seen while open. A gear in the title bar
+-- opens the settings page. It never sees a Member record.
 
 local _, ns = ...
 
@@ -544,6 +544,23 @@ local function create()
   end
   frame.title = title
   title:SetText("BFF")
+
+  -- The gear, left of the close button, opens the settings page.
+  local gear = CreateFrame("Button", nil, frame)
+  gear:SetSize(16, 16)
+  gear:SetPoint("TOPRIGHT", -28, -4)
+  gear:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
+  gear:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+  gear:SetScript("OnClick", function()
+    frame:Hide()
+    ns.Settings.open()
+  end)
+  gear:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText("Settings")
+    GameTooltip:Show()
+  end)
+  gear:SetScript("OnLeave", hideTooltip)
 end
 
 local function createEditBox(parent, width)
