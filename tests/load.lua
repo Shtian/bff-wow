@@ -1,5 +1,18 @@
--- Loads Core the way the game does: every Core/ file listed in BFF.toc, in
--- order, called with the addon name and a shared private namespace.
+-- Loads Core the way the game does: the pure libraries Core uses, then every
+-- Core/ file listed in BFF.toc, in order, called with the addon name and a
+-- shared private namespace.
+
+-- LibStub keeps one copy of each library per process, as in game.
+local libraries = {
+  "Libs/LibStub/LibStub.lua",
+  "Libs/LibSerialize/LibSerialize.lua",
+  "Libs/LibDeflate/LibDeflate.lua",
+}
+for _, path in ipairs(libraries) do
+  local chunk = loadfile(path)
+  assert(chunk, path .. " is missing; run scripts/fetch-libs.sh")
+  chunk()
+end
 
 local function coreFiles()
   local files = {}

@@ -38,7 +38,23 @@ function Core.new(deps)
     receiveOnly = deps.receiveOnly == true,
     initialLogin = deps.initialLogin == true,
     maxLevel = deps.maxLevel,
+    ledger = ns.Ledger.new(deps.db, deps.now, deps.random),
   }, Core)
+end
+
+-- The current state of the Character being played, from Snapshot: guid,
+-- name, classFilename, level, xp, maxXp, zone and deaths.
+function Core:updateOwn(character)
+  if self.ledger:updateOwn(character) then
+    self.listener("changed")
+  end
+end
+
+-- The panel's rows, ready to render. Each row is a Member: memberId, and the
+-- shown Character's name, classFilename, level, xp, maxXp and zone, plus
+-- alts (name, classFilename, level).
+function Core:rows()
+  return ns.Roster.rows(self.ledger)
 end
 
 -- Called once a second. Core decides what is due.

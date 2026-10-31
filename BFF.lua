@@ -6,7 +6,10 @@ local _, ns = ...
 -- Stands in for the channel link until it exists: sends go nowhere.
 local noLink = { send = function() end }
 
-local function onCoreEvent()
+local function onCoreEvent(event)
+  if event == "changed" then
+    ns.Panel.refresh()
+  end
 end
 
 local function start(isInitialLogin)
@@ -21,6 +24,8 @@ local function start(isInitialLogin)
     initialLogin = isInitialLogin,
     maxLevel = GetMaxLevelForPlayerExpansion(),
   })
+  ns.Panel.start(ns.core)
+  ns.Snapshot.start(ns.core)
   C_Timer.NewTicker(1, function() ns.core:tick() end)
 end
 
@@ -31,3 +36,8 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     start((...))
   end
 end)
+
+SLASH_BFF1 = "/bff"
+SlashCmdList.BFF = function()
+  if ns.core then ns.Panel.toggle() end
+end
