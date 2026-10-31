@@ -10,5 +10,5 @@ end)
 
 SLASH_BFFHELLO1 = "/bffhello"
 SlashCmdList.BFFHELLO = function()
-  print("|cff33ff99BFF|r hello, edit me and /reload (v1)")
+  print("|cff33ff99BFF|r hello, edit me and /reload (v2)")
 end
