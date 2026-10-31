@@ -4,6 +4,7 @@
 ## Author: Stian Haga
 ## Version: @project-version@
 ## SavedVariables: BFF_DB
+## SavedVariablesPerCharacter: BFF_CharacterDB
 
 Libs/LibStub/LibStub.lua
 Libs/CallbackHandler-1.0/CallbackHandler-1.0.xml
@@ -13,6 +14,13 @@ Libs/LibDeflate/lib.xml
 Libs/LibDataBroker-1.1/LibDataBroker-1.1.lua
 Libs/LibDBIcon-1.0/lib.xml
 
+Core/Codec.lua
+Core/Ledger.lua
+Core/Roster.lua
 Core/Core.lua
+
+Game/Snapshot.lua
+
+UI/Panel.lua
 
 BFF.lua
