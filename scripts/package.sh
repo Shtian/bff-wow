@@ -44,9 +44,12 @@ git tag -f "$tag" >/dev/null
 
 # Build only (-d): the packager fetches the .pkgmeta externals, leaves out the
 # ignored paths and writes .release/BFF-v<version>.zip. Bumpy owns the release.
+# Run it as if outside Actions: on a branch push it skips building when HEAD has
+# a tag ("Found future tag"), expecting a tag build to follow, and our build tag
+# is on HEAD. Outside Actions it only loses its log groups and step outputs.
 curl -fsSL -o "$work/release.sh" \
   "https://raw.githubusercontent.com/BigWigsMods/packager/$PACKAGER_VERSION/release.sh"
-bash "$work/release.sh" -d -r "$release_dir"
+env -u GITHUB_ACTIONS bash "$work/release.sh" -d -r "$release_dir"
 [[ -f "$release_dir/$zip" ]] || { echo "The packager didn't write $zip" >&2; exit 1; }
 
 # The packager only writes release.json (read by WowUp) in its upload step,
