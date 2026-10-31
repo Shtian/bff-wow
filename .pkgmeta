@@ -1,0 +1,41 @@
+package-as: BFF
+
+enable-nolib-creation: no
+
+# scripts/fetch-libs.sh reads this list too, so keep each external in the
+# block form below (url, tag, path), or a CurseForge svn URL pinned to a tag.
+externals:
+  Libs/LibStub:
+    url: https://github.com/WoWUIDev/Ace3
+    tag: Release-r1403
+    path: LibStub
+  Libs/CallbackHandler-1.0:
+    url: https://github.com/WoWUIDev/Ace3
+    tag: Release-r1403
+    path: CallbackHandler-1.0
+  Libs/AceComm-3.0:
+    url: https://github.com/WoWUIDev/Ace3
+    tag: Release-r1403
+    path: AceComm-3.0
+  Libs/LibSerialize:
+    url: https://github.com/rossnichols/LibSerialize
+    tag: v1.2.3
+  Libs/LibDeflate:
+    url: https://github.com/SafeteeWoW/LibDeflate
+    tag: 1.0.2-release
+  Libs/LibDataBroker-1.1:
+    url: https://github.com/tekkub/libdatabroker-1-1
+    tag: v1.1.4
+  Libs/LibDBIcon-1.0:
+    url: https://repos.curseforge.com/wow/libdbicon-1-0/tags/v12.1.2/LibDBIcon-1.0
+
+ignore:
+  - tests
+  - Dev
+  - scripts
+  - docs
+  - AGENTS.md
+  - CLAUDE.md
+  - CONTEXT.md
+  - package.json
+  - node_modules
