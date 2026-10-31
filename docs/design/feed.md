@@ -73,11 +73,12 @@ Entries that arrive while settling go into the summary and print no chat line.
 
 ### How it looks
 
-A small frame in the panel's style (#7):
+A small frame in the panel's style (#7), laid out as a scoreboard:
 
-- One block per Member, ordered by most recent activity. Each Member's events are condensed onto one line, e.g. "**Ana** (Main Thrall): 18 » 24, died 3×, new Character Jaina (12)". The level range goes from the lowest "before" to the highest "after" across that Member's unseen entries, per Character.
-- Max level, joined and left get their own highlighted line.
-- **Open Feed** and **Close** buttons.
+- Members ordered by most recent activity, and a row per Character with unseen events: the Main's first, then the rest by latest activity. The Member's name and class icon sit on their first row, with the Character's name under it when it differs ("Alt Jaina").
+- Columns for the **level** now, **levels gained** and **deaths**. Under the level, a bar from 0 to max level shows the jump: grey for where they started, green for what they gained, gold with a star when it reached max level. A new Character shows its level and "new" instead of levels gained. The level range goes from the lowest "before" to the highest "after" across that Character's unseen entries.
+- Joined and left show in gold beside the Member's name; a Member with nothing else gets just that row.
+- **Open Feed** and **Dismiss** buttons.
 
 The summary is marked as seen once Core has fired it.
 
@@ -113,7 +114,7 @@ Kept deep: Core decides what is seen and what the settings allow, so UI and App 
 
 ## Scenarios to add to the FakeNet tests
 
-- C misses A's dings from 22 to 24 and two deaths; at C's next login the summary shows "22 » 24, died 2×" once, and nothing prints in chat.
+- C misses A's dings from 22 to 24 and two deaths; at C's next login the summary shows A's Main going from 22 to 24 with 2 deaths once, and nothing prints in chat.
 - A reaches max level from 59 in one jump: one max level entry, no ding.
 - D joins a Crew that already has A, B and C at various levels: D's Feed stays empty, and A, B and C each get one "D joined the Crew".
 - B returns after 200 days offline, so C pruned B's record at 180 days: C makes no "joined" entry.

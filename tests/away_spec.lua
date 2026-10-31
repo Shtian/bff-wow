@@ -43,6 +43,12 @@ local function chatLines(client)
   return lines
 end
 
+-- The first Character's level range in a summary's first Member.
+local function levels(summary)
+  local character = summary.members[1].characters[1]
+  return { from = character.from, level = character.level }
+end
+
 -- Logs the client back in with a clean event list.
 local function relog(net, client)
   client.events = {}
@@ -51,7 +57,7 @@ local function relog(net, client)
 end
 
 describe("While you were away", function()
-  it("condenses missed dings and deaths into one line, once, with no chat lines", function()
+  it("condenses missed dings and deaths per Character, once, with no chat lines", function()
     local net, clients = crew({ "Ann", "Bob", "Cid" }, { Ann = 22 })
     local a, c = clients[1], clients[3]
 
@@ -75,7 +81,9 @@ describe("While you were away", function()
     assert.equal("Ann", ann.displayName)
     assert.equal("Ann", ann.main)
     assert.equal("WARRIOR", ann.classFilename)
-    assert.equal("22 » 24, died 2×", ann.line)
+    assert.same({
+      { name = "Ann", main = true, from = 22, level = 24, deaths = 2 },
+    }, ann.characters)
     assert.same({}, ann.highlights)
     assert.same({}, chatLines(c))
     assert.equal(0, c.core:feed().unseen)
@@ -116,7 +124,7 @@ describe("While you were away", function()
     b:lockdown(false)
     net:run(40)
     assert.equal(1, #summaries(b))
-    assert.equal("10 » 11", summaries(b)[1].members[1].line)
+    assert.same({ from = 10, level = 11 }, levels(summaries(b)[1]))
   end)
 
   it("starts settling over when the link drops before it settles", function()
@@ -139,7 +147,7 @@ describe("While you were away", function()
     b:lockdown(false)
     net:run(40)
     assert.equal(1, #summaries(b))
-    assert.equal("10 » 11", summaries(b)[1].members[1].line)
+    assert.same({ from = 10, level = 11 }, levels(summaries(b)[1]))
   end)
 
   it("takes in entries that arrive while settling", function()
@@ -154,7 +162,7 @@ describe("While you were away", function()
     a:play({ level = 11 })
     net:run(40)
     assert.equal(1, #summaries(b))
-    assert.equal("10 » 11", summaries(b)[1].members[1].line)
+    assert.same({ from = 10, level = 11 }, levels(summaries(b)[1]))
     assert.same({}, chatLines(b))
   end)
 
@@ -224,10 +232,12 @@ describe("While you were away", function()
     for i, member in ipairs(members) do names[i] = member.displayName end
     assert.same({ "Eve", "Bob", "Cid", "Ann" }, names)
     assert.same({ { kind = "joined", text = "Eve joined the Crew" } }, members[1].highlights)
-    assert.is_nil(members[1].line)
-    assert.equal("died", members[2].line)
+    assert.same({}, members[1].characters)
+    assert.same({ { name = "Bob", main = true, deaths = 1 } }, members[2].characters)
     assert.same({ { kind = "left", text = "Cid left the Crew" } }, members[3].highlights)
-    assert.equal("58 » 60", members[4].line)
+    assert.same({
+      { name = "Ann", main = true, from = 58, level = 60, maxLevel = true },
+    }, members[4].characters)
     assert.same({ { kind = "maxLevel", text = "Ann reached max level!" } }, members[4].highlights)
     assert.equal(4, summaries(d)[1].count)
   end)
@@ -257,6 +267,10 @@ describe("While you were away", function()
     relog(net, b)
     local ann = summaries(b)[1].members[1]
     assert.equal("Ann", ann.main)
-    assert.equal("18 » 20; Jaina 10 » 12, died; new Character Rexxar (7)", ann.line)
+    assert.same({
+      { name = "Ann", main = true, from = 18, level = 20 },
+      { name = "Jaina", from = 10, level = 12, deaths = 1 },
+      { name = "Rexxar", new = true, level = 7 },
+    }, ann.characters)
   end)
 end)

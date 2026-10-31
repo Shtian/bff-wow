@@ -136,9 +136,10 @@ end
 -- Sync has settled after an initial login: While you were away goes out
 -- if the popup is on and there's anything unseen, which is then seen. The
 -- summary is { members, count }: a Member has memberId, displayName, main
--- and classFilename (their Main), time (latest activity), line (their
--- Characters' events condensed, e.g. "18 » 24, died 3×; Jaina 10 » 12",
--- or nil) and highlights ({ kind, text } for max level, joined and left).
+-- and classFilename (their Main), time (latest activity), characters (a
+-- row per Character with events, the Main's first: name, main, from,
+-- level, deaths, new, maxLevel, each nil when it doesn't apply)
+-- and highlights ({ kind, text } for max level, joined and left).
 local function awaySummary(self)
   if not self:isAwayPopupOn() then return end
   local summary = self.log:takeSummary()
