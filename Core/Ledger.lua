@@ -54,13 +54,13 @@ function Ledger:updateOwn(character)
   end
 
   local saved = record.characters[character.guid]
-  local changed = saved == nil or self.playing ~= character.guid
+  local changed = saved == nil or self.playingGuid ~= character.guid
   if saved then
     for _, field in ipairs(CHARACTER_FIELDS) do
       if saved[field] ~= character[field] then changed = true end
     end
   end
-  self.playing = character.guid
+  self.playingGuid = character.guid
   if not changed then return false end
 
   saved = { guid = character.guid }

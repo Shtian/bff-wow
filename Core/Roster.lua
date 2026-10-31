@@ -19,6 +19,8 @@ local function rowFor(record)
   if #characters == 0 then return nil end
   table.sort(characters, mostRecentFirst)
 
+  -- No Main override yet, so the Main is the most recently played
+  -- Character and every other one is an Alt.
   local shown = characters[1]
   local alts = {}
   for i = 2, #characters do

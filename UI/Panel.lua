@@ -80,8 +80,11 @@ local function create()
   -- Closes on Escape.
   table.insert(UISpecialFrames, "BFFPanel")
 
-  local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  title:SetPoint("TOP", 0, -5)
+  local title = frame.TitleText
+  if not title then
+    title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    title:SetPoint("TOP", 0, -5)
+  end
   title:SetText("BFF")
 end
 
