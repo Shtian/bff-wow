@@ -6,6 +6,7 @@ local _, ns = ...
 local function say(text)
   print("|cff33ff99BFF|r: " .. text)
 end
+ns.say = say
 
 -- What Core's and the channel link's refusals and notices say.
 local MESSAGES = {
@@ -24,9 +25,11 @@ ns.MESSAGES = MESSAGES
 local function onCoreEvent(event, kind)
   if event == "changed" then
     ns.Panel.refresh()
+    ns.Minimap.refresh()
   elseif event == "crewChanged" then
     ns.ChannelLink.setCrew(ns.core:crew())
     ns.Panel.refresh()
+    ns.Minimap.refresh()
   elseif event == "notice" then
     say(MESSAGES[kind])
   end
@@ -47,6 +50,7 @@ local function start(isInitialLogin)
   ns.ChannelLink.start(ns.core, function(kind) say(MESSAGES[kind]) end)
   ns.ChannelLink.setCrew(ns.core:crew())
   ns.Panel.start(ns.core)
+  ns.Minimap.start(ns.core)
   ns.Snapshot.start(ns.core)
   C_Timer.NewTicker(1, function() ns.core:tick() end)
   if isInitialLogin and not ns.core:crew() then
@@ -111,6 +115,11 @@ function commands.name(name)
   if ok then say("your display name is " .. ns.core:displayName() .. ".") else say(MESSAGES[reason]) end
 end
 
+function commands.minimap()
+  ns.core:setMinimapShown(true)
+  say("minimap button shown.")
+end
+
 function commands.leave()
   if ns.core:crew() then ns.confirmLeave() else say(MESSAGES.noCrew) end
 end
@@ -147,6 +156,14 @@ SlashCmdList.BFF = function(input)
   elseif commands[command] then
     commands[command](rest)
   else
-    say("/bff, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff leave")
+    say("/bff, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff minimap, /bff leave")
   end
+end
+
+-- The key binding in Bindings.xml, under a "BFF" header in Key Bindings.
+BINDING_HEADER_BFF = "BFF"
+BINDING_NAME_BFF_TOGGLE = "Open or close the BFF panel"
+
+function BFF_TogglePanel()
+  if ns.core then ns.Panel.toggle() end
 end

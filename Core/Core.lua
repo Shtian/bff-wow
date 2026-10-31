@@ -267,12 +267,36 @@ end
 -- Pause sharing: send nothing, still receive, and appear offline. Kept
 -- across reloads and logouts.
 function Core:setPaused(paused)
-  self.db.paused = paused and true or nil
+  paused = paused and true or nil
+  if paused == self.db.paused then return end
+  self.db.paused = paused
   self.gossip:setPaused(self:isPaused())
+  self.listener("changed")
 end
 
 function Core:isPaused()
   return self.db.paused == true
+end
+
+-- The minimap button's saved table, handed to LibDBIcon, which keeps the
+-- button's position in it. Account-wide, like every setting.
+function Core:minimapIcon()
+  self.db.minimap = self.db.minimap or {}
+  return self.db.minimap
+end
+
+-- Show minimap button: on by default. LibDBIcon reads hide from the same
+-- table.
+function Core:setMinimapShown(shown)
+  local hide = not shown or nil
+  local icon = self:minimapIcon()
+  if hide == icon.hide then return end
+  icon.hide = hide
+  self.listener("changed")
+end
+
+function Core:isMinimapShown()
+  return not self:minimapIcon().hide
 end
 
 -- Hands the tombstone to the link, then forgets the Crew. Your own record

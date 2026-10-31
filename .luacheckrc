@@ -10,6 +10,9 @@ stds.wow = {
   globals = {
     "BFF_CharacterDB",
     "BFF_DB",
+    "BFF_TogglePanel",
+    "BINDING_HEADER_BFF",
+    "BINDING_NAME_BFF_TOGGLE",
     "SLASH_BFF1",
     "SlashCmdList",
     "StaticPopupDialogs",
@@ -64,6 +67,6 @@ stds.bit = { read_globals = { "bit" } }
 files["Core/"] = { std = "lua51+libstub+bit" }
 files["BFF.lua"] = { std = "lua51+wow" }
 files["Game/"] = { std = "lua51+wow+libstub" }
-files["UI/"] = { std = "lua51+wow" }
+files["UI/"] = { std = "lua51+wow+libstub" }
 files["Dev/"] = { std = "lua51+wow" }
 files["tests/"] = { std = "lua51+busted" }
