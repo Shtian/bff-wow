@@ -11,8 +11,8 @@ ns.Skin = Skin
 
 Skin.GOLD = { 1, 0.82, 0.29 }
 Skin.TEXT = { 0.91, 0.9, 0.89 }
-Skin.MUTED = { 0.55, 0.54, 0.6 }
-Skin.DIM = { 0.43, 0.42, 0.47 }
+Skin.MUTED = { 0.68, 0.67, 0.72 }
+Skin.DIM = { 0.55, 0.54, 0.6 }
 Skin.ONLINE = { 0.44, 0.89, 0.44 }
 Skin.OFFLINE = { 0.33, 0.32, 0.37 }
 Skin.WINDOW = { 0.055, 0.051, 0.078, 0.95 }
@@ -42,6 +42,7 @@ Skin.fonts = {
   text = font("BFFFontText", NARROW, 14),
   small = font("BFFFontSmall", NARROW, 12),
   tiny = font("BFFFontTiny", NARROW, 10),
+  glyph = font("BFFFontGlyph", NARROW, 20),
 }
 
 function Skin.color(target, color)

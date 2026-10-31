@@ -2,8 +2,8 @@
 -- the setup view (display name, Start or Join); in one, a sidebar with
 -- Roster, Feed and Settings. The Roster has your own row pinned on top,
 -- then a row per Member with expandable Alts, a sort menu, a tooltip and
--- right-click menu per Character, and a footer with Pause sharing, the
--- hidden count, removed Members and the Crew code. The Feed is a timeline
+-- right-click menu per Character, and a footer with the hidden count,
+-- removed Members and the Crew code. The Feed is a timeline
 -- of Core's entries by day, an icon per kind, and marks them seen while
 -- open. It never sees a Member record.
 
@@ -23,14 +23,14 @@ local ROW_HEIGHT = 44
 local ALT_HEIGHT = 20
 local SECTION = 26
 local INSET = 12
-local MIN_HEIGHT = 200
-local FEED_HEIGHT = 340
+-- One height for every view, so switching tabs never resizes the window;
+-- the Roster and the Feed scroll inside it.
+local HEIGHT = 380
 local FEED_ENTRY = 38
 local FEED_DAY = 26
 -- The timeline's line runs through the middle of the entry icons.
-local NODE = 24
+local NODE = 26
 local LINE_X = INSET + NODE / 2 - 1
-local SETUP_HEIGHT = 250
 -- Last seen goes stale, so the open panel redraws this often.
 local REDRAW_EVERY = 30
 local SCROLL_STEP = 40
@@ -38,7 +38,7 @@ local SCROLL_STEP = 40
 local TITLE = "Best Friends in Forever"
 local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
 local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
-local PAUSED = "Sharing is paused: the others see you as offline."
+local PAUSED = "You appear offline: the others don't see you. Change it in Settings."
 local FEED_EMPTY = "Nothing yet. Dings, deaths and new Characters show up here."
 
 local GOLD = Skin.GOLD
@@ -53,8 +53,10 @@ local SORTS = { { "online", "Online first" }, { "level", "Level" }, { "name", "N
 local HIGHLIGHT = { maxLevel = true, joined = true, left = true }
 -- Each kind's timeline icon. The icons tell kinds apart, not colour: they
 -- are all drawn in the same grey.
+-- A ding is a plus drawn as text, which centres better than any texture.
+local ICON_COLOR = { 0.82, 0.8, 0.86 }
+local GLYPHS = { ding = "+" }
 local ICONS = {
-  ding = "Interface\\Buttons\\Arrow-Up-Up",
   maxLevel = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1",
   death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
   newCharacter = "Interface\\FriendsFrame\\UI-Toast-FriendRequestIcon",
@@ -67,6 +69,7 @@ local frame
 local setup
 local nav
 local section
+local rosterView
 local feedView
 local footer
 local rowFrames = {}
@@ -206,7 +209,7 @@ local function setTag(tag, text, color)
 end
 
 local function characterButton(height)
-  local button = CreateFrame("Button", nil, frame.content)
+  local button = CreateFrame("Button", nil, rosterView.content)
   button:SetHeight(height)
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   Skin.fill(button, Skin.HOVER, "HIGHLIGHT")
@@ -362,11 +365,11 @@ local function hideAll(lines, from)
   for i = from, #lines do lines[i]:Hide() end
 end
 
--- Places a line across the content area, at y from its top.
+-- Places a line across the Roster, at y from its top.
 local function place(line, y)
   line:ClearAllPoints()
-  line:SetPoint("TOPLEFT", frame.content, "TOPLEFT", 0, y)
-  line:SetPoint("TOPRIGHT", frame.content, "TOPRIGHT", 0, y)
+  line:SetPoint("TOPLEFT", rosterView.content, "TOPLEFT", 0, y)
+  line:SetPoint("TOPRIGHT", rosterView.content, "TOPRIGHT", 0, y)
 end
 
 local function showSortMenu(owner)
@@ -383,7 +386,7 @@ end
 
 -- "CREW ———— [Sort: Online first]" between your row and the Members'.
 local function createSection()
-  section = CreateFrame("Frame", nil, frame.content)
+  section = CreateFrame("Frame", nil, rosterView.content)
   section:SetHeight(SECTION)
   local label = Skin.label(section, "tiny", DIM)
   label:SetPoint("LEFT", INSET, -2)
@@ -470,42 +473,49 @@ local function drawNav(unseen)
   nav.feed.badge:SetShown(unseen > 0 and tab ~= "feed")
 end
 
--- The Feed: a timeline in a scroll frame that scrolls with the mouse wheel,
--- with a thin thumb on the right showing where you are.
-local function updateThumb()
-  local range = feedView:GetVerticalScrollRange()
-  local thumb = feedView.thumb
+-- A scroll frame that scrolls with the mouse wheel, with a thin thumb on
+-- the right showing where you are. view.content is what scrolls.
+local function updateThumb(view)
+  local range = view:GetVerticalScrollRange()
+  local thumb = view.thumb
   if range <= 0 then
+    view:SetVerticalScroll(0)
     thumb:Hide()
     return
   end
-  local visible = feedView:GetHeight()
+  if view:GetVerticalScroll() > range then view:SetVerticalScroll(range) end
+  local visible = view:GetHeight()
   local height = math.max(24, visible * visible / (visible + range))
   thumb:SetHeight(height)
   thumb:ClearAllPoints()
-  thumb:SetPoint("TOPRIGHT", feedView, "TOPRIGHT", 4, -(visible - height) * feedView:GetVerticalScroll() / range)
+  thumb:SetPoint("TOPRIGHT", view, "TOPRIGHT", 4, -(visible - height) * view:GetVerticalScroll() / range)
   thumb:Show()
 end
 
-local function scrollFeed(_, delta)
-  local range = feedView:GetVerticalScrollRange()
-  local y = math.min(range, math.max(0, feedView:GetVerticalScroll() - delta * SCROLL_STEP))
-  feedView:SetVerticalScroll(y)
-  updateThumb()
+local function scroll(view, delta)
+  local range = view:GetVerticalScrollRange()
+  view:SetVerticalScroll(math.min(range, math.max(0, view:GetVerticalScroll() - delta * SCROLL_STEP)))
+  updateThumb(view)
 end
 
+local function createScrollView()
+  local view = CreateFrame("ScrollFrame", nil, frame.content)
+  view:EnableMouseWheel(true)
+  view:SetScript("OnMouseWheel", scroll)
+  view.content = CreateFrame("Frame", nil, view)
+  view.content:SetSize(CONTENT_WIDTH - 6, 1)
+  view:SetScrollChild(view.content)
+  view.thumb = view:CreateTexture(nil, "OVERLAY")
+  view.thumb:SetColorTexture(1, 1, 1, 0.18)
+  view.thumb:SetWidth(3)
+  return view
+end
+
+-- The Feed: a timeline, newest first.
 local function createFeedView()
-  feedView = CreateFrame("ScrollFrame", nil, frame.content)
+  feedView = createScrollView()
   feedView:SetPoint("TOPLEFT")
   feedView:SetPoint("BOTTOMRIGHT", -6, 0)
-  feedView:EnableMouseWheel(true)
-  feedView:SetScript("OnMouseWheel", scrollFeed)
-  feedView.content = CreateFrame("Frame", nil, feedView)
-  feedView.content:SetSize(CONTENT_WIDTH - 6, FEED_HEIGHT)
-  feedView:SetScrollChild(feedView.content)
-  feedView.thumb = feedView:CreateTexture(nil, "OVERLAY")
-  feedView.thumb:SetColorTexture(1, 1, 1, 0.18)
-  feedView.thumb:SetWidth(3)
 
   feedView.line = feedView.content:CreateTexture(nil, "BACKGROUND")
   feedView.line:SetColorTexture(1, 1, 1, 0.08)
@@ -514,7 +524,7 @@ local function createFeedView()
   feedView.entries = {}
   feedView.empty = Skin.label(feedView.content, "text", MUTED)
   feedView.empty:SetPoint("TOPLEFT", INSET, -INSET)
-  feedView.empty:SetPoint("RIGHT", -INSET, 0)
+  feedView.empty:SetWidth(CONTENT_WIDTH - 2 * INSET)
   feedView.empty:SetText(FEED_EMPTY)
 end
 
@@ -550,8 +560,10 @@ local function createFeedEntry()
   roundTexture(node, NODE, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3] }, 2)
   roundTexture(node, NODE - 4, { 0.13, 0.12, 0.16 }, 3)
   entry.icon = node:CreateTexture(nil, "OVERLAY")
-  entry.icon:SetSize(12, 12)
+  entry.icon:SetSize(16, 16)
   entry.icon:SetPoint("CENTER")
+  entry.glyph = Skin.label(node, "glyph", ICON_COLOR)
+  entry.glyph:SetPoint("CENTER", 0, 0)
 
   entry.text = Skin.label(entry, "text")
   entry.text:SetPoint("TOPLEFT", node, "TOPRIGHT", 10, -2)
@@ -559,7 +571,7 @@ local function createFeedEntry()
   entry.text:SetWordWrap(false)
   entry.new = Skin.badge(entry, "tiny", { 0.1, 0.08, 0 }, GOLD)
   entry.new:SetText("NEW")
-  entry.time = Skin.label(entry, "small", DIM)
+  entry.time = Skin.label(entry, "small", MUTED)
   entry.time:SetPoint("TOPLEFT", entry.text, "BOTTOMLEFT", 0, -2)
   feedView.entries[#feedView.entries + 1] = entry
   return entry
@@ -576,9 +588,14 @@ local function entryKey(entry)
 end
 
 local function drawFeedEntry(line, entry)
-  line.icon:SetTexture(ICONS[entry.kind] or ICONS.ding)
-  line.icon:SetDesaturated(true)
-  line.icon:SetVertexColor(0.82, 0.8, 0.86)
+  local glyph = GLYPHS[entry.kind] or not ICONS[entry.kind] and "+" or nil
+  line.glyph:SetText(glyph or "")
+  line.icon:SetShown(glyph == nil)
+  if not glyph then
+    line.icon:SetTexture(ICONS[entry.kind])
+    line.icon:SetDesaturated(true)
+    Skin.color(line.icon, ICON_COLOR)
+  end
   line.text:SetText(entry.text)
   Skin.color(line.text, HIGHLIGHT[entry.kind] and GOLD or entry.own and MUTED or TEXT)
   line.time:SetText(date("%H:%M", entry.time))
@@ -627,16 +644,15 @@ local function drawFeed(feed)
   feedView.line:SetPoint("BOTTOMLEFT", LINE_X, INSET + 8)
   feedView.line:SetShown(entryCount > 0)
   feedView.content:SetHeight(math.max(-y + INSET, 1))
-  frame:SetHeight(HEADER + FEED_HEIGHT)
   feedView:Show()
-  updateThumb()
+  updateThumb(feedView)
   if feed.unseen > 0 then core:feedSeen() end
 end
 
 local function create()
   frame = Skin.window("BFFPanel", WIDTH, TITLE)
   frame:SetPoint("CENTER")
-  frame:SetHeight(MIN_HEIGHT)
+  frame:SetHeight(HEIGHT)
   frame:SetScript("OnShow", Panel.refresh)
   frame:SetScript("OnHide", function() fresh = {} end)
   local sinceRedraw = 0
@@ -728,7 +744,6 @@ local function showSetup()
     setup.codeError:SetText("")
   end
   setup:Show()
-  frame:SetHeight(HEADER + SETUP_HEIGHT)
 end
 
 -- Re-add a removed Member, from a menu of everyone removed.
@@ -743,10 +758,10 @@ local function showRemovedMenu(owner)
   end)
 end
 
--- Below the rows: Pause sharing, then the hidden count and removed Members
--- on the right, the waiting, leaving or paused line, and the Crew code in a
--- read-only box with the text selected, since addons can't copy to the
--- clipboard.
+-- Below the rows: the waiting, leaving or appear-offline line, then the
+-- Crew code in a read-only box with the text selected (addons can't copy
+-- to the clipboard), with the hidden count and removed Members right of
+-- it.
 local function createFooter()
   footer = CreateFrame("Frame", nil, frame.content)
   footer:SetPoint("BOTTOMLEFT")
@@ -754,14 +769,9 @@ local function createFooter()
   Skin.fill(footer, { 0, 0, 0, 0.2 })
   Skin.edge(footer, "TOP", Skin.LINE)
 
-  footer.pause = Skin.checkbox(footer, "Pause sharing", function(box)
-    core:setPaused(box:GetChecked())
-  end)
-  footer.pause:SetPoint("TOPLEFT", INSET, -10)
-
   footer.removed = CreateFrame("Button", nil, footer)
   footer.removed:SetHeight(14)
-  footer.removed:SetPoint("TOPRIGHT", -INSET, -10)
+  footer.removed:SetPoint("BOTTOMRIGHT", -INSET, 19)
   footer.removed.text = Skin.label(footer.removed, "small", GOLD)
   footer.removed.text:SetPoint("RIGHT")
   footer.removed.text:SetJustifyH("RIGHT")
@@ -771,7 +781,7 @@ local function createFooter()
   footer.hidden:SetJustifyH("RIGHT")
 
   footer.status = Skin.label(footer, "small", MUTED)
-  footer.status:SetPoint("TOPLEFT", INSET, -32)
+  footer.status:SetPoint("TOPLEFT", INSET, -10)
   -- Set outright so the wrapped text has a height before layout.
   footer.status:SetWidth(CONTENT_WIDTH - 2 * INSET)
   footer.status:SetWordWrap(true)
@@ -790,16 +800,11 @@ local function createFooter()
       box:HighlightText()
     end
   end)
-  local hint = Skin.label(footer, "tiny", DIM)
-  hint:SetPoint("LEFT", footer.code, "RIGHT", 8, 0)
-  hint:SetText("Ctrl+C to copy")
 end
 
 -- Draws the footer and returns its height.
 local function drawFooter(crew, summary)
   if not footer then createFooter() end
-  footer.pause:SetChecked(core:isPaused())
-
   local removed = #core:removed()
   footer.removed.text:SetText(removed > 0 and ("Removed: %d"):format(removed) or "")
   footer.removed:SetWidth(footer.removed.text:GetStringWidth())
@@ -808,7 +813,7 @@ local function drawFooter(crew, summary)
   if removed > 0 then
     footer.hidden:SetPoint("RIGHT", footer.removed, "LEFT", -10, 0)
   else
-    footer.hidden:SetPoint("TOPRIGHT", -INSET, -10)
+    footer.hidden:SetPoint("BOTTOMRIGHT", -INSET, 19)
   end
   footer.hidden:SetText(summary.hidden > 0 and ("Hidden: %d (unseen %dd)"):format(summary.hidden,
     ns.Core.HIDE_AFTER_DAYS) or "")
@@ -826,22 +831,26 @@ local function drawFooter(crew, summary)
     status = WAITING
   end
   footer.status:SetText(status)
-  local height = 32 + 46
-  if status ~= "" then height = height + footer.status:GetStringHeight() + 4 end
+  local height = 46
+  if status ~= "" then height = height + footer.status:GetStringHeight() + 6 end
   footer:SetHeight(height)
   footer:Show()
   return height
 end
 
 local function hideRoster()
-  hideAll(rowFrames, 1)
-  hideAll(altFrames, 1)
-  if section then section:Hide() end
+  if rosterView then rosterView:Hide() end
   if footer then footer:Hide() end
 end
 
 local function drawRoster(crew, summary)
   if feedView then feedView:Hide() end
+  if not rosterView then rosterView = createScrollView() end
+  local footerHeight = drawFooter(crew, summary)
+  rosterView:ClearAllPoints()
+  rosterView:SetPoint("TOPLEFT")
+  rosterView:SetPoint("BOTTOMRIGHT", -6, footerHeight)
+  rosterView:Show()
   drawSection()
   section:Hide()
 
@@ -871,8 +880,8 @@ local function drawRoster(crew, summary)
   hideAll(rowFrames, rowCount + 1)
   hideAll(altFrames, altCount + 1)
 
-  local footerHeight = drawFooter(crew, summary)
-  frame:SetHeight(math.max(MIN_HEIGHT, HEADER - y + 6 + footerHeight))
+  rosterView.content:SetHeight(-y + 6)
+  updateThumb(rosterView)
 end
 
 -- Redraws from Core, if the panel is open.

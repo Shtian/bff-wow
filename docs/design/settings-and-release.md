@@ -18,7 +18,7 @@ One page in the game's native Settings panel (Esc → Options → AddOns → **B
 |---|---|---|---|
 | **You** | Display name (2–16 characters) | Character name at setup | #10 |
 | | Crew code, read-only, text selected for copying | | #10 |
-| **Sharing** | Pause sharing | off | #8 |
+| **Sharing** | Appear offline (Pause sharing) | off | #8 |
 | | Leave Crew button (asks to confirm) | | #10 |
 | **Notifications and display** | Chat message for live events | on | #14 |
 | | Show While you were away on login | on | #14 |

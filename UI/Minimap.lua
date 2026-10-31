@@ -2,7 +2,7 @@
 -- LibDataBroker and LibDBIcon. Click toggles the panel, the badge counts
 -- Members online, the tooltip says who is online and can play (and, with
 -- the While you were away popup off, what's new in the Feed), and
--- right-click gives Settings, Pause sharing and Hide minimap button. Its
+-- right-click gives Settings, Appear offline and Hide minimap button. Its
 -- position and hidden flag live in Core's account-wide minimap table.
 
 local _, ns = ...
@@ -34,7 +34,7 @@ local function showTooltip(tooltip)
     if not core:isAwayPopupOn() and unseen > 0 then
       tooltip:AddLine(("%d new in Feed"):format(unseen), 1, 0.82, 0)
     end
-    if core:isPaused() then tooltip:AddLine("Sharing is paused.", 0.6, 0.6, 0.6) end
+    if core:isPaused() then tooltip:AddLine("You appear offline.", 0.6, 0.6, 0.6) end
   end
   tooltip:AddLine("Click: open BFF. Right-click: options.", 0.6, 0.6, 0.6)
 end
@@ -48,7 +48,7 @@ local function showMenu(owner)
   MenuUtil.CreateContextMenu(owner, function(_, root)
     root:CreateTitle("BFF")
     root:CreateButton("Settings", ns.Settings.open)
-    local pause = root:CreateCheckbox("Pause sharing", function() return core:isPaused() end,
+    local pause = root:CreateCheckbox("Appear offline", function() return core:isPaused() end,
       function() core:setPaused(not core:isPaused()) end)
     pause:SetEnabled(core:crew() ~= nil)
     root:CreateButton("Hide minimap button", hideButton)
