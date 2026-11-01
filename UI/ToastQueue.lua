@@ -15,7 +15,7 @@ ToastQueue.__index = ToastQueue
 ns.ToastQueue = ToastQueue
 
 ToastQueue.MAX = 3
-ToastQueue.DURATION = 6
+ToastQueue.DURATION = 10
 ToastQueue.SOUND_GAP = 2
 
 -- reactionText(names, phrase) words a merged Reaction toast
