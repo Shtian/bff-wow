@@ -61,9 +61,21 @@ end
 
 -- Items ----------------------------------------------------------------------
 
+-- Never trust loc:IsValid() blindly: for a bank item found by GUID it raised
+-- "bad argument #1 to 'DoesItemExist'", so report the raw fields and the error.
+local function isValid(loc)
+  local ok, valid = pcall(loc.IsValid, loc)
+  if ok then return valid end
+  return false, valid
+end
+
 local function whereIs(loc)
   if not loc then return "nil" end
-  if not loc:IsValid() then return "invalid location" end
+  local raw = ("raw{bag=%s slot=%s equip=%s}"):format(
+    str(loc.bagID), str(loc.slotIndex), str(loc.equipmentSlotIndex))
+  local valid, err = isValid(loc)
+  if err then return raw .. " IsValid ERROR: " .. str(err) end
+  if not valid then return raw .. " invalid" end
   if loc:IsBagAndSlot() then
     local bag, slot = loc:GetBagAndSlot()
     return ("bag %s slot %s"):format(str(bag), str(slot))
@@ -71,13 +83,13 @@ local function whereIs(loc)
   if loc:IsEquipmentSlot() then
     return "equipped, slot " .. str(loc:GetEquipmentSlot())
   end
-  return "valid but neither bag nor equipment"
+  return raw .. " valid but neither bag nor equipment"
 end
 
 local function describe(loc, label)
   label = label or "item"
-  if not loc or not loc:IsValid() then
-    write(label, "no valid item location")
+  if not loc or not isValid(loc) then
+    write(label, "no valid item location: " .. whereIs(loc))
     return
   end
   if not C_Item.DoesItemExist(loc) then
@@ -188,7 +200,7 @@ local function reportTracked(label, onlyChanged)
 end
 
 local function track(loc)
-  if not loc or not loc:IsValid() or not C_Item.DoesItemExist(loc) then
+  if not loc or not isValid(loc) or not C_Item.DoesItemExist(loc) then
     write("track", "pick up an item first, then type /bagtest track")
     return
   end
@@ -284,7 +296,7 @@ local function received(how)
   write("drop", "  " .. state())
   local loc = cursorLocation()
   write("drop", "  C_Cursor.GetCursorItem: " .. whereIs(loc))
-  if loc and loc:IsValid() then describe(loc, "drop") end
+  if loc and isValid(loc) then describe(loc, "drop") end
   ClearCursor()
   write("drop", "  ClearCursor done; is the item back in its slot?")
 end
