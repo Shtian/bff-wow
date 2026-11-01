@@ -42,6 +42,7 @@ A World of Warcraft: Forever addon for friends who don't always play at the same
 
 ## Install
 
+- **CurseForge:** [BFF – Best Friends in Forever](https://www.curseforge.com/wow/addons/bff-best-friends-in-forever), or search for it in the CurseForge app.
 - **WowUp:** Get Addons → Install from URL, and paste `https://github.com/Shtian/bff-wow`. WowUp picks up new releases from there.
 - **By hand:** download `BFF-vX.Y.Z.zip` from the [latest release](https://github.com/Shtian/bff-wow/releases/latest) and unzip it into the game's `Interface\AddOns` folder, so you get `AddOns\BFF\BFF.toc`.
 
