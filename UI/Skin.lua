@@ -28,6 +28,8 @@ Skin.HOVER = { 1, 1, 1, 0.05 }
 -- something (levels gained, a goal complete).
 Skin.TRACK = { 1, 1, 1, 0.08 }
 Skin.BAR = { 1, 1, 1, 0.3 }
+-- A secondary button's plate: the small buttons and the Skin buttons.
+Skin.SECONDARY = { 1, 1, 1, 0.06 }
 
 Skin.HEADER_HEIGHT = 30
 
@@ -37,15 +39,15 @@ Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, goal = true }
 -- A muted grey for a picture's edge when its kind has no colour, and for
 -- the overflow toast's icon.
 Skin.FEED_ICON_COLOR = { 0.82, 0.8, 0.86 }
--- Each Feed kind's small icon, inline in the While you were away popup.
--- The Feed tab and toasts draw Skin.FEED_PICTURES instead.
+-- Small icons inline in the While you were away popup: the max-level star,
+-- the death skull and the Spare lines. The Feed tab and toasts draw
+-- Skin.FEED_PICTURES instead.
 Skin.FEED_ICONS = {
   maxLevel = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1",
   death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
   newCharacter = "Interface\\FriendsFrame\\UI-Toast-FriendRequestIcon",
   joined = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
   left = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
-  goal = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_3",
   -- Spares: a Give in the Feed, and the notices.
   gave = "Interface\\GossipFrame\\VendorGossipIcon",
   claimed = "Interface\\GossipFrame\\VendorGossipIcon",
@@ -127,7 +129,7 @@ Skin.REACTION_NAMES = { cheer = "Cheer", respects = "Pay respects", welcome = "W
 function Skin.reactionGlyph(reaction, size)
   local icon = Skin.REACTION_ICONS[reaction]
   if not icon then return "" end
-  return ("|T%s:%d:%d:0:0:64:64:5:59:5:59|t"):format(icon, size, size)
+  return Skin.iconGlyph(icon, size)
 end
 
 local function reactionHover(button, over)
@@ -324,7 +326,6 @@ local function hover(button, shown)
   if button:IsEnabled() then button.hover:SetShown(shown) end
 end
 
-local SECONDARY = { 1, 1, 1, 0.06 }
 local ON_GOLD = { 0.1, 0.08, 0 }
 
 -- A button's plate and label for its kind and state. A disabled button,
@@ -332,20 +333,22 @@ local ON_GOLD = { 0.1, 0.08, 0 }
 -- second primary.
 local function look(button, enabled)
   local gold = button.primary and enabled
-  local fill = gold and Skin.GOLD or SECONDARY
+  local fill = gold and Skin.GOLD or Skin.SECONDARY
   button.background:SetColorTexture(fill[1], fill[2], fill[3], fill[4] or 1)
   for _, line in ipairs(button.lines) do line:SetShown(not gold) end
   button.hover:SetColorTexture(1, 1, 1, gold and 0.18 or 0.06)
-  if not enabled then button.hover:Hide() end
+  button.hover:SetShown(enabled and button:IsMouseOver())
   Skin.color(button.label, gold and ON_GOLD or enabled and Skin.TEXT or Skin.DIM)
 end
 
--- A flat button. Primary ones are gold with dark text.
+-- A flat button. Primary ones are gold with dark text. It restyles itself
+-- from OnEnable and OnDisable, so callers add to those with HookScript, not
+-- SetScript.
 function Skin.button(parent, text, onClick, primary)
   local button = CreateFrame("Button", nil, parent)
   button:SetSize(96, 24)
   button.primary = primary == true
-  button.background = Skin.fill(button, SECONDARY)
+  button.background = Skin.fill(button, Skin.SECONDARY)
   button.lines = Skin.border(button, Skin.BORDER)
   button.hover = Skin.fill(button, { 1, 1, 1, 0.06 }, "HIGHLIGHT")
   button.hover:SetBlendMode("ADD")

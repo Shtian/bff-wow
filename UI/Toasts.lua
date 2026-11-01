@@ -26,6 +26,7 @@ local FADE = 0.6
 -- The timer line along a toast's bottom edge, faint white on every toast:
 -- gold text already marks the news.
 local TIMER = 2
+local TIMER_COLOR = { 1, 1, 1, 0.18 }
 -- Where toasts start, down from the top centre, until moved.
 local DEFAULT_FROM_TOP = 160
 -- The overflow toast's icon: a small grey chat bubble.
@@ -113,7 +114,8 @@ local function createToast()
   toast:SetClampedToScreen(true)
   Skin.fill(toast, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 0.88 })
   toast.timer = toast:CreateTexture(nil, "ARTWORK")
-  toast.timer:SetColorTexture(1, 1, 1, 0.18)
+  toast.timer:SetColorTexture(1, 1, 1, 1)
+  Skin.color(toast.timer, TIMER_COLOR)
   toast.timer:SetPoint("BOTTOMLEFT")
   toast.timer:SetHeight(TIMER)
   Skin.fill(toast, Skin.HOVER, "HIGHLIGHT")
