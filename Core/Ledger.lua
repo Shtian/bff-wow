@@ -30,10 +30,8 @@ local function newMemberId(random)
 end
 
 -- db is the whole saved table; the Ledger keeps `memberId`, `records`,
--- `heard`, `via`, `removed`, `nextSpare` and `spareItems` (per
--- Character GUID, the item GUID of each own open Spare it posted).
--- Last-heard times survive a reload but not a logout, since nobody was
--- heard while you were logged out.
+-- `heard`, `via` and `removed`. Last-heard times survive a reload but not
+-- a logout, since nobody was heard while you were logged out.
 function Ledger.new(db, now, random, initialLogin)
   db.memberId = db.memberId or newMemberId(random)
   db.records = db.records or {}
@@ -61,47 +59,32 @@ local function ownRecord(self)
   return record
 end
 
--- Whether the Spare a Claim points at is still open, as far as the
--- held copy of its owner's record says: an owner not held, left or
--- Removed has ended it too.
-local function claimOpen(self, owner, id)
-  local record = self.db.records[owner]
-  if not record or record.left or self.db.removed[owner] then return false end
-  for _, spare in ipairs(ns.Spares.inRecord(record)) do
-    if spare.id == id then return ns.Spares.isOpen(spare, self.now()) end
-  end
-  return false
-end
-
--- Forgets the item GUIDs of own Spares that are no longer open:
--- withdrawn, Given or past their 30 days.
-local function pruneItems(self)
-  local items = self.db.spareItems
-  if not items then return end
-  local open = {}
-  for _, spare in ipairs(ns.Spares.inRecord(self:own())) do
-    if ns.Spares.isOpen(spare, self.now()) then open[spare.id] = true end
-  end
-  for character, list in pairs(items) do
-    for id in pairs(list) do
-      if not open[id] then list[id] = nil end
-    end
-    if next(list) == nil then items[character] = nil end
-  end
-  if next(items) == nil then self.db.spareItems = nil end
-end
-
--- Every write of the own record also prunes its Reactions, Spares
--- and Claims, so pruning alone never sends DATA.
+-- Every write of the own record also prunes its Reactions, and whatever
+-- the pruner handed to pruneWith keeps in it, so pruning alone never sends
+-- DATA.
 local function bump(self, record)
   local now = self.now()
   record.version = math.max(now, record.version + 1)
   if record.reactions then ns.Reactions.prune(record.reactions, now) end
-  if record.spares then ns.Spares.prune(record.spares, now) end
-  if record.claims then
-    ns.Spares.pruneClaims(record.claims, now, function(owner, id) return claimOpen(self, owner, id) end)
-  end
-  if record.id == self.db.memberId then pruneItems(self) end
+  if self.prune then self.prune(record, now) end
+end
+
+-- Hands over the pruner: prune(record, now) edits the own record on every
+-- write, before it goes out. The Spares module prunes its Spares and
+-- Claims this way, since only it knows which have ended.
+function Ledger:pruneWith(prune)
+  self.prune = prune
+end
+
+-- A write of the own record by a module that owns part of it: change(record)
+-- edits it and returns true if it changed, which makes the write. Returns
+-- what change did. A change returning false that edits it anyway isn't a
+-- write, as when leaving the Crew clears the own Spares.
+function Ledger:changeOwn(change)
+  local record = ownRecord(self)
+  local changed = change(record)
+  if changed then bump(self, record) end
+  return changed
 end
 
 -- Records the current state of the Character being played. Returns true if
@@ -226,102 +209,6 @@ function Ledger:addReaction(key)
   record.reactions = record.reactions or {}
   record.reactions[#record.reactions + 1] = ns.Reactions.item(key, self.now())
   bump(self, record)
-end
-
--- Posts a Spare (a trimmed item string and its required level)
--- into the own record, now. Returns its id: never reused, even after
--- leaving, nor after the counter is lost while the record still holds
--- higher ids. itemGuid (optional) is the item's GUID in the bags: it's
--- kept for the Character being played, outside the record, so it never
--- leaves this client.
-function Ledger:postSpare(item, level, itemGuid)
-  local record = ownRecord(self)
-  local id = self.db.nextSpare or 1
-  for _, held in ipairs(record.spares or {}) do
-    if type(held.i) == "number" and held.i >= id then id = held.i + 1 end
-  end
-  self.db.nextSpare = id + 1
-  record.spares = record.spares or {}
-  record.spares[#record.spares + 1] = ns.Spares.item(id, item, level, self.now())
-  local character = self.playingGuid
-  if type(itemGuid) == "string" and itemGuid ~= "" and character then
-    self.db.spareItems = self.db.spareItems or {}
-    self.db.spareItems[character] = self.db.spareItems[character] or {}
-    self.db.spareItems[character][id] = itemGuid
-  end
-  bump(self, record)
-  return id
-end
-
--- The item GUIDs of the open Spares the Character being played
--- posted: { [id] = itemGuid }.
-function Ledger:spareItems()
-  pruneItems(self)
-  local list = {}
-  local items = self.db.spareItems
-  for id, itemGuid in pairs(items and self.playingGuid and items[self.playingGuid] or {}) do
-    list[id] = itemGuid
-  end
-  return list
-end
-
--- The own record, an own Spare as stored and its index, or nil.
-local function ownSpare(self, id)
-  local record = self:own()
-  for index, item in ipairs(record and record.spares or {}) do
-    if item.i == id then return record, item, index end
-  end
-end
-
--- Takes an own Spare out of the record. Returns false if it isn't
--- there.
-function Ledger:withdrawSpare(id)
-  local record, _, index = ownSpare(self, id)
-  if not record then return false end
-  table.remove(record.spares, index)
-  bump(self, record)
-  return true
-end
-
--- Records the Give of an own Spare to a Member's Character. It
--- stays in the record, so every client sees it, until its 30 days run
--- out. Returns false if it isn't there.
-function Ledger:giveSpare(id, memberId, guid)
-  local record, item = ownSpare(self, id)
-  if not record then return false end
-  item.r, item.c = memberId, guid
-  bump(self, record)
-  return true
-end
-
--- Adds a Claim on another Member's Spare for one of your own
--- Characters, made now.
-function Ledger:addClaim(owner, id, guid)
-  local record = ownRecord(self)
-  record.claims = record.claims or {}
-  record.claims[#record.claims + 1] = ns.Spares.claim(owner, id, guid, self.now())
-  bump(self, record)
-end
-
--- Takes an own Claim out of the record. Returns false if it isn't there.
-function Ledger:withdrawClaim(owner, id)
-  local record = self:own()
-  for index, item in ipairs(record and record.claims or {}) do
-    if item.m == owner and item.i == id then
-      table.remove(record.claims, index)
-      bump(self, record)
-      return true
-    end
-  end
-  return false
-end
-
--- Leaving the Crew clears the own Spares and Claims. Not a write,
--- like clearReactions.
-function Ledger:clearSpares()
-  local record = self:own()
-  if record then record.spares, record.claims = nil, nil end
-  self.db.spareItems = nil
 end
 
 -- Leaving the Crew clears the own Reactions. Not a write: the tombstone

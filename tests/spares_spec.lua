@@ -1,195 +1,819 @@
--- The pure parts of Spares: item strings, what a record carries,
--- tradeability, pruning and who wins.
+-- Spares, Claims and Gives played out across a Crew, through Core's
+-- interface: the Spares tab, the Feed, listener events and what goes out.
 local load = require("tests.load")
 
+local Codec = load().Codec
+
 local DAY = 24 * 60 * 60
+local BARB = "|cff1eff00|Hitem:5191::::::::18:::::::|h[Cruel Barb]|h|r"
+local SWORD = "|cff1eff00|Hitem:15210::::::-19:1238425:30|h[Raider Shortsword of the Monkey]|h|r"
+local ITEMS = {
+  ["item:5191"] = "[Cruel Barb]",
+  ["item:15210::::::-19:1238425"] = "[Raider Shortsword of the Monkey]",
+}
+
+local function playing(name, level, extra)
+  local character = {
+    guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
+    level = level or 20, xp = 0, maxXp = 1000, zone = "Elwynn Forest", deaths = 0,
+  }
+  for k, v in pairs(extra or {}) do character[k] = v end
+  return character
+end
+
+local function crew(names, levels)
+  local ns = load()
+  local net = ns.FakeNet.new({ items = ITEMS })
+  local clients = {}
+  for i, name in ipairs(names) do
+    clients[i] = net:add(name, { character = playing(name, levels and levels[name]) }):login()
+  end
+  local code = clients[1]:join()
+  for i = 2, #clients do clients[i]:join(code) end
+  net:run(40)
+  return net, clients, ns, code
+end
+
+local function view(client)
+  return client.core:spares()
+end
+
+-- The row another client shows for the owner's Spare.
+local function crewRow(client, owner, id)
+  for _, row in ipairs(view(client).crew) do
+    if row.ownerId == owner.memberId and row.id == id then return row end
+  end
+  return nil
+end
+
+local function yourRow(client, id)
+  for _, row in ipairs(view(client).yours) do
+    if row.id == id then return row end
+  end
+  return nil
+end
+
+local function events(client, name)
+  local list = {}
+  for _, event in ipairs(client.events) do
+    if event[1] == name then list[#list + 1] = event[2] end
+  end
+  return list
+end
+
+local function notices(client)
+  local texts = {}
+  for i, news in ipairs(events(client, "spare")) do texts[i] = news.text end
+  return texts
+end
+
+local function feedTexts(client, kind)
+  local texts = {}
+  for _, day in ipairs(client.core:feed().days) do
+    for _, entry in ipairs(day.entries) do
+      if entry.kind == kind then texts[#texts + 1] = entry.text end
+    end
+  end
+  return texts
+end
+
+-- The client's own record as its last DATA sent it.
+local function sent(net, client)
+  for i = #net.wire, 1, -1 do
+    local message = Codec.decode(net.wire[i].message)
+    if type(message) == "table" and message.type == "DATA" and message.from == client.memberId then
+      for _, rec in ipairs(message.records) do
+        if rec.id == client.memberId then return rec end
+      end
+    end
+  end
+  return nil
+end
+
+local function post(net, client, link, level)
+  local id = assert(client.core:postSpare(link or BARB, level or 18))
+  net:run(3)
+  return id
+end
+
+-- Claims while the claimer's messages are lost, so the Claim reaches the
+-- others only once it resends (refused()).
+local function claimUnheard(net, client, owner, id)
+  net.drop = function(_, from, to) return from == client.name and to ~= client.name end
+  assert(client.core:claimSpare(owner.memberId, id))
+  net:run(5)
+  net.drop = nil
+end
+
+local function resend(net, client)
+  client:refused()
+  net:run(10)
+end
 
 describe("Spares", function()
-  local H
-  before_each(function() H = load().Spares end)
+  it("are posted into the owner's record and show to the rest of the Crew", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local changed = a:count("changed")
+    local id = post(net, a)
+    assert.is_true(a:count("changed") > changed)
 
-  describe("item strings", function()
-    it("keep the item ID and nothing unset", function()
-      assert.equal("5191", H.itemString("|cff1eff00|Hitem:5191::::::::18:::::::|h[Cruel Barb]|h|r"))
-      assert.equal("5191", H.itemString("item:5191:0:0:0:0:0:0:0:18"))
-    end)
-
-    it("keep the enchant when set", function()
-      assert.equal("5191:1897", H.itemString("|Hitem:5191:1897:::::::18|h[Cruel Barb]|h"))
-    end)
-
-    it("keep a random suffix, and its factor when the suffix scales", function()
-      assert.equal("15210::1026", H.itemString("|Hitem:15210::::::1026:12345:30|h[Raider Shortsword of the Tiger]|h"))
-      assert.equal("15210::-19:1238425", H.itemString("|Hitem:15210::::::-19:1238425:30|h[Raider Shortsword of the Monkey]|h"))
-    end)
-
-    it("refuse anything that isn't an item", function()
-      assert.is_nil(H.itemString("|Hspell:133|h[Fireball]|h"))
-      assert.is_nil(H.itemString("Cruel Barb"))
-      assert.is_nil(H.itemString(nil))
-      assert.is_nil(H.itemString("item:0"))
-    end)
-
-    it("rebuild to a string the game resolves, with the suffix where it was", function()
-      local original = "item:15210:0:0:0:0:0:-19:1238425:30:0"
-      local trimmed = H.itemString(original)
-      local rebuilt = H.fullItemString(trimmed)
-      assert.equal("item:15210::::::-19:1238425", rebuilt)
-      local fields = {}
-      for field in (rebuilt .. ":"):gmatch("([^:]*):") do fields[#fields + 1] = field end
-      assert.equal("15210", fields[2])
-      assert.equal("-19", fields[8])
-      assert.equal("1238425", fields[9])
-      assert.equal(trimmed, H.itemString(rebuilt))
-      assert.equal("item:5191:1897", H.fullItemString("5191:1897"))
-      assert.equal("item:5191", H.fullItemString("5191"))
-    end)
-
-    it("validate what comes off the wire", function()
-      assert.is_true(H.validItem("5191"))
-      assert.is_true(H.validItem("15210::-19:1238425"))
-      assert.is_false(H.validItem("abc"))
-      assert.is_false(H.validItem("5191:1:2:3:4"))
-      assert.is_false(H.validItem(5191))
-      assert.is_false(H.validItem("5191|Hspell"))
-    end)
+    assert.equal(1, #sent(net, a).spares)
+    assert.equal("5191", sent(net, a).spares[1].s)
+    local row = crewRow(b, a, id)
+    assert.equal("Ann", row.owner)
+    assert.equal("item:5191", row.item)
+    assert.equal("[Cruel Barb]", row.link)
+    assert.equal(18, row.level)
+    assert.is_true(row.usable)
+    assert.is_true(row.canClaim)
+    assert.equal("No claims yet", row.state)
+    assert.same({}, view(a).crew)
+    assert.equal(1, #view(a).yours)
+    assert.equal(1, b.core:summary().spares)
+    assert.equal(0, a.core:summary().spares)
+    assert.same({ nil, "noClaim" }, { a.core:giveSpare(id) })
+    assert.is_false(yourRow(a, id).canGive)
+    assert.is_true(yourRow(a, id).canWithdraw)
   end)
 
-  describe("in a record", function()
-    it("read the well-formed Spares and skip the rest", function()
-      local record = { spares = {
-        { i = 1, s = "5191", l = 18, t = 100 },
-        { i = 2, s = "nonsense", l = 18, t = 100 },
-        "junk",
-        { i = 3, s = "5191", l = 18, t = 100, r = "bobbobbo", c = "Player-0-Jaina" },
-        { i = 4, s = "5191", l = 18, t = 100, r = "bobbobbo" },
-        { i = 5, s = "5191", t = 100 },
-      } }
-      local list = H.inRecord(record)
-      assert.equal(2, #list)
-      assert.same({ id = 1, item = "5191", level = 18, time = 100 }, list[1])
-      assert.same({ id = 3, item = "5191", level = 18, time = 100, to = "bobbobbo", guid = "Player-0-Jaina" }, list[2])
-      assert.same({}, H.inRecord({ spares = "junk" }))
-      assert.same({}, H.inRecord({}))
-      assert.same({}, H.inRecord(nil))
-    end)
-
-    it("read the well-formed Claims, one per Spare, the earliest", function()
-      local record = { claims = {
-        { m = "annannan", i = 1, c = "Player-0-Bob", t = 100 },
-        { m = "annannan", i = 1, c = "Player-0-Bob", t = 50 },
-        { m = "annannan", c = "Player-0-Bob", t = 100 },
-        { m = "annannan", i = 2, t = 100 },
-        7,
-      } }
-      assert.same({ { owner = "annannan", id = 1, guid = "Player-0-Bob", time = 50 } }, H.claimsIn(record))
-      assert.same({}, H.claimsIn({ claims = { m = 1 } }))
-    end)
+  it("keep a random suffix", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local id = post(net, a, SWORD, 25)
+    local row = crewRow(b, a, id)
+    assert.equal("item:15210::::::-19:1238425", row.item)
+    assert.equal("[Raider Shortsword of the Monkey]", row.link)
   end)
 
-  describe("pruning", function()
-    it("drops Spares 30 days after posting, given or not", function()
-      local list = {
-        { i = 1, s = "1", l = 1, t = 0 },
-        { i = 2, s = "1", l = 1, t = 0, r = "bob", c = "g" },
-        { i = 3, s = "1", l = 1, t = 2 * DAY },
-        "junk",
-      }
-      H.prune(list, 31 * DAY)
-      assert.same({ { i = 3, s = "1", l = 1, t = 2 * DAY } }, list)
-    end)
-
-    it("drops Claims whose Spare ended, and after 30 days", function()
-      local list = {
-        { m = "ann", i = 1, c = "g", t = 0 },
-        { m = "ann", i = 2, c = "g", t = 5 * DAY },
-        { m = "ann", i = 3, c = "g", t = 5 * DAY },
-      }
-      H.pruneClaims(list, 31 * DAY, function(owner, id) return owner == "ann" and id ~= 3 end)
-      assert.same({ { m = "ann", i = 2, c = "g", t = 5 * DAY } }, list)
-    end)
-
-    it("knows when a Spare is open", function()
-      assert.is_true(H.isOpen({ time = 0 }, 30 * DAY))
-      assert.is_false(H.isOpen({ time = 0 }, 30 * DAY + 1))
-      assert.is_false(H.isOpen({ time = 0, to = "bob" }, 10))
-    end)
+  it("refuse what isn't an item, and outside a Crew", function()
+    local _, clients = crew({ "Ann" })
+    local a = clients[1]
+    assert.same({ nil, "invalidItem" }, { a.core:postSpare("Cruel Barb", 18) })
+    a.core:leaveCrew()
+    assert.same({ nil, "noCrew" }, { a.core:postSpare(BARB, 18) })
   end)
 
-  describe("tradeable", function()
-    it("takes an unbound item that binds on equip, or not at all", function()
-      assert.is_true(H.tradeable(false, 2))
-      assert.is_true(H.tradeable(false, 0))
-      assert.is_true(H.tradeable(false, nil))
+  it("are dimmed when none of your Characters is high enough level", function()
+    local net, clients = crew({ "Ann", "Bob" }, { Bob = 10 })
+    local a, b = clients[1], clients[2]
+    local id = post(net, a, BARB, 18)
+    assert.is_false(crewRow(b, a, id).usable)
+    assert.equal(0, b.core:summary().spares)
+
+    b.character = playing("Jaina", 30, { guid = "Player-0-Jaina" })
+    b:play()
+    assert.is_true(crewRow(b, a, id).usable)
+    assert.equal(1, b.core:summary().spares)
+  end)
+
+  it("are withdrawn by the owner, and go from everyone's list", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local id = post(net, a)
+    assert.is_true(b.core:claimSpare(a.memberId, id))
+    net:run(3)
+    assert.is_true(a.core:withdrawSpare(id))
+    net:run(3)
+    assert.same({}, sent(net, a).spares)
+    assert.same({}, view(a).yours)
+    assert.is_nil(crewRow(b, a, id))
+    assert.same({ nil, "unknown" }, { a.core:withdrawSpare(id) })
+    -- Bob's Claim goes at his next write.
+    assert.equal(1, #sent(net, b).claims)
+    b:play({ zone = "Westfall" })
+    net:run(15)
+    assert.same({}, sent(net, b).claims)
+  end)
+
+  it("are at most 20 open per owner", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    for _ = 1, 20 do assert.is_number(a.core:postSpare(BARB, 18)) end
+    assert.same({ nil, "tooMany" }, { a.core:postSpare(BARB, 18) })
+    local first = view(a).yours[1].id
+    a.core:withdrawSpare(first)
+    local id = a.core:postSpare(BARB, 18)
+    assert.is_number(id)
+    assert.is_true(id > 20)
+    net:run(3)
+  end)
+
+  it("never reuse an id the record still holds, even if the counter is lost", function()
+    local net, clients = crew({ "Ann" })
+    local a = clients[1]
+    local first = post(net, a)
+    local second = post(net, a)
+    a.db.nextSpare = nil
+    local third = post(net, a)
+    assert.is_true(third > second and second > first)
+  end)
+
+  it("end 30 days after posting, and are pruned at the owner's next write", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local id = post(net, a)
+    net:step(net:now() + 30 * DAY - 10)
+    assert.is_table(crewRow(b, a, id))
+    net:step(net:now() + 20)
+    assert.is_nil(crewRow(b, a, id))
+    assert.same({ nil, "unknown" }, { b.core:claimSpare(a.memberId, id) })
+    assert.equal(1, #sent(net, a).spares)
+    a:play({ zone = "Westfall" })
+    net:run(15)
+    assert.equal(0, #sent(net, a).spares)
+  end)
+
+  describe("Claims", function()
+    it("go into the claimer's record for the Character logged in, or another", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      local id = post(net, a)
+      assert.is_true(b.core:claimSpare(a.memberId, id))
+      assert.equal("You claimed it for Bob", crewRow(b, a, id).state)
+      assert.equal("Bob", crewRow(b, a, id).claimCharacter)
+      assert.is_true(crewRow(b, a, id).claimed)
+      assert.is_false(crewRow(b, a, id).canClaim)
+      net:run(3)
+      local claim = sent(net, b).claims[1]
+      assert.equal(a.memberId, claim.m)
+      assert.equal(id, claim.i)
+      assert.equal(b.character.guid, claim.c)
+      assert.equal("Bob claimed it for Bob", yourRow(a, id).state)
+      assert.same({ "Bob claimed [Cruel Barb] for Bob" }, notices(a))
+
+      local other = net:add("Cid", { character = playing("Cid") }):login()
+      other:join(a.core:crew().code)
+      net:run(40)
+      other.character = playing("Jaina", 25, { guid = "Player-0-Jaina" })
+      other:play()
+      other.character = playing("Cid", 20)
+      other:play()
+      assert.same({ nil, "unknownCharacter" }, { other.core:claimSpare(a.memberId, id, "Player-0-Nobody") })
+      assert.is_true(other.core:claimSpare(a.memberId, id, "Player-0-Jaina"))
+      assert.equal("Bob claimed it first (you claimed it for Jaina)", crewRow(other, a, id).state)
     end)
 
-    it("refuses a bound item, whatever its binding says", function()
-      assert.same({ nil, "bound" }, { H.tradeable(true, 2) })
-      -- An heirloom reports bindType 1 and IsBound true.
-      assert.same({ nil, "bound" }, { H.tradeable(true, 1) })
+    it("are refused on your own, twice, and on a Removed Member's", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      local id = post(net, a)
+      assert.same({ nil, "own" }, { a.core:claimSpare(a.memberId, id) })
+      assert.is_true(b.core:claimSpare(a.memberId, id))
+      assert.same({ nil, "claimed" }, { b.core:claimSpare(a.memberId, id) })
+      assert.same({ nil, "unknown" }, { b.core:claimSpare(a.memberId, 99) })
+      assert.same({ nil, "unknown" }, { b.core:claimSpare("nobody", id) })
+      assert.equal(1, view(b).claims)
+
+      b.core:removeMember(a.memberId)
+      assert.same({}, view(b).crew)
+      assert.same({ nil, "unknown" }, { b.core:claimSpare(a.memberId, id) })
     end)
 
-    it("refuses a quest item", function()
-      assert.same({ nil, "questItem" }, { H.tradeable(false, 4) })
+    it("are at most 20 open", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      local ids = {}
+      for i = 1, 20 do ids[i] = a.core:postSpare(BARB, 18) end
+      net:run(3)
+      for i = 1, 20 do assert.is_true(b.core:claimSpare(a.memberId, ids[i])) end
+      local c = net:add("Cid", { character = playing("Cid") }):login()
+      c:join(a.core:crew().code)
+      net:run(40)
+      local extra = c.core:postSpare(BARB, 18)
+      net:run(3)
+      assert.same({ nil, "tooManyClaims" }, { b.core:claimSpare(c.memberId, extra) })
+      assert.equal(20, view(b).claims)
+      assert.equal(20, view(b).maxClaims)
+
+      b.core:withdrawClaim(a.memberId, ids[1])
+      assert.is_true(b.core:claimSpare(c.memberId, extra))
     end)
 
-    it("refuses an account-bound item", function()
-      for _, bindType in ipairs({ 7, 8, 9 }) do
-        assert.same({ nil, "accountBound" }, { H.tradeable(false, bindType) })
+    it("are won by the earliest; withdrawing moves the next one up", function()
+      local net, clients = crew({ "Ann", "Bob", "Cleo", "Dee" })
+      local a, b, c, d = clients[1], clients[2], clients[3], clients[4]
+      local id = post(net, a)
+      claimUnheard(net, c, a, id)
+      net:run(2)
+      assert.is_true(b.core:claimSpare(a.memberId, id))
+      net:run(5)
+      assert.equal(b.memberId, yourRow(a, id).winner.memberId)
+      resend(net, c)
+      for _, client in ipairs({ b, c, d }) do
+        assert.equal(c.memberId, crewRow(client, a, id).winner.memberId)
+      end
+      assert.equal("Cleo claimed it first", crewRow(d, a, id).state)
+      assert.equal("Cleo claimed it first (you claimed it for Bob)", crewRow(b, a, id).state)
+      assert.equal("Cleo claimed it for Cleo (2 Claims)", yourRow(a, id).state)
+
+      assert.is_true(c.core:withdrawClaim(a.memberId, id))
+      net:run(5)
+      assert.equal(b.memberId, yourRow(a, id).winner.memberId)
+      assert.equal(b.memberId, crewRow(d, a, id).winner.memberId)
+      assert.same({ nil, "notClaimed" }, { c.core:withdrawClaim(a.memberId, id) })
+      -- Bob's and Cleo's Claims came in one DATA each: Bob first, then Cleo
+      -- moved ahead of him, then she withdrew.
+      assert.same({
+        "Bob claimed [Cruel Barb] for Bob",
+        "Cleo claimed [Cruel Barb] for Cleo",
+        "Bob claimed [Cruel Barb] for Bob",
+      }, notices(a))
+      assert.same({}, notices(b))
+      assert.same({}, notices(c))
+    end)
+
+    it("tie by Member id the same on every client", function()
+      local net, clients = crew({ "Ann", "Bob", "Cleo" })
+      local a, b, c = clients[1], clients[2], clients[3]
+      local id = post(net, a)
+      assert.is_true(b.core:claimSpare(a.memberId, id))
+      assert.is_true(c.core:claimSpare(a.memberId, id))
+      net:run(5)
+      assert.equal(sent(net, b).claims[1].t, sent(net, c).claims[1].t)
+      local first = b.memberId < c.memberId and b.memberId or c.memberId
+      for _, client in ipairs({ a, b, c }) do
+        local row = client == a and yourRow(a, id) or crewRow(client, a, id)
+        assert.equal(first, row.winner.memberId)
       end
     end)
+
+    it("from a Removed Member don't count", function()
+      local net, clients = crew({ "Ann", "Bob", "Cleo" })
+      local a, b, c = clients[1], clients[2], clients[3]
+      local id = post(net, a)
+      assert.is_true(c.core:claimSpare(a.memberId, id))
+      net:run(5)
+      assert.is_true(b.core:claimSpare(a.memberId, id))
+      net:run(5)
+      assert.equal(c.memberId, yourRow(a, id).winner.memberId)
+      local before = #notices(a)
+      a.core:removeMember(c.memberId)
+      assert.equal(b.memberId, yourRow(a, id).winner.memberId)
+      assert.equal(before, #notices(a))
+      b.core:removeMember(c.memberId)
+      assert.equal(b.memberId, crewRow(b, a, id).winner.memberId)
+    end)
+
+    it("aren't news on first sight of the claimer", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      net.drop = function(_, from, to) return from == "Bob" and to == "Ann" end
+      local id = post(net, a)
+      assert.is_true(b.core:claimSpare(a.memberId, id))
+      net:run(5)
+      net.drop = nil
+      a.core:removeMember(b.memberId)
+      a.core:readdMember(b.memberId)
+      net:run(10)
+      assert.equal(b.memberId, yourRow(a, id).winner.memberId)
+      assert.same({}, notices(a))
+    end)
+
+    it("expire after 30 days", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      local id = post(net, a)
+      assert.is_true(b.core:claimSpare(a.memberId, id))
+      net:run(3)
+      net:step(net:now() + 29 * DAY)
+      b:play({ zone = "Westfall" })
+      net:run(15)
+      assert.equal(1, #sent(net, b).claims)
+      net:step(net:now() + 2 * DAY)
+      b:play({ zone = "Duskwood" })
+      net:run(15)
+      assert.same({}, sent(net, b).claims)
+    end)
   end)
 
-  describe("when the item has left the bags", function()
-    -- isOpen, hasClaim, inInventory, isEquipped, isNextLogin
-    it("keeps an item still in the bags or bank", function()
-      assert.equal("keep", H.itemCheck(true, false, true, false, false))
-      assert.equal("keep", H.itemCheck(true, true, true, false, true))
+  describe("Giving", function()
+    it("goes to the winner, is final, and makes one gave entry everywhere", function()
+      local net, clients = crew({ "Ann", "Bob", "Cleo", "Dee" })
+      local a, b, c, d = clients[1], clients[2], clients[3], clients[4]
+      local id = post(net, a)
+      -- Nobody hears Cleo's Claim until after the Give.
+      claimUnheard(net, c, a, id)
+      assert.is_true(b.core:claimSpare(a.memberId, id))
+      net:run(5)
+      assert.equal(b.memberId, yourRow(a, id).winner.memberId)
+      assert.same({ nil, "unknown" }, { a.core:giveSpare(99) })
+
+      assert.same({ nil, "winnerChanged" }, { a.core:giveSpare(id, c.memberId) })
+      assert.is_true(a.core:giveSpare(id, b.memberId))
+      assert.same({ nil, "unknown" }, { a.core:giveSpare(id) })
+      assert.same({ nil, "unknown" }, { a.core:withdrawSpare(id) })
+      net:run(5)
+      local given = sent(net, a).spares[1]
+      assert.equal(b.memberId, given.r)
+      assert.equal(b.character.guid, given.c)
+
+      -- Cleo's Claim arrives later and is earlier, but the Give is final.
+      resend(net, c)
+      assert.equal(2, yourRow(a, id).claims)
+      assert.equal(b.memberId, yourRow(a, id).given.memberId)
+      assert.equal("Given to Bob (Bob)", yourRow(a, id).state)
+      for _, client in ipairs({ b, c, d }) do assert.is_nil(crewRow(client, a, id)) end
+      assert.same({ nil, "given" }, { b.core:withdrawClaim(a.memberId, id) })
+
+      assert.same({ "Ann sent you [Cruel Barb]. Check Bob's mailbox." }, notices(b))
+      assert.same({}, notices(c))
+      assert.same({ "You gave Bob [Cruel Barb]" }, feedTexts(a, "gave"))
+      assert.same({ "Ann gave you [Cruel Barb]" }, feedTexts(b, "gave"))
+      assert.same({ "Ann gave Bob [Cruel Barb]" }, feedTexts(c, "gave"))
+      assert.same({ "Ann gave Bob [Cruel Barb]" }, feedTexts(d, "gave"))
+      for _, client in ipairs({ a, b, c, d }) do
+        for _, day in ipairs(client.core:feed().days) do
+          for _, entry in ipairs(day.entries) do
+            if entry.kind == "gave" then
+              assert.is_false(entry.canReact)
+              assert.is_nil(entry.key)
+            end
+          end
+        end
+      end
+      -- Live: Dee's gave entry is news; Bob's is covered by his notice.
+      assert.equal(1, #events(d, "feedEntry"))
+      assert.equal(0, #events(b, "feedEntry"))
+
+      -- The Give stays in the record until the 30 days are up.
+      a:play({ zone = "Westfall" })
+      b:play({ zone = "Westfall" })
+      net:run(15)
+      assert.equal(1, #sent(net, a).spares)
+      assert.same({}, sent(net, b).claims)
     end)
 
-    it("notes a gone item during the session, Claim or not", function()
-      assert.equal("note", H.itemCheck(true, false, false, false, false))
-      assert.equal("note", H.itemCheck(true, true, false, false, false))
+    it("make one gave entry even after skipped versions, never twice", function()
+      local net, clients = crew({ "Ann", "Bob", "Cleo" })
+      local a, b, c = clients[1], clients[2], clients[3]
+      c:lockdown(true)
+      local id = post(net, a)
+      assert.is_true(b.core:claimSpare(a.memberId, id))
+      net:run(5)
+      a.core:giveSpare(id)
+      net:run(3)
+      a:play({ zone = "Westfall" })
+      net:run(15)
+      c:lockdown(false)
+      net:run(10)
+      assert.same({ "Ann gave Bob [Cruel Barb]" }, feedTexts(c, "gave"))
+      a:play({ zone = "Duskwood" })
+      net:run(15)
+      assert.same({ "Ann gave Bob [Cruel Barb]" }, feedTexts(c, "gave"))
     end)
 
-    it("counts an equipped item as gone", function()
-      assert.equal("note", H.itemCheck(true, false, true, true, false))
-      assert.equal("withdraw", H.itemCheck(true, false, true, true, true))
+    it("reaches While you were away for the winner, and the Claim for the owner", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      local id = post(net, a)
+      a:logout()
+      net:run(5)
+      b.core:claimSpare(a.memberId, id)
+      net:run(5)
+      a.events = {}
+      a:login()
+      net:run(40)
+      local summary = events(a, "awaySummary")[1]
+      assert.same({ { kind = "claimed", text = "Bob claimed [Cruel Barb] for Bob" } }, (function()
+        local lines = {}
+        for i, line in ipairs(summary.spares) do lines[i] = { kind = line.kind, text = line.text } end
+        return lines
+      end)())
+      assert.same({}, notices(a))
+      assert.equal(0, view(a).unseen)
+
+      b:logout()
+      net:run(5)
+      a.core:giveSpare(id)
+      net:run(5)
+      b.events = {}
+      b:login()
+      net:run(40)
+      local texts = {}
+      for i, line in ipairs(events(b, "awaySummary")[1].spares) do texts[i] = line.text end
+      assert.same({ "Ann sent you [Cruel Barb]. Check Bob's mailbox." }, texts)
     end)
 
-    it("withdraws a gone, unclaimed one at the next login", function()
-      assert.equal("withdraw", H.itemCheck(true, false, false, false, true))
-    end)
-
-    it("asks about a gone, claimed one at the next login", function()
-      assert.equal("ask", H.itemCheck(true, true, false, false, true))
-    end)
-
-    it("keeps one that has ended", function()
-      assert.equal("keep", H.itemCheck(false, false, false, false, true))
-    end)
-
-    it("keeps one whose place in the bags is unknown", function()
-      assert.equal("keep", H.itemCheck(true, false, nil, false, true))
+    it("stay unseen with chat lines and toasts off until the tab is opened", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      a.core:setChatLines(false)
+      a.core:setToasts(false)
+      local id = post(net, a)
+      b.core:claimSpare(a.memberId, id)
+      net:run(5)
+      assert.same({}, notices(a))
+      assert.equal(1, view(a).unseen)
+      a.core:sparesSeen()
+      assert.equal(0, view(a).unseen)
     end)
   end)
 
-  describe("the winner", function()
-    it("is the earliest Claim", function()
-      local winner = H.winner({
-        { memberId = "bob", time = 100 },
-        { memberId = "cleo", time = 90 },
-      })
-      assert.equal("cleo", winner.memberId)
-    end)
+  it("are relayed by a Member in between, Claims too", function()
+    local net, clients = crew({ "Ann", "Bob", "Cid" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    net.drop = function(_, from, to)
+      return (from == "Ann" and to == "Cid") or (from == "Cid" and to == "Ann")
+    end
+    local id = post(net, a)
+    b:refused()
+    net:run(10)
+    assert.is_table(crewRow(c, a, id))
+    c.core:claimSpare(a.memberId, id)
+    net:run(10)
+    b:refused()
+    net:run(10)
+    assert.equal(c.memberId, yourRow(a, id).winner.memberId)
+  end)
 
-    it("breaks a tie by Member id, whatever order the Claims come in", function()
-      assert.equal("bob", H.winner({ { memberId = "cleo", time = 90 }, { memberId = "bob", time = 90 } }).memberId)
-      assert.equal("bob", H.winner({ { memberId = "bob", time = 90 }, { memberId = "cleo", time = 90 } }).memberId)
-    end)
+  it("keep records with malformed Spares and Claims, minus those items", function()
+    local net, clients, ns = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local id = post(net, a)
+    local function send(sender, fields)
+      local rec = {
+        id = sender, version = net:now(), displayName = sender, joinedAt = 1,
+        characters = { ["Player-0-X" .. sender] = {
+          guid = "Player-0-X" .. sender, name = sender, level = 20, lastPlayed = net:now(),
+        } },
+      }
+      for k, v in pairs(fields) do rec[k] = v end
+      b.core:received(ns.Codec.encode({ type = "DATA", from = sender, records = { rec } }))
+    end
+    send("garbled1", {
+      spares = { "junk", { i = 1, s = "bad" }, { i = 2, s = "5191", l = 18, t = net:now() } },
+      claims = { "junk", { m = a.memberId, i = id, c = "Player-0-Xgarbled1", t = 1 } },
+    })
+    send("garbled2", { spares = "junk", claims = 7 })
+    assert.is_table(b:rowFor({ memberId = "garbled1" }))
+    assert.is_table(b:rowFor({ memberId = "garbled2" }))
+    local owners = {}
+    for _, row in ipairs(view(b).crew) do owners[#owners + 1] = row.ownerId end
+    table.sort(owners)
+    assert.same({ a.memberId, "garbled1" }, owners)
+    assert.equal("garbled1", crewRow(b, a, id).winner.memberId)
+  end)
 
-    it("is nobody without Claims", function()
-      assert.is_nil(H.winner({}))
-    end)
+  it("are cleared, Claims too, when you leave", function()
+    local net, clients, _, code = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local id = post(net, a)
+    local other = post(net, b)
+    a.core:claimSpare(b.memberId, other)
+    b.core:claimSpare(a.memberId, id)
+    net:run(3)
+    a.core:leaveCrew()
+    net:run(3)
+    assert.same({}, view(a).yours)
+    assert.equal(0, view(a).claims)
+    assert.is_nil(crewRow(b, a, id))
+    -- Rejoining sends a record without them.
+    a:join(code)
+    net:run(40)
+    assert.is_nil(sent(net, a).spares)
+    assert.is_nil(sent(net, a).claims)
+    assert.same({}, view(a).yours)
+  end)
+end)
+
+describe("Spare items in the bags", function()
+  local GUID = "Item-0-0000000000A1B2C3"
+
+  -- Whether a value holds the text anywhere, keys included.
+  local function holds(value, text)
+    if type(value) == "string" then return value:find(text, 1, true) ~= nil end
+    if type(value) ~= "table" then return false end
+    for k, v in pairs(value) do
+      if holds(k, text) or holds(v, text) then return true end
+    end
+    return false
+  end
+
+  it("are remembered for the posting Character, and never sent", function()
+    local net, clients, ns = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local id = assert(a.core:postSpare(BARB, 18, { guid = GUID, bindType = 2 }))
+    net:run(5)
+    a:reload()
+    net:run(5)
+
+    assert.same({ [id] = GUID }, a.core:spareItems())
+    assert.is_not_nil(crewRow(b, a, id))
+    assert.is_true(#net.wire > 0)
+    for _, item in ipairs(net.wire) do
+      assert.is_false(holds(ns.Codec.decode(item.message), GUID))
+    end
+  end)
+
+  it("are kept per Character", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    local id = assert(a.core:postSpare(BARB, 18, { guid = GUID, bindType = 2 }))
+    a:play({ guid = "Player-0-Annalt", name = "Annalt" })
+    local other = assert(a.core:postSpare(SWORD, 25, { guid = "Item-0-0000000000D4E5F6" }))
+    net:run(3)
+    assert.same({ [other] = "Item-0-0000000000D4E5F6" }, a.core:spareItems())
+    a:play({ guid = "Player-0-Ann", name = "Ann" })
+    assert.same({ [id] = GUID }, a.core:spareItems())
+  end)
+
+  it("are forgotten once the Spare is withdrawn, Given or ends", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local withdrawn = assert(a.core:postSpare(BARB, 18, { guid = "Item-0-1" }))
+    local given = assert(a.core:postSpare(BARB, 18, { guid = "Item-0-2" }))
+    net:run(3)
+    assert(a.core:withdrawSpare(withdrawn))
+    assert(b.core:claimSpare(a.memberId, given))
+    net:run(5)
+    assert(a.core:giveSpare(given))
+    assert.same({}, a.core:spareItems())
+
+    local ending = assert(a.core:postSpare(BARB, 18, { guid = "Item-0-3" }))
+    net:run(3)
+    assert.same({ [ending] = "Item-0-3" }, a.core:spareItems())
+    net:step(net:now() + 31 * DAY)
+    assert.same({}, a.core:spareItems())
+  end)
+
+  it("are forgotten when you leave the Crew", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    assert(a.core:postSpare(BARB, 18, { guid = GUID, bindType = 2 }))
+    net:run(3)
+    a.core:leaveCrew()
+    net:run(3)
+    assert.same({}, a.core:spareItems())
+  end)
+
+  it("refuse what can't be traded, and post nothing", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local before = #net.wire
+    assert.same({ nil, "bound" }, { a.core:postSpare(BARB, 18, { guid = GUID, isBound = true, bindType = 1 }) })
+    assert.same({ nil, "questItem" }, { a.core:postSpare(BARB, 18, { guid = GUID, bindType = 4 }) })
+    assert.same({ nil, "accountBound" }, { a.core:postSpare(BARB, 18, { guid = GUID, bindType = 8 }) })
+    net:run(3)
+    assert.equal(before, #net.wire)
+    assert.same({}, view(a).yours)
+    assert.same({}, view(b).crew)
+    assert.same({}, a.core:spareItems())
+  end)
+
+  it("aren't needed for a post", function()
+    local net, clients = crew({ "Ann" })
+    local a = clients[1]
+    assert(a.core:postSpare(BARB, 18))
+    net:run(3)
+    assert.same({}, a.core:spareItems())
+  end)
+end)
+
+describe("Spares whose item has left the bags", function()
+  local GUID = "Item-0-0000000000A1B2C3"
+
+  local function gone(client)
+    return events(client, "spareGone")
+  end
+
+  -- Ann posts the Barb from her bags; Bob sees it.
+  local function posted()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    a:putItem(GUID, "bags")
+    local id = assert(a.core:postSpare(BARB, 18, { guid = GUID, bindType = 2 }))
+    a:bagsUpdated()
+    net:run(5)
+    return net, a, b, id
+  end
+
+  it("aren't checked before the bags first settle after login", function()
+    local net, a, b, id = posted()
+    a:putItem(GUID, nil)
+    a:logout()
+    net:run(5)
+    a:login()
+    net:run(10)
+    a.bagReads = 0
+    a.core:tick()
+
+    assert.equal(0, a.bagReads)
+    assert.is_nil(yourRow(a, id).gone)
+    assert.is_not_nil(crewRow(b, a, id))
+    assert.same({}, gone(a))
+
+    a:bagsUpdated()
+    assert.is_nil(yourRow(a, id))
+  end)
+
+  it("are noted on the owner's tab when sold, and the note clears on buyback", function()
+    local net, a, b, id = posted()
+    a:putItem(GUID, nil):bagsUpdated()
+    net:run(5)
+    assert.is_true(yourRow(a, id).gone)
+    assert.is_not_nil(crewRow(b, a, id))
+    assert.same({}, gone(a))
+
+    a:putItem(GUID, "bags"):bagsUpdated()
+    assert.is_nil(yourRow(a, id).gone)
+  end)
+
+  it("count an equipped item as gone", function()
+    local _, a, _, id = posted()
+    a:putItem(GUID, "equipped"):bagsUpdated()
+    assert.is_true(yourRow(a, id).gone)
+  end)
+
+  it("aren't ended by a /reload, since buyback survives it", function()
+    local net, a, _, id = posted()
+    a:putItem(GUID, nil):bagsUpdated()
+    a:reload()
+    net:run(5)
+    a:bagsUpdated()
+    assert.is_true(yourRow(a, id).gone)
+    assert.same({}, gone(a))
+  end)
+
+  it("are withdrawn at the next login without a Claim, and the owner is told once", function()
+    local net, a, b, id = posted()
+    a:putItem(GUID, nil):bagsUpdated()
+    a:logout()
+    net:run(5)
+    a:login()
+    net:run(5)
+    a.events = {}
+    a:bagsUpdated()
+    -- The withdrawal's changed event comes first, then the one telling the
+    -- owner, as for any withdrawal.
+    assert.same({ "changed", "spareGone" }, { a.events[1][1], a.events[2][1] })
+    a:bagsUpdated()
+    net:run(5)
+
+    assert.is_nil(yourRow(a, id))
+    assert.is_nil(crewRow(b, a, id))
+    local told = gone(a)
+    assert.equal(1, #told)
+    assert.equal("withdrawn", told[1].action)
+    assert.equal(id, told[1].id)
+    assert.equal("[Cruel Barb]", told[1].link)
+    assert.same({}, a.core:spareItems())
+  end)
+
+  it("ask the owner at the next login when there's a Claim, and ask again the login after", function()
+    local net, a, b, id = posted()
+    assert(b.core:claimSpare(a.memberId, id))
+    net:run(5)
+    a:putItem(GUID, nil):bagsUpdated()
+    a:logout()
+    net:run(5)
+    a:login()
+    net:run(5)
+    a:bagsUpdated()
+    a:bagsUpdated()
+
+    local told = gone(a)
+    assert.equal(1, #told)
+    assert.equal("ask", told[1].action)
+    assert.equal(id, told[1].id)
+    assert.equal(b.memberId, told[1].winner.memberId)
+    assert.equal("Bob", told[1].winner.character)
+    assert.is_true(yourRow(a, id).gone)
+    assert.is_not_nil(crewRow(b, a, id))
+
+    a:logout()
+    net:run(5)
+    a:login()
+    a:bagsUpdated()
+    assert.equal(2, #gone(a))
+    assert.equal("ask", gone(a)[2].action)
+    assert(a.core:giveSpare(id, told[1].winner.memberId))
+  end)
+
+  it("are kept when the item is back by the next login", function()
+    local net, a, b, id = posted()
+    a:putItem(GUID, nil):bagsUpdated()
+    a:putItem(GUID, "bags")
+    a:logout()
+    net:run(5)
+    a:login()
+    a:bagsUpdated()
+    net:run(5)
+    assert.is_nil(yourRow(a, id).gone)
+    assert.is_not_nil(crewRow(b, a, id))
+    assert.same({}, gone(a))
+  end)
+
+  it("are never checked without a stored item GUID", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    local id = assert(a.core:postSpare(BARB, 18))
+    a:logout()
+    net:run(5)
+    a:login()
+    a:bagsUpdated()
+    assert.is_not_nil(yourRow(a, id))
+    assert.is_nil(yourRow(a, id).gone)
+    assert.equal(0, a.bagReads)
   end)
 end)

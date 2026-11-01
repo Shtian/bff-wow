@@ -24,9 +24,9 @@ Core/Ledger.lua
 Core/Gossip.lua
 Core/Settle.lua
 Core/Reactions.lua
+Core/SpareRules.lua
 Core/Spares.lua
 Core/Feed.lua
-Core/Giving.lua
 Core/Roster.lua
 Core/Goals.lua
 Core/Core.lua

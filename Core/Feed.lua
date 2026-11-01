@@ -221,7 +221,8 @@ local function gaveEntry(self, record, own, spare)
   return entry
 end
 
--- The Spares Given in after that weren't in before, each once.
+-- The Spares Given in after that weren't in before, as Spares tells
+-- them, each once.
 local function gaveEntries(self, before, after, list)
   for _, spare in ipairs(Spares.newlyGiven(before, after)) do
     if not hasGave(self, after.id, spare.id) then
@@ -275,8 +276,8 @@ function Feed:ownChanged(was, guid)
   return insert(self, list)
 end
 
--- You Gave one of your Spares ({ id, item, to } as in
--- Spares.inRecord): your own gave entry. Returns the new entries.
+-- You Gave one of your Spares ({ id, item, to }), as the Spares
+-- module tells: your own gave entry. Returns the new entries.
 function Feed:ownGave(spare)
   if hasGave(self, self.ledger:memberId(), spare.id) then return {} end
   return insert(self, { gaveEntry(self, self.ledger:own(), true, spare) })
@@ -603,7 +604,7 @@ end
 -- While you were away: the unseen entries from other Members, one block
 -- per Member, most recent activity first, the Crew goals reached, newest
 -- first ({ text, time }), the unseen Reactions to your own, and
--- spares: the Spare notices given (Giving:takeNews), then the
+-- spares: the Spare notices given (Spares:takeNews), then the
 -- Gives, newest first ({ kind = "gave", text, time }), as { members,
 -- goals, spares, count, noticed }. Marks them seen. Nil when there
 -- are none.
