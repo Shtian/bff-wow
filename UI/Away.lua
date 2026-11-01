@@ -152,9 +152,9 @@ local function row(index)
   return item
 end
 
--- The level column: the level now (gold with a star at max level) over a
--- bar from 0 to max level, the part before in grey and the jump in green,
--- or gold at max level. A dash for a Character that only died.
+-- The level column: the level now (with a star at max level) over a bar
+-- from 0 to max level, the part before in grey and the jump in green. A
+-- dash for a Character that only died.
 local function drawLevel(item, character, maxLevel)
   local shown = character.level ~= nil
   item.track:SetShown(shown)
@@ -167,8 +167,7 @@ local function drawLevel(item, character, maxLevel)
     return
   end
 
-  item.level:SetText(character.maxLevel and hex(Skin.GOLD) .. character.level .. "|r " .. STAR
-    or tostring(character.level))
+  item.level:SetText(character.maxLevel and character.level .. " " .. STAR or tostring(character.level))
   item.level:SetPoint("BOTTOMLEFT", item, "LEFT", LEVEL_X, -1)
   item.track:SetPoint("TOPLEFT", item, "LEFT", LEVEL_X, -3)
 
@@ -179,8 +178,7 @@ local function drawLevel(item, character, maxLevel)
     item.before:SetSize(from * scale, 4)
     item.before:Show()
   end
-  local color = character.maxLevel and Skin.GOLD or GAINED
-  item.gain:SetColorTexture(color[1], color[2], color[3])
+  item.gain:SetColorTexture(GAINED[1], GAINED[2], GAINED[3])
   item.gain:SetPoint("TOPLEFT", item.track, "TOPLEFT", from * scale, 0)
   item.gain:SetSize(math.max(2, (character.level - from) * scale), 4)
   item.gain:Show()
@@ -194,12 +192,16 @@ local function drawRow(item, member, character, first, maxLevel)
   item.member:SetShown(first)
   if first then
     item.icon:SetAtlas("classicon-" .. (member.classFilename or ""):lower())
+    -- Joined is news, in gold; left is said plainly.
     local tags = {}
     for _, highlight in ipairs(member.highlights) do
-      if highlight.kind ~= "maxLevel" then tags[#tags + 1] = highlight.kind end
+      if highlight.kind ~= "maxLevel" then
+        local color = Skin.FEED_HIGHLIGHT[highlight.kind] and Skin.GOLD or Skin.MUTED
+        tags[#tags + 1] = hex(color) .. highlight.kind .. "|r"
+      end
     end
     local text = classHex(member.classFilename) .. member.displayName .. "|r"
-    if #tags > 0 then text = text .. "  " .. hex(Skin.GOLD) .. table.concat(tags, ", ") .. "|r" end
+    if #tags > 0 then text = text .. "  " .. table.concat(tags, ", ") end
     item.member:SetText(text)
   end
   -- The Welcome sits just after the gold joined tag.
@@ -234,7 +236,7 @@ local function drawRow(item, member, character, first, maxLevel)
 
   drawLevel(item, character or {}, maxLevel)
   if character and character.new then
-    item.gained:SetText(hex(Skin.GOLD) .. "new|r")
+    item.gained:SetText(hex(GAINED) .. "new|r")
   elseif character and character.from then
     item.gained:SetText(hex(GAINED) .. "+" .. (character.level - character.from) .. "|r")
   else

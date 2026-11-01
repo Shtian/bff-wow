@@ -23,10 +23,9 @@ local PICTURE = 24
 local REACT = 20
 -- Seconds a toast takes to fade out at the end of its time.
 local FADE = 0.6
--- The timer line along a toast's bottom edge: gold on the entries the
--- Feed highlights, faint white otherwise.
+-- The timer line along a toast's bottom edge, faint white on every toast:
+-- gold text already marks the news.
 local TIMER = 2
-local TIMER_FAINT = { 1, 1, 1, 0.18 }
 -- Where toasts start, down from the top centre, until moved.
 local DEFAULT_FROM_TOP = 160
 -- The overflow toast's icon: the Feed's, as in the panel's sidebar.
@@ -114,7 +113,7 @@ local function createToast()
   toast:SetClampedToScreen(true)
   Skin.fill(toast, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 0.88 })
   toast.timer = toast:CreateTexture(nil, "ARTWORK")
-  toast.timer:SetColorTexture(1, 1, 1, 1)
+  toast.timer:SetColorTexture(1, 1, 1, 0.18)
   toast.timer:SetPoint("BOTTOMLEFT")
   toast.timer:SetHeight(TIMER)
   Skin.fill(toast, Skin.HOVER, "HIGHLIGHT")
@@ -154,7 +153,6 @@ end
 local function drawToast(frame, toast)
   local entry = toast.entry
   local highlight = entry and Skin.FEED_HIGHLIGHT[entry.kind] == true
-  Skin.color(frame.timer, highlight and Skin.GOLD or TIMER_FAINT)
   local canReact = entry ~= nil and not entry.entryKey and entry.canReact == true
   frame.react:SetShown(canReact)
   if canReact then frame.react:SetReaction(entry.reaction, entry.reacted) end

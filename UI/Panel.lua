@@ -269,13 +269,6 @@ local function createRow()
 
   row.ownBackground = Skin.fill(row, { GOLD[1], GOLD[2], GOLD[3], 0.05 })
 
-  -- The gold left border for "can play with you".
-  row.border = row:CreateTexture(nil, "ARTWORK")
-  row.border:SetColorTexture(GOLD[1], GOLD[2], GOLD[3])
-  row.border:SetPoint("TOPLEFT")
-  row.border:SetPoint("BOTTOMLEFT")
-  row.border:SetWidth(2)
-
   row.icon = row:CreateTexture(nil, "ARTWORK")
   row.icon:SetSize(28, 28)
   row.icon:SetPoint("TOPLEFT", INSET, -7)
@@ -314,7 +307,6 @@ end
 local function drawRow(row, data)
   row.row, row.character = data, data
   row.ownBackground:SetShown(data.own)
-  row.border:SetShown(data.canPlay)
   setDot(row.dot, data.online)
   row.icon:SetAtlas("classicon-" .. (data.classFilename or ""):lower())
   row.name:SetText(data.name)
@@ -645,12 +637,12 @@ local function entryKey(entry)
 end
 
 -- Who reacted, after the time: the Reaction's icon and their names, You
--- in gold.
+-- a step brighter than the others.
 local function reactorsText(entry)
   if #entry.reactors == 0 then return "" end
   local names = {}
   for i, reactor in ipairs(entry.reactors) do
-    names[i] = reactor.you and Skin.hex(GOLD) .. "You|r" or reactor.name
+    names[i] = reactor.you and Skin.hex(TEXT) .. "You|r" or reactor.name
   end
   return Skin.reactionGlyph(entry.reaction, 12) .. " " .. table.concat(names, ", ")
 end
@@ -773,7 +765,12 @@ local function drawGoal(row, goal)
     row.bar:SetMinMaxValues(0, math.max(goal.goal, 1))
     row.bar:SetValue(math.min(goal.value, goal.goal))
   end
-  row.bar:SetStatusBarColor(GOLD[1], GOLD[2], GOLD[3], goal.complete and 1 or 0.85)
+  -- Gold only once complete: a bar on its way is progress, not news.
+  if goal.complete then
+    row.bar:SetStatusBarColor(GOLD[1], GOLD[2], GOLD[3])
+  else
+    row.bar:SetStatusBarColor(1, 1, 1, 0.3)
+  end
   row.last:SetText(lastReached(goal))
   Skin.color(row.last, goal.complete and GOLD or MUTED)
 end
@@ -1185,7 +1182,6 @@ local function drawSpareRow(row, data, yours)
     drawSpareText(row, data, placeSpareButtons(row, not data.given and "Give" or nil,
       data.canWithdraw and "Withdraw" or nil))
     row.primary:SetEnabled(data.canGive)
-    row.primary:SetAlpha(data.canGive and 1 or 0.4)
     row:SetAlpha(data.given and 0.6 or 1)
   else
     row.info:SetText(("%s · %s"):format(data.owner, data.state))
@@ -1193,7 +1189,6 @@ local function drawSpareRow(row, data, yours)
     drawSpareText(row, data, placeSpareButtons(row, data.canClaim and "Claim" or nil,
       data.claimed and "Withdraw" or nil))
     row.primary:SetEnabled(true)
-    row.primary:SetAlpha(1)
     row:SetAlpha(data.usable and 1 or 0.45)
   end
   row:Show()
@@ -1394,6 +1389,9 @@ local function createFooter()
   footer.code:SetHeight(22)
   footer.code:SetJustifyH("CENTER")
   footer.code:SetPoint("LEFT", codeLabel, "RIGHT", 8, 0)
+  -- The text stays selected for copying; a faint selection keeps the code
+  -- from being the brightest thing in the panel.
+  footer.code:SetHighlightColor(1, 1, 1, 0.15)
   footer.code:SetScript("OnEditFocusGained", function(box) box:HighlightText() end)
   footer.code:SetScript("OnTextChanged", function(box, userInput)
     if userInput then

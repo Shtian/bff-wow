@@ -25,8 +25,9 @@ Skin.HOVER = { 1, 1, 1, 0.05 }
 
 Skin.HEADER_HEIGHT = 30
 
--- Feed entries shown in gold.
-Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, left = true, goal = true }
+-- Feed entries shown in gold: the news. Leaving keeps its grey edge and
+-- plain text.
+Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, goal = true }
 -- A muted grey for a picture's edge when its kind has no colour, and for
 -- the overflow toast's icon.
 Skin.FEED_ICON_COLOR = { 0.82, 0.8, 0.86 }
@@ -77,6 +78,9 @@ Skin.FEED_EDGES = {
   given = SPARE,
 }
 local EDGE_ALPHA = 0.55
+-- A given Reaction's edge: a quiet frame, not gold, so the Feed's gold stays
+-- on the news.
+local GIVEN_EDGE = { 1, 1, 1, 0.3 }
 
 -- A square picture `size` wide: an opaque back (so a line behind it is
 -- covered), the edge, and the icon inset 1px with its own bevel cropped.
@@ -133,7 +137,8 @@ local function reactionHover(button, over)
 end
 
 -- A small square button with a Reaction's icon. :SetReaction(reaction,
--- done) shows it dim and clickable, or bright with a gold edge once given.
+-- done) shows it dim and clickable, or in full colour with a faint edge
+-- once given.
 function Skin.reactionButton(parent, size, onClick)
   local button = CreateFrame("Button", nil, parent)
   button:SetSize(size, size)
@@ -142,7 +147,7 @@ function Skin.reactionButton(parent, size, onClick)
   button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   button.edges = {}
   for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
-    button.edges[#button.edges + 1] = Skin.edge(button, side, Skin.GOLD, "OVERLAY")
+    button.edges[#button.edges + 1] = Skin.edge(button, side, GIVEN_EDGE, "OVERLAY")
   end
   button.restAlpha = 0.55
   button:SetScript("OnClick", onClick)
@@ -260,8 +265,13 @@ function Skin.edge(frame, side, color, layer)
   return line
 end
 
+-- 1px lines round `frame`. Returns them.
 function Skin.border(frame, color)
-  for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do Skin.edge(frame, side, color or Skin.BORDER) end
+  local lines = {}
+  for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+    lines[#lines + 1] = Skin.edge(frame, side, color or Skin.BORDER)
+  end
+  return lines
 end
 
 function Skin.label(parent, fontName, color, layer)
@@ -299,20 +309,40 @@ local function hover(button, shown)
   if button:IsEnabled() then button.hover:SetShown(shown) end
 end
 
+local SECONDARY = { 1, 1, 1, 0.06 }
+local ON_GOLD = { 0.1, 0.08, 0 }
+
+-- A button's plate and label for its kind and state. A disabled button,
+-- primary or not, is a secondary plate with dim text: faded gold read as a
+-- second primary.
+local function look(button, enabled)
+  local gold = button.primary and enabled
+  local fill = gold and Skin.GOLD or SECONDARY
+  button.background:SetColorTexture(fill[1], fill[2], fill[3], fill[4] or 1)
+  for _, line in ipairs(button.lines) do line:SetShown(not gold) end
+  button.hover:SetColorTexture(1, 1, 1, gold and 0.18 or 0.06)
+  if not enabled then button.hover:Hide() end
+  Skin.color(button.label, gold and ON_GOLD or enabled and Skin.TEXT or Skin.DIM)
+end
+
 -- A flat button. Primary ones are gold with dark text.
 function Skin.button(parent, text, onClick, primary)
   local button = CreateFrame("Button", nil, parent)
   button:SetSize(96, 24)
-  button.background = Skin.fill(button, primary and Skin.GOLD or { 1, 1, 1, 0.06 })
-  if not primary then Skin.border(button, Skin.BORDER) end
-  button.hover = Skin.fill(button, { 1, 1, 1, primary and 0.18 or 0.06 }, "HIGHLIGHT")
+  button.primary = primary == true
+  button.background = Skin.fill(button, SECONDARY)
+  button.lines = Skin.border(button, Skin.BORDER)
+  button.hover = Skin.fill(button, { 1, 1, 1, 0.06 }, "HIGHLIGHT")
   button.hover:SetBlendMode("ADD")
-  button.label = Skin.label(button, "text", primary and { 0.1, 0.08, 0 } or Skin.TEXT)
+  button.label = Skin.label(button, "text")
   button.label:SetPoint("CENTER")
   button.label:SetText(text)
+  look(button, true)
   button:SetScript("OnClick", onClick)
   button:SetScript("OnEnter", function(self) hover(self, true) end)
   button:SetScript("OnLeave", function(self) hover(self, false) end)
+  button:SetScript("OnEnable", function(self) look(self, true) end)
+  button:SetScript("OnDisable", function(self) look(self, false) end)
   function button:SetText(value) self.label:SetText(value) end
   return button
 end
