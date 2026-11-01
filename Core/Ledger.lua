@@ -56,8 +56,11 @@ local function ownRecord(self)
   return record
 end
 
+-- Every write of the own record also prunes its Reactions, so pruning
+-- alone never sends DATA.
 local function bump(self, record)
   record.version = math.max(self.now(), record.version + 1)
+  if record.reactions then ns.Reactions.prune(record.reactions, self.now()) end
 end
 
 -- Records the current state of the Character being played. Returns true if
@@ -121,6 +124,21 @@ function Ledger:writeOwn(fields)
   end
   if changed then bump(self, record) end
   return changed
+end
+
+-- Adds a Reaction (a key from Reactions) to the own record, made now.
+function Ledger:addReaction(key)
+  local record = ownRecord(self)
+  record.reactions = record.reactions or {}
+  record.reactions[#record.reactions + 1] = ns.Reactions.item(key, self.now())
+  bump(self, record)
+end
+
+-- Leaving the Crew clears the own Reactions. Not a write: the tombstone
+-- carries none, and rejoining writes the record anyway.
+function Ledger:clearReactions()
+  local record = self:own()
+  if record then record.reactions = nil end
 end
 
 -- What a Member who left publishes: no Characters.

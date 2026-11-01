@@ -23,7 +23,7 @@ local MESSAGES = {
 }
 ns.MESSAGES = MESSAGES
 
--- A live Feed entry as a chat line: "BFF: Ana dinged 24."
+-- A live Feed entry or Reaction as a chat line: "BFF: Ana dinged 24."
 local function chatLine(entry)
   local text = entry.text
   if not text:find("[.!?]$") then text = text .. "." end
@@ -55,7 +55,7 @@ local function onCoreEvent(event, kind)
     ns.Settings.refresh()
   elseif event == "notice" then
     say(MESSAGES[kind])
-  elseif event == "feedEntry" then
+  elseif event == "feedEntry" or event == "reaction" then
     if ns.core:isChatLinesOn() then chatLine(kind) end
     if ns.core:isToastsOn() then ns.Toasts.show(kind) end
   elseif event == "awaySummary" then

@@ -1,10 +1,12 @@
 -- Away: the While you were away popup from the Feed decision (#14), in the
--- Skin's flat look. Draws Core's summary as a scoreboard, Members by most
--- recent activity: a row per Character with its level now, a bar for the
--- jump (gold when it reached max level), levels gained and deaths. The
--- Member's name sits on their first row, with joined or left beside it.
--- Dismiss and Open Feed. App shows it once out of combat. See
--- docs/design/feed.md.
+-- Skin's flat look. Your Crew noticed comes first: a line per entry of
+-- yours others reacted to. Then Core's summary as a scoreboard, Members by
+-- most recent activity: a row per Character with its level now, a bar for
+-- the jump (gold when it reached max level), levels gained, deaths, and
+-- Cheer and Respects buttons. The Member's name sits on their first row,
+-- with joined or left beside it, and a Welcome by joined. Dismiss and Open
+-- Feed. App shows it once out of combat. See docs/design/feed.md and
+-- docs/design/reactions.md.
 
 local _, ns = ...
 
@@ -13,19 +15,27 @@ ns.Away = Away
 
 local Skin = ns.Skin
 
-local WIDTH = 360
+local WIDTH = 400
 local INSET = 14
 local INTRO = 30
 local HEADINGS = 18
 local BUTTONS = 46
 local ICON = 14
 local ROW = 26
+local NOTICED_TITLE = 18
+local NOTICED_LINE = 22
+local NOTICED_GAP = 12
+-- The Reaction buttons, in a column at the right of each row.
+local REACT = 18
+local REACT_GAP = 4
+local REACT_COLUMN = 2 * REACT + REACT_GAP + 8
 -- A row with the Character's name under the Member's.
 local TALL_ROW = 38
 -- Columns, as x from the left of the scoreboard and from its right.
 local LEVEL_X = 136
 local BAR = 90
-local GAINED_RIGHT = 30
+local DEATHS_RIGHT = REACT_COLUMN
+local GAINED_RIGHT = DEATHS_RIGHT + 30
 -- The names stop short of the level column.
 local NAME_WIDTH = LEVEL_X - 8
 local GAINED = Skin.ONLINE
@@ -34,6 +44,7 @@ local SKULL = "|T" .. Skin.FEED_ICONS.death .. ":12|t"
 
 local frame
 local rows = {}
+local lines = {}
 
 local function hex(color)
   return ("|cff%02x%02x%02x"):format(color[1] * 255, color[2] * 255, color[3] * 255)
@@ -45,10 +56,14 @@ local function classHex(classFilename)
   return hex(Skin.TEXT)
 end
 
-local function heading(text, point, x)
+-- A column heading, placed by show(): x is from the left, or from the
+-- right when negative.
+local function heading(text, x)
   local label = Skin.label(frame, "tiny", Skin.DIM)
   label:SetText(text)
-  label:SetPoint(point, x, -Skin.HEADER_HEIGHT - INTRO)
+  label.x = x
+  if x < 0 then label:SetJustifyH("RIGHT") end
+  frame.headings[#frame.headings + 1] = label
   return label
 end
 
@@ -56,14 +71,14 @@ local function create()
   frame = Skin.window("BFFAway", WIDTH, "While you were away")
   frame:SetPoint("CENTER", 0, 120)
 
+  frame.noticed = Skin.label(frame, "tiny", Skin.DIM)
+  frame.noticed:SetText("YOUR CREW NOTICED")
   frame.intro = Skin.label(frame, "small", Skin.MUTED)
-  frame.intro:SetPoint("TOPLEFT", INSET, -Skin.HEADER_HEIGHT - 10)
 
-  heading("LEVEL", "TOPLEFT", INSET + LEVEL_X)
-  local gained = heading("GAINED", "TOPRIGHT", -INSET - GAINED_RIGHT)
-  gained:SetJustifyH("RIGHT")
-  local deaths = heading(SKULL, "TOPRIGHT", -INSET)
-  deaths:SetJustifyH("RIGHT")
+  frame.headings = {}
+  heading("LEVEL", INSET + LEVEL_X)
+  heading("GAINED", -INSET - GAINED_RIGHT)
+  heading(SKULL, -INSET - DEATHS_RIGHT)
 
   local open = Skin.button(frame, "Open Feed", function()
     frame:Hide()
@@ -74,8 +89,24 @@ local function create()
   dismiss:SetPoint("RIGHT", open, "LEFT", -8, 0)
 end
 
+-- A Reaction button's click: reacts with the key it was drawn with, and
+-- shows it done.
+local function react(button)
+  if button.key and not button.done then ns.core:react(button.key) end
+  button:SetReaction(button.reaction, true)
+end
+
+-- Draws a Reaction button from a summary button ({ key, reacted }), or
+-- hides it.
+local function drawButton(button, reaction, data)
+  button:SetShown(data ~= nil)
+  if not data then return end
+  button.key = data.key
+  button:SetReaction(reaction, data.reacted)
+end
+
 -- A scoreboard row: the Member (on their first row) and the Character on
--- the left, then level and bar, levels gained and deaths.
+-- the left, then level and bar, levels gained, deaths and Reactions.
 local function row(index)
   local item = rows[index]
   if item then return item end
@@ -103,7 +134,12 @@ local function row(index)
   item.gained:SetPoint("RIGHT", -GAINED_RIGHT, 0)
   item.deaths = Skin.label(item, "text", Skin.DIM)
   item.deaths:SetJustifyH("RIGHT")
-  item.deaths:SetPoint("RIGHT", 0, 0)
+  item.deaths:SetPoint("RIGHT", -DEATHS_RIGHT, 0)
+  item.respects = Skin.reactionButton(item, REACT, react)
+  item.respects:SetPoint("RIGHT", 0, 0)
+  item.cheer = Skin.reactionButton(item, REACT, react)
+  item.cheer:SetPoint("RIGHT", item.respects, "LEFT", -REACT_GAP, 0)
+  item.welcome = Skin.reactionButton(item, REACT, react)
   rows[index] = item
   return item
 end
@@ -158,6 +194,15 @@ local function drawRow(item, member, character, first, maxLevel)
     if #tags > 0 then text = text .. "  " .. hex(Skin.GOLD) .. table.concat(tags, ", ") .. "|r" end
     item.member:SetText(text)
   end
+  -- The Welcome sits just after the gold joined tag.
+  drawButton(item.welcome, "welcome", first and member.welcome or nil)
+  if first and member.welcome then
+    item.welcome:ClearAllPoints()
+    local width = math.min(item.member:GetStringWidth(), item.member:GetWidth())
+    item.welcome:SetPoint("LEFT", item.member, "LEFT", width + 6, 0)
+  end
+  drawButton(item.cheer, "cheer", character and character.cheer)
+  drawButton(item.respects, "respects", character and character.respects)
 
   -- The Character's name, unless it is the Member's own name on their Main.
   local name
@@ -192,14 +237,58 @@ local function drawRow(item, member, character, first, maxLevel)
   return height
 end
 
--- Shows the summary from Core's awaySummary: { members, count }.
+-- A line in Your Crew noticed: the Reaction's icon and the text.
+local function line(index)
+  local item = lines[index]
+  if item then return item end
+  item = Skin.label(frame, "text")
+  item:SetWordWrap(false)
+  lines[index] = item
+  return item
+end
+
+-- Your Crew noticed, from y down. Returns the y below it.
+local function drawNoticed(noticed, y)
+  frame.noticed:SetShown(#noticed > 0)
+  for i = #noticed + 1, #lines do lines[i]:Hide() end
+  if #noticed == 0 then return y end
+  y = y - 10
+  frame.noticed:SetPoint("TOPLEFT", INSET, y)
+  y = y - NOTICED_TITLE
+  for i, notice in ipairs(noticed) do
+    local item = line(i)
+    item:ClearAllPoints()
+    item:SetPoint("TOPLEFT", INSET, y)
+    item:SetPoint("RIGHT", -INSET, 0)
+    item:SetText(Skin.reactionGlyph(notice.reaction, 14) .. "  " .. notice.text)
+    item:Show()
+    y = y - NOTICED_LINE
+  end
+  return y - NOTICED_GAP
+end
+
+-- Shows the summary from Core's awaySummary: { members, count, noticed }.
+-- With no Crew news, only Your Crew noticed shows.
 function Away.show(summary)
   if not frame then create() end
-  frame.intro:SetText(summary.count == 1 and "1 thing happened while you were away."
-    or ("%d things happened while you were away."):format(summary.count))
+  local y = drawNoticed(summary.noticed or {}, -Skin.HEADER_HEIGHT)
+
+  local scoreboard = #summary.members > 0
+  frame.intro:SetShown(scoreboard)
+  for _, label in ipairs(frame.headings) do label:SetShown(scoreboard) end
+  if scoreboard then
+    frame.intro:SetText(summary.count == 1 and "1 thing happened while you were away."
+      or ("%d things happened while you were away."):format(summary.count))
+    frame.intro:ClearAllPoints()
+    frame.intro:SetPoint("TOPLEFT", INSET, y - 10)
+    for _, label in ipairs(frame.headings) do
+      label:ClearAllPoints()
+      label:SetPoint(label.x < 0 and "TOPRIGHT" or "TOPLEFT", label.x, y - INTRO)
+    end
+    y = y - INTRO - HEADINGS
+  end
 
   local maxLevel = GetMaxLevelForPlayerExpansion()
-  local y = -Skin.HEADER_HEIGHT - INTRO - HEADINGS
   local index = 0
   for _, member in ipairs(summary.members) do
     local characters = member.characters

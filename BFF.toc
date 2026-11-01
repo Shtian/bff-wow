@@ -18,6 +18,7 @@ Core/Codec.lua
 Core/CrewCode.lua
 Core/Ledger.lua
 Core/Gossip.lua
+Core/Reactions.lua
 Core/Feed.lua
 Core/Roster.lua
 Core/Core.lua

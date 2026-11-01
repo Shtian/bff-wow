@@ -3,7 +3,10 @@
 -- time, and draws visible() after each update. At most MAX toasts show,
 -- each for DURATION seconds (the clock stops while hovered); a burst that
 -- doesn't fit ends in one "+N more" toast; nothing new shows in combat;
--- and the sound plays at most once per SOUND_GAP. See docs/design/toasts.md.
+-- and the sound plays at most once per SOUND_GAP. A Reaction to an entry
+-- whose Reaction toast is showing or waiting merges into it, and a shown
+-- one gets its full time again. See docs/design/toasts.md and
+-- docs/design/reactions.md.
 
 local _, ns = ...
 
@@ -19,8 +22,41 @@ function ToastQueue.new()
   return setmetatable({ pending = {}, shown = {} }, ToastQueue)
 end
 
--- A live Feed entry to show.
+-- The Reaction toast showing or waiting for this entry, and whether it's
+-- showing.
+local function reactionFor(self, entryKey)
+  for _, toast in ipairs(self.shown) do
+    if toast.entry and toast.entry.entryKey == entryKey then return toast.entry, toast end
+  end
+  for _, entry in ipairs(self.pending) do
+    if entry.entryKey == entryKey then return entry end
+  end
+end
+
+-- Adds a Member's name to a Reaction toast: "Bob and Cleo cheered your
+-- ding to 30".
+local function merge(target, news)
+  for _, name in ipairs(target.names) do
+    if name == news.name then return false end
+  end
+  target.names[#target.names + 1] = news.name
+  target.text = ns.Reactions.text(target.names, target.phrase)
+  return true
+end
+
+-- A live Feed entry, or a Reaction from Core's reaction event, to show.
 function ToastQueue:push(entry)
+  if entry.entryKey then
+    local target, toast = reactionFor(self, entry.entryKey)
+    if target then
+      if merge(target, entry) and toast then toast.renew = true end
+      return
+    end
+    local copy = {}
+    for k, v in pairs(entry) do copy[k] = v end
+    copy.names = { entry.name }
+    entry = copy
+  end
   self.pending[#self.pending + 1] = entry
 end
 
@@ -80,6 +116,19 @@ end
 local function restart(toast, now)
   toast.expiresAt = now + ToastQueue.DURATION
   toast.left = ToastQueue.DURATION
+  toast.renew = nil
+end
+
+-- Restarts the toasts a merged Reaction renewed. Returns whether any.
+local function renew(self, now)
+  local any = false
+  for _, toast in ipairs(self.shown) do
+    if toast.renew then
+      restart(toast, now)
+      any = true
+    end
+  end
+  return any
 end
 
 local function expire(self, now)
@@ -139,7 +188,8 @@ end
 -- combat. Returns whether the toasts on screen changed, and whether to
 -- play the sound.
 function ToastQueue:update(now, inCombat)
-  local changed = expire(self, now)
+  local renewed = renew(self, now)
+  local changed = expire(self, now) or renewed
   local showed = not inCombat and fill(self, now)
   local sound = false
   if showed and (not self.lastSound or now - self.lastSound >= ToastQueue.SOUND_GAP) then
