@@ -190,7 +190,18 @@ function Sim.start(core)
   net = ns.FakeNet.new({ clock = now, maxLevel = GetMaxLevelForPlayerExpansion() })
   local you = net:attach(core)
   yourId = core.ledger:memberId()
-  ns.ChannelLink.onSend = function(message) net:broadcast(you, message) end
+  -- The simulated Members only belong to the Crew the sim started in. Once
+  -- you leave it (or join another), nothing more passes between them and
+  -- you, or your Core would take their records into the new Crew and relay
+  -- them to its real Members.
+  local code = crew.code
+  local function inSimCrew()
+    local current = core:crew()
+    return current ~= nil and current.code == code
+  end
+  ns.ChannelLink.onSend = function(message)
+    if inSimCrew() then net:broadcast(you, message) end
+  end
   members = {}
   local current = members
   for i, spec in ipairs(MEMBERS) do
@@ -205,7 +216,10 @@ function Sim.start(core)
       end)
     end
   end
-  ticker = C_Timer.NewTicker(1, function() net:step(GetServerTime()) end)
+  ticker = C_Timer.NewTicker(1, function()
+    if not inSimCrew() then return Sim.stop(true) end
+    net:step(GetServerTime())
+  end)
   ns.Console.open(core)
   return true
 end
@@ -411,16 +425,56 @@ function Sim.goal(core)
   end
 end
 
--- Logs the simulated Members out; you see them go offline.
-function Sim.stop()
+-- Logs the simulated Members out; you see them go offline. abandoned (you
+-- left the sim's Crew) drops whatever is still on the wire instead, so
+-- none of it reaches you.
+function Sim.stop(abandoned)
   if not net then return end
-  for _, client in ipairs(members) do
-    if client.core then client:logout() end
+  if abandoned then
+    net.queue = {}
+  else
+    for _, client in ipairs(members) do
+      if client.core then client:logout() end
+    end
+    net:step(GetServerTime())
   end
-  net:step(GetServerTime())
   ticker:Cancel()
   ns.ChannelLink.onSend = nil
   net, ticker, members = nil, nil, nil
+end
+
+-- Whether a record is one of the simulated Members': their Characters'
+-- GUIDs all come from guidFor.
+local function isSimulated(record)
+  local any = false
+  for _, held in pairs(record.characters or {}) do
+    if type(held.guid) ~= "string" or not held.guid:find("^Player%-0%-Sim%d") then
+      return false
+    end
+    any = true
+  end
+  return any
+end
+
+-- Clears simulated Members out of a real Crew they leaked into (the sim
+-- once kept running after you left its Crew): each one held gets a newer
+-- record saying they left, as if they had sent it themselves, so your Core
+-- stops showing them and gossip carries it to the other Members. Returns
+-- how many, or nil and "running".
+function Sim.purge(core)
+  if net then return nil, "running" end
+  local count = 0
+  for id, record in core.ledger:records() do
+    if id ~= core.ledger:memberId() and not record.left and isSimulated(record) then
+      local tombstone = {
+        id = id, version = math.max(GetServerTime(), record.version + 1),
+        displayName = record.displayName, left = true,
+      }
+      core:received(ns.Codec.encode({ type = "DATA", from = id, records = { tombstone } }))
+      count = count + 1
+    end
+  end
+  return count
 end
 
 -- Console: the dev window. Watching starts the first time it opens, by
@@ -735,10 +789,17 @@ local SAMPLE_TOASTS = {
 }
 
 -- /bffdev toggles the console; /bffdev toast [n] shows n sample toasts
--- (default 1), straight to the toasts and not through Core.
+-- (default 1), straight to the toasts and not through Core; /bffdev purge
+-- runs Sim.purge.
 SlashCmdList.BFFDEV = function(input)
   if not ns.core then return end
   local command, count = (input or ""):match("^%s*(%S*)%s*(%d*)")
+  if command == "purge" then
+    local purged = Sim.purge(ns.core)
+    print(purged and ("BFF: %d simulated Members marked as left."):format(purged)
+      or "BFF: stop the sim first (/bff sim stop).")
+    return
+  end
   if command == "toast" then
     for i = 1, tonumber(count) or 1 do
       ns.Toasts.show(SAMPLE_TOASTS[(i - 1) % #SAMPLE_TOASTS + 1])
