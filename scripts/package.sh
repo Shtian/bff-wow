@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Builds the release zip and release.json for BFF <version> and uploads both to
-# the GitHub release bff@<version>. Bumpy runs this as the package's
+# Builds the release zip and release.json for BFF <version>, uploads the zip to
+# CurseForge (when CF_API_KEY and CURSEFORGE_PROJECT_ID are set) and uploads
+# both to the GitHub release bff@<version>. Bumpy runs this as the package's
 # publishCommand, after it has created that release as a draft and before it
 # finalises it.
 #
@@ -42,20 +43,34 @@ work="$(mktemp -d)"
 trap 'git tag -d "$tag" >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
 git tag -f "$tag" >/dev/null
 
-# Build only (-d): the packager fetches the .pkgmeta externals, leaves out the
-# ignored paths and writes .release/BFF-v<version>.zip. Bumpy owns the release.
+# The packager fetches the .pkgmeta externals, leaves out the ignored paths and
+# writes .release/BFF-v<version>.zip. Bumpy owns the GitHub release, so the
+# packager only ever uploads to CurseForge: with -p and CF_API_KEY it uploads
+# the zip there (game versions from the .toc's interfaces, changelog from
+# .pkgmeta's manual-changelog); otherwise it builds only (-d). The other hosts'
+# tokens are unset so it never uploads anywhere else.
 # Run it as if outside Actions: on a branch push it skips building when HEAD has
 # a tag ("Found future tag"), expecting a tag build to follow, and our build tag
 # is on HEAD. Outside Actions it only loses its log groups and step outputs.
+packager_args=(-r "$release_dir")
+if $upload && [[ -n "${CF_API_KEY:-}" && -n "${CURSEFORGE_PROJECT_ID:-}" ]]; then
+  packager_args+=(-p "$CURSEFORGE_PROJECT_ID")
+else
+  if $upload; then
+    echo "CF_API_KEY or CURSEFORGE_PROJECT_ID not set; skipping CurseForge" >&2
+  fi
+  packager_args+=(-d)
+fi
 curl -fsSL -o "$work/release.sh" \
   "https://raw.githubusercontent.com/BigWigsMods/packager/$PACKAGER_VERSION/release.sh"
-env -u GITHUB_ACTIONS bash "$work/release.sh" -d -r "$release_dir"
+env -u GITHUB_ACTIONS -u GITHUB_OAUTH -u GITHUB_API_TOKEN -u WOWI_API_TOKEN -u WAGO_API_TOKEN \
+  bash "$work/release.sh" "${packager_args[@]}"
 [[ -f "$release_dir/$zip" ]] || { echo "The packager didn't write $zip" >&2; exit 1; }
 
-# The packager only writes release.json (read by WowUp) in its upload step,
-# which -d skips, so write it here in the same format: one entry for the zip,
-# one metadata row per interface in the .toc, with the packager's flavour
-# names. BFF only ships for Forever and retail.
+# The packager only writes release.json (read by WowUp) in its GitHub upload
+# step, which never runs here, so write it here in the same format: one entry
+# for the zip, one metadata row per interface in the .toc, with the packager's
+# flavour names. BFF only ships for Forever and retail.
 interface_flavor() {
   case "$1" in
     16???) echo forever ;;

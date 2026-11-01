@@ -60,7 +60,7 @@ merge to main              -> bumpy ci release opens/updates the "Versioned rele
 merge the Versioned release PR
   -> release.yml: test.yml (luacheck, busted), then bumpy ci release publishes:
        draft GitHub release for tag bff@X.Y.Z (notes from the bump files)
-       publishCommand: scripts/package.sh X.Y.Z
+       publishCommand: scripts/package.sh X.Y.Z (zip to CurseForge and the draft release)
        tag pushed, release finalised
 ```
 
@@ -80,8 +80,20 @@ Bumpy owns the tag, the GitHub release and its notes. The BigWigs packager only 
 
 1. Create a local tag `v<version>`, so the packager's `@project-version@` (used in `## Version:`) becomes `v0.1.0` rather than `bff@0.1.0`. It's never pushed.
 2. Run the packager (pinned to a release tag) in build-only mode (`-d`): fetch the `.pkgmeta` externals and write `BFF-v<version>.zip`, leaving out `tests/`, `Dev/`, `scripts/`, `.bumpy/`, `package.json`, `package-lock.json` and `node_modules/`.
-3. Write `release.json` with `jq` in the packager's format: one entry for the zip, with a metadata row per interface in the `.toc` (`forever` for `16001`, `mainline` for `120105`). The packager only writes it in its own upload step, which `-d` skips.
+3. Write `release.json` with `jq` in the packager's format: one entry for the zip, with a metadata row per interface in the `.toc` (`forever` for `16001`, `mainline` for `120105`). The packager only writes it in its GitHub upload step, which never runs here.
 4. `gh release upload bff@<version>` with the zip and `release.json`.
+
+When `CF_API_KEY` and `CURSEFORGE_PROJECT_ID` are both set, step 2 runs without `-d` and with `-p <project id>`, so the packager also uploads the zip to CurseForge. That happens before step 4, so a failed CurseForge upload stops the publish with the GitHub release still a draft. If either is missing, the script says so and builds only. The packager also uploads to GitHub, WoWInterface and Wago when it finds their tokens, so the script unsets those: bumpy owns the GitHub release, and BFF isn't on the other two.
+
+On CurseForge the file is a `release` (the build tag `v<version>` has no alpha or beta in it). Its changelog is `CHANGELOG.md` (`manual-changelog`), and its game versions come from the `.toc`'s interfaces: Forever (CurseForge's game version type 88568) for `16001`, retail for `120105`. When CurseForge doesn't list the exact version, the packager picks the closest lower one.
+
+### CurseForge setup
+
+1. Create the project on CurseForge (authors.curseforge.com → Create Project, game World of Warcraft) and wait for approval.
+2. Make an API token at authors.curseforge.com → API tokens.
+3. In the GitHub repo: the token as the **secret** `CF_API_KEY`, the numeric project ID (on the project page, "Project ID") as the **variable** `CURSEFORGE_PROJECT_ID` (Settings → Secrets and variables → Actions).
+
+The project ID lives in a repo variable, not as `## X-Curse-Project-ID:` in the `.toc`, so turning CurseForge on doesn't need a release.
 
 Bumpy creates the draft release, runs the `publishCommand`, then finalises the release and pushes the tag, so the upload goes to a **draft** release whose tag doesn't exist on the remote yet. A dry run on 2026-10-31 proved that works: `gh release upload` found a draft by its pending tag name and attached both files, and no tag was created.
 
@@ -93,6 +105,7 @@ The released `.toc` keeps `## Interface: 16001, 120105` and has no `AllowLoadGam
 
 ### Installing
 
+- **CurseForge app** (and WowUp's CurseForge search): once the project is set up, as above.
 - **WowUp:** add the GitHub repo URL; WowUp reads `release.json` from the latest release.
 - **By hand:** download the zip from GitHub releases and unzip it into `Interface\AddOns`.
 
