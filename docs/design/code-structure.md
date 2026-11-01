@@ -30,12 +30,12 @@ Core is created with:
 - `listener`: receives Core's events.
 - `initialLogin`: `isInitialLogin` from `PLAYER_ENTERING_WORLD`, so Core can tell a login from a reload (see `docs/design/feed.md`).
 - `maxLevel`: from `GetMaxLevelForPlayerExpansion()`, for max level Feed entries.
-- `utcOffset`: how many seconds local time is ahead of server time, so `feed()` starts each day at local midnight (default 0).
+- `utcOffset`: how many seconds local time is ahead of server time, so `feed()` starts each day at local midnight and `playTimes()` shows local hours (default 0).
 
 Inputs:
 
 - `updateOwn(character)`: the current state of the Character being played, from Snapshot.
-- `tick()`: once a second. Core decides what is due (reply delays, debounced sends, heartbeat, online timeouts, pruning).
+- `tick()`: once a second. Core decides what is due (reply delays, debounced sends, heartbeat, online timeouts, pruning), and counts the second towards Play times.
 - `received(string)`, `up()`, `down()` and `gone(name)`: the incoming half of the link port.
 - Commands: start, join and leave a Crew, change the display name, Set as Main, Remove and re-add a Member, Pause sharing, and settings (see `docs/design/joining-a-crew.md`).
 
@@ -50,7 +50,7 @@ Outputs:
   - `notice(kind)`: one-off messages ("BFF is out of date", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
 - Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isPaused()`, `isMinimapShown()`, `isChatLinesOn()`, `isAwayPopupOn()`, `isToastsOn()`, `toastSound()` and `toastPosition()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
-- Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), `goals()` (the Goals tab's row per Crew goal track, `docs/design/goals.md`), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
+- Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), `goals()` (the Goals tab's row per Crew goal track, `docs/design/goals.md`), `playTimes(memberId?)` (the When tab's grid for the Crew or one Member, `docs/design/play-times.md`), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
 - `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` or `awaySummary`.
 - `react(key)` reacts to someone else's Feed entry, with a key from `feed()` or the summary.
 
@@ -64,6 +64,7 @@ These are internal seams: separate files for locality, tested only through Core'
 - **Reactions** (`Core/Reactions.lua`): the pure parts of Reactions: which Reaction each entry kind has, the key a Reaction points at an entry by, how keys are stored in a record and pruned, and the wording the owner sees. Feed attaches Reactions to its entries. See `docs/design/reactions.md`.
 - **Settle** (`Core/Settle.lua`): when sync has gone quiet after the link came up (10 s with no new DATA, at most 30 s). Feed uses it for While you were away, Goals for its silent baseline.
 - **Goals** (`Core/Goals.lua`): the built-in Crew goal tracks and their rungs, progress worked out from Ledger's records, the reached rungs, the silent baseline and the Goals tab's rows. See `docs/design/goals.md`.
+- **PlayTimes** (`Core/PlayTimes.lua`): counts the own Member's seconds played per UTC hour of the week for the last 4 weeks, makes the summary their record shares, ages summaries by the viewer's clock and shifts them into local time. See `docs/design/play-times.md`.
 - **Roster** (`Core/Roster.lua`): builds panel rows from Ledger. Covers Main resolution, "on alt", online (heard within 12 min, and not seen leaving the channel since), Last seen, "can play with you" (±3 levels), the 30-day hide and sorting.
 - **CrewCode** (`Core/CrewCode.lua`): generates, normalises and checks Crew codes, and derives the channel name and password from them.
 - **Codec** (`Core/Codec.lua`): a plain-text protocol version header, then the LibSerialize + LibDeflate body (`1|<payload>`). A newer version is detected before anything is decoded.
@@ -127,7 +128,7 @@ Not embedded: AceDB (Core owns plain SavedVariables), AceConsole and AceEvent (a
 BFF.toc
 BFF.lua
 Bindings.xml                         -- key binding to open the panel
-Core/  Core.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  Feed.lua  Roster.lua  Goals.lua  CrewCode.lua  Codec.lua
+Core/  Core.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  Feed.lua  Roster.lua  Goals.lua  PlayTimes.lua  CrewCode.lua  Codec.lua
 Game/  Snapshot.lua  ChannelLink.lua
 UI/    Skin.lua  Panel.lua  Minimap.lua  Away.lua  ToastQueue.lua  Toasts.lua  Settings.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases

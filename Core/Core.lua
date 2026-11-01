@@ -57,6 +57,9 @@ function Core.new(deps)
     self.link.send(ns.Codec.encode(message))
   end)
   self.gossip:setPaused(self:isPaused())
+  self.playTracker = ns.PlayTimes.new(deps.db, deps.now)
+  -- The own record's Play times may be out of date until the first tick.
+  self.playTimesDue = true
   self.online = ns.Roster.online(self.ledger, deps.now())
   return self
 end
@@ -94,6 +97,14 @@ local function checkGoals(self, quiet)
   if #reached > 0 then announce(self, self.log:goalsReached(reached)) end
 end
 
+-- Writes the Play times summary into the own record, if it may have
+-- changed and the record exists. Returns true if the record changed.
+local function writePlayTimes(self)
+  if not (self.playTimesDue and self.ledger:own()) then return false end
+  self.playTimesDue = false
+  return self.ledger:setPlayTimes(self.playTracker:summary())
+end
+
 -- The own record's display name or left flag changed: it goes out now.
 local function sendOwnNow(self)
   self.gossip:ownChanged("now")
@@ -103,6 +114,11 @@ end
 -- name, classFilename, level, xp, maxXp, zone and deaths.
 function Core:updateOwn(character)
   local changed, before = self.ledger:updateOwn(character)
+  -- The first report after login carries the Play times along.
+  if writePlayTimes(self) and not changed then
+    self.gossip:ownChanged("later")
+    self.listener("changed")
+  end
   if changed then
     -- Your own events go into the Feed only while in a Crew.
     if self.db.crew then self.log:ownChanged(before, character.guid) end
@@ -171,8 +187,15 @@ local function awaySummary(self)
   self.listener("changed")
 end
 
+
 -- Called once a second. Core decides what is due.
 function Core:tick()
+  -- Counts the second played. A changed summary rides the next send.
+  if self.playTracker:tick() then self.playTimesDue = true end
+  if writePlayTimes(self) then
+    self.gossip:ownChanged("later")
+    self.listener("changed")
+  end
   self.gossip:tick()
   if self.log:tick() then awaySummary(self) end
   if self.db.crew and self.crewGoals:tick() then self.listener("changed") end
@@ -201,6 +224,73 @@ end
 -- reacted), reacted (you have) and canReact (not yours, and it has a key).
 function Core:feed()
   return self.log:view(self.utcOffset)
+end
+
+local function emptyGrid(values)
+  for _, value in ipairs(values) do
+    if value > 0 then return false end
+  end
+  return true
+end
+
+-- A Member "usually plays" an hour played in at least this many of the
+-- last 4 weeks.
+local USUALLY = 2
+
+-- The When tab, in the viewer's local time: grid (7 days from Monday, each
+-- 24 hours from 00:00), max (the most a cell can hold) and empty (every
+-- cell 0). Without memberId, the Crew: each cell counts the Members your
+-- Roster shows who usually play then, out of members. With one, that
+-- Member's weeks played (0–4) per hour, displayName, collectingSince (when
+-- they started, while under a week ago) and noData (their BFF shares no
+-- Play times); nil for a Member the Roster doesn't show.
+function Core:playTimes(memberId)
+  local now = self.now()
+  local PlayTimes = ns.PlayTimes
+  local rows = ns.Roster.rows(self.ledger, now)
+  local function weeks(id)
+    local summary = self.ledger:record(id).playTimes
+    return summary and PlayTimes.weeksPlayed(summary, now), summary
+  end
+
+  if memberId == nil then
+    local counts = {}
+    for slot = 1, 7 * 24 do counts[slot] = 0 end
+    for _, row in ipairs(rows) do
+      local played = weeks(row.memberId)
+      for slot = 1, played and #played or 0 do
+        if played[slot] >= USUALLY then counts[slot] = counts[slot] + 1 end
+      end
+    end
+    return {
+      grid = PlayTimes.grid(counts, self.utcOffset),
+      max = #rows,
+      members = #rows,
+      empty = emptyGrid(counts),
+    }
+  end
+
+  for _, row in ipairs(rows) do
+    if row.memberId == memberId then
+      local played, summary = weeks(memberId)
+      if not played then
+        played = {}
+        for slot = 1, 7 * 24 do played[slot] = 0 end
+      end
+      local since = summary and summary.since
+      return {
+        memberId = memberId,
+        displayName = row.displayName,
+        own = row.own == true,
+        grid = PlayTimes.grid(played, self.utcOffset),
+        max = PlayTimes.WEEKS,
+        empty = emptyGrid(played),
+        noData = summary == nil,
+        collectingSince = since and now - since < PlayTimes.WEEK and since or nil,
+      }
+    end
+  end
+  return nil
 end
 
 -- How many of others' Feed entries, and Reactions to your own, haven't

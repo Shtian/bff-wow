@@ -16,6 +16,7 @@ Libs/LibDBIcon-1.0/lib.xml
 
 Core/Codec.lua
 Core/CrewCode.lua
+Core/PlayTimes.lua
 Core/Ledger.lua
 Core/Gossip.lua
 Core/Settle.lua

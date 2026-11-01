@@ -59,6 +59,10 @@ _Avoid_: Like, emote, kudos
 A small on-screen notice for a live Feed entry or a Reaction to one of your entries, with an optional sound. Shows the same things as the chat line.
 _Avoid_: Popup, alert, notification (when meaning a toast)
 
+**Play times**:
+The hours of the week a Member usually plays, from the last 4 weeks of their own client's counting, across all their Characters. A Member **usually plays** an hour they played at least 10 minutes in, in at least 2 of those weeks.
+_Avoid_: Schedule, availability, activity
+
 **Last seen**:
 When a Member or Character was last played, as reported by that Member's own client rather than observed by others.
 _Avoid_: Last online, last active

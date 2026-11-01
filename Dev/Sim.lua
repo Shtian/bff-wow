@@ -84,6 +84,30 @@ local function playHistory(client, i, spec, yourLevel, now)
   if spec.main then client.core:setMain(guidFor(i, spec.main)) end
 end
 
+-- Four weeks of made-up Play times for the When tab: each Member has
+-- their own evening hours (UTC) and plays most weeks, plus weekend
+-- afternoons now and then.
+local function playTimesHistory(i, now)
+  local PlayTimes = ns.PlayTimes
+  local current = PlayTimes.week(now)
+  local weeks = {}
+  for age = 0, PlayTimes.WEEKS - 1 do
+    local week = current - age
+    local slots = {}
+    for day = 0, 6 do
+      for hour = 0, 23 do
+        local evening = day < 5 and hour >= 17 + i and hour <= 20 + i
+        local weekend = day >= 5 and hour >= 12 + i and hour <= 15 + i
+        if (evening and (week + day + i) % 3 ~= 0) or (weekend and (week + i) % 2 == 0) then
+          slots[day * 24 + hour + 1] = 20 * 60
+        end
+      end
+    end
+    weeks[week] = slots
+  end
+  return { since = now - 30 * 24 * 60 * 60, weeks = weeks }
+end
+
 -- Starts the simulated Members. Returns true, or nil and "running" or
 -- "notAlone".
 function Sim.start(core)
@@ -101,7 +125,7 @@ function Sim.start(core)
   members = {}
   local current = members
   for i, spec in ipairs(MEMBERS) do
-    local client = net:add(spec.name)
+    local client = net:add(spec.name, { db = { playTimes = playTimesHistory(i, now) } })
     client.characters = {}
     playHistory(client, i, spec, yourLevel, now)
     client:join(crew.code)

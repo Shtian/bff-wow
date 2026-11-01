@@ -164,6 +164,10 @@ function commands.goals()
   ns.Panel.show("goals")
 end
 
+function commands.when()
+  ns.Panel.showWhen(nil)
+end
+
 function commands.settings()
   ns.Settings.open()
 end
@@ -209,7 +213,7 @@ SlashCmdList.BFF = function(input)
   elseif commands[command] then
     commands[command](rest)
   else
-    say("/bff, /bff feed, /bff goals, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
+    say("/bff, /bff feed, /bff goals, /bff when, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
   end
 end
 

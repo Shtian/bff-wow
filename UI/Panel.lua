@@ -1,13 +1,15 @@
 -- Panel: the BFF window, in the Skin's flat look. Without a Crew it shows
 -- the setup view (display name, Start or Join); in one, a sidebar with
--- Roster, Feed, Goals and Settings. The Roster has your own row pinned on top,
+-- Roster, Feed, Goals, When and Settings. The Roster has your own row pinned on top,
 -- then a row per Member with expandable Alts, a sort menu, a tooltip and
 -- right-click menu per Character, and a footer with the hidden count,
 -- removed Members and the Crew code. The Feed is a timeline
 -- of Core's entries by day, an icon per kind, who reacted to each and a
 -- button to react, and marks them seen while open. Goals has a row per
 -- Crew goal track: the next rung, a progress bar with numbers and the last
--- rung reached. It never sees a Member record.
+-- rung reached. When is a heatmap of the week in local time: how many
+-- Members usually play each hour, or one Member's weeks played, picked
+-- from a menu. It never sees a Member record.
 
 local _, ns = ...
 
@@ -46,6 +48,11 @@ local FEED_EMPTY = "Nothing yet. Dings, deaths and new Characters show up here."
 local GOALS_INTRO = "Reached together: everyone's progress counts."
 local GOAL_ROW = 74
 local GOAL_BAR = 6
+-- The When grid: a cell per hour, a row per day.
+local WHEN_CELL = 11
+local WHEN_ROW = 15
+local WHEN_DAYS = 30
+local DAY_NAMES = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" }
 
 local GOLD = Skin.GOLD
 local MUTED = Skin.MUTED
@@ -65,6 +72,7 @@ local section
 local rosterView
 local feedView
 local goalsView
+local whenView
 local footer
 local rowFrames = {}
 local altFrames = {}
@@ -72,6 +80,8 @@ local altFrames = {}
 -- Alts, and which Feed entries were unseen when the Feed was opened (they
 -- keep their "new" tag until you leave the Feed).
 local tab = "roster"
+-- The When tab's Member, or nil for the Crew.
+local whenMember
 local order = "online"
 local expanded = {}
 local fresh = {}
@@ -170,6 +180,7 @@ local function showMenu(owner)
       root:CreateButton("Whisper", function() whisper(character.name) end):SetEnabled(character.playing)
       root:CreateButton("Invite", function() invite(character.name) end):SetEnabled(character.playing)
       local name = row.displayName or character.name
+      root:CreateButton(("When does %s play?"):format(name), function() Panel.showWhen(row.memberId) end)
       root:CreateButton(("Remove %s..."):format(name), function()
         StaticPopup_Show("BFF_REMOVE_MEMBER", name, nil, row.memberId)
       end)
@@ -410,12 +421,13 @@ local function drawSection()
   section.sort:SetWidth(section.sort.label:GetStringWidth() + 16)
 end
 
--- The sidebar: Roster and Feed on top, Settings at the bottom, each with a
+-- The sidebar: Roster, Feed, Goals and When on top, Settings at the bottom, each with a
 -- greyed game icon tinted like its label.
 local NAV_ICONS = {
   roster = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
   feed = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon",
   goals = Skin.FEED_ICONS.goal,
+  when = "Interface\\FriendsFrame\\StatusIcon-Away",
   settings = "Interface\\Buttons\\UI-OptionsButton",
 }
 
@@ -467,6 +479,9 @@ local function createNav()
   nav.goals = navButton("Goals", NAV_ICONS.goals, open("goals"))
   nav.goals:SetPoint("TOPLEFT", nav.feed, "BOTTOMLEFT")
   nav.goals:SetPoint("TOPRIGHT", nav.feed, "BOTTOMRIGHT")
+  nav.when = navButton("When", NAV_ICONS.when, open("when"))
+  nav.when:SetPoint("TOPLEFT", nav.goals, "BOTTOMLEFT")
+  nav.when:SetPoint("TOPRIGHT", nav.goals, "BOTTOMRIGHT")
   -- The panel steps aside so it doesn't cover the settings.
   nav.settings = navButton("Settings", NAV_ICONS.settings, function()
     if ns.Settings.open() then frame:Hide() end
@@ -480,6 +495,7 @@ local function drawNav(unseen)
   setSelected(nav.roster, tab == "roster")
   setSelected(nav.feed, tab == "feed")
   setSelected(nav.goals, tab == "goals")
+  setSelected(nav.when, tab == "when")
   setSelected(nav.settings, false)
   nav.feed.badge:SetText(unseen)
   nav.feed.badge:SetShown(unseen > 0 and tab ~= "feed")
@@ -761,6 +777,169 @@ local function drawGoals()
   goalsView:Show()
 end
 
+-- When: a menu to pick the Crew or a Member, a line saying what the
+-- grid shows, the grid, a legend and a note when there's little data.
+local function showWhenMenu(owner)
+  MenuUtil.CreateContextMenu(owner, function(_, root)
+    root:CreateTitle("Show")
+    root:CreateRadio("The Crew", function() return whenMember == nil end, function()
+      whenMember = nil
+      Panel.refresh()
+    end)
+    for _, row in ipairs(core:rows("name")) do
+      local label = row.own and "You" or row.displayName or row.name
+      root:CreateRadio(label, function() return whenMember == row.memberId end, function()
+        whenMember = row.memberId
+        Panel.refresh()
+      end)
+    end
+  end)
+end
+
+-- A cell's shade: faint when 0, then more gold the more it holds.
+local function shadeCell(cell, value, max)
+  if value <= 0 or max <= 0 then
+    cell.texture:SetColorTexture(1, 1, 1, 0.05)
+  else
+    cell.texture:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.2 + 0.8 * math.min(value / max, 1))
+  end
+end
+
+local function showCellTooltip(cell)
+  local view = whenView.data
+  if not view then return end
+  local value = view.grid[cell.day][cell.hour]
+  GameTooltip:SetOwner(cell, "ANCHOR_RIGHT")
+  GameTooltip:AddLine(("%s %02d:00-%02d:00"):format(DAY_NAMES[cell.day], cell.hour - 1, cell.hour % 24), 1, 1, 1)
+  if view.memberId then
+    local who = view.own and "You" or view.displayName or "They"
+    GameTooltip:AddLine(("%s played %d of the last 4 weeks"):format(who, value), MUTED[1], MUTED[2], MUTED[3])
+  else
+    GameTooltip:AddLine(("%d of %d Members usually play"):format(value, view.members), MUTED[1], MUTED[2], MUTED[3])
+  end
+  GameTooltip:Show()
+end
+
+local function createWhenView()
+  whenView = CreateFrame("Frame", nil, frame.content)
+  whenView:SetAllPoints()
+
+  whenView.pick = CreateFrame("Button", nil, whenView)
+  whenView.pick:SetHeight(20)
+  whenView.pick:SetPoint("TOPLEFT", INSET, -INSET)
+  Skin.border(whenView.pick, Skin.BORDER)
+  Skin.fill(whenView.pick, Skin.HOVER, "HIGHLIGHT")
+  whenView.pick.label = Skin.label(whenView.pick, "small", TEXT)
+  whenView.pick.label:SetPoint("CENTER")
+  whenView.pick:SetScript("OnClick", showWhenMenu)
+
+  whenView.intro = Skin.label(whenView, "small", MUTED)
+  whenView.intro:SetPoint("TOPLEFT", whenView.pick, "BOTTOMLEFT", 0, -8)
+  whenView.intro:SetWidth(CONTENT_WIDTH - 2 * INSET)
+  whenView.intro:SetWordWrap(true)
+  whenView.intro:SetJustifyH("LEFT")
+
+  local top = -INSET - 20 - 8 - 36
+  for hour = 0, 21, 3 do
+    local label = Skin.label(whenView, "tiny", DIM)
+    label:SetPoint("BOTTOMLEFT", whenView, "TOPLEFT", INSET + WHEN_DAYS + hour * WHEN_CELL, top + 2)
+    label:SetText(("%02d"):format(hour))
+  end
+  whenView.cells = {}
+  for day = 1, 7 do
+    local y = top - (day - 1) * WHEN_ROW
+    local label = Skin.label(whenView, "small", MUTED)
+    label:SetPoint("TOPLEFT", INSET, y - 1)
+    label:SetText(DAY_NAMES[day])
+    for hour = 1, 24 do
+      local cell = CreateFrame("Frame", nil, whenView)
+      cell:SetSize(WHEN_CELL - 1, WHEN_ROW - 2)
+      cell:SetPoint("TOPLEFT", INSET + WHEN_DAYS + (hour - 1) * WHEN_CELL, y)
+      cell.texture = cell:CreateTexture(nil, "ARTWORK")
+      cell.texture:SetAllPoints()
+      cell.day, cell.hour = day, hour
+      cell:EnableMouse(true)
+      cell:SetScript("OnEnter", showCellTooltip)
+      cell:SetScript("OnLeave", hideTooltip)
+      whenView.cells[#whenView.cells + 1] = cell
+    end
+  end
+
+  local below = top - 7 * WHEN_ROW - 10
+  whenView.fewer = Skin.label(whenView, "tiny", DIM)
+  whenView.fewer:SetPoint("TOPLEFT", INSET + WHEN_DAYS, below)
+  whenView.legend = {}
+  local anchor = whenView.fewer
+  for i = 1, 4 do
+    local swatch = whenView:CreateTexture(nil, "ARTWORK")
+    swatch:SetSize(WHEN_CELL - 1, WHEN_ROW - 2)
+    swatch:SetPoint("LEFT", anchor, "RIGHT", i == 1 and 6 or 1, 0)
+    whenView.legend[i] = { texture = swatch }
+    anchor = swatch
+  end
+  whenView.more = Skin.label(whenView, "tiny", DIM)
+  whenView.more:SetPoint("LEFT", anchor, "RIGHT", 6, 0)
+
+  whenView.note = Skin.label(whenView, "small", MUTED)
+  whenView.note:SetPoint("TOPLEFT", INSET, below - 24)
+  whenView.note:SetWidth(CONTENT_WIDTH - 2 * INSET)
+  whenView.note:SetWordWrap(true)
+  whenView.note:SetJustifyH("LEFT")
+end
+
+local function shortDate(time)
+  return (date("%d %b", time):gsub("^0", ""))
+end
+
+-- What the grid shows, and a note when there's little or nothing to see.
+local function whenTexts(view)
+  if not view.memberId then
+    local intro = ("How many of the %d Members usually play each hour: in 2 of the last 4 weeks. Your local time.")
+      :format(view.members)
+    local note = view.empty and "Nobody usually plays at any hour yet. It takes two weeks of play to show." or ""
+    return "The Crew", intro, note
+  end
+  local name = view.own and "You" or view.displayName or "?"
+  local intro = ("How many of the last 4 weeks %s played each hour. Your local time."):format(
+    view.own and "you" or name)
+  local note = ""
+  if view.noData then
+    note = ("%s's BFF doesn't share Play times yet."):format(name)
+  elseif view.collectingSince then
+    note = ("Collecting since %s: less than a week of data so far."):format(shortDate(view.collectingSince))
+  elseif view.empty then
+    note = "No hour played for 10 minutes or more in the last 4 weeks."
+  end
+  return name, intro, note
+end
+
+local function drawWhen()
+  if not whenView then createWhenView() end
+  local view = whenMember and core:playTimes(whenMember)
+  if not view then
+    whenMember = nil
+    view = core:playTimes()
+  end
+  whenView.data = view
+  local pick, intro, note = whenTexts(view)
+  whenView.pick.label:SetText("Show: " .. pick)
+  whenView.pick:SetWidth(whenView.pick.label:GetStringWidth() + 16)
+  whenView.intro:SetText(intro)
+  whenView.note:SetText(note)
+  for _, cell in ipairs(whenView.cells) do
+    shadeCell(cell, view.grid[cell.day][cell.hour], view.max)
+  end
+  whenView.fewer:SetText(view.memberId and "0" or "None")
+  whenView.more:SetText(view.memberId and "4 weeks" or "Everyone")
+  for i, swatch in ipairs(whenView.legend) do
+    shadeCell(swatch, i - 1, 3)
+  end
+  if GameTooltip:GetOwner() and GameTooltip:GetOwner():GetParent() == whenView then
+    showCellTooltip(GameTooltip:GetOwner())
+  end
+  whenView:Show()
+end
+
 local function create()
   frame = Skin.window("BFFPanel", WIDTH, TITLE)
   frame:SetPoint("CENTER")
@@ -950,7 +1129,7 @@ local function drawFooter(crew, summary)
   return height
 end
 
--- Hides every tab's view but the one named ("roster", "feed", "goals";
+-- Hides every tab's view but the one named ("roster", "feed", "goals", "when";
 -- nil hides them all). Each draw function shows its own.
 local function hideViewsBut(name)
   if name ~= "roster" then
@@ -959,6 +1138,7 @@ local function hideViewsBut(name)
   end
   if name ~= "feed" and feedView then feedView:Hide() end
   if name ~= "goals" and goalsView then goalsView:Hide() end
+  if name ~= "when" and whenView then whenView:Hide() end
 end
 
 local function drawRoster(crew, summary)
@@ -1023,6 +1203,9 @@ function Panel.refresh()
   elseif tab == "goals" then
     fresh = {}
     drawGoals()
+  elseif tab == "when" then
+    fresh = {}
+    drawWhen()
   else
     fresh = {}
     drawRoster(crew, summary)
@@ -1034,11 +1217,17 @@ function Panel.toggle()
   frame:SetShown(not frame:IsShown())
 end
 
--- Opens the panel on a tab: "roster", "feed" or "goals".
+-- Opens the panel on a tab: "roster", "feed", "goals" or "when".
 function Panel.show(name)
   if not frame then create() end
   tab = name
   if frame:IsShown() then Panel.refresh() else frame:Show() end
+end
+
+-- Opens the When tab on a Member, or the Crew for nil.
+function Panel.showWhen(memberId)
+  whenMember = memberId
+  Panel.show("when")
 end
 
 function Panel.start(theCore)
