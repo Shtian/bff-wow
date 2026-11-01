@@ -701,27 +701,32 @@ local function createGoalsView()
   goalsView.intro:SetPoint("TOPLEFT", INSET, -INSET)
   goalsView.intro:SetText(GOALS_INTRO)
   goalsView.rows = {}
-  for i = 1, 3 do
-    local row = CreateFrame("Frame", nil, goalsView)
-    row:SetHeight(GOAL_ROW)
-    row:SetPoint("TOPLEFT", 0, -INSET - 22 - (i - 1) * GOAL_ROW)
-    row:SetPoint("RIGHT")
-    Skin.edge(row, "TOP", Skin.LINE)
-    row.title = Skin.label(row, "body")
-    row.title:SetPoint("TOPLEFT", INSET, -12)
-    row.numbers = Skin.label(row, "text")
-    row.numbers:SetJustifyH("RIGHT")
-    row.numbers:SetPoint("TOPRIGHT", -INSET, -13)
-    row.bar = CreateFrame("StatusBar", nil, row)
-    row.bar:SetPoint("TOPLEFT", INSET, -36)
-    row.bar:SetPoint("RIGHT", -INSET, 0)
-    row.bar:SetHeight(GOAL_BAR)
-    row.bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-    Skin.fill(row.bar, { 1, 1, 1, 0.08 })
-    row.last = Skin.label(row, "small", MUTED)
-    row.last:SetPoint("TOPLEFT", row.bar, "BOTTOMLEFT", 0, -8)
-    goalsView.rows[i] = row
-  end
+end
+
+-- A track's row: title and numbers, the bar, and the last rung reached.
+local function goalRow(i)
+  local row = goalsView.rows[i]
+  if row then return row end
+  row = CreateFrame("Frame", nil, goalsView)
+  row:SetHeight(GOAL_ROW)
+  row:SetPoint("TOPLEFT", 0, -INSET - 22 - (i - 1) * GOAL_ROW)
+  row:SetPoint("RIGHT")
+  Skin.edge(row, "TOP", Skin.LINE)
+  row.title = Skin.label(row, "body")
+  row.title:SetPoint("TOPLEFT", INSET, -12)
+  row.numbers = Skin.label(row, "text")
+  row.numbers:SetJustifyH("RIGHT")
+  row.numbers:SetPoint("TOPRIGHT", -INSET, -13)
+  row.bar = CreateFrame("StatusBar", nil, row)
+  row.bar:SetPoint("TOPLEFT", INSET, -36)
+  row.bar:SetPoint("RIGHT", -INSET, 0)
+  row.bar:SetHeight(GOAL_BAR)
+  row.bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+  Skin.fill(row.bar, { 1, 1, 1, 0.08 })
+  row.last = Skin.label(row, "small", MUTED)
+  row.last:SetPoint("TOPLEFT", row.bar, "BOTTOMLEFT", 0, -8)
+  goalsView.rows[i] = row
+  return row
 end
 
 -- "Reached 200 on 14 Oct", or that nothing is yet.
@@ -740,9 +745,7 @@ local function drawGoal(row, goal)
     row.bar:SetMinMaxValues(0, 1)
     row.bar:SetValue(1)
   else
-    -- Everyone at level N counts Members; the others count up to the rung.
-    local unit = goal.track == "everyone" and " Members" or ""
-    row.numbers:SetText(("%d / %d%s"):format(goal.value, goal.goal, unit))
+    row.numbers:SetText(("%d / %d%s"):format(goal.value, goal.goal, goal.unit and " " .. goal.unit or ""))
     Skin.color(row.numbers, TEXT)
     row.bar:SetMinMaxValues(0, math.max(goal.goal, 1))
     row.bar:SetValue(math.min(goal.value, goal.goal))
@@ -754,9 +757,7 @@ end
 
 local function drawGoals()
   if not goalsView then createGoalsView() end
-  for i, goal in ipairs(core:goals()) do
-    if goalsView.rows[i] then drawGoal(goalsView.rows[i], goal) end
-  end
+  for i, goal in ipairs(core:goals()) do drawGoal(goalRow(i), goal) end
   goalsView:Show()
 end
 
@@ -949,14 +950,18 @@ local function drawFooter(crew, summary)
   return height
 end
 
-local function hideRoster()
-  if rosterView then rosterView:Hide() end
-  if footer then footer:Hide() end
+-- Hides every tab's view but the one named ("roster", "feed", "goals";
+-- nil hides them all). Each draw function shows its own.
+local function hideViewsBut(name)
+  if name ~= "roster" then
+    if rosterView then rosterView:Hide() end
+    if footer then footer:Hide() end
+  end
+  if name ~= "feed" and feedView then feedView:Hide() end
+  if name ~= "goals" and goalsView then goalsView:Hide() end
 end
 
 local function drawRoster(crew, summary)
-  if feedView then feedView:Hide() end
-  if goalsView then goalsView:Hide() end
   if not rosterView then rosterView = createScrollView() end
   local footerHeight = drawFooter(crew, summary)
   rosterView:ClearAllPoints()
@@ -1002,9 +1007,7 @@ function Panel.refresh()
   local crew = core:crew()
   layout(crew ~= nil)
   if not crew then
-    hideRoster()
-    if feedView then feedView:Hide() end
-    if goalsView then goalsView:Hide() end
+    hideViewsBut(nil)
     showSetup()
     return
   end
@@ -1014,13 +1017,10 @@ function Panel.refresh()
   frame.headerRight:SetText(("%d of %d online"):format(summary.online, summary.members))
   local feed = core:feed()
   drawNav(feed.unseen)
+  hideViewsBut(tab)
   if tab == "feed" then
-    hideRoster()
-    if goalsView then goalsView:Hide() end
     drawFeed(feed)
   elseif tab == "goals" then
-    hideRoster()
-    if feedView then feedView:Hide() end
     fresh = {}
     drawGoals()
   else

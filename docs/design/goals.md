@@ -24,6 +24,7 @@ Each client works out three built-in goal tracks from the Member records it alre
 - Reached rungs are kept in `db.goals` (account-wide) with when they were reached. A reached rung **stays reached** even if progress drops (a level-1 Member joins, someone is Removed); the track just moves on to the rung above the highest reached.
 - A newly reached rung makes **one Crew-wide Feed entry**, kind `goal`, with no Member: "The Crew reached 300 Crew levels!", "Everyone in the Crew has a Character at 20!" ("… at max level!" for the last rung), "The Crew has died 100 times together!". It's highlighted in gold like max level and joined, has no Reaction, and goes the usual ways: chat line, toast (same sound and settings), or While you were away when it arrives while settling or with both off.
 - Several rungs crossed at once (after being away) are each recorded, but make **one entry per track**, for the highest.
+- **Only progress is news.** A rung reached because *who counts* changed (a Member first seen after the baseline, one Leaving or coming back, or one you Remove) is recorded quietly, with no entry. Like the Feed's first sight of a Member, a new Member's levels aren't something the Crew did together, and a toast celebrating someone leaving would read wrong.
 
 ### Silent baseline
 

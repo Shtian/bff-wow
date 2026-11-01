@@ -223,8 +223,7 @@ describe("Crew goals", function()
     net:run(3)
     a:play({ level = 30 })
     net:run(3)
-    -- Only Everyone at 20, from Cid's removal.
-    assert.same({ "Everyone in the Crew has a Character at 20!" }, goalTexts(a))
+    assert.same({}, goalTexts(a))
   end)
 
   it("leave out Left and Removed Members", function()
@@ -239,8 +238,8 @@ describe("Crew goals", function()
     assert.equal(45, rows.crewLevels.value)
     assert.equal(3, rows.deaths.value)
     assert.equal(2, rows.everyone.goal)
-    -- Removing the lowest Member lets everyone reach 10.
-    assert.same({ "Everyone in the Crew has a Character at 10!" }, goalTexts(a))
+    -- Removing the lowest Member reaches Everyone at 10, quietly.
+    assert.equal(10, rows.everyone.last.rung)
 
     b.core:leaveCrew()
     net:run(3)
@@ -248,6 +247,31 @@ describe("Crew goals", function()
     assert.equal(30, rows.crewLevels.value)
     assert.equal(1, rows.deaths.value)
     assert.equal(1, rows.everyone.goal)
+    assert.equal(30, rows.everyone.last.rung)
+    assert.same({}, goalTexts(a))
+  end)
+
+  it("are reached quietly when a Member is first seen after the baseline", function()
+    local net, clients = crew({ "Ann", "Bob" }, { Ann = { level = 30 }, Bob = { level = 15 } })
+    local a = clients[1]
+    assert.equal(45, goals(a).crewLevels.value)
+
+    local d = net:add("Dan", { character = playing("Dan", { level = 40 }) }):login()
+    d:join(a.core:crew().code)
+    net:run(10)
+    local rows = goals(a)
+    assert.equal(85, rows.crewLevels.value)
+    assert.equal(50, rows.crewLevels.last.rung)
+    assert.same({}, goalTexts(a))
+    assert.same({}, chatLines(a))
+
+    -- Progress after that is news again.
+    d:play({ level = 45 })
+    net:run(3)
+    assert.same({}, goalTexts(a))
+    d:play({ level = 56 })
+    net:run(3)
+    assert.same({ "The Crew reached 100 Crew levels!" }, goalTexts(a))
   end)
 
   it("stop Everyone at level N at max level and show it complete", function()

@@ -243,23 +243,13 @@ function Feed:ownChanged(was, guid)
   return insert(self, list)
 end
 
--- The text of a Crew goal entry, by track.
-local GOAL_TEXT = {
-  crewLevels = "The Crew reached %d Crew levels!",
-  everyone = "Everyone in the Crew has a Character at %d!",
-  deaths = "The Crew has died %d times together!",
-}
-
--- Crew goals were reached: one Crew-wide entry each ({ track, rung, top },
--- top when it is the track's last rung), naming no Member. They are news
--- like any other Member's entry. Returns the new entries.
+-- Crew goals were reached: one Crew-wide entry each ({ track, rung, text }
+-- from Goals), naming no Member. They are news like any other Member's
+-- entry. Returns the new entries.
 function Feed:goalsReached(reached)
   local list = {}
   for _, goal in ipairs(reached) do
-    local text = goal.track == "everyone" and goal.top
-      and "Everyone in the Crew has a Character at max level!"
-      or GOAL_TEXT[goal.track]:format(goal.rung)
-    list[#list + 1] = { kind = "goal", time = self.now(), track = goal.track, rung = goal.rung, text = text }
+    list[#list + 1] = { kind = "goal", time = self.now(), track = goal.track, rung = goal.rung, text = goal.text }
   end
   return insert(self, list)
 end

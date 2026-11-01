@@ -251,44 +251,44 @@ local function line(pool, index)
   return item
 end
 
--- Your Crew noticed, from y down. Returns the y below it.
-local function drawNoticed(noticed, y)
-  frame.noticed:SetShown(#noticed > 0)
-  for i = #noticed + 1, #lines do lines[i]:Hide() end
-  if #noticed == 0 then return y end
+-- A section of one-line items under a title (Your Crew noticed, Crew
+-- goals), from y down, with a line per text from the pool. Returns the y
+-- below it.
+local function drawSection(title, texts, pool, y)
+  title:SetShown(#texts > 0)
+  for i = #texts + 1, #pool do pool[i]:Hide() end
+  if #texts == 0 then return y end
   y = y - 10
-  frame.noticed:SetPoint("TOPLEFT", INSET, y)
+  title:SetPoint("TOPLEFT", INSET, y)
   y = y - NOTICED_TITLE
-  for i, notice in ipairs(noticed) do
-    local item = line(lines, i)
+  for i, text in ipairs(texts) do
+    local item = line(pool, i)
     item:ClearAllPoints()
     item:SetPoint("TOPLEFT", INSET, y)
     item:SetPoint("RIGHT", -INSET, 0)
-    item:SetText(Skin.reactionGlyph(notice.reaction, 14) .. "  " .. notice.text)
+    item:SetText(text)
     item:Show()
     y = y - NOTICED_LINE
   end
   return y - NOTICED_GAP
 end
 
--- Crew goals reached, in gold, from y down. Returns the y below it.
-local function drawGoals(goals, y)
-  frame.goals:SetShown(#goals > 0)
-  for i = #goals + 1, #goalLines do goalLines[i]:Hide() end
-  if #goals == 0 then return y end
-  y = y - 10
-  frame.goals:SetPoint("TOPLEFT", INSET, y)
-  y = y - NOTICED_TITLE
-  for i, goal in ipairs(goals) do
-    local item = line(goalLines, i)
-    item:ClearAllPoints()
-    item:SetPoint("TOPLEFT", INSET, y)
-    item:SetPoint("RIGHT", -INSET, 0)
-    item:SetText(GOAL .. "  " .. Skin.hex(Skin.GOLD) .. goal.text .. "|r")
-    item:Show()
-    y = y - NOTICED_LINE
+-- Your Crew noticed: each with its Reaction's icon.
+local function drawNoticed(noticed, y)
+  local texts = {}
+  for i, notice in ipairs(noticed) do
+    texts[i] = Skin.reactionGlyph(notice.reaction, 14) .. "  " .. notice.text
   end
-  return y - NOTICED_GAP
+  return drawSection(frame.noticed, texts, lines, y)
+end
+
+-- Crew goals reached, in gold.
+local function drawGoals(goals, y)
+  local texts = {}
+  for i, goal in ipairs(goals) do
+    texts[i] = GOAL .. "  " .. Skin.hex(Skin.GOLD) .. goal.text .. "|r"
+  end
+  return drawSection(frame.goals, texts, goalLines, y)
 end
 
 -- Shows the summary from Core's awaySummary: { members, goals, count,

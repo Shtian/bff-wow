@@ -86,10 +86,11 @@ local function announce(self, entries, reactions)
 end
 
 -- A record changed: Crew goals newly reached each make a Crew-wide Feed
--- entry, announced like any other.
-local function checkGoals(self)
+-- entry, announced like any other. Quiet when the Members counted changed
+-- rather than their progress: those rungs are only recorded.
+local function checkGoals(self, quiet)
   if not self.db.crew then return end
-  local reached = self.crewGoals:check()
+  local reached = self.crewGoals:check(quiet)
   if #reached > 0 then announce(self, self.log:goalsReached(reached)) end
 end
 
@@ -410,7 +411,7 @@ function Core:removeMember(id)
   self.gossip:forget(id)
   self.log:dropMember(id)
   self.online[id] = nil
-  checkGoals(self)
+  checkGoals(self, true)
   self.listener("changed")
   return true
 end
@@ -532,6 +533,8 @@ local function dataReceived(self, records, from)
       self.log:dataMerged()
       self.crewGoals:dataMerged()
       announce(self, self.log:recordChanged(before, record))
+      -- A Member first seen, leaving or back counts or stops counting.
+      if before == nil or (before.left == true) ~= (record.left == true) then checkGoals(self, true) end
     end
     if type(record) == "table" and type(record.id) == "string" and type(record.version) == "number" then
       self.gossip:recordSeen(record.id, record.version)
