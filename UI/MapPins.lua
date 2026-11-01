@@ -27,7 +27,10 @@ local function showTooltip(frame)
   GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
   GameTooltip:AddLine(pin.displayName or pin.name, 1, 1, 1)
   GameTooltip:AddLine(("%s, level %d"):format(pin.name, pin.level), Skin.classColor(pin.classFilename))
-  if pin.zone then GameTooltip:AddLine(pin.zone, Skin.MUTED[1], Skin.MUTED[2], Skin.MUTED[3]) end
+  -- Inside an instance the zone is usually the instance itself.
+  if pin.zone and pin.zone ~= pin.instance then
+    GameTooltip:AddLine(pin.zone, Skin.MUTED[1], Skin.MUTED[2], Skin.MUTED[3])
+  end
   if pin.instance then
     GameTooltip:AddLine("in " .. pin.instance, Skin.MUTED[1], Skin.MUTED[2], Skin.MUTED[3])
   end

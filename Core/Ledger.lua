@@ -107,9 +107,10 @@ function Ledger:touch()
   return true
 end
 
--- Positions are kept to 0.1% of the map, so standing still isn't a change.
+-- Positions are kept to 0.1% of the map, so standing still isn't a change,
+-- and inside 0–1, since peers drop a record with a spot off the map.
 local function round(value)
-  return math.floor(value * 1000 + 0.5) / 1000
+  return math.min(1, math.max(0, math.floor(value * 1000 + 0.5) / 1000))
 end
 
 -- Records where the Character being played is, from locate(): mapId, x
@@ -310,7 +311,7 @@ local CHARACTER_SHAPE = {
   maxXp = isOptional(isNumber),
   zone = isOptional(isText),
   deaths = isOptional(isNumber),
-  mapId = isOptional(isNumber),
+  mapId = isOptional(function(value) return isNumber(value) and value > 0 end),
   x = isOptional(isFraction),
   y = isOptional(isFraction),
   instance = isOptional(isText),

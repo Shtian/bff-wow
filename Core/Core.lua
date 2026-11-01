@@ -147,8 +147,9 @@ end
 -- record, if not their own) and alts, plus the shown Character: the one
 -- being played while online, else the Main. A Character, shown or alt, has
 -- guid, name, classFilename, level, xp, maxXp, zone, deaths, mapId, x, y and
--- instance (where last seen; see mapPins()), lastPlayed, sinceSeen, playing (being played right now), main and canPlay (within
--- Core.CAN_PLAY_LEVELS of the Character you play).
+-- instance (where last seen; see mapPins()), lastPlayed, sinceSeen, playing
+-- (being played right now), main and canPlay (within Core.CAN_PLAY_LEVELS
+-- of the Character you play).
 function Core:rows(order)
   return ns.Roster.rows(self.ledger, self.now(), order)
 end

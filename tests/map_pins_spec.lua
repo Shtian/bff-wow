@@ -78,13 +78,16 @@ describe("Map pins", function()
     assert.equal(1, #a.core:mapPins())
   end)
 
-  it("round the position to 0.1%", function()
-    local _, clients = crew({ "Ann", "Bob" }, {
+  it("round the position to 0.1%, inside the map", function()
+    local _, clients = crew({ "Ann", "Bob", "Cid" }, {
       Bob = { location = { mapId = 1429, x = 0.123456, y = 0.98765 } },
+      Cid = { location = { mapId = 1429, x = -0.002, y = 1.004 } },
     })
     local pin = pinFor(clients[1], clients[2])
     assert.equal(0.123, pin.x)
     assert.equal(0.988, pin.y)
+    pin = pinFor(clients[1], clients[3])
+    assert.same({ 0, 1 }, { pin.x, pin.y })
   end)
 
   it("don't send anything when a Member only moves; the move rides the heartbeat", function()

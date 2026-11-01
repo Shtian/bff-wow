@@ -1,5 +1,5 @@
--- Skin: BFF's own flat look, shared by the panel and the While you were
--- away popup. Dark windows with a 1px border, a gold accent, Arial Narrow
+-- Skin: BFF's own flat look, shared by the panel, the While you were away
+-- popup, toasts and map pins. Dark windows with a 1px border, a gold accent, Arial Narrow
 -- for text and Friz Quadrata for titles. Built from solid colour textures
 -- and a few long-standing game textures, so it doesn't depend on Blizzard's
 -- frame templates looking the same in every client.
