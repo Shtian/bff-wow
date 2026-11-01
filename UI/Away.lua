@@ -62,7 +62,7 @@ end
 -- A column heading, placed by show(): x is from the left, or from the
 -- right when negative.
 local function heading(text, x)
-  local label = Skin.label(frame, "tiny", Skin.DIM)
+  local label = Skin.label(frame, "label", Skin.DIM)
   label:SetText(text)
   label.x = x
   if x < 0 then label:SetJustifyH("RIGHT") end
@@ -74,11 +74,11 @@ local function create()
   frame = Skin.window("BFFAway", WIDTH, "While you were away")
   frame:SetPoint("CENTER", 0, 120)
 
-  frame.noticed = Skin.label(frame, "tiny", Skin.DIM)
+  frame.noticed = Skin.label(frame, "label", Skin.DIM)
   frame.noticed:SetText("YOUR CREW NOTICED")
-  frame.goals = Skin.label(frame, "tiny", Skin.DIM)
+  frame.goals = Skin.label(frame, "label", Skin.DIM)
   frame.goals:SetText("CREW GOALS")
-  frame.spares = Skin.label(frame, "tiny", Skin.DIM)
+  frame.spares = Skin.label(frame, "label", Skin.DIM)
   frame.spares:SetText("SPARES")
   frame.intro = Skin.label(frame, "small", Skin.MUTED)
 

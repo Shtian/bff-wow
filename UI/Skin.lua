@@ -174,12 +174,17 @@ local function font(name, path, size)
   return object
 end
 
+-- Friz names things: window titles, headings (goal names) and labels
+-- (section, day and column labels, written in capitals). Arial Narrow
+-- carries everything else; tiny is for badges and chart captions.
 Skin.fonts = {
   title = font("BFFFontTitle", FRIZ, 13),
+  heading = font("BFFFontHeading", FRIZ, 12),
+  label = font("BFFFontLabel", FRIZ, 10),
   body = font("BFFFontBody", NARROW, 15),
   text = font("BFFFontText", NARROW, 14),
   small = font("BFFFontSmall", NARROW, 12),
-  tiny = font("BFFFontTiny", NARROW, 10),
+  tiny = font("BFFFontTiny", NARROW, 11),
 }
 
 -- A class's colour as r, g, b; white for an unknown class.
