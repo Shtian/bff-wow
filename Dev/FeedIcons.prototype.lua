@@ -4,7 +4,7 @@
 --
 -- Four variants restyle the real Feed tab's nodes (hooked from
 -- drawFeedEntry in UI/Panel.lua). /bfficons opens a switcher bar at the
--- bottom of the screen; /bfficons A-E jumps straight to one. E is today's
+-- bottom of the screen; /bfficons A-F jumps straight to one. E is today's
 -- look, for comparison. In memory only: a /reload goes back to A.
 --
 --   A  Brighter    same node, lighter disc and ring, 20px white icon
@@ -12,6 +12,7 @@
 --   C  Bare        no disc or ring, a 24px full-colour icon on the line
 --   D  Picture     a round full-colour Interface\Icons picture fills the node
 --   E  Current     what ships today
+--   F  Square      D's pictures as squares in a kind-coloured frame, uncropped
 
 local _, ns = ...
 local Skin = ns.Skin
@@ -20,8 +21,8 @@ local P = {}
 ns.FeedIconsPrototype = P
 
 local NODE = 26
-local VARIANTS = { "A", "B", "C", "D", "E" }
-local NAMES = { A = "Brighter", B = "Kind ring", C = "Bare", D = "Picture", E = "Current" }
+local VARIANTS = { "A", "B", "C", "D", "E", "F" }
+local NAMES = { A = "Brighter", B = "Kind ring", C = "Bare", D = "Picture", E = "Current", F = "Square" }
 local current = "A"
 
 local WHITE = { 1, 1, 1 }
@@ -38,7 +39,7 @@ local ACCENT = {
   given = { 0.78, 0.6, 1 },
 }
 local PICTURES = {
-  ding = "Interface\\Icons\\Achievement_Level_10",
+  ding = "Interface\\Icons\\Spell_ChargePositive",
   maxLevel = "Interface\\Icons\\Achievement_Level_80",
   death = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01",
   newCharacter = "Interface\\Icons\\INV_Misc_GroupNeedMore",
@@ -77,6 +78,10 @@ local function reset(line)
   line.glyph:SetFontObject(Skin.fonts.glyph)
   Skin.color(line.glyph, Skin.FEED_ICON_COLOR)
   if line.picture then line.picture:Hide() end
+  if line.square then
+    line.square:Hide()
+    line.squarePicture:Hide()
+  end
 end
 
 local style = {}
@@ -124,6 +129,30 @@ function style.D(line, kind)
 end
 
 function style.E() end
+
+-- Square: a kind-coloured frame on the line (covering it), the picture
+-- inset 2px, cropped only by the icon's own border.
+function style.F(line, kind)
+  local accent = ACCENT[kind] or Skin.FEED_ICON_COLOR
+  if not line.square then
+    line.square = line.node:CreateTexture(nil, "OVERLAY", nil, 3)
+    line.square:SetSize(NODE, NODE)
+    line.square:SetPoint("CENTER")
+    line.squarePicture = line.node:CreateTexture(nil, "OVERLAY", nil, 4)
+    line.squarePicture:SetSize(NODE - 4, NODE - 4)
+    line.squarePicture:SetPoint("CENTER")
+    line.squarePicture:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+  end
+  line.ring:Hide()
+  line.gap:Hide()
+  line.disc:Hide()
+  setColor(line.square, accent)
+  line.square:Show()
+  line.squarePicture:SetTexture(PICTURES[kind] or "Interface\\Icons\\INV_Misc_QuestionMark")
+  line.squarePicture:Show()
+  line.icon:Hide()
+  line.glyph:SetText("")
+end
 
 function P.style(line, kind)
   reset(line)
