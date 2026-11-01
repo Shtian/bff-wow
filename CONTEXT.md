@@ -80,3 +80,17 @@ _Avoid_: Total levels
 **Competition**:
 A contest that ranks Members against each other. Unlike a Crew goal, it names who is ahead.
 _Avoid_: Race, leaderboard (when meaning the contest)
+
+### Passing things on
+
+**Hand-me-down**:
+An item a Member offers free to the Crew, to be sent by in-game mail to whichever Member Claims it. It ends when it is Given, withdrawn by its owner, or after 30 days.
+_Avoid_: Gift, offer, listing, loot
+
+**Claim**:
+A Member asking for a Hand-me-down, for one of their own Characters to receive it. The earliest Claim gets the Hand-me-down; a claimer can withdraw their Claim until it is Given.
+_Avoid_: Request, reserve, dibs
+
+**Give**:
+What the owner of a Hand-me-down does once they have mailed it to the Character named in the winning Claim. It ends the Hand-me-down and makes a Feed entry.
+_Avoid_: Deliver, trade, send (when meaning the act in BFF)
