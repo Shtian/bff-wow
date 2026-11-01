@@ -18,6 +18,7 @@ Feed entries are worked out by comparing the copy of a record you held with the 
 | **max level** | A Character's level reached `maxLevel` | "Ana reached max level!" |
 | **joined the Crew** | A Member appears whose `joinedAt` is after yours, or a known Member's left flag goes from set to cleared | "Bob joined the Crew" |
 | **left the Crew** | A known Member's left flag goes from cleared to set (#10) | "Bob left the Crew" |
+| **goal** | The Crew reached a rung of a Crew goal; Crew-wide, naming no Member (`docs/design/goals.md`) | "The Crew reached 300 Crew levels!" |
 
 Zone changes and Main changes make no entries: zones change too often and the panel already shows them, and a new Main is shown by the panel too.
 

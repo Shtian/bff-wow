@@ -1,5 +1,6 @@
 -- Feed: turns a record as it was and as it is now into Feed entries (ding,
--- death, new Character, max level, joined and left the Crew), and keeps the
+-- death, new Character, max level, joined and left the Crew), adds the
+-- Crew-wide entries for Crew goals reached, and keeps the
 -- account-wide log with its seen flags. A jump over skipped versions makes
 -- at most one entry of each kind per Character, and the first sight of a
 -- Member is a silent baseline, unless they joined the Crew after you. Also
@@ -20,10 +21,6 @@ local DAY = 24 * 60 * 60
 -- Entries are kept this long, and at most this many.
 local KEEP_FOR = 30 * DAY
 local KEEP_MAX = 200
--- Settled after this long with no new DATA, or at most this long after the
--- link came up.
-local QUIET_FOR = 10
-local SETTLE_WITHIN = 30
 
 -- For "a new Character: Jaina (Mage)". Core has no game strings.
 local CLASS_NAMES = {
@@ -48,11 +45,7 @@ function Feed.new(db, ledger, now, maxLevel, initialLogin)
     ledger = ledger,
     now = now,
     maxLevel = maxLevel,
-    settled = not initialLogin,
-    -- When the link first came up in a Crew, and when DATA last changed
-    -- something.
-    upSince = nil,
-    lastData = nil,
+    settle = ns.Settle.new(now, not initialLogin),
   }, Feed)
 end
 
@@ -250,6 +243,27 @@ function Feed:ownChanged(was, guid)
   return insert(self, list)
 end
 
+-- The text of a Crew goal entry, by track.
+local GOAL_TEXT = {
+  crewLevels = "The Crew reached %d Crew levels!",
+  everyone = "Everyone in the Crew has a Character at %d!",
+  deaths = "The Crew has died %d times together!",
+}
+
+-- Crew goals were reached: one Crew-wide entry each ({ track, rung, top },
+-- top when it is the track's last rung), naming no Member. They are news
+-- like any other Member's entry. Returns the new entries.
+function Feed:goalsReached(reached)
+  local list = {}
+  for _, goal in ipairs(reached) do
+    local text = goal.track == "everyone" and goal.top
+      and "Everyone in the Crew has a Character at max level!"
+      or GOAL_TEXT[goal.track]:format(goal.rung)
+    list[#list + 1] = { kind = "goal", time = self.now(), track = goal.track, rung = goal.rung, text = text }
+  end
+  return insert(self, list)
+end
+
 -- Drops a Removed Member's entries.
 function Feed:dropMember(id)
   local log = self.db.feed
@@ -380,23 +394,22 @@ end
 
 -- The link came up in a Crew: settling starts, if it hasn't.
 function Feed:linkUp()
-  self.upSince = self.upSince or self.now()
+  self.settle:up()
 end
 
 -- The link went down before settling: a half-synced summary is never
 -- shown, so settling starts over at the next up().
 function Feed:linkDown()
-  if self.settled then return end
-  self.upSince, self.lastData = nil, nil
+  self.settle:down()
 end
 
 -- DATA changed a record.
 function Feed:dataMerged()
-  self.lastData = self.now()
+  self.settle:data()
 end
 
 function Feed:isSettled()
-  return self.settled
+  return self.settle:isSettled()
 end
 
 -- Called once a second: prunes the log, and settles once sync has gone
@@ -407,18 +420,11 @@ function Feed:tick()
   while log[1] and (#log > KEEP_MAX or now - log[1].time > KEEP_FOR) do
     table.remove(log, 1)
   end
-
-  if self.settled or not self.upSince then return false end
-  local quietSince = math.max(self.upSince, self.lastData or self.upSince)
-  if now - quietSince >= QUIET_FOR or now - self.upSince >= SETTLE_WITHIN then
-    self.settled = true
-    return true
-  end
-  return false
+  return self.settle:tick()
 end
 
 -- Entries shown in the summary on their own highlighted line.
-local HIGHLIGHT = { maxLevel = true, joined = true, left = true }
+local HIGHLIGHT = { maxLevel = true, joined = true, left = true, goal = true }
 
 -- A Reaction button in the summary: { key, reacted }, or nil.
 local function button(self, entry)
@@ -552,13 +558,18 @@ local function takeNoticed(self)
 end
 
 -- While you were away: the unseen entries from other Members, one block
--- per Member, most recent activity first, and the unseen Reactions to your
--- own, as { members, count, noticed }. Marks them seen. Nil when there are
+-- per Member, most recent activity first, the Crew goals reached, newest
+-- first ({ text, time }), and the unseen Reactions to your own, as
+-- { members, goals, count, noticed }. Marks them seen. Nil when there are
 -- none.
 function Feed:takeSummary()
-  local byMember, ids, count = {}, {}, 0
+  local byMember, ids, goals, count = {}, {}, {}, 0
   for _, entry in ipairs(self.db.feed) do
-    if not entry.seen then
+    if not entry.seen and entry.kind == "goal" then
+      entry.seen = true
+      count = count + 1
+      table.insert(goals, 1, { text = entry.text, time = entry.time })
+    elseif not entry.seen then
       entry.seen = true
       count = count + 1
       local memberEntries = byMember[entry.memberId]
@@ -579,7 +590,7 @@ function Feed:takeSummary()
     if a.time ~= b.time then return a.time > b.time end
     return a.memberId < b.memberId
   end)
-  return { members = members, count = count, noticed = noticed }
+  return { members = members, goals = goals, count = count, noticed = noticed }
 end
 
 -- An entry as handed out: a fresh table UI may keep. Seen is false while
