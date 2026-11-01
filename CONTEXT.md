@@ -59,6 +59,10 @@ _Avoid_: Popup, alert, notification (when meaning a toast)
 When a Member or Character was last played, as reported by that Member's own client rather than observed by others.
 _Avoid_: Last online, last active
 
+**Play times**:
+When a Member usually plays, by hour of the week over the last four weeks, as reported by that Member's own client.
+_Avoid_: Schedule, availability, heatmap (when meaning the data)
+
 ### Together and against each other
 
 **Crew goal**:
