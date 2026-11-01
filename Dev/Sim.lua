@@ -3,7 +3,8 @@
 -- records are kept and relayed like real ones, so it only runs in a Crew
 -- where no one else is known yet: start a test Crew for it. Also the dev
 -- console (/bffdev, opened by /bff sim too): buttons that make each
--- simulated Member ding, die, move, react to your newest entry or log out,
+-- simulated Member ding, die, move, react to your newest entry, offer a
+-- test Hand-me-down, Claim your newest one or log out,
 -- one that plays out a stretch of you being away so While you were away
 -- shows (with Reactions to your entries), one that reaches the next Crew
 -- deaths goal, and a live log of what
@@ -203,6 +204,30 @@ local function reactToYou(client, you)
   return false
 end
 
+-- Test Hand-me-downs, as links the way the game hands them out: one
+-- plain, one with an enchant, one with a scaling random suffix.
+local TEST_ITEMS = {
+  { link = "|cff1eff00|Hitem:5191::::::::18:::::::|h[Cruel Barb]|h|r", level = 19 },
+  { link = "|cff1eff00|Hitem:2042:1897:::::::20:::::::|h[Staff of Westfall]|h|r", level = 18 },
+  { link = "|cff1eff00|Hitem:15210::::::-19:1238425:30:::::::|h[Raider Shortsword of the Monkey]|h|r", level = 15 },
+}
+
+-- Offers a test Hand-me-down to the Crew.
+local function offer(client, i)
+  local item = TEST_ITEMS[(i - 1) % #TEST_ITEMS + 1]
+  return client.core:postHandMeDown(item.link, item.level)
+end
+
+-- Claims your newest Hand-me-down the client hasn't claimed yet.
+local function claimYours(client, you)
+  for _, row in ipairs(client.core:handMeDowns().crew) do
+    if row.ownerId == you and row.canClaim then
+      return client.core:claimHandMeDown(row.ownerId, row.id)
+    end
+  end
+  return false
+end
+
 -- What each console button does to a simulated Member's client.
 local ACTIONS = {
   ding = function(client) client:play({ level = client.character.level + 1, xp = 0 }) end,
@@ -225,6 +250,8 @@ local ACTIONS = {
     client:play()
   end,
   react = function(client) reactToYou(client, yourId) end,
+  offer = function(client, i) offer(client, i) end,
+  claim = function(client) claimYours(client, yourId) end,
   online = function(client)
     if client.core then client:logout() else client:login() end
   end,
@@ -237,7 +264,7 @@ function Sim.act(i, action)
   local client = members and members[i]
   if not client or not ACTIONS[action] then return false end
   if action ~= "online" and not client.core then return false end
-  ACTIONS[action](client)
+  ACTIONS[action](client, i)
   return true
 end
 
@@ -354,7 +381,7 @@ ns.Console = Console
 
 local Skin = ns.Skin
 
-local WIDTH = 640
+local WIDTH = 760
 local HEIGHT = 480
 local INSET = 12
 local ROW_HEIGHT = 28
@@ -370,7 +397,8 @@ local DIM = "8c8a99"
 -- The console buttons on each simulated Member's row, left to right.
 local BUTTONS = {
   { "ding", "Ding" }, { "xp", "XP" }, { "die", "Die" }, { "zone", "Zone" },
-  { "alt", "Alt" }, { "max", "Max" }, { "react", "React" }, { "online", "Log out" },
+  { "alt", "Alt" }, { "max", "Max" }, { "react", "React" }, { "offer", "Offer" },
+  { "claim", "Claim" }, { "online", "Log out" },
 }
 
 local frame
@@ -433,6 +461,8 @@ local function onEvent(event, arg)
     log(color(EVENT, "feed  ") .. arg.text)
   elseif event == "reaction" then
     log(color(EVENT, "reaction  ") .. arg.text)
+  elseif event == "handMeDown" then
+    log(color(EVENT, "hand-me-down  ") .. arg.text)
   elseif event == "awaySummary" then
     log(color(EVENT, "away summary  ") .. tostring(arg.count) .. " entries from " .. #arg.members .. " Members")
   else
@@ -648,6 +678,9 @@ local SAMPLE_TOASTS = {
   { kind = "joined", text = "Simbad joined the Crew" },
   { kind = "left", text = "Simba left the Crew" },
   { kind = "goal", text = "The Crew reached 300 Crew levels!" },
+  { kind = "claimed", text = "Simone claimed [Cruel Barb] for Simonette", opens = "handMeDowns" },
+  { kind = "given", text = "Simbad sent you [Staff of Westfall]. Check Simonette's mailbox.", opens = "handMeDowns" },
+  { kind = "gave", text = "Simbad gave Simone [Staff of Westfall]" },
 }
 
 -- /bffdev toggles the console; /bffdev toast [n] shows n sample toasts

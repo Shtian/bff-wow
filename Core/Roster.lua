@@ -52,6 +52,14 @@ function Roster.main(record, now)
   return mainOf(record, (visibleCharacters(record, now)))
 end
 
+-- What a Member is called in texts: their display name, else their
+-- Main's name, else "Someone".
+function Roster.memberName(record, now)
+  if record and record.displayName then return record.displayName end
+  local main = record and Roster.main(record, now)
+  return main and main.name or "Someone"
+end
+
 local function canPlay(character, yourLevel)
   return yourLevel ~= nil and math.abs(character.level - yourLevel) <= CAN_PLAY
 end

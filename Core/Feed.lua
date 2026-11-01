@@ -1,5 +1,6 @@
 -- Feed: turns a record as it was and as it is now into Feed entries (ding,
--- death, new Character, max level, joined and left the Crew), adds the
+-- death, new Character, max level, joined and left the Crew, and gave: a
+-- Hand-me-down Given, matched by owner and id), adds the
 -- Crew-wide entries for Crew goals reached, and keeps the
 -- account-wide log with its seen flags. A jump over skipped versions makes
 -- at most one entry of each kind per Character, and the first sight of a
@@ -7,7 +8,8 @@
 -- attaches the Reactions Members' records carry to the entries they point
 -- at, each with a seen flag on your own entries, and knows when sync has
 -- settled after an initial login.
--- See docs/design/feed.md and docs/design/reactions.md.
+-- See docs/design/feed.md, docs/design/reactions.md and
+-- docs/design/hand-me-downs.md.
 
 local _, ns = ...
 
@@ -16,6 +18,7 @@ Feed.__index = Feed
 ns.Feed = Feed
 
 local Reactions = ns.Reactions
+local HandMeDowns = ns.HandMeDowns
 
 local DAY = 24 * 60 * 60
 -- Entries are kept this long, and at most this many.
@@ -36,8 +39,9 @@ end
 -- db is the whole saved table; Feed keeps `feed` (the log, oldest first)
 -- and `feedJoins` (the joinedAt last seen per Member, so re-adding a
 -- Member doesn't announce their join again). Only an initial login waits
--- for sync to settle.
-function Feed.new(db, ledger, now, maxLevel, initialLogin)
+-- for sync to settle. itemLink(itemString) is the game's link for an item,
+-- or nil while it isn't cached, for gave entries.
+function Feed.new(db, ledger, now, maxLevel, initialLogin, itemLink)
   db.feed = db.feed or {}
   db.feedJoins = db.feedJoins or {}
   return setmetatable({
@@ -45,14 +49,13 @@ function Feed.new(db, ledger, now, maxLevel, initialLogin)
     ledger = ledger,
     now = now,
     maxLevel = maxLevel,
+    itemLink = itemLink or HandMeDowns.NO_LINK,
     settle = ns.Settle.new(now, not initialLogin),
   }, Feed)
 end
 
 local function memberName(self, record)
-  if record.displayName then return record.displayName end
-  local main = ns.Roster.main(record, self.now())
-  return main and main.name or "Someone"
+  return ns.Roster.memberName(record, self.now())
 end
 
 -- Who an event happened to: "Ana", "Ana's Alt Jaina", "You" or "Your Alt
@@ -199,6 +202,34 @@ local function crewEntry(self, kind, record)
   return entry
 end
 
+-- Whether the log has the gave entry for this owner's Hand-me-down.
+local function hasGave(self, owner, id)
+  for _, entry in ipairs(self.db.feed) do
+    if entry.kind == "gave" and entry.memberId == owner and entry.handMeDown == id then return true end
+  end
+  return false
+end
+
+-- A gave entry: owner, the Hand-me-down's id and item, and who it went to.
+-- Its text is worked out when it's described, once the item is cached.
+local function gaveEntry(self, record, own, handMeDown)
+  local entry = newEntry("gave", record, own, nil)
+  entry.time = own and self.now() or record.version
+  entry.handMeDown, entry.item, entry.recipient = handMeDown.id, handMeDown.item, handMeDown.to
+  -- The recipient's own notice already tells them.
+  if handMeDown.to == self.ledger:memberId() then entry.seen = true end
+  return entry
+end
+
+-- The Hand-me-downs Given in after that weren't in before, each once.
+local function gaveEntries(self, before, after, list)
+  for _, handMeDown in ipairs(HandMeDowns.newlyGiven(before, after)) do
+    if not hasGave(self, after.id, handMeDown.id) then
+      list[#list + 1] = gaveEntry(self, after, false, handMeDown)
+    end
+  end
+end
+
 -- Someone else's record was kept: before is the copy held until now (nil
 -- on first sight) and after the new one. Returns the new entries, and the
 -- new Reactions to your own entries as { entry, reaction }.
@@ -220,6 +251,7 @@ function Feed:recordChanged(before, after)
     for guid, character in pairs(after.characters) do
       characterEntries(self, after, before.characters[guid], character, false, list)
     end
+    gaveEntries(self, before, after, list)
   end
   return insert(self, list), reactionsChanged(self, before, after)
 end
@@ -241,6 +273,13 @@ function Feed:ownChanged(was, guid)
   local first = was == nil and next(own.characters, next(own.characters)) == nil
   if not first then characterEntries(self, own, was, own.characters[guid], true, list) end
   return insert(self, list)
+end
+
+-- You Gave one of your Hand-me-downs ({ id, item, to } as in
+-- HandMeDowns.inRecord): your own gave entry. Returns the new entries.
+function Feed:ownGave(handMeDown)
+  if hasGave(self, self.ledger:memberId(), handMeDown.id) then return {} end
+  return insert(self, { gaveEntry(self, self.ledger:own(), true, handMeDown) })
 end
 
 -- Crew goals were reached: one Crew-wide entry each ({ track, rung, text }
@@ -317,6 +356,20 @@ end
 local function reactorName(self, id)
   local record = self.ledger:record(id)
   return record and memberName(self, record) or "Someone"
+end
+
+-- A gave entry's text: "Ana gave Bob [Cruel Barb]", "You gave Bob ...",
+-- "Ana gave you ...".
+local function gaveText(self, entry)
+  local giver = entry.own and "You" or reactorName(self, entry.memberId)
+  local recipient = entry.recipient == self.ledger:memberId() and "you" or reactorName(self, entry.recipient)
+  return ("%s gave %s %s"):format(giver, recipient, HandMeDowns.linkText(self.itemLink, entry.item))
+end
+
+-- An entry's text: stored, except a gave entry's, worked out as shown.
+local function textOf(self, entry)
+  if entry.kind == "gave" then return gaveText(self, entry) end
+  return entry.text
 end
 
 -- The Members who reacted to an entry, each once, in the order they did.
@@ -549,16 +602,23 @@ end
 
 -- While you were away: the unseen entries from other Members, one block
 -- per Member, most recent activity first, the Crew goals reached, newest
--- first ({ text, time }), and the unseen Reactions to your own, as
--- { members, goals, count, noticed }. Marks them seen. Nil when there are
--- none.
-function Feed:takeSummary()
-  local byMember, ids, goals, count = {}, {}, {}, 0
+-- first ({ text, time }), the unseen Reactions to your own, and
+-- handMeDowns: the Hand-me-down notices given (Giving:takeNews), then the
+-- Gives, newest first ({ kind = "gave", text, time }), as { members,
+-- goals, handMeDowns, count, noticed }. Marks them seen. Nil when there
+-- are none.
+function Feed:takeSummary(handMeDowns)
+  handMeDowns = handMeDowns or {}
+  local byMember, ids, goals, gives, count = {}, {}, {}, {}, 0
   for _, entry in ipairs(self.db.feed) do
     if not entry.seen and entry.kind == "goal" then
       entry.seen = true
       count = count + 1
       table.insert(goals, 1, { text = entry.text, time = entry.time })
+    elseif not entry.seen and entry.kind == "gave" then
+      entry.seen = true
+      count = count + 1
+      table.insert(gives, 1, { kind = "gave", text = gaveText(self, entry), time = entry.time })
     elseif not entry.seen then
       entry.seen = true
       count = count + 1
@@ -572,7 +632,8 @@ function Feed:takeSummary()
     end
   end
   local noticed = takeNoticed(self)
-  if count == 0 and #noticed == 0 then return nil end
+  if count == 0 and #noticed == 0 and #handMeDowns == 0 then return nil end
+  for _, give in ipairs(gives) do handMeDowns[#handMeDowns + 1] = give end
 
   local members = {}
   for i, id in ipairs(ids) do members[i] = memberBlock(self, id, byMember[id]) end
@@ -580,7 +641,7 @@ function Feed:takeSummary()
     if a.time ~= b.time then return a.time > b.time end
     return a.memberId < b.memberId
   end)
-  return { members = members, goals = goals, count = count, noticed = noticed }
+  return { members = members, goals = goals, handMeDowns = handMeDowns, count = count, noticed = noticed }
 end
 
 -- An entry as handed out: a fresh table UI may keep. Seen is false while
@@ -599,7 +660,7 @@ function Feed:describe(entry)
     time = entry.time,
     memberId = entry.memberId,
     guid = entry.guid,
-    text = entry.text,
+    text = textOf(self, entry),
     from = entry.from,
     level = entry.level,
     count = entry.count,

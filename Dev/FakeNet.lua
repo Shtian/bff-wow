@@ -34,12 +34,15 @@ local function seedFor(name)
   return seed
 end
 
--- options: clock (the starting server time, default 1000) and maxLevel.
+-- options: clock (the starting server time, default 1000), maxLevel, and
+-- items (the link each item string resolves to, as the game's cache
+-- would; one not there isn't cached).
 function FakeNet.new(options)
   options = options or {}
   return setmetatable({
     clock = options.clock or 1000,
     maxLevel = options.maxLevel or 60,
+    items = options.items or {},
     clients = {},
     queue = {},
     -- Every message put on the wire: { from = name, message = string, time }.
@@ -155,6 +158,7 @@ local function newCore(client, initialLogin)
     maxLevel = net.maxLevel,
     utcOffset = client.utcOffset,
     locate = function() return copy(client.location) end,
+    itemLink = function(itemString) return net.items[itemString] end,
   })
   client.core:updateOwn(copy(client.character))
   client.memberId = client.core:rows()[1].memberId
