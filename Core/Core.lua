@@ -24,6 +24,16 @@ Core.CAN_PLAY_LEVELS = ns.Roster.CAN_PLAY
 Core.reactionText = ns.Reactions.text
 Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
 
+-- The tooltip's gold line for a Character's money (copper): whole gold,
+-- floored, with thousands separators ("Gold: 1,234"). Nil when the
+-- Character's client never shared it, so no line shows rather than "0".
+function Core.goldText(money)
+  if type(money) ~= "number" then return nil end
+  local digits = tostring(math.floor(money / 10000))
+  local grouped = digits:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+  return "Gold: " .. grouped
+end
+
 -- deps: db, now(), random(), link (with send(string)), listener(event, ...),
 -- initialLogin, maxLevel, utcOffset (seconds local time is ahead of server
 -- time, for the Feed's days; default 0) and locate() (optional: where the
@@ -124,7 +134,7 @@ local function sendOwnNow(self)
 end
 
 -- The current state of the Character being played, from Snapshot: guid,
--- name, classFilename, level, xp, maxXp, zone and deaths.
+-- name, classFilename, level, xp, maxXp, zone, deaths and money (copper).
 function Core:updateOwn(character)
   local changed, before = self.ledger:updateOwn(character)
   -- The first report after login brings the Play times up to date.
@@ -146,7 +156,8 @@ end
 -- altsCanPlay, via (display name of the Member whose message brought their
 -- record, if not their own) and alts, plus the shown Character: the one
 -- being played while online, else the Main. A Character, shown or alt, has
--- guid, name, classFilename, level, xp, maxXp, zone, deaths, mapId, x, y and
+-- guid, name, classFilename, level, xp, maxXp, zone, deaths, money (copper,
+-- nil if its client never shared it), mapId, x, y and
 -- instance (where last seen; see mapPins()), lastPlayed, sinceSeen, playing
 -- (being played right now), main and canPlay (within Core.CAN_PLAY_LEVELS
 -- of the Character you play).

@@ -134,6 +134,8 @@ local function showTooltip(owner)
     GameTooltip:AddLine(("XP %d%%"):format(math.floor(100 * (character.xp or 0) / character.maxXp)), MUTED[1], MUTED[2], MUTED[3])
   end
   GameTooltip:AddLine(("Deaths: %d"):format(character.deaths or 0), MUTED[1], MUTED[2], MUTED[3])
+  local gold = ns.Core.goldText(character.money)
+  if gold then GameTooltip:AddLine(gold, MUTED[1], MUTED[2], MUTED[3]) end
   if character.playing then
     GameTooltip:AddLine(row.own and "Playing now" or "Online now", ONLINE[1], ONLINE[2], ONLINE[3])
   else

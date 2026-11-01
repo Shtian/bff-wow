@@ -15,7 +15,7 @@ local ID_LENGTH = 8
 local ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
 
 -- The fields Snapshot reports for a Character.
-local CHARACTER_FIELDS = { "name", "classFilename", "level", "xp", "maxXp", "zone", "deaths" }
+local CHARACTER_FIELDS = { "name", "classFilename", "level", "xp", "maxXp", "zone", "deaths", "money" }
 -- Where a Character was last seen, from locate(): written only by
 -- Ledger:locate, and kept when Snapshot reports the Character.
 local LOCATION_FIELDS = { "mapId", "x", "y", "instance" }
@@ -311,6 +311,7 @@ local CHARACTER_SHAPE = {
   maxXp = isOptional(isNumber),
   zone = isOptional(isText),
   deaths = isOptional(isNumber),
+  money = isOptional(function(value) return isNumber(value) and value >= 0 end),
   mapId = isOptional(function(value) return isNumber(value) and value > 0 end),
   x = isOptional(isFraction),
   y = isOptional(isFraction),
