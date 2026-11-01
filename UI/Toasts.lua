@@ -121,10 +121,11 @@ local function createToast()
 
   toast.picture = Skin.feedPicture(toast, PICTURE)
   toast.picture:SetPoint("LEFT", 10, 0)
-  -- The overflow toast's small grey icon, centred where the picture goes.
+  -- The overflow toast's small grey icon, centred where the picture goes
+  -- (the picture is hidden then).
   toast.icon = toast:CreateTexture(nil, "ARTWORK")
   toast.icon:SetSize(ICON, ICON)
-  toast.icon:SetPoint("CENTER", toast.picture)
+  toast.icon:SetPoint("LEFT", 10 + (PICTURE - ICON) / 2, 0)
   toast.icon:SetTexture(MORE_ICON)
   toast.icon:SetDesaturated(true)
   Skin.color(toast.icon, Skin.FEED_ICON_COLOR)
@@ -202,11 +203,9 @@ end
 local function fade(now)
   for _, frame in ipairs(toastFrames) do
     if frame:IsShown() then
-      local remaining = queue:remaining(frame.toast, now)
-      local left = frame.toast.hovered and FADE or remaining
+      local left = frame.toast.hovered and FADE or queue:remaining(frame.toast, now)
       frame:SetAlpha(math.max(0, math.min(1, left / FADE)))
-      local share = math.max(0, math.min(1, remaining / ns.ToastQueue.DURATION))
-      frame.timer:SetWidth(math.max(1, WIDTH * share))
+      frame.timer:SetWidth(math.max(1, WIDTH * queue:share(frame.toast, now)))
     end
   end
 end

@@ -144,26 +144,23 @@ end
 -- that opens the same menu.
 local DROPDOWN = "WowStyle1DropdownTemplate"
 
+-- Each picker has :draw(), which shows the chosen sound: the dropdown
+-- reads it from its menu's radios, the button is given it as text.
 local function createSoundPicker()
   local hasDropdown = C_XMLUtil and C_XMLUtil.GetTemplateInfo
     and C_XMLUtil.GetTemplateInfo(DROPDOWN) ~= nil
   if hasDropdown then
     local dropdown = CreateFrame("DropdownButton", nil, frame, DROPDOWN)
     dropdown:SetupMenu(buildSoundMenu)
+    dropdown.draw = dropdown.GenerateMenu
     return dropdown
   end
   local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
   button:SetScript("OnClick", function(owner) MenuUtil.CreateContextMenu(owner, buildSoundMenu) end)
-  return button
-end
-
--- Shows the chosen sound: the dropdown reads it from its menu's radios.
-local function drawSoundPicker()
-  if frame.sound.GenerateMenu then
-    frame.sound:GenerateMenu()
-  else
-    frame.sound:SetText(ns.Toasts.soundLabel(core:toastSound()))
+  function button:draw()
+    self:SetText(ns.Toasts.soundLabel(core:toastSound()))
   end
+  return button
 end
 
 local function createToasts()
@@ -246,7 +243,7 @@ function Page.refresh()
   -- The sound and Move toasts are greyed out while toasts are off.
   local toasts = core:isToastsOn()
   frame.toasts:SetChecked(toasts)
-  drawSoundPicker()
+  frame.sound:draw()
   frame.soundLabel:SetAlpha(toasts and 1 or 0.5)
   frame.sound:SetEnabled(toasts)
   frame.play:SetEnabled(toasts)

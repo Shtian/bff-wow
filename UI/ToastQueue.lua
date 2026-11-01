@@ -114,6 +114,11 @@ function ToastQueue:remaining(toast, now)
   return toast.expiresAt - now
 end
 
+-- The share of its full time the toast has left, from 1 down to 0.
+function ToastQueue:share(toast, now)
+  return math.max(0, math.min(1, self:remaining(toast, now) / ToastQueue.DURATION))
+end
+
 -- Gives a toast its full time.
 local function restart(toast, now)
   toast.expiresAt = now + ToastQueue.DURATION

@@ -1,5 +1,5 @@
 -- Skin: BFF's own flat look, shared by the panel, the While you were away
--- popup, toasts and map pins. Dark windows with a 1px border, a gold accent, Arial Narrow
+-- popup, toasts and map pins. Dark windows, a gold accent, Arial Narrow
 -- for text and Friz Quadrata for titles. Built from solid colour textures
 -- and a few long-standing game textures, so it doesn't depend on Blizzard's
 -- frame templates looking the same in every client.
@@ -27,10 +27,12 @@ Skin.HEADER_HEIGHT = 30
 
 -- Feed entries shown in gold.
 Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, left = true, goal = true }
--- Each Feed kind's small grey icon, inline in the While you were away
--- popup and on the panel's sidebar. The Feed tab and toasts draw
--- Skin.FEED_PICTURES instead.
+-- A muted grey for a picture's edge when its kind has no colour, and for
+-- the overflow toast's icon.
 Skin.FEED_ICON_COLOR = { 0.82, 0.8, 0.86 }
+-- Each Feed kind's small icon, inline in the While you were away popup,
+-- and the Goals and Spares tabs' sidebar icons. The Feed tab and toasts
+-- draw Skin.FEED_PICTURES instead.
 Skin.FEED_ICONS = {
   maxLevel = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1",
   death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
@@ -61,13 +63,14 @@ Skin.FEED_PICTURES = {
   given = "Interface\\Icons\\INV_Letter_15",
 }
 local SPARE = { 0.78, 0.6, 1 }
+local CREW = { 0.4, 0.75, 1 }
 Skin.FEED_EDGES = {
-  ding = { 0.44, 0.89, 0.44 },
+  ding = Skin.ONLINE,
   maxLevel = Skin.GOLD,
   goal = Skin.GOLD,
   death = { 0.95, 0.4, 0.36 },
-  newCharacter = { 0.4, 0.75, 1 },
-  joined = { 0.4, 0.75, 1 },
+  newCharacter = CREW,
+  joined = CREW,
   left = { 0.6, 0.6, 0.66 },
   gave = SPARE,
   claimed = SPARE,
@@ -208,6 +211,37 @@ function Skin.fill(frame, color, layer, sublevel)
   texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
   texture:SetAllPoints()
   return texture
+end
+
+-- A flat chip filling `frame` inset by x and y, with its corners stepped
+-- in over `radius` pixels so it reads as rounded (textures have no corner
+-- radius). Returns an object whose :SetShown shows or hides every part.
+function Skin.chip(frame, color, x, y, radius, layer)
+  local chip = { parts = {} }
+  local function part()
+    local texture = frame:CreateTexture(nil, layer or "BACKGROUND")
+    texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+    chip.parts[#chip.parts + 1] = texture
+    return texture
+  end
+  local middle = part()
+  middle:SetPoint("TOPLEFT", x, -(y + radius))
+  middle:SetPoint("BOTTOMRIGHT", -x, y + radius)
+  for row = 0, radius - 1 do
+    local inset = x + radius - row
+    local top = part()
+    top:SetPoint("TOPLEFT", inset, -(y + row))
+    top:SetPoint("TOPRIGHT", -inset, -(y + row))
+    top:SetHeight(1)
+    local bottom = part()
+    bottom:SetPoint("BOTTOMLEFT", inset, y + row)
+    bottom:SetPoint("BOTTOMRIGHT", -inset, y + row)
+    bottom:SetHeight(1)
+  end
+  function chip:SetShown(shown)
+    for _, texture in ipairs(self.parts) do texture:SetShown(shown) end
+  end
+  return chip
 end
 
 -- A 1px line along one edge of `frame`.

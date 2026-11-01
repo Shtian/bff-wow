@@ -28,6 +28,10 @@ local HEADER = Skin.HEADER_HEIGHT
 local NAV_HEIGHT = 30
 local NAV_CHIP_X = 6
 local NAV_CHIP_Y = 2
+local NAV_CHIP_RADIUS = 2
+-- The Roster footer's small labels (Crew code, Hidden, Removed) share one
+-- bottom line, so they line up with each other and the code box.
+local CODE_LINE = 15
 local ROW_HEIGHT = 44
 local ALT_HEIGHT = 20
 local SECTION = 26
@@ -459,13 +463,8 @@ local function navButton(label, icon, onClick)
   button:SetHeight(NAV_HEIGHT)
   -- The selected tab and the hovered one get a light chip, inset from
   -- the sidebar's edges.
-  button.selected = Skin.fill(button, { 1, 1, 1, 0.08 })
-  button.selected:ClearAllPoints()
-  button.selected:SetPoint("TOPLEFT", NAV_CHIP_X, -NAV_CHIP_Y)
-  button.selected:SetPoint("BOTTOMRIGHT", -NAV_CHIP_X, NAV_CHIP_Y)
-  local hover = Skin.fill(button, { 1, 1, 1, 0.04 }, "HIGHLIGHT")
-  hover:ClearAllPoints()
-  hover:SetAllPoints(button.selected)
+  button.selected = Skin.chip(button, { 1, 1, 1, 0.08 }, NAV_CHIP_X, NAV_CHIP_Y, NAV_CHIP_RADIUS)
+  Skin.chip(button, { 1, 1, 1, 0.04 }, NAV_CHIP_X, NAV_CHIP_Y, NAV_CHIP_RADIUS, "HIGHLIGHT")
   button.icon = button:CreateTexture(nil, "ARTWORK")
   button.icon:SetSize(14, 14)
   button.icon:SetPoint("LEFT", 12, 0)
@@ -1364,10 +1363,6 @@ end
 -- Crew code in a read-only box with the text selected (addons can't copy
 -- to the clipboard), with the hidden count and removed Members right of
 -- it.
--- The footer's small labels (Crew code, Hidden, Removed) share one
--- bottom line, so they line up with each other and the code box.
-local CODE_LINE = 15
-
 local function createFooter()
   footer = CreateFrame("Frame", nil, frame.content)
   footer:SetPoint("BOTTOMLEFT")
