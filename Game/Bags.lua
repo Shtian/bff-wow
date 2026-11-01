@@ -1,8 +1,8 @@
 -- Bags: reads items in the bags for Hand-me-downs. Posts the item on the
 -- cursor (dropped on the Hand-me-downs tab) or the first bag item matching
 -- a link (/bff hmd add), with its item GUID and binding, which Core
--- checks it can be traded by. See docs/design/hand-me-downs.md and
--- docs/research/bag-items.md.
+-- checks it can be traded by. Also finds where a posted item is now. See
+-- docs/design/hand-me-downs.md and docs/research/bag-items.md.
 
 local _, ns = ...
 
@@ -61,4 +61,16 @@ function Bags.postFromCursor(core)
   ClearCursor()
   if kind ~= "item" then return nil, "invalidItem" end
   return post(core, location)
+end
+
+-- Where an item is by its GUID, for Core:bagsUpdated: whether it's in the
+-- bags or bank (nil if the game can't say), and whether it's equipped.
+-- IsItemGUIDInInventory covers the bank even while it's closed. Read the
+-- location only once that's true, and never call IsValid() on it: for a
+-- gone or banked item it's an empty ItemLocation, and IsValid() errors.
+function Bags.findItem(itemGuid)
+  if not C_Item.IsItemGUIDInInventory then return nil, false end
+  if not C_Item.IsItemGUIDInInventory(itemGuid) then return false, false end
+  local location = C_Item.GetItemLocation(itemGuid)
+  return true, location ~= nil and location:IsEquipmentSlot() == true
 end

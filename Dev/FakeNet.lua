@@ -101,7 +101,9 @@ end
 -- plays: guid, name, classFilename, level, xp, maxXp, zone, deaths, money),
 -- location (where it stands, as Snapshot.locate reports it: mapId, x and y,
 -- or instance; default nowhere known) and utcOffset (seconds its local time
--- is ahead of server time, default 0).
+-- is ahead of server time, default 0) and bags (where each item GUID is,
+-- as Bags.findItem reads it: "bags" for the bags or bank, "equipped", or
+-- nil when it has left; default empty).
 function FakeNet:add(name, options)
   options = options or {}
   local client = setmetatable({
@@ -111,6 +113,8 @@ function FakeNet:add(name, options)
     random = options.random or seeded(seedFor(name)),
     utcOffset = options.utcOffset,
     location = copy(options.location),
+    bags = copy(options.bags) or {},
+    bagReads = 0,
     character = copy(options.character) or {
       guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
       level = 10, xp = 0, maxXp = 1000, zone = "Elwynn Forest", deaths = 0,
@@ -159,6 +163,11 @@ local function newCore(client, initialLogin)
     utcOffset = client.utcOffset,
     locate = function() return copy(client.location) end,
     itemLink = function(itemString) return net.items[itemString] end,
+    findItem = function(itemGuid)
+      client.bagReads = client.bagReads + 1
+      local where = client.bags[itemGuid]
+      return where ~= nil, where == "equipped"
+    end,
   })
   client.core:updateOwn(copy(client.character))
   client.memberId = client.core:rows()[1].memberId
@@ -248,6 +257,19 @@ end
 function Client:play(changes)
   for k, v in pairs(changes or {}) do self.character[k] = v end
   if self.core then self.core:updateOwn(copy(self.character)) end
+  return self
+end
+
+-- Puts an item GUID somewhere ("bags", "equipped", or nil for gone).
+-- Core hears of it on the next bagsUpdated.
+function Client:putItem(itemGuid, where)
+  self.bags[itemGuid] = where
+  return self
+end
+
+-- The bags have settled, as on BAG_UPDATE_DELAYED.
+function Client:bagsUpdated()
+  self.core:bagsUpdated()
   return self
 end
 

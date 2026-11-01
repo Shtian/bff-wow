@@ -38,8 +38,11 @@ end
 -- initialLogin, maxLevel, utcOffset (seconds local time is ahead of server
 -- time, for the Feed's days; default 0) and locate() (optional: where the
 -- Character being played stands, read just before own DATA goes out; see
--- Snapshot.locate) and itemLink(itemString) (optional: the game's link for
--- an item string, or nil while it isn't cached; texts say "an item" then).
+-- Snapshot.locate), itemLink(itemString) (optional: the game's link for
+-- an item string, or nil while it isn't cached; texts say "an item" then)
+-- and findItem(itemGuid) (optional: whether the item is in the bags or
+-- bank, nil if the game can't say, and whether it's equipped; see
+-- Bags.findItem).
 function Core.new(deps)
   for name, kind in pairs(required) do
     if type(deps[name]) ~= kind then
@@ -61,6 +64,11 @@ function Core.new(deps)
     ledger = ns.Ledger.new(deps.db, deps.now, deps.random, deps.initialLogin == true),
     utcOffset = type(deps.utcOffset) == "number" and deps.utcOffset or 0,
     linkUp = false,
+    findItem = type(deps.findItem) == "function" and deps.findItem or nil,
+    -- Own Hand-me-down ids whose item has left the bags this session.
+    goneItems = {},
+    -- Whether the check at login has run: only it ends Hand-me-downs.
+    loginChecked = deps.initialLogin ~= true,
   }, Core)
   local itemLink = type(deps.itemLink) == "function" and deps.itemLink or nil
   self.log = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin, itemLink)
@@ -373,7 +381,11 @@ end
 -- yet shown, claims and open your open Claims and Hand-me-downs, out of
 -- maxClaims and maxOpen.
 function Core:handMeDowns()
-  return self.giving:view()
+  local view = self.giving:view()
+  for _, row in ipairs(view.yours) do
+    if self.goneItems[row.id] and not row.given then row.gone = true end
+  end
+  return view
 end
 
 -- An own write that others should get now.
@@ -437,6 +449,40 @@ function Core:giveHandMeDown(id, expected)
   self.giving:check(true)
   ownWrite(self)
   return true
+end
+
+-- The bags have settled (BAG_UPDATE_DELAYED): checks where the item of
+-- each open Hand-me-down the Character being played posted is
+-- (docs/adr/0004). Never call it before the first BAG_UPDATE_DELAYED of a
+-- session: until then the bags read as empty. A gone item is noted on
+-- your tab (row.gone); at the first check after a real login one with no
+-- Claim is withdrawn, and the listener hears ("handMeDownGone", { action
+-- = "withdrawn", id, item, link }), and for one with a Claim, ({ action =
+-- "ask", id, item, link, winner }), to ask whether to Give or withdraw it.
+function Core:bagsUpdated()
+  if not (self.findItem and self.ledger:playing()) then return end
+  local isNextLogin = not self.loginChecked
+  self.loginChecked = true
+  local rows, changed = {}, false
+  for _, row in ipairs(self.giving:view().yours) do rows[row.id] = row end
+  for id, itemGuid in pairs(self.ledger:handMeDownItems()) do
+    local row = rows[id]
+    local isOpen = row ~= nil and row.given == nil and self.giving:ownOpen(id) ~= nil
+    local inInventory, isEquipped = self.findItem(itemGuid)
+    local action = ns.HandMeDowns.itemCheck(isOpen, row and row.winner ~= nil, inInventory, isEquipped, isNextLogin)
+    local isGone = action == "note" or action == "ask"
+    if isGone ~= (self.goneItems[id] == true) then
+      self.goneItems[id] = isGone or nil
+      changed = true
+    end
+    if action == "withdraw" then
+      self:withdrawHandMeDown(id)
+      self.listener("handMeDownGone", { action = "withdrawn", id = id, item = row.item, link = row.link })
+    elseif action == "ask" then
+      self.listener("handMeDownGone", { action = "ask", id = id, item = row.item, link = row.link, winner = row.winner })
+    end
+  end
+  if changed then self.listener("changed") end
 end
 
 -- Claims another Member's open Hand-me-down for one of your Characters by

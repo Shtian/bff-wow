@@ -140,6 +140,40 @@ describe("HandMeDowns", function()
     end)
   end)
 
+  describe("when the item has left the bags", function()
+    -- isOpen, hasClaim, inInventory, isEquipped, isNextLogin
+    it("keeps an item still in the bags or bank", function()
+      assert.equal("keep", H.itemCheck(true, false, true, false, false))
+      assert.equal("keep", H.itemCheck(true, true, true, false, true))
+    end)
+
+    it("notes a gone item during the session, Claim or not", function()
+      assert.equal("note", H.itemCheck(true, false, false, false, false))
+      assert.equal("note", H.itemCheck(true, true, false, false, false))
+    end)
+
+    it("counts an equipped item as gone", function()
+      assert.equal("note", H.itemCheck(true, false, true, true, false))
+      assert.equal("withdraw", H.itemCheck(true, false, true, true, true))
+    end)
+
+    it("withdraws a gone, unclaimed one at the next login", function()
+      assert.equal("withdraw", H.itemCheck(true, false, false, false, true))
+    end)
+
+    it("asks about a gone, claimed one at the next login", function()
+      assert.equal("ask", H.itemCheck(true, true, false, false, true))
+    end)
+
+    it("keeps one that has ended", function()
+      assert.equal("keep", H.itemCheck(false, false, false, false, true))
+    end)
+
+    it("keeps one whose place in the bags is unknown", function()
+      assert.equal("keep", H.itemCheck(true, false, nil, false, true))
+    end)
+  end)
+
   describe("the winner", function()
     it("is the earliest Claim", function()
       local winner = H.winner({
