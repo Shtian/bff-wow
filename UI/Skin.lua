@@ -15,7 +15,9 @@ Skin.MUTED = { 0.68, 0.67, 0.72 }
 Skin.DIM = { 0.55, 0.54, 0.6 }
 Skin.ONLINE = { 0.44, 0.89, 0.44 }
 Skin.OFFLINE = { 0.33, 0.32, 0.37 }
-Skin.WINDOW = { 0.055, 0.051, 0.078, 0.95 }
+-- 97% opaque: at 95%, bright world text read through a panel's empty
+-- space.
+Skin.WINDOW = { 0.055, 0.051, 0.078, 0.97 }
 Skin.HEADER = { 0.1, 0.095, 0.13, 1 }
 Skin.SIDEBAR = { 0, 0, 0, 0.25 }
 Skin.RAISED = { 0.106, 0.102, 0.137, 1 }

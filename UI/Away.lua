@@ -19,14 +19,18 @@ local Skin = ns.Skin
 
 local WIDTH = 400
 local INSET = 14
-local INTRO = 30
+-- The intro line's slot above the column headings.
+local INTRO = 34
 local HEADINGS = 18
 local BUTTONS = 46
 local ICON = 14
 local ROW = 26
-local NOTICED_TITLE = 18
-local NOTICED_LINE = 22
-local NOTICED_GAP = 12
+-- Above each section title (and the intro line), the title's slot, each
+-- line's slot, and what's left under a section's last line.
+local SECTION_TOP = 12
+local NOTICED_TITLE = 16
+local NOTICED_LINE = 20
+local NOTICED_GAP = 4
 -- The Reaction buttons, in a column at the right of each row.
 local REACT = 18
 local REACT_GAP = 4
@@ -264,7 +268,7 @@ local function drawSection(title, texts, pool, y)
   title:SetShown(#texts > 0)
   for i = #texts + 1, #pool do pool[i]:Hide() end
   if #texts == 0 then return y end
-  y = y - 10
+  y = y - SECTION_TOP
   title:SetPoint("TOPLEFT", INSET, y)
   y = y - NOTICED_TITLE
   for i, text in ipairs(texts) do
@@ -322,12 +326,12 @@ function Away.show(summary)
     frame.intro:SetText(summary.count == 1 and "1 thing happened while you were away."
       or ("%d things happened while you were away."):format(summary.count))
     frame.intro:ClearAllPoints()
-    frame.intro:SetPoint("TOPLEFT", INSET, y - 10)
+    frame.intro:SetPoint("TOPLEFT", INSET, y - SECTION_TOP)
     for _, label in ipairs(frame.headings) do
       label:ClearAllPoints()
-      label:SetPoint(label.x < 0 and "TOPRIGHT" or "TOPLEFT", label.x, y - INTRO)
+      label:SetPoint(label.x < 0 and "TOPRIGHT" or "TOPLEFT", label.x, y - SECTION_TOP - INTRO)
     end
-    y = y - INTRO - HEADINGS
+    y = y - SECTION_TOP - INTRO - HEADINGS
   end
 
   local maxLevel = GetMaxLevelForPlayerExpansion()

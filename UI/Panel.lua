@@ -63,11 +63,11 @@ local SETUP_WIDTH = 320
 local SETUP_COLUMN = 150
 local SETUP_COLUMNS_Y = -72
 local GOALS_INTRO = "Reached together: everyone's progress counts."
-local GOAL_ROW = 74
+local GOAL_ROW = 84
 local GOAL_BAR = 6
 -- The When grid: a cell per hour, a row per day.
 local WHEN_CELL = 11
-local WHEN_ROW = 15
+local WHEN_ROW = 18
 local WHEN_DAYS = 30
 local DAY_NAMES = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" }
 -- Spares: a row per item, under a section heading.
@@ -757,13 +757,13 @@ local function goalRow(i)
   row:SetPoint("RIGHT")
   Skin.edge(row, "TOP", Skin.LINE)
   row.title = Skin.label(row, "heading")
-  row.title:SetPoint("TOPLEFT", INSET, -14)
+  row.title:SetPoint("TOPLEFT", INSET, -18)
   row.numbers = Skin.label(row, "text")
   row.numbers:SetJustifyH("RIGHT")
   row.numbers:SetPoint("RIGHT", -INSET, 0)
   row.numbers:SetPoint("BOTTOM", row.title, "BOTTOM", 0, -1)
   row.bar = CreateFrame("StatusBar", nil, row)
-  row.bar:SetPoint("TOPLEFT", INSET, -36)
+  row.bar:SetPoint("TOPLEFT", INSET, -42)
   row.bar:SetPoint("RIGHT", -INSET, 0)
   row.bar:SetHeight(GOAL_BAR)
   row.bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
