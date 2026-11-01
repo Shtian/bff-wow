@@ -1,10 +1,10 @@
 # Hand-me-downs
 
-Answers [Hand-me-downs: records, Claims, notices and tab](https://github.com/Shtian/bff-wow/issues/66), part of [Hand-me-downs: items free to the Crew](https://github.com/Shtian/bff-wow/issues/54). Builds on sync in #8 (`docs/adr/0001-owner-written-records-gossiped-by-server-time.md`), the Feed in #14 (`docs/design/feed.md`) and Reactions (`docs/design/reactions.md`). Who wins a Claim is `docs/adr/0003-earliest-claim-wins-until-the-owner-gives.md`. Domain vocabulary from `CONTEXT.md`.
+Answers [Hand-me-downs: records, Claims, notices and tab](https://github.com/Shtian/bff-wow/issues/66), part of [Hand-me-downs: items free to the Crew](https://github.com/Shtian/bff-wow/issues/54). Builds on sync in #8 (`docs/adr/0001-owner-written-records-gossiped-by-server-time.md`), the Feed in #14 (`docs/design/feed.md`) and Reactions (`docs/design/reactions.md`). Who wins a Claim is `docs/adr/0003-hand-me-down-claims-earliest-wins-give-is-final.md`. Domain vocabulary from `CONTEXT.md`.
 
 ## The idea in one line
 
-A Member offers an item to the Crew as a Hand-me-down in their own record. Other Members Claim it from their own records, the earliest Claim wins, and the owner Gives it and sends it by ordinary mail.
+A Member offers an item to the Crew as a Hand-me-down in their own record. Other Members Claim it from their own records, the earliest Claim wins, and the owner mails it with ordinary in-game mail, then Gives it in BFF.
 
 ## Hand-me-downs
 
@@ -92,7 +92,7 @@ A Give makes a **gave** Feed entry for the owner: "Ana gave Bob [Cruel Barb]", "
 A sidebar tab under When, opened by `/bff hmd`, within the panel's fixed height and scrolling:
 
 - **From the Crew:** other Members' open Hand-me-downs, newest first. Each row has the item's icon and link (hover for its tooltip, shift-click to link it in chat), the required level, the owner, and the Claim state: "No claims yet", "Bob claimed it first", "You claimed it for Jaina", "Bob claimed it first (you claimed it for Jaina)". **Claim** claims it for the Character you're playing, and a right-click on it picks another of your Characters. **Withdraw** takes your Claim back. Rows none of your Characters is high enough level for are dimmed. There's no class or armour check. The heading shows your open Claims, out of 20.
-- **Yours:** each of your Hand-me-downs, newest first, with the time left and its winning Claim ("Bob claimed it for Jaina (2 Claims)"). **Give** (once there's a winner) asks to confirm and records the Give; mailing the item is up to you. **Withdraw** takes it down. Given ones stay, dimmed, as "Given to Bob (Jaina)", until their 30 days are up. The heading shows how many are up, out of 20.
+- **Yours:** each of your Hand-me-downs, newest first, with the time left and its winning Claim ("Bob claimed it for Jaina (2 Claims)"). **Give** (once there's a winner) is for after you've mailed the item: it asks to confirm and records the Give. **Withdraw** takes it down. Given ones stay, dimmed, as "Given to Bob (Jaina)", until their 30 days are up. The heading shows how many are up, out of 20.
 
 ### Roster
 

@@ -62,7 +62,7 @@ local HAND_ME_DOWN_ICON = 28
 local HAND_ME_DOWN_BUTTON = 58
 local HAND_ME_DOWN_SECTION = 28
 local HAND_ME_DOWNS_NONE = "No Hand-me-downs from the Crew right now."
-local HAND_ME_DOWNS_HOW = "Offer an item: type /bff hmd add, then shift-click it into the chat box. Mail it once you Give it."
+local HAND_ME_DOWNS_HOW = "Offer an item: type /bff hmd add, then shift-click it into the chat box. Mail it to the winner, then Give it."
 local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local GOLD = Skin.GOLD
@@ -978,7 +978,7 @@ end
 local getItemIcon = C_Item and C_Item.GetItemIconByID or GetItemIcon
 
 StaticPopupDialogs.BFF_GIVE_HAND_ME_DOWN = {
-  text = "Give %s to %s? Send it by mail yourself: BFF only tells the Crew.",
+  text = "Give %s to %s? Do this once you've mailed it: BFF only tells the Crew.",
   button1 = YES,
   button2 = NO,
   OnAccept = function(_, data)
@@ -1025,7 +1025,7 @@ local function handMeDownHeading(index)
   return heading
 end
 
--- A line of muted text in the list: nothing on offer, or how to offer.
+-- A line of muted text in the list: no Hand-me-downs yet, or how to post one.
 local function handMeDownNote(index)
   local note = handMeDownsView.notes[index]
   if note then return note end

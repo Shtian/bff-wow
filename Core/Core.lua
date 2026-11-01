@@ -406,8 +406,8 @@ function Core:withdrawHandMeDown(id)
 end
 
 -- Gives an own open Hand-me-down to the winning Claim's Character, which
--- is final: every client shows that recipient from then on. Sending the
--- mail is up to you. expected is the winner's Member id as you were shown
+-- is final: every client shows that recipient from then on. It's for
+-- after you've mailed the item, which BFF can't see. expected is the winner's Member id as you were shown
 -- it, if any, so an earlier Claim arriving meanwhile isn't Given to
 -- unseen. Returns true, or nil and "unknown", "noClaim" or
 -- "winnerChanged".
