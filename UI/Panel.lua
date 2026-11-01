@@ -1361,6 +1361,10 @@ end
 -- Crew code in a read-only box with the text selected (addons can't copy
 -- to the clipboard), with the hidden count and removed Members right of
 -- it.
+-- The footer's small labels (Crew code, Hidden, Removed) share one
+-- bottom line, so they line up with each other and the code box.
+local CODE_LINE = 15
+
 local function createFooter()
   footer = CreateFrame("Frame", nil, frame.content)
   footer:SetPoint("BOTTOMLEFT")
@@ -1370,9 +1374,9 @@ local function createFooter()
 
   footer.removed = CreateFrame("Button", nil, footer)
   footer.removed:SetHeight(14)
-  footer.removed:SetPoint("BOTTOMRIGHT", -INSET, 19)
+  footer.removed:SetPoint("BOTTOMRIGHT", -INSET, CODE_LINE)
   footer.removed.text = Skin.label(footer.removed, "small", GOLD)
-  footer.removed.text:SetPoint("RIGHT")
+  footer.removed.text:SetPoint("BOTTOMRIGHT")
   footer.removed.text:SetJustifyH("RIGHT")
   footer.removed:SetScript("OnClick", showRemovedMenu)
 
@@ -1386,7 +1390,7 @@ local function createFooter()
   footer.status:SetWordWrap(true)
 
   local codeLabel = Skin.label(footer, "small", MUTED)
-  codeLabel:SetPoint("BOTTOMLEFT", INSET, 15)
+  codeLabel:SetPoint("BOTTOMLEFT", INSET, CODE_LINE)
   codeLabel:SetText("Crew code")
   footer.code = Skin.editBox(footer, 100)
   footer.code:SetHeight(22)
@@ -1410,9 +1414,9 @@ local function drawFooter(crew, summary)
   footer.removed:SetShown(removed > 0)
   footer.hidden:ClearAllPoints()
   if removed > 0 then
-    footer.hidden:SetPoint("RIGHT", footer.removed, "LEFT", -10, 0)
+    footer.hidden:SetPoint("BOTTOMRIGHT", footer.removed, "BOTTOMLEFT", -10, 0)
   else
-    footer.hidden:SetPoint("BOTTOMRIGHT", -INSET, 19)
+    footer.hidden:SetPoint("BOTTOMRIGHT", -INSET, CODE_LINE)
   end
   footer.hidden:SetText(summary.hidden > 0 and ("Hidden: %d (unseen %dd)"):format(summary.hidden,
     ns.Core.HIDE_AFTER_DAYS) or "")
