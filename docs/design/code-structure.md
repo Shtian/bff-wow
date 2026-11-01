@@ -12,7 +12,7 @@ Almost all behaviour lives in one deep, pure-Lua module, **Core**, behind a smal
 |---|---|---|
 | **Core** (`Core/`) | yes | Everything BFF knows and decides: Member records, sync, Feed, panel rows, saved-data layout. Details below. |
 | **Snapshot** (`Game/Snapshot.lua`) | no | Reads level, XP, zone, class, gold and GUID, counts deaths (kept per Character in `BFF_CharacterDB`), and calls `core:updateOwn(character)`. `Snapshot.locate()` reads where the Character stands, for Core's `locate`. |
-| **Bags** (`Game/Bags.lua`) | no | Offers a bag item as a Hand-me-down: the item on the cursor (the Hand-me-downs tab's drop slot) or the first bag item matching a link (`/bff hmd add`). Passes its item GUID and binding to `core:postHandMeDown`, which refuses an item that can't be traded. |
+| **Bags** (`Game/Bags.lua`) | no | Offers a bag item as a Hand-me-down: the item on the cursor (the Hand-me-downs tab's drop slot) or the first bag item matching a link (`/bff hmd add`). Passes its item GUID and binding to `core:postHandMeDown`, which refuses an item that can't be traded. Also tells Core where a posted item is now (`findItem`), for `core:bagsUpdated` on `BAG_UPDATE_DELAYED`. |
 | **Channel link** (`Game/ChannelLink.lua`) | no | The production link adapter: joins and hides the Crew channel (including filtering its system notices out of chat), AceComm with ChatThrottleLib, decides when the link is up or down, reports Members leaving the channel, and has an echo mode. See `docs/research/channel-spike.md`. |
 | **UI** (`UI/Skin.lua`, `UI/Panel.lua`, `UI/Minimap.lua`, `UI/MapPins.lua`, `UI/Away.lua`, `UI/ToastQueue.lua`, `UI/Toasts.lua`, `UI/Settings.lua`) | no | Renders Core's rows and summaries and sends user commands to Core. Shows no state it worked out itself. Skin is the shared flat look (colours, fonts, window, buttons, Feed icons) for the panel, the popup, toasts and map pins. ToastQueue is pure and tested offline (`docs/design/toasts.md`). |
 | **App** (`BFF.lua`) | no | Wiring only: creates Core, routes WoW events, runs a 1 s `C_Timer` ticker that calls `core:tick()`, and handles slash commands. |
@@ -34,12 +34,14 @@ Core is created with:
 - `utcOffset`: how many seconds local time is ahead of server time, so `feed()` starts each day at local midnight and `playTimes()` shows local hours (default 0).
 - `locate()` (optional): where the Character being played stands, as `Snapshot.locate()` reads it: `{ mapId, x, y }` in the open world, `{ instance }` inside an instance, or nil when it can't be read. Core calls it just before its own DATA goes out (a zone change, a ding, the heartbeat), so moving alone never sends anything or changes the record. The Ledger rounds the position to 0.1%, keeps the last open-world spot inside an instance, and keeps the last known spot on nil.
 - `itemLink(itemString)` (optional): the game's link for an item string, as `Snapshot.itemLink` reads it, or nil while the item isn't cached. Hand-me-down texts say "an item" until then (`docs/design/hand-me-downs.md`).
+- `findItem(itemGuid)` (optional): where a posted item is now, as `Bags.findItem` reads it: whether it's in the bags or bank (nil if the game can't say), and whether it's equipped.
 
 Inputs:
 
 - `updateOwn(character)`: the current state of the Character being played, from Snapshot.
 - `tick()`: once a second. Core decides what is due (reply delays, debounced sends, heartbeat, online timeouts, pruning), and counts the second towards Play times.
 - `received(string)`, `up()`, `down()` and `gone(name)`: the incoming half of the link port.
+- `bagsUpdated()`: on each `BAG_UPDATE_DELAYED`, never before the first of a session. Core checks where each own Hand-me-down's item is (ADR 0004).
 - Commands: start, join and leave a Crew, change the display name, Set as Main, Remove and re-add a Member, Pause sharing, and settings (see `docs/design/joining-a-crew.md`). Hand-me-downs: post (with the item's GUID, kept locally, and its binding: an item that can't be traded is refused), withdraw and Give one, and make and withdraw a Claim (`docs/design/hand-me-downs.md`).
 
 Outputs:
@@ -50,6 +52,7 @@ Outputs:
   - `feedEntry(entry)`: a live Feed event, fired only when the chat-line or toast setting is on. App prints `entry.text` and shows a toast, each if its setting is on.
   - `reaction(news)`: a live Reaction to one of your entries, fired and shown the same way as `feedEntry`. Toasts for the same entry merge (see `docs/design/reactions.md`).
   - `handMeDown(news)`: a live Hand-me-down notice (a Claim now winning yours, or one Given to you), fired and shown the same way as `feedEntry` (see `docs/design/hand-me-downs.md`).
+  - `handMeDownGone(gone)`: at the first bag check after a real login, a Hand-me-down whose item is gone was withdrawn (`action` "withdrawn": App says so in chat) or has a Claim (`action` "ask", with its `winner`: App asks whether to Give or withdraw it).
   - `awaySummary(summary)`: While you were away has settled after an initial login. Fired only when the popup setting is on and it isn't empty. App shows it once out of combat.
   - `notice(kind)`: one-off messages ("BFF is out of date", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.

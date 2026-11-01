@@ -1201,8 +1201,12 @@ local function drawHandMeDownRow(row, data, yours)
   row.icon:SetTexture(getItemIcon and getItemIcon(data.item) or QUESTION_MARK)
   local left = data.expires > 0 and ago(data.expires) .. " left" or "ending"
   if yours then
-    row.info:SetText(data.given and data.state or ("%s · %s"):format(left, data.state))
-    Skin.color(row.info, data.winner and GOLD or MUTED)
+    if data.gone then
+      row.info:SetText(("This item has left your bags · %s"):format(data.state))
+    else
+      row.info:SetText(data.given and data.state or ("%s · %s"):format(left, data.state))
+    end
+    Skin.color(row.info, (data.winner or data.gone) and GOLD or MUTED)
     drawHandMeDownText(row, data, placeHandMeDownButtons(row, not data.given and "Give" or nil,
       data.canWithdraw and "Withdraw" or nil))
     row.primary:SetEnabled(data.canGive)

@@ -212,3 +212,16 @@ function HandMeDowns.winner(claims)
   end
   return best
 end
+
+-- What to do about an own Hand-me-down from where its item is (docs/adr/0004):
+-- "keep", "note" (it has left your bags this session; a sold item can still
+-- be bought back), "withdraw" or "ask" (whether to Give it to the winning
+-- Claim or withdraw it). Gone means not in the bags or bank, or equipped.
+-- Only the next login decides, as buyback is empty by then. inInventory
+-- nil means the game couldn't say, which keeps it.
+function HandMeDowns.itemCheck(isOpen, hasClaim, inInventory, isEquipped, isNextLogin)
+  if not isOpen or inInventory == nil then return "keep" end
+  if inInventory and not isEquipped then return "keep" end
+  if not isNextLogin then return "note" end
+  return hasClaim and "ask" or "withdraw"
+end

@@ -58,6 +58,54 @@ local function showAway(summary)
   end
 end
 
+-- Hand-me-downs whose item left the bags and that have a Claim, asked
+-- about one at a time: Give to the winner, withdraw, or not now (the
+-- question comes back next login). Escape is "not now".
+local goneAsks = {}
+
+local function askNextGone()
+  local ask = goneAsks[1]
+  if not ask then return end
+  -- No free popup: drop the rest rather than wait for an OnHide that
+  -- won't come. They're asked again next login.
+  if not StaticPopup_Show("BFF_HAND_ME_DOWN_GONE", ask.link or "Your Hand-me-down",
+    ask.winner and ask.winner.character or "?", ask) then
+    goneAsks = {}
+  end
+end
+
+StaticPopupDialogs.BFF_HAND_ME_DOWN_GONE = {
+  text = "%s left your bags. Did you mail it to %s?",
+  button1 = "Give",
+  button2 = "Not now",
+  button3 = "Withdraw",
+  OnAccept = function(_, ask)
+    local ok, reason = ns.core:giveHandMeDown(ask.id, ask.winner and ask.winner.memberId)
+    if not ok then say(MESSAGES[reason]) end
+  end,
+  OnAlt = function(_, ask)
+    local ok, reason = ns.core:withdrawHandMeDown(ask.id)
+    if not ok then say(MESSAGES[reason]) end
+  end,
+  OnHide = function()
+    table.remove(goneAsks, 1)
+    C_Timer.After(0, askNextGone)
+  end,
+  timeout = 0,
+  whileDead = true,
+  hideOnEscape = true,
+}
+
+-- Core found a Hand-me-down's item gone at login: it withdrew it, or asks.
+local function handMeDownGone(gone)
+  if gone.action == "withdrawn" then
+    say(("%s has left your bags, so your Hand-me-down is withdrawn."):format(gone.link or "An item"))
+  elseif gone.action == "ask" then
+    goneAsks[#goneAsks + 1] = gone
+    if #goneAsks == 1 then askNextGone() end
+  end
+end
+
 local function onCoreEvent(event, kind)
   if event == "changed" then
     ns.Panel.refresh()
@@ -77,6 +125,8 @@ local function onCoreEvent(event, kind)
     if ns.core:isToastsOn() then ns.Toasts.show(kind) end
   elseif event == "awaySummary" then
     showAway(kind)
+  elseif event == "handMeDownGone" then
+    handMeDownGone(kind)
   end
 end
 
@@ -111,6 +161,7 @@ local function start(isInitialLogin)
     utcOffset = utcOffset(),
     locate = ns.Snapshot.locate,
     itemLink = ns.Snapshot.itemLink,
+    findItem = ns.Bags.findItem,
   })
   ns.ChannelLink.start(ns.core, function(kind) say(MESSAGES[kind]) end)
   ns.ChannelLink.setCrew(ns.core:crew())
@@ -128,11 +179,16 @@ end
 
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+-- After a real login the bags read as empty until the first of these, so
+-- Core checks Hand-me-down items only on it.
+eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_ENTERING_WORLD" and not ns.core then
     start((...))
   elseif event == "GET_ITEM_INFO_RECEIVED" then
     if ns.core then itemInfoReceived() end
+  elseif event == "BAG_UPDATE_DELAYED" then
+    if ns.core then ns.core:bagsUpdated() end
   elseif event == "PLAYER_REGEN_ENABLED" then
     eventFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
     local summary = pendingAway
