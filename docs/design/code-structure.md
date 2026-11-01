@@ -11,9 +11,9 @@ Almost all behaviour lives in one deep, pure-Lua module, **Core**, behind a smal
 | Module | Pure? | Owns |
 |---|---|---|
 | **Core** (`Core/`) | yes | Everything BFF knows and decides: Member records, sync, Feed, panel rows, saved-data layout. Details below. |
-| **Snapshot** (`Game/Snapshot.lua`) | no | Reads level, XP, zone, class and GUID, counts deaths (kept per Character in `BFF_CharacterDB`), and calls `core:updateOwn(character)`. |
+| **Snapshot** (`Game/Snapshot.lua`) | no | Reads level, XP, zone, class and GUID, counts deaths (kept per Character in `BFF_CharacterDB`), and calls `core:updateOwn(character)`. `Snapshot.locate()` reads where the Character stands, for Core's `locate`. |
 | **Channel link** (`Game/ChannelLink.lua`) | no | The production link adapter: joins and hides the Crew channel (including filtering its system notices out of chat), AceComm with ChatThrottleLib, decides when the link is up or down, reports Members leaving the channel, and has an echo mode. See `docs/research/channel-spike.md`. |
-| **UI** (`UI/Skin.lua`, `UI/Panel.lua`, `UI/Minimap.lua`, `UI/Away.lua`, `UI/ToastQueue.lua`, `UI/Toasts.lua`, `UI/Settings.lua`) | no | Renders Core's rows and summaries and sends user commands to Core. Shows no state it worked out itself. Skin is the shared flat look (colours, fonts, window, buttons, Feed icons) for the panel, the popup and toasts. ToastQueue is pure and tested offline (`docs/design/toasts.md`). |
+| **UI** (`UI/Skin.lua`, `UI/Panel.lua`, `UI/Minimap.lua`, `UI/MapPins.lua`, `UI/Away.lua`, `UI/ToastQueue.lua`, `UI/Toasts.lua`, `UI/Settings.lua`) | no | Renders Core's rows and summaries and sends user commands to Core. Shows no state it worked out itself. Skin is the shared flat look (colours, fonts, window, buttons, Feed icons) for the panel, the popup, toasts and map pins. ToastQueue is pure and tested offline (`docs/design/toasts.md`). |
 | **App** (`BFF.lua`) | no | Wiring only: creates Core, routes WoW events, runs a 1 s `C_Timer` ticker that calls `core:tick()`, and handles slash commands. |
 
 The first draft's Zones module is dropped from v1, because only the overlap finder needed it.
@@ -31,6 +31,7 @@ Core is created with:
 - `initialLogin`: `isInitialLogin` from `PLAYER_ENTERING_WORLD`, so Core can tell a login from a reload (see `docs/design/feed.md`).
 - `maxLevel`: from `GetMaxLevelForPlayerExpansion()`, for max level Feed entries.
 - `utcOffset`: how many seconds local time is ahead of server time, so `feed()` starts each day at local midnight and `playTimes()` shows local hours (default 0).
+- `locate()` (optional): where the Character being played stands, as `Snapshot.locate()` reads it: `{ mapId, x, y }` in the open world, `{ instance }` inside an instance, or nil when it can't be read. Core calls it just before its own DATA goes out (a zone change, a ding, the heartbeat), so moving alone never sends anything or changes the record. The Ledger rounds the position to 0.1%, keeps the last open-world spot inside an instance, and keeps the last known spot on nil.
 
 Inputs:
 
@@ -50,7 +51,7 @@ Outputs:
   - `notice(kind)`: one-off messages ("BFF is out of date", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
 - Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isPaused()`, `isMinimapShown()`, `isChatLinesOn()`, `isAwayPopupOn()`, `isToastsOn()`, `toastSound()` and `toastPosition()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
-- Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), `goals()` (the Goals tab's row per Crew goal track, `docs/design/goals.md`), `playTimes(memberId?)` (the When tab's grid for the Crew or one Member, `docs/design/play-times.md`), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
+- Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), `goals()` (the Goals tab's row per Crew goal track, `docs/design/goals.md`), `playTimes(memberId?)` (the When tab's grid for the Crew or one Member, `docs/design/play-times.md`), `mapPins()` (a world map pin per other Member the Roster shows, at their shown Character's last-seen spot), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
 - `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` or `awaySummary`.
 - `react(key)` reacts to someone else's Feed entry, with a key from `feed()` or the summary.
 
@@ -117,6 +118,7 @@ Every file starts with `local _, ns = ...` and attaches itself to `ns`, the addo
 | ChatThrottleLib | send limits (used by AceComm) |
 | LibSerialize, LibDeflate | compact payloads; pure Lua, so tests use them too |
 | LibDataBroker-1.1, LibDBIcon-1.0 | minimap button |
+| HereBeDragons-2.0, HereBeDragons-Pins-2.0 | world map pins (`UI/MapPins.lua`); 2.18+ knows WoW: Forever |
 
 Not embedded: AceDB (Core owns plain SavedVariables), AceConsole and AceEvent (a few lines with `SlashCmdList` and an event frame), and AceConfig (the native Settings API).
 
@@ -130,7 +132,7 @@ BFF.lua
 Bindings.xml                         -- key binding to open the panel
 Core/  Core.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  Feed.lua  Roster.lua  Goals.lua  PlayTimes.lua  CrewCode.lua  Codec.lua
 Game/  Snapshot.lua  ChannelLink.lua
-UI/    Skin.lua  Panel.lua  Minimap.lua  Away.lua  ToastQueue.lua  Toasts.lua  Settings.lua
+UI/    Skin.lua  Panel.lua  Minimap.lua  MapPins.lua  Away.lua  ToastQueue.lua  Toasts.lua  Settings.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases
 Libs/                                -- fetched, gitignored
 scripts/ fetch-libs.sh  package.sh   -- package.sh builds the release zip

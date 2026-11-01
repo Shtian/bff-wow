@@ -1,6 +1,7 @@
 -- Snapshot: reads the Character being played and hands it to Core. It also
 -- counts deaths, kept per Character in BFF_CharacterDB, so a client crash
--- loses that session's deaths (see docs/design/code-structure.md).
+-- loses that session's deaths (see docs/design/code-structure.md), and
+-- reads where the Character stands for Core's locate().
 
 local _, ns = ...
 
@@ -40,6 +41,33 @@ local function read()
     zone = zone,
     deaths = BFF_CharacterDB.deaths,
   }
+end
+
+-- Where the Character stands: mapId, x and y (0–1) on the best map for
+-- the player, or instance (its name) inside an instance, where the
+-- position can't be read. Nil while neither is (loading screens, unmapped
+-- areas); Core keeps the last known spot and rounds it.
+local function locate()
+  if IsInInstance() then
+    local name = GetInstanceInfo()
+    if type(name) == "string" and name ~= "" then return { instance = name } end
+    return nil
+  end
+  local mapId = C_Map.GetBestMapForUnit("player")
+  if not mapId then return nil end
+  local position = C_Map.GetPlayerMapPosition(mapId, "player")
+  if not position then return nil end
+  local x, y = position:GetXY()
+  if type(x) ~= "number" or type(y) ~= "number" then return nil end
+  if issecretvalue and (issecretvalue(x) or issecretvalue(y)) then return nil end
+  return { mapId = mapId, x = x, y = y }
+end
+
+-- Core calls this just before own DATA goes out. A map API that errors
+-- (a restriction we don't know of) only costs the spot, never the send.
+function Snapshot.locate()
+  local ok, location = pcall(locate)
+  return ok and location or nil
 end
 
 function Snapshot.start(core)

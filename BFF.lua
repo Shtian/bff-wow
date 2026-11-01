@@ -47,11 +47,13 @@ local function onCoreEvent(event, kind)
   if event == "changed" then
     ns.Panel.refresh()
     ns.Minimap.refresh()
+    ns.MapPins.refresh()
     ns.Settings.refresh()
   elseif event == "crewChanged" then
     ns.ChannelLink.setCrew(ns.core:crew())
     ns.Panel.refresh()
     ns.Minimap.refresh()
+    ns.MapPins.refresh()
     ns.Settings.refresh()
   elseif event == "notice" then
     say(MESSAGES[kind])
@@ -81,11 +83,13 @@ local function start(isInitialLogin)
     initialLogin = isInitialLogin,
     maxLevel = GetMaxLevelForPlayerExpansion(),
     utcOffset = utcOffset(),
+    locate = ns.Snapshot.locate,
   })
   ns.ChannelLink.start(ns.core, function(kind) say(MESSAGES[kind]) end)
   ns.ChannelLink.setCrew(ns.core:crew())
   ns.Panel.start(ns.core)
   ns.Minimap.start(ns.core)
+  ns.MapPins.start(ns.core)
   ns.Toasts.start(ns.core)
   ns.Settings.start(ns.core)
   ns.Snapshot.start(ns.core)

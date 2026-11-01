@@ -33,6 +33,9 @@ externals:
     tag: v1.1.4
   Libs/LibDBIcon-1.0:
     url: https://repos.curseforge.com/wow/libdbicon-1-0/tags/v12.1.2/LibDBIcon-1.0
+  Libs/HereBeDragons:
+    url: https://github.com/Nevcairiel/HereBeDragons
+    tag: 2.18-release
 
 ignore:
   - tests

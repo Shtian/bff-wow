@@ -1,5 +1,5 @@
--- Skin: BFF's own flat look, shared by the panel and the While you were
--- away popup. Dark windows with a 1px border, a gold accent, Arial Narrow
+-- Skin: BFF's own flat look, shared by the panel, the While you were away
+-- popup, toasts and map pins. Dark windows with a 1px border, a gold accent, Arial Narrow
 -- for text and Friz Quadrata for titles. Built from solid colour textures
 -- and a few long-standing game textures, so it doesn't depend on Blizzard's
 -- frame templates looking the same in every client.
@@ -127,6 +127,21 @@ Skin.fonts = {
   tiny = font("BFFFontTiny", NARROW, 10),
   glyph = font("BFFFontGlyph", NARROW, 20),
 }
+
+-- A class's colour as r, g, b; white for an unknown class.
+function Skin.classColor(classFilename)
+  local color = classFilename and RAID_CLASS_COLORS[classFilename]
+  if color then return color.r, color.g, color.b end
+  return 1, 1, 1
+end
+
+-- How long ago, as Last seen words it: 5m, 3h, 2d.
+function Skin.ago(seconds)
+  seconds = math.max(0, seconds)
+  if seconds < 60 * 60 then return ("%dm"):format(math.floor(seconds / 60)) end
+  if seconds < 24 * 60 * 60 then return ("%dh"):format(math.floor(seconds / 3600 + 0.5)) end
+  return ("%dd"):format(math.floor(seconds / 86400 + 0.5))
+end
 
 -- A colour as a text escape: "|cffrrggbb".
 function Skin.hex(color)

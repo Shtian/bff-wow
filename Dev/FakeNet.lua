@@ -95,8 +95,10 @@ end
 
 -- A simulated Member's account. options: random (default a
 -- generator seeded by name), db (default empty), character (the one it
--- plays: guid, name, classFilename, level, xp, maxXp, zone, deaths) and
--- utcOffset (seconds its local time is ahead of server time, default 0).
+-- plays: guid, name, classFilename, level, xp, maxXp, zone, deaths),
+-- location (where it stands, as Snapshot.locate reports it: mapId, x and y,
+-- or instance; default nowhere known) and utcOffset (seconds its local time
+-- is ahead of server time, default 0).
 function FakeNet:add(name, options)
   options = options or {}
   local client = setmetatable({
@@ -105,6 +107,7 @@ function FakeNet:add(name, options)
     db = options.db or {},
     random = options.random or seeded(seedFor(name)),
     utcOffset = options.utcOffset,
+    location = copy(options.location),
     character = copy(options.character) or {
       guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
       level = 10, xp = 0, maxXp = 1000, zone = "Elwynn Forest", deaths = 0,
@@ -151,6 +154,7 @@ local function newCore(client, initialLogin)
     initialLogin = initialLogin,
     maxLevel = net.maxLevel,
     utcOffset = client.utcOffset,
+    locate = function() return copy(client.location) end,
   })
   client.core:updateOwn(copy(client.character))
   client.memberId = client.core:rows()[1].memberId
@@ -240,6 +244,13 @@ end
 function Client:play(changes)
   for k, v in pairs(changes or {}) do self.character[k] = v end
   if self.core then self.core:updateOwn(copy(self.character)) end
+  return self
+end
+
+-- Moves the client: where Core's next locate() finds it, as
+-- Snapshot.locate would report it (nil when it can't be read).
+function Client:move(location)
+  self.location = copy(location)
   return self
 end
 

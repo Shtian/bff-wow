@@ -19,13 +19,15 @@ local HEARTBEAT = 5 * 60
 local DIGEST_SIZE = 10
 
 -- ledger; now() and random() from Core; send(message) encodes and hands a
--- message to the link.
-function Gossip.new(ledger, now, random, send)
+-- message to the link; beforeOwnSend() runs just before own DATA goes out,
+-- so whatever only rides a send (where you stand) can be written first.
+function Gossip.new(ledger, now, random, send, beforeOwnSend)
   return setmetatable({
     ledger = ledger,
     now = now,
     random = random,
     send = send,
+    beforeOwnSend = beforeOwnSend,
     linkUp = false,
     paused = false,
     open = false,
@@ -65,6 +67,7 @@ local function sendDigest(self)
 end
 
 local function sendOwn(self)
+  if self.beforeOwnSend then self.beforeOwnSend() end
   local own = self.ledger:own()
   self.dirty, self.dataDue = false, nil
   self.lastOwnSent = self.now()
@@ -115,8 +118,9 @@ function Gossip:sendNow(message)
 end
 
 -- The own record changed. urgency is "now" (ding, death, new Character,
--- display name, Main), "soon" (zone, debounced) or "later" (XP: waits for
--- the next send or the heartbeat).
+-- display name, Main), "soon" (zone, debounced) or "later" (XP, Play times:
+-- waits for the next send or the heartbeat). Where you stand never calls
+-- this: it is written just before own DATA goes out (beforeOwnSend).
 function Gossip:ownChanged(urgency)
   self.dirty = true
   local due
