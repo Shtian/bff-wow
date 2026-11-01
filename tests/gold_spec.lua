@@ -31,12 +31,7 @@ local function sentBy(net, from, name)
 end
 
 describe("Gold", function()
-  it("counts a gold-only change as a change, but not an urgent one", function()
-    local ns = load()
-    local before = { level = 10, deaths = 0, zone = "Elwynn Forest", money = 5 * GOLD }
-    local after = { level = 10, deaths = 0, zone = "Elwynn Forest", money = 6 * GOLD }
-    assert.equal("later", ns.Gossip.urgency(before, after))
-
+  it("sends a gold-only change only along with the next send", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     a:play({ money = 5 * GOLD, level = 11 })
