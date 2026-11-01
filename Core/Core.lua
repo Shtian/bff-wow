@@ -67,8 +67,9 @@ function Core.new(deps)
     findItem = type(deps.findItem) == "function" and deps.findItem or nil,
     -- Own Hand-me-down ids whose item has left the bags this session.
     goneItems = {},
-    -- Whether the check at login has run: only it ends Hand-me-downs.
-    loginChecked = deps.initialLogin ~= true,
+    -- Whether the check that may end Hand-me-downs is still to come: the
+    -- first after a real login, never after a /reload (buyback survives it).
+    loginCheckDue = deps.initialLogin == true,
   }, Core)
   local itemLink = type(deps.itemLink) == "function" and deps.itemLink or nil
   self.log = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin, itemLink)
@@ -461,15 +462,16 @@ end
 -- "ask", id, item, link, winner }), to ask whether to Give or withdraw it.
 function Core:bagsUpdated()
   if not (self.findItem and self.ledger:playing()) then return end
-  local isNextLogin = not self.loginChecked
-  self.loginChecked = true
+  local isNextLogin = self.loginCheckDue
+  self.loginCheckDue = false
   local rows, changed = {}, false
   for _, row in ipairs(self.giving:view().yours) do rows[row.id] = row end
   for id, itemGuid in pairs(self.ledger:handMeDownItems()) do
     local row = rows[id]
-    local isOpen = row ~= nil and row.given == nil and self.giving:ownOpen(id) ~= nil
+    local isOpen = row ~= nil and self.giving:ownOpen(id) ~= nil
+    local hasClaim = isOpen and row.winner ~= nil
     local inInventory, isEquipped = self.findItem(itemGuid)
-    local action = ns.HandMeDowns.itemCheck(isOpen, row and row.winner ~= nil, inInventory, isEquipped, isNextLogin)
+    local action = ns.HandMeDowns.itemCheck(isOpen, hasClaim, inInventory, isEquipped, isNextLogin)
     local isGone = action == "note" or action == "ask"
     if isGone ~= (self.goneItems[id] == true) then
       self.goneItems[id] = isGone or nil

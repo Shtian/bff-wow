@@ -58,6 +58,54 @@ local function showAway(summary)
   end
 end
 
+-- Hand-me-downs whose item left the bags and that have a Claim, asked
+-- about one at a time: Give to the winner, withdraw, or not now (the
+-- question comes back next login). Escape is "not now".
+local goneAsks = {}
+
+local function askNextGone()
+  local ask = goneAsks[1]
+  if not ask then return end
+  -- No free popup: drop the rest rather than wait for an OnHide that
+  -- won't come. They're asked again next login.
+  if not StaticPopup_Show("BFF_HAND_ME_DOWN_GONE", ask.link or "Your Hand-me-down",
+    ask.winner and ask.winner.character or "?", ask) then
+    goneAsks = {}
+  end
+end
+
+StaticPopupDialogs.BFF_HAND_ME_DOWN_GONE = {
+  text = "%s left your bags. Did you mail it to %s?",
+  button1 = "Give",
+  button2 = "Not now",
+  button3 = "Withdraw",
+  OnAccept = function(_, ask)
+    local ok, reason = ns.core:giveHandMeDown(ask.id, ask.winner and ask.winner.memberId)
+    if not ok then say(MESSAGES[reason]) end
+  end,
+  OnAlt = function(_, ask)
+    local ok, reason = ns.core:withdrawHandMeDown(ask.id)
+    if not ok then say(MESSAGES[reason]) end
+  end,
+  OnHide = function()
+    table.remove(goneAsks, 1)
+    C_Timer.After(0, askNextGone)
+  end,
+  timeout = 0,
+  whileDead = true,
+  hideOnEscape = true,
+}
+
+-- Core found a Hand-me-down's item gone at login: it withdrew it, or asks.
+local function handMeDownGone(gone)
+  if gone.action == "withdrawn" then
+    say(("%s has left your bags, so your Hand-me-down is withdrawn."):format(gone.link or "An item"))
+  elseif gone.action == "ask" then
+    goneAsks[#goneAsks + 1] = gone
+    if #goneAsks == 1 then askNextGone() end
+  end
+end
+
 local function onCoreEvent(event, kind)
   if event == "changed" then
     ns.Panel.refresh()
@@ -78,7 +126,7 @@ local function onCoreEvent(event, kind)
   elseif event == "awaySummary" then
     showAway(kind)
   elseif event == "handMeDownGone" then
-    ns.handMeDownGone(kind)
+    handMeDownGone(kind)
   end
 end
 
@@ -158,50 +206,6 @@ StaticPopupDialogs.BFF_LEAVE_CREW = {
   whileDead = true,
   hideOnEscape = true,
 }
-
--- Hand-me-downs whose item left the bags and that have a Claim, asked
--- about one at a time: Give to the winner, withdraw, or not now (the
--- question comes back next login). Escape is "not now".
-local goneAsks = {}
-
-local function askNextGone()
-  local ask = goneAsks[1]
-  if not ask then return end
-  StaticPopup_Show("BFF_HAND_ME_DOWN_GONE", ask.link or "Your Hand-me-down",
-    ask.winner and ask.winner.character or "?", ask)
-end
-
-StaticPopupDialogs.BFF_HAND_ME_DOWN_GONE = {
-  text = "%s left your bags. Did you mail it to %s?",
-  button1 = "Give",
-  button2 = "Not now",
-  button3 = "Withdraw",
-  OnAccept = function(_, ask)
-    local ok, reason = ns.core:giveHandMeDown(ask.id, ask.winner and ask.winner.memberId)
-    if not ok then say(MESSAGES[reason]) end
-  end,
-  OnAlt = function(_, ask)
-    local ok, reason = ns.core:withdrawHandMeDown(ask.id)
-    if not ok then say(MESSAGES[reason]) end
-  end,
-  OnHide = function()
-    table.remove(goneAsks, 1)
-    C_Timer.After(0, askNextGone)
-  end,
-  timeout = 0,
-  whileDead = true,
-  hideOnEscape = true,
-}
-
--- Core found a Hand-me-down's item gone at login: it withdrew it, or asks.
-function ns.handMeDownGone(gone)
-  if gone.action == "withdrawn" then
-    say(("%s has left your bags, so your Hand-me-down is withdrawn."):format(gone.link or "An item"))
-  elseif gone.action == "ask" then
-    goneAsks[#goneAsks + 1] = gone
-    if #goneAsks == 1 then askNextGone() end
-  end
-end
 
 -- Asks to confirm, then leaves.
 function ns.confirmLeave()
