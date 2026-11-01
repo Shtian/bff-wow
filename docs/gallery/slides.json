@@ -1,0 +1,133 @@
+[
+  {
+    "id": "00-banner",
+    "layout": "banner",
+    "width": 1600,
+    "height": 520,
+    "title": "Best Friends in Forever",
+    "caption": "Keep up with your friends in WoW: Forever, even when you play at different times.",
+    "shots": []
+  },
+  {
+    "id": "01-hero",
+    "layout": "hero",
+    "title": "While you were away",
+    "caption": "Log in to every ding, death and new character your friends had since you last played.",
+    "shots": [
+      {
+        "file": "away.jpg",
+        "crop": [
+          700,
+          240,
+          520,
+          360
+        ]
+      },
+      {
+        "file": "toast.jpg",
+        "crop": [
+          1258,
+          0,
+          308,
+          100
+        ]
+      }
+    ]
+  },
+  {
+    "id": "02-roster",
+    "layout": "right",
+    "title": "Your whole crew",
+    "caption": "Every friend's characters, levels and whereabouts, and when each was last seen.",
+    "shots": [
+      {
+        "file": "roster.jpg",
+        "crop": [
+          680,
+          10,
+          552,
+          460
+        ]
+      }
+    ]
+  },
+  {
+    "id": "03-feed",
+    "layout": "left",
+    "title": "Cheer every ding",
+    "caption": "One click sends a cheer for a ding, respects for a death, or a welcome for someone new.",
+    "shots": [
+      {
+        "file": "feed.jpg",
+        "crop": [
+          680,
+          10,
+          552,
+          460
+        ]
+      }
+    ]
+  },
+  {
+    "id": "04-goals",
+    "layout": "right",
+    "title": "Level up together",
+    "caption": "Goals the whole crew works towards, like everyone reaching level 80. Nobody is ranked.",
+    "shots": [
+      {
+        "file": "goals.jpg",
+        "crop": [
+          680,
+          10,
+          552,
+          460
+        ]
+      }
+    ]
+  },
+  {
+    "id": "05-spares",
+    "layout": "left",
+    "title": "Pass on spare gear",
+    "caption": "Offer an item to your friends. Whoever claims it first gets it by in‑game mail.",
+    "shots": [
+      {
+        "file": "spares.jpg",
+        "crop": [
+          680,
+          10,
+          552,
+          460
+        ]
+      }
+    ]
+  },
+  {
+    "id": "06-when",
+    "layout": "right",
+    "title": "When everyone plays",
+    "caption": "A heatmap of the hours each friend usually plays, in your own time zone.",
+    "shots": [
+      {
+        "file": "when.jpg",
+        "crop": [
+          680,
+          10,
+          552,
+          460
+        ]
+      }
+    ]
+  },
+  {
+    "id": "07-crew",
+    "layout": "steps",
+    "title": "Start a crew",
+    "caption": "No server, no account, and no shared guild needed.",
+    "steps": [
+      "Everyone in the group installs BFF.",
+      "One friend types `/bff start` and shares the code.",
+      "The others type `/bff join` with the code."
+    ]
+  }
+]

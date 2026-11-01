@@ -1,0 +1,216 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Archivo+Narrow:wght@400;600&display=block" rel="stylesheet">
+<style>
+  /* The brand register of DESIGN.md: the addon's dark window and Ember Gold,
+     the icon's teal as the second ring, Cinzel and Archivo Narrow. The game
+     screenshot is the scenery; everything else stays out of its way. */
+  :root {
+    --gold: #ffd14a;
+    --gold-deep: #f0a21c;
+    --teal: #3fd6e0;
+    --text: #e8e6e3;
+    --muted: #adabb8;
+    --window: #0e0d14;
+    --navy: #0b1a4a;
+    /* Gallery scale (1920×1080), see DESIGN.md: display, title, step, caption. */
+    --t-display: 104px;
+    --t-title: 96px;
+    --t-step: 40px;
+    --t-caption: 34px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: var(--window); }
+  body { font-family: "Archivo Narrow", "Arial Narrow", sans-serif; color: var(--text); }
+
+  .slide {
+    position: relative; overflow: hidden;
+    width: var(--w); height: var(--h);
+    background: radial-gradient(120% 120% at 50% 0%, var(--navy), var(--window) 70%);
+  }
+  /* Without scenery (banner, steps): the icon's two rings as faint light. */
+  .slide.unlit {
+    background:
+      radial-gradient(55% 80% at 15% 35%, rgba(240,162,28,.10), transparent 70%),
+      radial-gradient(50% 70% at 90% 75%, rgba(63,214,224,.08), transparent 70%),
+      radial-gradient(120% 120% at 50% 0%, var(--navy), var(--window) 70%);
+  }
+  /* The slide's own screenshot as real scenery: lightly softened, not smeared. */
+  .scenery {
+    position: absolute; inset: -30px;
+    background-size: cover; background-position: center;
+    filter: blur(8px) brightness(.85);
+  }
+  /* Night falls on the text side so the copy reads; the far side keeps the world. */
+  .shade { position: absolute; inset: 0;
+    background:
+      linear-gradient(var(--dir), rgba(14,13,20,.94) 0%, rgba(14,13,20,.88) 36%, rgba(14,13,20,.42) 72%, rgba(14,13,20,.5) 100%),
+      linear-gradient(180deg, rgba(14,13,20,.25), transparent 30%, transparent 70%, rgba(14,13,20,.45)); }
+  /* Fine grain so the gradients don't band. */
+  .grain { position: absolute; inset: 0; opacity: .06; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+
+  /* The braid: a gold line meeting a teal one at a spark, like the icon. */
+  .braid { display: flex; align-items: center; height: 14px; width: 280px; }
+  .braid i { display: block; height: 2px; flex: 1; }
+  .braid i:first-child { background: linear-gradient(90deg, transparent, var(--gold-deep)); }
+  .braid i:last-child { background: linear-gradient(90deg, var(--teal), transparent); }
+  .braid b { width: 10px; height: 10px; flex: none; border-radius: 50%;
+    background: radial-gradient(circle, #fff 0 25%, rgba(255,209,74,.9) 40%, transparent 70%); }
+
+  h1 { font-family: Cinzel, serif; font-weight: 600; line-height: 1.06; letter-spacing: 0;
+    color: var(--gold); font-size: var(--t-title); text-wrap: balance;
+    text-shadow: 0 2px 10px rgba(14,13,20,.6); }
+  p.caption { color: var(--muted); font-size: var(--t-caption); line-height: 1.38;
+    text-wrap: pretty; max-width: 30ch; }
+
+  /* Split layouts: copy on one side, screenshot(s) on the other. The shot
+     column is minmax(0, 1fr), so a wide shot can never push the copy. */
+  .split { position: absolute; inset: 0; display: grid; align-items: center;
+    grid-template-columns: 640px minmax(0, 1fr); gap: 80px; padding: 0 110px 0 120px; }
+  .split.right { grid-template-columns: minmax(0, 1fr) 640px; padding: 0 120px 0 110px; }
+  .split.right .copy { order: 2; }
+  .copy { display: flex; flex-direction: column; gap: 32px; }
+  .shots { position: relative; height: 880px; min-width: 0; }
+
+  /* A screenshot in a window like the addon's own: hairline edge, gold-to-teal top line. */
+  .frame { position: absolute; border-radius: 10px; overflow: hidden; background: var(--window);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 4px 12px rgba(0,0,0,.35), 0 28px 64px rgba(0,0,0,.5); }
+  .frame::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; z-index: 2;
+    background: linear-gradient(90deg, transparent, var(--gold) 30%, var(--teal) 70%, transparent); }
+  .frame img { position: absolute; display: block; }
+  .frame.missing { display: grid; place-items: center; background: rgba(255,255,255,.03);
+    color: var(--muted); font-size: 28px; }
+  .frame.missing::after { content: ""; position: absolute; inset: 16px;
+    border: 2px dashed rgba(255,255,255,.15); border-radius: 6px; }
+
+  /* Hero: the cover. The only slide with the name on it, small, since
+     CurseForge shows the name and icon next to the gallery. */
+  .hero h1 { font-size: var(--t-display); }
+  .lockup { position: absolute; top: 72px; left: 120px; display: flex; align-items: center; gap: 16px; }
+  .lockup img { width: 56px; height: 56px; border-radius: 22%;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 6px 18px rgba(0,0,0,.45); }
+  .lockup span { font-family: Cinzel, serif; font-weight: 600; font-size: 26px; letter-spacing: .12em; }
+
+  /* Steps: a numbered how-to where the order is the information. */
+  .steps { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 56px;
+    counter-reset: step; max-width: 860px; }
+  .steps li { display: grid; grid-template-columns: 96px 1fr; align-items: baseline;
+    font-size: var(--t-step); line-height: 1.3; counter-increment: step; }
+  .steps li::before { content: counter(step); font-family: Cinzel, serif; font-weight: 600;
+    font-size: 80px; line-height: 1; color: var(--gold); }
+  .steps b { font-weight: 600; color: var(--gold); white-space: nowrap; }
+
+  /* Banner, for the README: icon, title and caption in a row. */
+  .banner { position: absolute; inset: 0; display: flex; align-items: center; gap: 64px; padding: 0 110px; }
+  .banner > img { width: 220px; height: 220px; border-radius: 22%; flex: none;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.15), 0 16px 48px rgba(0,0,0,.55); }
+  .banner .copy { gap: 24px; }
+  .banner h1 { font-size: 84px; }
+  .banner p.caption { font-size: 32px; max-width: none; text-wrap: balance; }
+
+  /* Draft renders say so, so they can't be mistaken for finished images. */
+  .draft { position: absolute; top: 28px; right: 28px; z-index: 9; padding: 6px 14px;
+    border: 2px solid #f2665c; color: #f2665c; font-weight: 600; font-size: 24px; letter-spacing: .2em; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  // SLIDE is set by render.mjs: { layout, width, height, title, caption, steps,
+  // shots: [{ file, crop: [x, y, w, h], width, url }], draft }, where url is
+  // null when the screenshot doesn't exist yet.
+  const s = window.SLIDE;
+  const W = s.width || 1920, H = s.height || 1080;
+  const ICON = window.ICON;
+  const MAX_SCALE = 1.4; // enlarging game text further makes it soft
+  const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  // `text` in steps marks a chat command.
+  const marks = (t) => esc(t).replace(/`([^`]+)`/g, "<b>$1</b>");
+
+  const braid = `<div class="braid"><i></i><b></b><i></i></div>`;
+  const shots = s.shots || [];
+  const scenery = shots.find((x) => x.url);
+  const right = s.layout === "right";
+
+  let html = `<div class="slide${scenery ? "" : " unlit"}" style="--w:${W}px;--h:${H}px;--dir:${right ? "270deg" : "90deg"}">`;
+  if (scenery) html += `<div class="scenery" style="background-image:url('${scenery.url}')"></div><div class="shade"></div>`;
+  html += `<div class="grain"></div>`;
+
+  const copy = `<div class="copy"><h1>${esc(s.title)}</h1>${braid}<p class="caption">${esc(s.caption)}</p></div>`;
+  const frames = shots.map((shot, i) => shot.url
+    ? `<div class="frame" data-i="${i}"><img src="${shot.url}"></div>`
+    : `<div class="frame missing" data-i="${i}">shots/${esc(shot.file)}</div>`).join("");
+
+  if (s.layout === "banner") {
+    html += `<div class="banner"><img src="${ICON}">${copy}</div>`;
+  } else if (s.layout === "steps") {
+    const list = `<ol class="steps">${(s.steps || []).map((t) => `<li><span>${marks(t)}</span></li>`).join("")}</ol>`;
+    html += `<div class="split">${copy}<div>${list}</div></div>`;
+  } else {
+    const cls = s.layout === "hero" ? "split hero" : `split${right ? " right" : ""}`;
+    html += `<div class="${cls}">${copy}<div class="shots">${frames}</div></div>`;
+    if (s.layout === "hero") html += `<div class="lockup"><img src="${ICON}"><span>BFF</span></div>`;
+  }
+  if (s.draft) html += `<div class="draft">DRAFT</div>`;
+  html += `</div>`;
+  document.getElementById("root").innerHTML = html;
+
+  // Fit a crop of cw×ch into a box, never enlarging past MAX_SCALE.
+  const fit = (shot, cw, ch, box) => shot.width ? shot.width / cw : Math.min(box.w / cw, box.h / ch, MAX_SCALE);
+
+  function size(frame, shot, img, scale, cw, ch, cx, cy) {
+    frame.style.width = `${cw * scale}px`;
+    frame.style.height = `${ch * scale}px`;
+    if (img) {
+      img.style.width = `${img.naturalWidth * scale}px`;
+      img.style.left = `${-cx * scale}px`;
+      img.style.top = `${-cy * scale}px`;
+    }
+    return { w: cw * scale, h: ch * scale };
+  }
+
+  // Lay the frames out inside the shots column, measured, not assumed. One
+  // shot is centred. With two, the second (a toast) sits below the first,
+  // on the side away from the copy, overlapping only its bottom 28px.
+  function layout() {
+    const area = document.querySelector(".shots");
+    if (!area) return;
+    const A = { w: area.clientWidth, h: area.clientHeight };
+    const items = [...area.querySelectorAll(".frame")].map((frame) => {
+      const i = Number(frame.dataset.i), shot = shots[i], img = frame.querySelector("img");
+      const [cx, cy, cw, ch] = shot.crop || (img ? [0, 0, img.naturalWidth, img.naturalHeight]
+        : i ? [0, 0, 600, 80] : [0, 0, 1000, 680]);
+      return { frame, shot, img, cx, cy, cw, ch };
+    });
+    const OVERLAP = 28;
+    const [main, inset] = items;
+    let insetSize = { w: 0, h: 0 };
+    if (inset) {
+      const sc = fit(inset.shot, inset.cw, inset.ch, { w: A.w * 0.62, h: 200 });
+      insetSize = size(inset.frame, inset.shot, inset.img, sc, inset.cw, inset.ch, inset.cx, inset.cy);
+    }
+    const mainBox = { w: A.w, h: inset ? A.h - insetSize.h + OVERLAP : A.h };
+    const m = size(main.frame, main.shot, main.img, fit(main.shot, main.cw, main.ch, mainBox), main.cw, main.ch, main.cx, main.cy);
+    const total = m.h + (inset ? insetSize.h - OVERLAP : 0);
+    const top = (A.h - total) / 2, left = (A.w - m.w) / 2;
+    main.frame.style.left = `${left}px`;
+    main.frame.style.top = `${top}px`;
+    if (inset) {
+      const awayFromCopy = s.layout === "right" ? left - 40 : left + m.w - insetSize.w + 40;
+      inset.frame.style.left = `${Math.max(0, Math.min(A.w - insetSize.w, awayFromCopy))}px`;
+      inset.frame.style.top = `${top + m.h - OVERLAP}px`;
+      inset.frame.style.zIndex = 3;
+    }
+  }
+
+  window.READY = Promise.all([
+    document.fonts.ready,
+    ...[...document.querySelectorAll(".frame img")].map((img) => img.decode()),
+  ]).then(layout);
+</script>
+</body>
+</html>

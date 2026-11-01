@@ -45,6 +45,8 @@ ignore:
   - AGENTS.md
   - CLAUDE.md
   - CONTEXT.md
+  - PRODUCT.md
+  - DESIGN.md
   - package.json
   - package-lock.json
   - node_modules
