@@ -58,3 +58,17 @@ _Avoid_: Popup, alert, notification (when meaning a toast)
 **Last seen**:
 When a Member or Character was last played, as reported by that Member's own client rather than observed by others.
 _Avoid_: Last online, last active
+
+### Together and against each other
+
+**Crew goal**:
+A target the whole Crew reaches together, where every Member's progress counts and nobody is ranked or credited. Built in, as a ladder of ever-higher targets.
+_Avoid_: Challenge, quest, achievement, milestone
+
+**Crew levels**:
+The sum, over the Crew's Members, of each Member's highest Character level. Alts don't add to it.
+_Avoid_: Total levels
+
+**Competition**:
+A contest that ranks Members against each other. Unlike a Crew goal, it names who is ahead.
+_Avoid_: Race, leaderboard (when meaning the contest)
