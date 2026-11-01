@@ -53,7 +53,15 @@ local TITLE = "Best Friends in Forever"
 local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
 local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
 local PAUSED = "You appear offline: the others don't see you. Change it in Settings."
-local FEED_EMPTY = "Nothing yet. Dings, deaths and new Characters show up here."
+local FEED_EMPTY_TITLE = "Nothing yet"
+local FEED_EMPTY = "Dings, deaths and new Characters show up here."
+-- The stretch of timeline behind an empty Feed's one node.
+local FEED_EMPTY_LINE = 120
+-- The setup view's block, centred in the window: Display name across it,
+-- Start and Join in two columns below.
+local SETUP_WIDTH = 320
+local SETUP_COLUMN = 150
+local SETUP_COLUMNS_Y = -72
 local GOALS_INTRO = "Reached together: everyone's progress counts."
 local GOAL_ROW = 74
 local GOAL_BAR = 6
@@ -576,10 +584,31 @@ local function createFeedView()
   feedView.line:SetWidth(2)
   feedView.days = {}
   feedView.entries = {}
-  feedView.empty = Skin.label(feedView.content, "text", MUTED)
-  feedView.empty:SetPoint("TOPLEFT", INSET, -INSET)
-  feedView.empty:SetWidth(CONTENT_WIDTH - 2 * INSET)
-  feedView.empty:SetText(FEED_EMPTY)
+
+  -- An empty Feed: a short stretch of the timeline with one faint node,
+  -- centred in the view, and what will show up beside it.
+  local empty = CreateFrame("Frame", nil, feedView)
+  empty:SetPoint("LEFT")
+  empty:SetPoint("RIGHT")
+  empty:SetHeight(FEED_EMPTY_LINE)
+  local line = empty:CreateTexture(nil, "BACKGROUND")
+  line:SetColorTexture(1, 1, 1, 0.08)
+  line:SetWidth(2)
+  line:SetPoint("TOPLEFT", LINE_X, 0)
+  line:SetPoint("BOTTOMLEFT", LINE_X, 0)
+  local node = Skin.feedPicture(empty, NODE)
+  node:SetPoint("LEFT", INSET, 0)
+  node:SetPicture(Skin.FEED_PICTURES.ding)
+  node.picture:SetDesaturated(true)
+  node.picture:SetAlpha(0.5)
+  local title = Skin.label(empty, "heading", TEXT)
+  title:SetPoint("BOTTOMLEFT", node, "RIGHT", 10, 1)
+  title:SetText(FEED_EMPTY_TITLE)
+  local text = Skin.label(empty, "small", MUTED)
+  text:SetPoint("TOPLEFT", node, "RIGHT", 10, -3)
+  text:SetWidth(CONTENT_WIDTH - 2 * INSET - NODE - 10)
+  text:SetText(FEED_EMPTY)
+  feedView.empty = empty
 end
 
 -- A day's label in a chip on the timeline's line.
@@ -1290,34 +1319,43 @@ local function layout(inCrew)
   if not inCrew then frame.headerRight:SetText("") end
 end
 
--- The setup view: display name, then Start a Crew or Join a Crew.
+-- The setup view, centred in the window: Display name, then Start a Crew
+-- and Join a Crew side by side, a hairline between them.
 local function createSetup()
   setup = CreateFrame("Frame", nil, frame.content)
-  setup:SetPoint("TOPLEFT", INSET + 4, -INSET)
-  setup:SetPoint("BOTTOMRIGHT", -INSET - 4, INSET)
+  setup:SetSize(SETUP_WIDTH, -SETUP_COLUMNS_Y + 90)
+  setup:SetPoint("CENTER", 0, 10)
 
   local nameLabel = Skin.label(setup, "label", DIM)
-  nameLabel:SetPoint("TOPLEFT", 0, -4)
+  nameLabel:SetPoint("TOPLEFT")
   nameLabel:SetText("DISPLAY NAME")
-  setup.name = Skin.editBox(setup, 220)
+  setup.name = Skin.editBox(setup, SETUP_WIDTH)
   setup.name:SetMaxLetters(16)
   setup.name:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -6)
   setup.nameError = Skin.label(setup, "small", ERROR)
   setup.nameError:SetPoint("TOPLEFT", setup.name, "BOTTOMLEFT", 0, -4)
+  setup.nameError:SetWidth(SETUP_WIDTH)
 
   local startLabel = Skin.label(setup, "label", DIM)
-  startLabel:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -62)
+  startLabel:SetPoint("TOPLEFT", 0, SETUP_COLUMNS_Y)
   startLabel:SetText("START A CREW")
   setup.start = Skin.button(setup, "Start", function()
     local _, reason = core:startCrew(setup.name:GetText())
     setup.nameError:SetText(reason and ns.MESSAGES[reason] or "")
   end, true)
+  setup.start:SetWidth(SETUP_COLUMN)
   setup.start:SetPoint("TOPLEFT", startLabel, "BOTTOMLEFT", 0, -6)
 
+  local divider = setup:CreateTexture(nil, "ARTWORK")
+  divider:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
+  divider:SetWidth(1)
+  divider:SetHeight(70)
+  divider:SetPoint("TOP", setup, "TOPLEFT", SETUP_WIDTH / 2, SETUP_COLUMNS_Y)
+
   local joinLabel = Skin.label(setup, "label", DIM)
-  joinLabel:SetPoint("TOPLEFT", startLabel, "BOTTOMLEFT", 0, -50)
+  joinLabel:SetPoint("TOPLEFT", SETUP_WIDTH - SETUP_COLUMN, SETUP_COLUMNS_Y)
   joinLabel:SetText("JOIN A CREW")
-  setup.code = Skin.editBox(setup, 140)
+  setup.code = Skin.editBox(setup, SETUP_COLUMN)
   setup.code:SetMaxLetters(12)
   setup.code:SetPoint("TOPLEFT", joinLabel, "BOTTOMLEFT", 0, -6)
   local function join()
@@ -1327,9 +1365,11 @@ local function createSetup()
   end
   setup.code:SetScript("OnEnterPressed", join)
   setup.join = Skin.button(setup, "Join", join)
-  setup.join:SetPoint("LEFT", setup.code, "RIGHT", 8, 0)
+  setup.join:SetWidth(SETUP_COLUMN)
+  setup.join:SetPoint("TOPLEFT", setup.code, "BOTTOMLEFT", 0, -6)
   setup.codeError = Skin.label(setup, "small", ERROR)
-  setup.codeError:SetPoint("TOPLEFT", setup.code, "BOTTOMLEFT", 0, -4)
+  setup.codeError:SetPoint("TOPLEFT", setup.join, "BOTTOMLEFT", 0, -4)
+  setup.codeError:SetWidth(SETUP_COLUMN)
 end
 
 local function showSetup()
