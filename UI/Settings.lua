@@ -128,17 +128,42 @@ local function createNotifications()
   frame.minimap:SetPoint("TOPLEFT", frame.away, "BOTTOMLEFT", 0, -4)
 end
 
--- The sound picker opens a menu of the sounds the client has; choosing one
--- plays it.
-local function soundMenu(owner)
-  MenuUtil.CreateContextMenu(owner, function(_, root)
-    for _, sound in ipairs(ns.Toasts.sounds()) do
-      root:CreateRadio(sound.label, function() return core:toastSound() == sound.key end, function()
-        core:setToastSound(sound.key)
-        ns.Toasts.play(sound.key)
-      end)
-    end
-  end)
+-- The sound picker: a radio per sound the client has; choosing one plays
+-- it.
+local function buildSoundMenu(_, root)
+  for _, sound in ipairs(ns.Toasts.sounds()) do
+    root:CreateRadio(sound.label, function() return core:toastSound() == sound.key end, function()
+      core:setToastSound(sound.key)
+      ns.Toasts.play(sound.key)
+    end)
+  end
+end
+
+-- The game's own dropdown, as on its Settings pages: the chosen sound in
+-- a select box with an arrow. A client without the template gets a button
+-- that opens the same menu.
+local DROPDOWN = "WowStyle1DropdownTemplate"
+
+local function createSoundPicker()
+  local hasDropdown = C_XMLUtil and C_XMLUtil.GetTemplateInfo
+    and C_XMLUtil.GetTemplateInfo(DROPDOWN) ~= nil
+  if hasDropdown then
+    local dropdown = CreateFrame("DropdownButton", nil, frame, DROPDOWN)
+    dropdown:SetupMenu(buildSoundMenu)
+    return dropdown
+  end
+  local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  button:SetScript("OnClick", function(owner) MenuUtil.CreateContextMenu(owner, buildSoundMenu) end)
+  return button
+end
+
+-- Shows the chosen sound: the dropdown reads it from its menu's radios.
+local function drawSoundPicker()
+  if frame.sound.GenerateMenu then
+    frame.sound:GenerateMenu()
+  else
+    frame.sound:SetText(ns.Toasts.soundLabel(core:toastSound()))
+  end
 end
 
 local function createToasts()
@@ -151,10 +176,9 @@ local function createToasts()
 
   frame.soundLabel = createLabel(frame, "Sound")
   frame.soundLabel:SetPoint("TOPLEFT", frame.toasts, "BOTTOMLEFT", 4, -14)
-  frame.sound = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  frame.sound = createSoundPicker()
   frame.sound:SetSize(160, 22)
   frame.sound:SetPoint("LEFT", frame.soundLabel, "LEFT", 116, 0)
-  frame.sound:SetScript("OnClick", soundMenu)
   frame.play = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
   frame.play:SetSize(60, 22)
   frame.play:SetText("Play")
@@ -222,7 +246,7 @@ function Page.refresh()
   -- The sound and Move toasts are greyed out while toasts are off.
   local toasts = core:isToastsOn()
   frame.toasts:SetChecked(toasts)
-  frame.sound:SetText(ns.Toasts.soundLabel(core:toastSound()))
+  drawSoundPicker()
   frame.soundLabel:SetAlpha(toasts and 1 or 0.5)
   frame.sound:SetEnabled(toasts)
   frame.play:SetEnabled(toasts)

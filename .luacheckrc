@@ -28,6 +28,7 @@ stds.wow = {
     "C_Map",
     "C_PartyInfo",
     "C_Timer",
+    "C_XMLUtil",
     "ChatEdit_InsertLink",
     "ChatFrame_AddMessageEventFilter",
     "ChatFrame_SendTell",

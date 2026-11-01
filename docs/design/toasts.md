@@ -39,7 +39,7 @@ A **Toasts** section on the settings page, under Notifications and display:
 | Setting | Default |
 |---|---|
 | Show toasts for live events | on |
-| Sound: a menu of game sounds, plus a **Play** button | Friend online (`UI_BNET_TOAST`) |
+| Sound: a dropdown of game sounds (the game's own select box), plus a **Play** button | Friend online (`UI_BNET_TOAST`) |
 | **Move toasts** button | |
 
 The sound and Move toasts are greyed out while toasts are off. Choosing a sound plays it. There's no duration setting.
