@@ -2,7 +2,7 @@
 -- counts deaths, kept per Character in BFF_CharacterDB, so a client crash
 -- loses that session's deaths (see docs/design/code-structure.md), and
 -- reads where the Character stands for Core's locate(), and item info for
--- Hand-me-downs.
+-- Spares.
 
 local _, ns = ...
 

@@ -65,9 +65,9 @@ function Core.new(deps)
     utcOffset = type(deps.utcOffset) == "number" and deps.utcOffset or 0,
     linkUp = false,
     findItem = type(deps.findItem) == "function" and deps.findItem or nil,
-    -- Own Hand-me-down ids whose item has left the bags this session.
+    -- Own Spare ids whose item has left the bags this session.
     goneItems = {},
-    -- Whether the check that may end Hand-me-downs is still to come: the
+    -- Whether the check that may end Spares is still to come: the
     -- first after a real login, never after a /reload (buyback survives it).
     loginCheckDue = deps.initialLogin == true,
   }, Core)
@@ -100,7 +100,7 @@ local function updateLink(self)
 end
 
 -- New Feed entries from other Members, new Reactions to your own and
--- Hand-me-down notices each make a chat line, a toast or both once
+-- Spare notices each make a chat line, a toast or both once
 -- settled, if either is on, and are seen once they have. Entries already
 -- seen (a gave entry your notice covers) make none.
 local function announce(self, entries, reactions, notices)
@@ -117,7 +117,7 @@ local function announce(self, entries, reactions, notices)
   end
   for _, news in ipairs(notices or {}) do
     self.giving:markSeen(news)
-    self.listener("handMeDown", self.giving:describe(news))
+    self.listener("spare", self.giving:describe(news))
   end
 end
 
@@ -215,11 +215,11 @@ end
 
 -- Counts for the title and minimap button: online, members, canPlay (online
 -- Members whose Character being played can play with you), hidden
--- (Characters unseen for Core.HIDE_AFTER_DAYS) and handMeDowns (others'
--- open Hand-me-downs one of your Characters is high enough level for).
+-- (Characters unseen for Core.HIDE_AFTER_DAYS) and spares (others'
+-- open Spares one of your Characters is high enough level for).
 function Core:summary()
   local summary = ns.Roster.summary(self.ledger, self.now())
-  summary.handMeDowns = self.giving:usableCount()
+  summary.spares = self.giving:usableCount()
   return summary
 end
 
@@ -252,8 +252,8 @@ end
 -- text } for max level, joined and left) and welcome. A button is { key,
 -- reacted }, the key for react(). noticed is Your Crew noticed, newest
 -- first: { text, reaction, time } per own entry with unseen Reactions.
--- goals is the Crew goals reached ({ text, time }), and handMeDowns the
--- Hand-me-down notices, then the Gives, each newest first: { kind
+-- goals is the Crew goals reached ({ text, time }), and spares the
+-- Spare notices, then the Gives, each newest first: { kind
 -- ("claimed", "given" or "gave"), text, time }.
 local function awaySummary(self)
   if not self:isAwayPopupOn() then return end
@@ -368,8 +368,8 @@ function Core:react(key)
   return true
 end
 
--- The Hand-me-downs tab: { crew, yours, unseen, claims, maxClaims, open,
--- maxOpen }. crew is other Members' open Hand-me-downs, newest first: {
+-- The Spares tab: { crew, yours, unseen, claims, maxClaims, open,
+-- maxOpen }. crew is other Members' open Spares, newest first: {
 -- ownerId, owner (display name), id, item (the item string to resolve),
 -- link (the game's link, nil until cached), level (required), time
 -- (posted), expires (seconds left), usable (one of your Characters is
@@ -379,9 +379,9 @@ end
 -- is your own, open or Given, newest first: { id, item, link, level,
 -- time, expires, winner, claims, given ({ memberId, name, character }
 -- once Given), canGive, canWithdraw, state }. unseen counts notices not
--- yet shown, claims and open your open Claims and Hand-me-downs, out of
+-- yet shown, claims and open your open Claims and Spares, out of
 -- maxClaims and maxOpen.
-function Core:handMeDowns()
+function Core:spares()
   local view = self.giving:view()
   for _, row in ipairs(view.yours) do
     if self.goneItems[row.id] and not row.given then row.gone = true end
@@ -399,65 +399,65 @@ end
 -- needs and, optionally, what the bags say about it: { guid (its item
 -- GUID), isBound (C_Item.IsBound), bindType (14th return of
 -- C_Item.GetItemInfo) }. An item that can't be traded is refused. The
--- GUID is kept for the Character being played (see handMeDownItems) and
--- never goes in the record. Returns the Hand-me-down's id, or nil and
+-- GUID is kept for the Character being played (see spareItems) and
+-- never goes in the record. Returns the Spare's id, or nil and
 -- "noCrew", "invalidItem", "bound", "questItem", "accountBound" or
 -- "tooMany" (20 open already).
-function Core:postHandMeDown(link, level, inBags)
+function Core:postSpare(link, level, inBags)
   if not self.db.crew then return nil, "noCrew" end
-  local item = ns.HandMeDowns.itemString(link)
+  local item = ns.Spares.itemString(link)
   if not item then return nil, "invalidItem" end
   inBags = type(inBags) == "table" and inBags or {}
-  local ok, reason = ns.HandMeDowns.tradeable(inBags.isBound, inBags.bindType)
+  local ok, reason = ns.Spares.tradeable(inBags.isBound, inBags.bindType)
   if not ok then return nil, reason end
-  if self.giving:openCount() >= ns.HandMeDowns.MAX_OPEN then return nil, "tooMany" end
+  if self.giving:openCount() >= ns.Spares.MAX_OPEN then return nil, "tooMany" end
   level = type(level) == "number" and level >= 0 and math.floor(level) or 0
-  local id = self.ledger:postHandMeDown(item, level, inBags.guid)
+  local id = self.ledger:postSpare(item, level, inBags.guid)
   ownWrite(self)
   return id
 end
 
--- The item GUIDs of the open Hand-me-downs the Character being played
+-- The item GUIDs of the open Spares the Character being played
 -- posted, { [id] = itemGuid }, so the game side can tell when an item
 -- has left the bags.
-function Core:handMeDownItems()
-  return self.ledger:handMeDownItems()
+function Core:spareItems()
+  return self.ledger:spareItems()
 end
 
--- Withdraws an own open Hand-me-down. Returns true, or nil and "unknown".
-function Core:withdrawHandMeDown(id)
+-- Withdraws an own open Spare. Returns true, or nil and "unknown".
+function Core:withdrawSpare(id)
   if not self.giving:ownOpen(id) then return nil, "unknown" end
-  self.ledger:withdrawHandMeDown(id)
+  self.ledger:withdrawSpare(id)
   self.giving:check(true)
   ownWrite(self)
   return true
 end
 
--- Gives an own open Hand-me-down to the winning Claim's Character, which
+-- Gives an own open Spare to the winning Claim's Character, which
 -- is final: every client shows that recipient from then on. It's for
 -- after you've mailed the item, which BFF can't see. expected is the winner's Member id as you were shown
 -- it, if any, so an earlier Claim arriving meanwhile isn't Given to
 -- unseen. Returns true, or nil and "unknown", "noClaim" or
 -- "winnerChanged".
-function Core:giveHandMeDown(id, expected)
-  local handMeDown = self.giving:ownOpen(id)
-  if not handMeDown then return nil, "unknown" end
+function Core:giveSpare(id, expected)
+  local spare = self.giving:ownOpen(id)
+  if not spare then return nil, "unknown" end
   local winner = self.giving:winnerOf(id)
   if not winner then return nil, "noClaim" end
   if expected ~= nil and winner.memberId ~= expected then return nil, "winnerChanged" end
-  self.ledger:giveHandMeDown(id, winner.memberId, winner.guid)
-  self.log:ownGave({ id = id, item = handMeDown.item, to = winner.memberId, guid = winner.guid })
+  self.ledger:giveSpare(id, winner.memberId, winner.guid)
+  self.log:ownGave({ id = id, item = spare.item, to = winner.memberId, guid = winner.guid })
   self.giving:check(true)
   ownWrite(self)
   return true
 end
 
 -- The bags have settled (BAG_UPDATE_DELAYED): checks where the item of
--- each open Hand-me-down the Character being played posted is
+-- each open Spare the Character being played posted is
 -- (docs/adr/0004). Never call it before the first BAG_UPDATE_DELAYED of a
 -- session: until then the bags read as empty. A gone item is noted on
 -- your tab (row.gone); at the first check after a real login one with no
--- Claim is withdrawn, and the listener hears ("handMeDownGone", { action
+-- Claim is withdrawn, and the listener hears ("spareGone", { action
 -- = "withdrawn", id, item, link }), and for one with a Claim, ({ action =
 -- "ask", id, item, link, winner }), to ask whether to Give or withdraw it.
 function Core:bagsUpdated()
@@ -466,33 +466,33 @@ function Core:bagsUpdated()
   self.loginCheckDue = false
   local rows, changed = {}, false
   for _, row in ipairs(self.giving:view().yours) do rows[row.id] = row end
-  for id, itemGuid in pairs(self.ledger:handMeDownItems()) do
+  for id, itemGuid in pairs(self.ledger:spareItems()) do
     local row = rows[id]
     local isOpen = row ~= nil and self.giving:ownOpen(id) ~= nil
     local hasClaim = isOpen and row.winner ~= nil
     local inInventory, isEquipped = self.findItem(itemGuid)
-    local action = ns.HandMeDowns.itemCheck(isOpen, hasClaim, inInventory, isEquipped, isNextLogin)
+    local action = ns.Spares.itemCheck(isOpen, hasClaim, inInventory, isEquipped, isNextLogin)
     local isGone = action == "note" or action == "ask"
     if isGone ~= (self.goneItems[id] == true) then
       self.goneItems[id] = isGone or nil
       changed = true
     end
     if action == "withdraw" then
-      self:withdrawHandMeDown(id)
-      self.listener("handMeDownGone", { action = "withdrawn", id = id, item = row.item, link = row.link })
+      self:withdrawSpare(id)
+      self.listener("spareGone", { action = "withdrawn", id = id, item = row.item, link = row.link })
     elseif action == "ask" then
-      self.listener("handMeDownGone", { action = "ask", id = id, item = row.item, link = row.link, winner = row.winner })
+      self.listener("spareGone", { action = "ask", id = id, item = row.item, link = row.link, winner = row.winner })
     end
   end
   if changed then self.listener("changed") end
 end
 
--- Claims another Member's open Hand-me-down for one of your Characters by
+-- Claims another Member's open Spare for one of your Characters by
 -- GUID, by default the one being played. It goes into your record and
 -- out with your next DATA, so it works in combat and offline. Returns
 -- true, or nil and "own", "unknown", "claimed", "tooManyClaims"
 -- (20 open) or "unknownCharacter".
-function Core:claimHandMeDown(owner, id, guid)
+function Core:claimSpare(owner, id, guid)
   local reason
   guid, reason = self.giving:canClaim(owner, id, guid)
   if not guid then return nil, reason end
@@ -501,7 +501,7 @@ function Core:claimHandMeDown(owner, id, guid)
   return true
 end
 
--- Withdraws your Claim, until the Hand-me-down is Given. Returns true, or
+-- Withdraws your Claim, until the Spare is Given. Returns true, or
 -- nil and "notClaimed" or "given".
 function Core:withdrawClaim(owner, id)
   local ok, reason = self.giving:canWithdrawClaim(owner, id)
@@ -511,13 +511,13 @@ function Core:withdrawClaim(owner, id)
   return true
 end
 
--- How many Hand-me-down notices haven't been shown yet, for the sidebar.
-function Core:unseenHandMeDowns()
+-- How many Spare notices haven't been shown yet, for the sidebar.
+function Core:unseenSpares()
   return self.giving:unseen()
 end
 
--- The Hand-me-downs tab was opened: every notice is seen.
-function Core:handMeDownsSeen()
+-- The Spares tab was opened: every notice is seen.
+function Core:sparesSeen()
   if self.giving:markAllSeen() then self.listener("changed") end
 end
 
@@ -781,7 +781,7 @@ local function finishLeaving(self)
   self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } })
   self.ledger:forgetOthers()
   self.ledger:clearReactions()
-  self.ledger:clearHandMeDowns()
+  self.ledger:clearSpares()
   self.giving:clear()
   self.log:clear()
   self.crewGoals:clear()

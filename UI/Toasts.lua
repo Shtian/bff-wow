@@ -1,9 +1,9 @@
--- Toasts: live Feed entries, Reactions to yours and Hand-me-down notices
+-- Toasts: live Feed entries, Reactions to yours and Spare notices
 -- as small notices on screen, from the toasts decision. ToastQueue decides
 -- what shows; this draws it in the Skin's look, plays the chosen sound,
 -- and has the move mode Settings opens. Toasts stack away from where
 -- they're placed: down from the top half of the screen, up from the
--- bottom half. A left click opens the Feed (the Hand-me-downs tab for a
+-- bottom half. A left click opens the Feed (the Spares tab for a
 -- notice), a right click dismisses, and an entry you can react to has a
 -- Reaction button at its right edge. See docs/design/toasts.md and
 -- docs/design/reactions.md.
@@ -19,9 +19,14 @@ local WIDTH = 300
 local HEIGHT = 40
 local GAP = 6
 local ICON = 18
+local PICTURE = 24
 local REACT = 20
 -- Seconds a toast takes to fade out at the end of its time.
 local FADE = 0.6
+-- The timer line along a toast's bottom edge: gold on the entries the
+-- Feed highlights, faint white otherwise.
+local TIMER = 2
+local TIMER_FAINT = { 1, 1, 1, 0.18 }
 -- Where toasts start, down from the top centre, until moved.
 local DEFAULT_FROM_TOP = 160
 -- The overflow toast's icon: the Feed's, as in the panel's sidebar.
@@ -81,8 +86,8 @@ local function position()
   return x, y, y > height / 2
 end
 
--- Opens the tab the toast is about: the Feed, or the Hand-me-downs tab
--- for a Hand-me-down notice.
+-- Opens the tab the toast is about: the Feed, or the Spares tab
+-- for a Spare notice.
 local function openFeed(toast)
   queue:dismiss(toast)
   ns.Panel.show(toast.entry and toast.entry.opens or "feed")
@@ -107,22 +112,25 @@ local function createToast()
   toast:SetSize(WIDTH, HEIGHT)
   toast:SetFrameStrata("HIGH")
   toast:SetClampedToScreen(true)
-  Skin.fill(toast, Skin.WINDOW)
-  Skin.border(toast, Skin.BORDER)
-  toast.accent = Skin.fill(toast, Skin.GOLD, "ARTWORK")
-  toast.accent:ClearAllPoints()
-  toast.accent:SetPoint("TOPLEFT", 1, -1)
-  toast.accent:SetPoint("BOTTOMLEFT", 1, 1)
-  toast.accent:SetWidth(2)
+  Skin.fill(toast, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 0.88 })
+  toast.timer = toast:CreateTexture(nil, "ARTWORK")
+  toast.timer:SetColorTexture(1, 1, 1, 1)
+  toast.timer:SetPoint("BOTTOMLEFT")
+  toast.timer:SetHeight(TIMER)
   Skin.fill(toast, Skin.HOVER, "HIGHLIGHT")
 
+  toast.picture = Skin.feedPicture(toast, PICTURE)
+  toast.picture:SetPoint("LEFT", 10, 0)
+  -- The overflow toast's small grey icon, centred where the picture goes
+  -- (the picture is hidden then).
   toast.icon = toast:CreateTexture(nil, "ARTWORK")
   toast.icon:SetSize(ICON, ICON)
-  toast.icon:SetPoint("LEFT", 12, 0)
-  toast.glyph = Skin.label(toast, "glyph", Skin.FEED_ICON_COLOR)
-  toast.glyph:SetPoint("CENTER", toast.icon, "CENTER", 0, 0)
+  toast.icon:SetPoint("LEFT", 10 + (PICTURE - ICON) / 2, 0)
+  toast.icon:SetTexture(MORE_ICON)
+  toast.icon:SetDesaturated(true)
+  Skin.color(toast.icon, Skin.FEED_ICON_COLOR)
   toast.text = Skin.label(toast, "body")
-  toast.text:SetPoint("LEFT", toast.icon, "RIGHT", 10, 0)
+  toast.text:SetPoint("LEFT", toast.picture, "RIGHT", 10, 0)
   toast.text:SetWordWrap(false)
   toast.react = Skin.reactionButton(toast, REACT, onReact)
   toast.react:SetPoint("RIGHT", -10, 0)
@@ -134,40 +142,30 @@ local function createToast()
 end
 
 -- A Reaction toast (news from Core's reaction event, which has an
--- entryKey) shows the Reaction's icon and has no button.
-local function drawIcon(frame, entry)
-  if not entry.entryKey then
-    frame.icon:SetTexCoord(0, 1, 0, 1)
-    Skin.feedIcon(frame.icon, frame.glyph, entry.kind)
-    return
+-- entryKey) shows the Reaction's icon, edged in gold, and has no button.
+local function drawPicture(frame, entry)
+  if entry.entryKey then
+    frame.picture:SetPicture(Skin.REACTION_ICONS[entry.reaction], Skin.GOLD)
+  else
+    frame.picture:SetKind(entry.kind)
   end
-  frame.glyph:SetText("")
-  frame.icon:SetShown(true)
-  frame.icon:SetTexture(Skin.REACTION_ICONS[entry.reaction])
-  frame.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  frame.icon:SetDesaturated(false)
-  frame.icon:SetVertexColor(1, 1, 1)
 end
 
 local function drawToast(frame, toast)
   local entry = toast.entry
   local highlight = entry and Skin.FEED_HIGHLIGHT[entry.kind] == true
-  frame.accent:SetShown(highlight)
+  Skin.color(frame.timer, highlight and Skin.GOLD or TIMER_FAINT)
   local canReact = entry ~= nil and not entry.entryKey and entry.canReact == true
   frame.react:SetShown(canReact)
   if canReact then frame.react:SetReaction(entry.reaction, entry.reacted) end
   frame.text:SetPoint("RIGHT", canReact and -(REACT + 16) or -10, 0)
+  frame.picture:SetShown(entry ~= nil)
+  frame.icon:SetShown(entry == nil)
   if entry then
-    drawIcon(frame, entry)
+    drawPicture(frame, entry)
     frame.text:SetText(entry.text)
     Skin.color(frame.text, highlight and Skin.GOLD or Skin.TEXT)
   else
-    frame.glyph:SetText("")
-    frame.icon:SetShown(true)
-    frame.icon:SetTexture(MORE_ICON)
-    frame.icon:SetTexCoord(0, 1, 0, 1)
-    frame.icon:SetDesaturated(true)
-    Skin.color(frame.icon, Skin.FEED_ICON_COLOR)
     frame.text:SetText(("+%d more in the Feed"):format(toast.more))
     Skin.color(frame.text, Skin.MUTED)
   end
@@ -201,11 +199,13 @@ local function hover(now)
 end
 
 -- Fades each toast over its last FADE seconds; a hovered one stays solid.
+-- Its timer line shrinks with the time it has left.
 local function fade(now)
   for _, frame in ipairs(toastFrames) do
     if frame:IsShown() then
       local left = frame.toast.hovered and FADE or queue:remaining(frame.toast, now)
       frame:SetAlpha(math.max(0, math.min(1, left / FADE)))
+      frame.timer:SetWidth(math.max(1, WIDTH * queue:share(frame.toast, now)))
     end
   end
 end
@@ -226,7 +226,7 @@ local function onUpdate()
 end
 
 -- Shows a live Feed entry (from Core's feedEntry), Reaction (from its
--- reaction event) or Hand-me-down notice (handMeDown) as a toast.
+-- reaction event) or Spare notice (spare) as a toast.
 function Toasts.show(entry)
   queue:push(entry)
   driver:Show()

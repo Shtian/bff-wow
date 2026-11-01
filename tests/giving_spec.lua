@@ -1,4 +1,4 @@
--- Hand-me-downs, Claims and Gives played out across a Crew.
+-- Spares, Claims and Gives played out across a Crew.
 local load = require("tests.load")
 
 local DAY = 24 * 60 * 60
@@ -32,10 +32,10 @@ local function crew(names, levels)
 end
 
 local function view(client)
-  return client.core:handMeDowns()
+  return client.core:spares()
 end
 
--- The row another client shows for the owner's Hand-me-down.
+-- The row another client shows for the owner's Spare.
 local function crewRow(client, owner, id)
   for _, row in ipairs(view(client).crew) do
     if row.ownerId == owner.memberId and row.id == id then return row end
@@ -60,7 +60,7 @@ end
 
 local function notices(client)
   local texts = {}
-  for i, news in ipairs(events(client, "handMeDown")) do texts[i] = news.text end
+  for i, news in ipairs(events(client, "spare")) do texts[i] = news.text end
   return texts
 end
 
@@ -79,7 +79,7 @@ local function record(client)
 end
 
 local function post(net, client, link, level)
-  local id = assert(client.core:postHandMeDown(link or BARB, level or 18))
+  local id = assert(client.core:postSpare(link or BARB, level or 18))
   net:run(3)
   return id
 end
@@ -88,7 +88,7 @@ end
 -- others only once it resends (refused()).
 local function claimUnheard(net, client, owner, id)
   net.drop = function(_, from, to) return from == client.name and to ~= client.name end
-  assert(client.core:claimHandMeDown(owner.memberId, id))
+  assert(client.core:claimSpare(owner.memberId, id))
   net:run(5)
   net.drop = nil
 end
@@ -98,7 +98,7 @@ local function resend(net, client)
   net:run(10)
 end
 
-describe("Hand-me-downs", function()
+describe("Spares", function()
   it("are posted into the owner's record and show to the rest of the Crew", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
@@ -106,8 +106,8 @@ describe("Hand-me-downs", function()
     local id = post(net, a)
     assert.is_true(a:count("changed") > changed)
 
-    assert.equal(1, #record(a).handMeDowns)
-    assert.equal("5191", record(a).handMeDowns[1].s)
+    assert.equal(1, #record(a).spares)
+    assert.equal("5191", record(a).spares[1].s)
     local row = crewRow(b, a, id)
     assert.equal("Ann", row.owner)
     assert.equal("item:5191", row.item)
@@ -118,9 +118,9 @@ describe("Hand-me-downs", function()
     assert.equal("No claims yet", row.state)
     assert.same({}, view(a).crew)
     assert.equal(1, #view(a).yours)
-    assert.equal(1, b.core:summary().handMeDowns)
-    assert.equal(0, a.core:summary().handMeDowns)
-    assert.same({ nil, "noClaim" }, { a.core:giveHandMeDown(id) })
+    assert.equal(1, b.core:summary().spares)
+    assert.equal(0, a.core:summary().spares)
+    assert.same({ nil, "noClaim" }, { a.core:giveSpare(id) })
     assert.is_false(yourRow(a, id).canGive)
     assert.is_true(yourRow(a, id).canWithdraw)
   end)
@@ -137,9 +137,9 @@ describe("Hand-me-downs", function()
   it("refuse what isn't an item, and outside a Crew", function()
     local _, clients = crew({ "Ann" })
     local a = clients[1]
-    assert.same({ nil, "invalidItem" }, { a.core:postHandMeDown("Cruel Barb", 18) })
+    assert.same({ nil, "invalidItem" }, { a.core:postSpare("Cruel Barb", 18) })
     a.core:leaveCrew()
-    assert.same({ nil, "noCrew" }, { a.core:postHandMeDown(BARB, 18) })
+    assert.same({ nil, "noCrew" }, { a.core:postSpare(BARB, 18) })
   end)
 
   it("are dimmed when none of your Characters is high enough level", function()
@@ -147,25 +147,25 @@ describe("Hand-me-downs", function()
     local a, b = clients[1], clients[2]
     local id = post(net, a, BARB, 18)
     assert.is_false(crewRow(b, a, id).usable)
-    assert.equal(0, b.core:summary().handMeDowns)
+    assert.equal(0, b.core:summary().spares)
 
     b.character = playing("Jaina", 30, { guid = "Player-0-Jaina" })
     b:play()
     assert.is_true(crewRow(b, a, id).usable)
-    assert.equal(1, b.core:summary().handMeDowns)
+    assert.equal(1, b.core:summary().spares)
   end)
 
   it("are withdrawn by the owner, and go from everyone's list", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     local id = post(net, a)
-    assert.is_true(b.core:claimHandMeDown(a.memberId, id))
+    assert.is_true(b.core:claimSpare(a.memberId, id))
     net:run(3)
-    assert.is_true(a.core:withdrawHandMeDown(id))
+    assert.is_true(a.core:withdrawSpare(id))
     net:run(3)
-    assert.same({}, record(a).handMeDowns)
+    assert.same({}, record(a).spares)
     assert.is_nil(crewRow(b, a, id))
-    assert.same({ nil, "unknown" }, { a.core:withdrawHandMeDown(id) })
+    assert.same({ nil, "unknown" }, { a.core:withdrawSpare(id) })
     -- Bob's Claim goes at his next write.
     b:play({ zone = "Westfall" })
     assert.same({}, record(b).claims)
@@ -174,11 +174,11 @@ describe("Hand-me-downs", function()
   it("are at most 20 open per owner", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a = clients[1]
-    for _ = 1, 20 do assert.is_number(a.core:postHandMeDown(BARB, 18)) end
-    assert.same({ nil, "tooMany" }, { a.core:postHandMeDown(BARB, 18) })
+    for _ = 1, 20 do assert.is_number(a.core:postSpare(BARB, 18)) end
+    assert.same({ nil, "tooMany" }, { a.core:postSpare(BARB, 18) })
     local first = view(a).yours[1].id
-    a.core:withdrawHandMeDown(first)
-    local id = a.core:postHandMeDown(BARB, 18)
+    a.core:withdrawSpare(first)
+    local id = a.core:postSpare(BARB, 18)
     assert.is_number(id)
     assert.is_true(id > 20)
     net:run(3)
@@ -189,7 +189,7 @@ describe("Hand-me-downs", function()
     local a = clients[1]
     local first = post(net, a)
     local second = post(net, a)
-    a.db.nextHandMeDown = nil
+    a.db.nextSpare = nil
     local third = post(net, a)
     assert.is_true(third > second and second > first)
   end)
@@ -202,10 +202,10 @@ describe("Hand-me-downs", function()
     assert.is_table(crewRow(b, a, id))
     net:step(net:now() + 20)
     assert.is_nil(crewRow(b, a, id))
-    assert.same({ nil, "unknown" }, { b.core:claimHandMeDown(a.memberId, id) })
-    assert.equal(1, #record(a).handMeDowns)
+    assert.same({ nil, "unknown" }, { b.core:claimSpare(a.memberId, id) })
+    assert.equal(1, #record(a).spares)
     a:play({ zone = "Westfall" })
-    assert.equal(0, #record(a).handMeDowns)
+    assert.equal(0, #record(a).spares)
   end)
 
   describe("Claims", function()
@@ -213,7 +213,7 @@ describe("Hand-me-downs", function()
       local net, clients = crew({ "Ann", "Bob" })
       local a, b = clients[1], clients[2]
       local id = post(net, a)
-      assert.is_true(b.core:claimHandMeDown(a.memberId, id))
+      assert.is_true(b.core:claimSpare(a.memberId, id))
       local claim = record(b).claims[1]
       assert.equal(a.memberId, claim.m)
       assert.equal(id, claim.i)
@@ -232,8 +232,8 @@ describe("Hand-me-downs", function()
       other:play()
       other.character = playing("Cid", 20)
       other:play()
-      assert.same({ nil, "unknownCharacter" }, { other.core:claimHandMeDown(a.memberId, id, "Player-0-Nobody") })
-      assert.is_true(other.core:claimHandMeDown(a.memberId, id, "Player-0-Jaina"))
+      assert.same({ nil, "unknownCharacter" }, { other.core:claimSpare(a.memberId, id, "Player-0-Nobody") })
+      assert.is_true(other.core:claimSpare(a.memberId, id, "Player-0-Jaina"))
       assert.equal("Bob claimed it first (you claimed it for Jaina)", crewRow(other, a, id).state)
     end)
 
@@ -241,36 +241,36 @@ describe("Hand-me-downs", function()
       local net, clients = crew({ "Ann", "Bob" })
       local a, b = clients[1], clients[2]
       local id = post(net, a)
-      assert.same({ nil, "own" }, { a.core:claimHandMeDown(a.memberId, id) })
-      assert.is_true(b.core:claimHandMeDown(a.memberId, id))
-      assert.same({ nil, "claimed" }, { b.core:claimHandMeDown(a.memberId, id) })
-      assert.same({ nil, "unknown" }, { b.core:claimHandMeDown(a.memberId, 99) })
-      assert.same({ nil, "unknown" }, { b.core:claimHandMeDown("nobody", id) })
+      assert.same({ nil, "own" }, { a.core:claimSpare(a.memberId, id) })
+      assert.is_true(b.core:claimSpare(a.memberId, id))
+      assert.same({ nil, "claimed" }, { b.core:claimSpare(a.memberId, id) })
+      assert.same({ nil, "unknown" }, { b.core:claimSpare(a.memberId, 99) })
+      assert.same({ nil, "unknown" }, { b.core:claimSpare("nobody", id) })
       assert.equal(1, #record(b).claims)
 
       b.core:removeMember(a.memberId)
       assert.same({}, view(b).crew)
-      assert.same({ nil, "unknown" }, { b.core:claimHandMeDown(a.memberId, id) })
+      assert.same({ nil, "unknown" }, { b.core:claimSpare(a.memberId, id) })
     end)
 
     it("are at most 20 open", function()
       local net, clients = crew({ "Ann", "Bob" })
       local a, b = clients[1], clients[2]
       local ids = {}
-      for i = 1, 20 do ids[i] = a.core:postHandMeDown(BARB, 18) end
+      for i = 1, 20 do ids[i] = a.core:postSpare(BARB, 18) end
       net:run(3)
-      for i = 1, 20 do assert.is_true(b.core:claimHandMeDown(a.memberId, ids[i])) end
+      for i = 1, 20 do assert.is_true(b.core:claimSpare(a.memberId, ids[i])) end
       local c = net:add("Cid", { character = playing("Cid") }):login()
       c:join(a.core:crew().code)
       net:run(40)
-      local extra = c.core:postHandMeDown(BARB, 18)
+      local extra = c.core:postSpare(BARB, 18)
       net:run(3)
-      assert.same({ nil, "tooManyClaims" }, { b.core:claimHandMeDown(c.memberId, extra) })
+      assert.same({ nil, "tooManyClaims" }, { b.core:claimSpare(c.memberId, extra) })
       assert.equal(20, view(b).claims)
       assert.equal(20, view(b).maxClaims)
 
       b.core:withdrawClaim(a.memberId, ids[1])
-      assert.is_true(b.core:claimHandMeDown(c.memberId, extra))
+      assert.is_true(b.core:claimSpare(c.memberId, extra))
     end)
 
     it("are won by the earliest; withdrawing moves the next one up", function()
@@ -279,7 +279,7 @@ describe("Hand-me-downs", function()
       local id = post(net, a)
       claimUnheard(net, c, a, id)
       net:run(2)
-      assert.is_true(b.core:claimHandMeDown(a.memberId, id))
+      assert.is_true(b.core:claimSpare(a.memberId, id))
       net:run(5)
       assert.equal(b.memberId, yourRow(a, id).winner.memberId)
       resend(net, c)
@@ -310,8 +310,8 @@ describe("Hand-me-downs", function()
       local net, clients = crew({ "Ann", "Bob", "Cleo" })
       local a, b, c = clients[1], clients[2], clients[3]
       local id = post(net, a)
-      assert.is_true(b.core:claimHandMeDown(a.memberId, id))
-      assert.is_true(c.core:claimHandMeDown(a.memberId, id))
+      assert.is_true(b.core:claimSpare(a.memberId, id))
+      assert.is_true(c.core:claimSpare(a.memberId, id))
       assert.equal(record(b).claims[1].t, record(c).claims[1].t)
       net:run(5)
       local first = b.memberId < c.memberId and b.memberId or c.memberId
@@ -325,9 +325,9 @@ describe("Hand-me-downs", function()
       local net, clients = crew({ "Ann", "Bob", "Cleo" })
       local a, b, c = clients[1], clients[2], clients[3]
       local id = post(net, a)
-      assert.is_true(c.core:claimHandMeDown(a.memberId, id))
+      assert.is_true(c.core:claimSpare(a.memberId, id))
       net:run(5)
-      assert.is_true(b.core:claimHandMeDown(a.memberId, id))
+      assert.is_true(b.core:claimSpare(a.memberId, id))
       net:run(5)
       assert.equal(c.memberId, yourRow(a, id).winner.memberId)
       local before = #notices(a)
@@ -343,7 +343,7 @@ describe("Hand-me-downs", function()
       local a, b = clients[1], clients[2]
       net.drop = function(_, from, to) return from == "Bob" and to == "Ann" end
       local id = post(net, a)
-      assert.is_true(b.core:claimHandMeDown(a.memberId, id))
+      assert.is_true(b.core:claimSpare(a.memberId, id))
       net:run(5)
       net.drop = nil
       a.core:removeMember(b.memberId)
@@ -357,7 +357,7 @@ describe("Hand-me-downs", function()
       local net, clients = crew({ "Ann", "Bob" })
       local a, b = clients[1], clients[2]
       local id = post(net, a)
-      assert.is_true(b.core:claimHandMeDown(a.memberId, id))
+      assert.is_true(b.core:claimSpare(a.memberId, id))
       net:run(3)
       net:step(net:now() + 29 * DAY)
       b:play({ zone = "Westfall" })
@@ -375,18 +375,18 @@ describe("Hand-me-downs", function()
       local id = post(net, a)
       -- Nobody hears Cleo's Claim until after the Give.
       claimUnheard(net, c, a, id)
-      assert.is_true(b.core:claimHandMeDown(a.memberId, id))
+      assert.is_true(b.core:claimSpare(a.memberId, id))
       net:run(5)
       assert.equal(b.memberId, yourRow(a, id).winner.memberId)
-      assert.same({ nil, "unknown" }, { a.core:giveHandMeDown(99) })
+      assert.same({ nil, "unknown" }, { a.core:giveSpare(99) })
 
-      assert.same({ nil, "winnerChanged" }, { a.core:giveHandMeDown(id, c.memberId) })
-      assert.is_true(a.core:giveHandMeDown(id, b.memberId))
-      local given = record(a).handMeDowns[1]
+      assert.same({ nil, "winnerChanged" }, { a.core:giveSpare(id, c.memberId) })
+      assert.is_true(a.core:giveSpare(id, b.memberId))
+      local given = record(a).spares[1]
       assert.equal(b.memberId, given.r)
       assert.equal(b.character.guid, given.c)
-      assert.same({ nil, "unknown" }, { a.core:giveHandMeDown(id) })
-      assert.same({ nil, "unknown" }, { a.core:withdrawHandMeDown(id) })
+      assert.same({ nil, "unknown" }, { a.core:giveSpare(id) })
+      assert.same({ nil, "unknown" }, { a.core:withdrawSpare(id) })
       net:run(5)
 
       -- Cleo's Claim arrives later and is earlier, but the Give is final.
@@ -419,7 +419,7 @@ describe("Hand-me-downs", function()
 
       -- The Give stays in the record until the 30 days are up.
       a:play({ zone = "Westfall" })
-      assert.equal(1, #record(a).handMeDowns)
+      assert.equal(1, #record(a).spares)
       b:play({ zone = "Westfall" })
       assert.same({}, record(b).claims)
     end)
@@ -429,9 +429,9 @@ describe("Hand-me-downs", function()
       local a, b, c = clients[1], clients[2], clients[3]
       c:lockdown(true)
       local id = post(net, a)
-      assert.is_true(b.core:claimHandMeDown(a.memberId, id))
+      assert.is_true(b.core:claimSpare(a.memberId, id))
       net:run(5)
-      a.core:giveHandMeDown(id)
+      a.core:giveSpare(id)
       net:run(3)
       a:play({ zone = "Westfall" })
       net:run(15)
@@ -449,7 +449,7 @@ describe("Hand-me-downs", function()
       local id = post(net, a)
       a:logout()
       net:run(5)
-      b.core:claimHandMeDown(a.memberId, id)
+      b.core:claimSpare(a.memberId, id)
       net:run(5)
       a.events = {}
       a:login()
@@ -457,7 +457,7 @@ describe("Hand-me-downs", function()
       local summary = events(a, "awaySummary")[1]
       assert.same({ { kind = "claimed", text = "Bob claimed [Cruel Barb] for Bob" } }, (function()
         local lines = {}
-        for i, line in ipairs(summary.handMeDowns) do lines[i] = { kind = line.kind, text = line.text } end
+        for i, line in ipairs(summary.spares) do lines[i] = { kind = line.kind, text = line.text } end
         return lines
       end)())
       assert.same({}, notices(a))
@@ -465,13 +465,13 @@ describe("Hand-me-downs", function()
 
       b:logout()
       net:run(5)
-      a.core:giveHandMeDown(id)
+      a.core:giveSpare(id)
       net:run(5)
       b.events = {}
       b:login()
       net:run(40)
       local texts = {}
-      for i, line in ipairs(events(b, "awaySummary")[1].handMeDowns) do texts[i] = line.text end
+      for i, line in ipairs(events(b, "awaySummary")[1].spares) do texts[i] = line.text end
       assert.same({ "Ann sent you [Cruel Barb]. Check Bob's mailbox." }, texts)
     end)
 
@@ -481,11 +481,11 @@ describe("Hand-me-downs", function()
       a.core:setChatLines(false)
       a.core:setToasts(false)
       local id = post(net, a)
-      b.core:claimHandMeDown(a.memberId, id)
+      b.core:claimSpare(a.memberId, id)
       net:run(5)
       assert.same({}, notices(a))
       assert.equal(1, view(a).unseen)
-      a.core:handMeDownsSeen()
+      a.core:sparesSeen()
       assert.equal(0, view(a).unseen)
     end)
   end)
@@ -500,14 +500,14 @@ describe("Hand-me-downs", function()
     b.core.gossip:askAround()
     net:run(10)
     assert.is_table(crewRow(c, a, id))
-    c.core:claimHandMeDown(a.memberId, id)
+    c.core:claimSpare(a.memberId, id)
     net:run(10)
     b.core.gossip:askAround()
     net:run(10)
     assert.equal(c.memberId, yourRow(a, id).winner.memberId)
   end)
 
-  it("keep records with malformed Hand-me-downs and Claims, minus those items", function()
+  it("keep records with malformed Spares and Claims, minus those items", function()
     local net, clients, ns = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     local id = post(net, a)
@@ -522,10 +522,10 @@ describe("Hand-me-downs", function()
       b.core:received(ns.Codec.encode({ type = "DATA", from = sender, records = { rec } }))
     end
     send("garbled1", {
-      handMeDowns = { "junk", { i = 1, s = "bad" }, { i = 2, s = "5191", l = 18, t = net:now() } },
+      spares = { "junk", { i = 1, s = "bad" }, { i = 2, s = "5191", l = 18, t = net:now() } },
       claims = { "junk", { m = a.memberId, i = id, c = "Player-0-Xgarbled1", t = 1 } },
     })
-    send("garbled2", { handMeDowns = "junk", claims = 7 })
+    send("garbled2", { spares = "junk", claims = 7 })
     assert.is_table(b.core.ledger:record("garbled1"))
     assert.is_table(b.core.ledger:record("garbled2"))
     local owners = {}
@@ -540,19 +540,19 @@ describe("Hand-me-downs", function()
     local a, b = clients[1], clients[2]
     local id = post(net, a)
     local other = post(net, b)
-    a.core:claimHandMeDown(b.memberId, other)
-    b.core:claimHandMeDown(a.memberId, id)
+    a.core:claimSpare(b.memberId, other)
+    b.core:claimSpare(a.memberId, id)
     net:run(3)
     a.core:leaveCrew()
     net:run(3)
-    assert.is_nil(record(a).handMeDowns)
+    assert.is_nil(record(a).spares)
     assert.is_nil(record(a).claims)
     assert.same({}, view(a).yours)
     assert.is_nil(crewRow(b, a, id))
   end)
 end)
 
-describe("Hand-me-down items in the bags", function()
+describe("Spare items in the bags", function()
   local GUID = "Item-0-0000000000A1B2C3"
 
   -- Whether a value holds the text anywhere, keys included.
@@ -568,12 +568,12 @@ describe("Hand-me-down items in the bags", function()
   it("are remembered for the posting Character, and never sent", function()
     local net, clients, ns = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
-    local id = assert(a.core:postHandMeDown(BARB, 18, { guid = GUID, bindType = 2 }))
+    local id = assert(a.core:postSpare(BARB, 18, { guid = GUID, bindType = 2 }))
     net:run(5)
     a:reload()
     net:run(5)
 
-    assert.same({ [id] = GUID }, a.core:handMeDownItems())
+    assert.same({ [id] = GUID }, a.core:spareItems())
     assert.is_not_nil(crewRow(b, a, id))
     assert.is_true(#net.wire > 0)
     for _, sent in ipairs(net.wire) do
@@ -584,72 +584,72 @@ describe("Hand-me-down items in the bags", function()
   it("are kept per Character", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a = clients[1]
-    local id = assert(a.core:postHandMeDown(BARB, 18, { guid = GUID, bindType = 2 }))
+    local id = assert(a.core:postSpare(BARB, 18, { guid = GUID, bindType = 2 }))
     a:play({ guid = "Player-0-Annalt", name = "Annalt" })
-    local other = assert(a.core:postHandMeDown(SWORD, 25, { guid = "Item-0-0000000000D4E5F6" }))
+    local other = assert(a.core:postSpare(SWORD, 25, { guid = "Item-0-0000000000D4E5F6" }))
     net:run(3)
-    assert.same({ [other] = "Item-0-0000000000D4E5F6" }, a.core:handMeDownItems())
+    assert.same({ [other] = "Item-0-0000000000D4E5F6" }, a.core:spareItems())
     a:play({ guid = "Player-0-Ann", name = "Ann" })
-    assert.same({ [id] = GUID }, a.core:handMeDownItems())
+    assert.same({ [id] = GUID }, a.core:spareItems())
   end)
 
-  it("are forgotten once the Hand-me-down is withdrawn, Given or ends", function()
+  it("are forgotten once the Spare is withdrawn, Given or ends", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
-    local withdrawn = assert(a.core:postHandMeDown(BARB, 18, { guid = "Item-0-1" }))
-    local given = assert(a.core:postHandMeDown(BARB, 18, { guid = "Item-0-2" }))
+    local withdrawn = assert(a.core:postSpare(BARB, 18, { guid = "Item-0-1" }))
+    local given = assert(a.core:postSpare(BARB, 18, { guid = "Item-0-2" }))
     net:run(3)
-    assert(a.core:withdrawHandMeDown(withdrawn))
-    assert(b.core:claimHandMeDown(a.memberId, given))
+    assert(a.core:withdrawSpare(withdrawn))
+    assert(b.core:claimSpare(a.memberId, given))
     net:run(5)
-    assert(a.core:giveHandMeDown(given))
-    assert.same({}, a.core:handMeDownItems())
+    assert(a.core:giveSpare(given))
+    assert.same({}, a.core:spareItems())
 
-    local ending = assert(a.core:postHandMeDown(BARB, 18, { guid = "Item-0-3" }))
+    local ending = assert(a.core:postSpare(BARB, 18, { guid = "Item-0-3" }))
     net:run(3)
-    assert.same({ [ending] = "Item-0-3" }, a.core:handMeDownItems())
+    assert.same({ [ending] = "Item-0-3" }, a.core:spareItems())
     net:step(net:now() + 31 * DAY)
-    assert.same({}, a.core:handMeDownItems())
+    assert.same({}, a.core:spareItems())
   end)
 
   it("are forgotten when you leave the Crew", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a = clients[1]
-    assert(a.core:postHandMeDown(BARB, 18, { guid = GUID, bindType = 2 }))
+    assert(a.core:postSpare(BARB, 18, { guid = GUID, bindType = 2 }))
     net:run(3)
     a.core:leaveCrew()
     net:run(3)
-    assert.same({}, a.core:handMeDownItems())
+    assert.same({}, a.core:spareItems())
   end)
 
   it("refuse what can't be traded, and post nothing", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     local before = #net.wire
-    assert.same({ nil, "bound" }, { a.core:postHandMeDown(BARB, 18, { guid = GUID, isBound = true, bindType = 1 }) })
-    assert.same({ nil, "questItem" }, { a.core:postHandMeDown(BARB, 18, { guid = GUID, bindType = 4 }) })
-    assert.same({ nil, "accountBound" }, { a.core:postHandMeDown(BARB, 18, { guid = GUID, bindType = 8 }) })
+    assert.same({ nil, "bound" }, { a.core:postSpare(BARB, 18, { guid = GUID, isBound = true, bindType = 1 }) })
+    assert.same({ nil, "questItem" }, { a.core:postSpare(BARB, 18, { guid = GUID, bindType = 4 }) })
+    assert.same({ nil, "accountBound" }, { a.core:postSpare(BARB, 18, { guid = GUID, bindType = 8 }) })
     net:run(3)
     assert.equal(before, #net.wire)
     assert.same({}, view(a).yours)
     assert.same({}, view(b).crew)
-    assert.same({}, a.core:handMeDownItems())
+    assert.same({}, a.core:spareItems())
   end)
 
   it("aren't needed for a post", function()
     local net, clients = crew({ "Ann" })
     local a = clients[1]
-    assert(a.core:postHandMeDown(BARB, 18))
+    assert(a.core:postSpare(BARB, 18))
     net:run(3)
-    assert.same({}, a.core:handMeDownItems())
+    assert.same({}, a.core:spareItems())
   end)
 end)
 
-describe("Hand-me-downs whose item has left the bags", function()
+describe("Spares whose item has left the bags", function()
   local GUID = "Item-0-0000000000A1B2C3"
 
   local function gone(client)
-    return events(client, "handMeDownGone")
+    return events(client, "spareGone")
   end
 
   -- Ann posts the Barb from her bags; Bob sees it.
@@ -657,7 +657,7 @@ describe("Hand-me-downs whose item has left the bags", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     a:putItem(GUID, "bags")
-    local id = assert(a.core:postHandMeDown(BARB, 18, { guid = GUID, bindType = 2 }))
+    local id = assert(a.core:postSpare(BARB, 18, { guid = GUID, bindType = 2 }))
     a:bagsUpdated()
     net:run(5)
     return net, a, b, id
@@ -728,12 +728,12 @@ describe("Hand-me-downs whose item has left the bags", function()
     assert.equal("withdrawn", told[1].action)
     assert.equal(id, told[1].id)
     assert.equal("[Cruel Barb]", told[1].link)
-    assert.same({}, a.core:handMeDownItems())
+    assert.same({}, a.core:spareItems())
   end)
 
   it("ask the owner at the next login when there's a Claim, and ask again the login after", function()
     local net, a, b, id = posted()
-    assert(b.core:claimHandMeDown(a.memberId, id))
+    assert(b.core:claimSpare(a.memberId, id))
     net:run(5)
     a:putItem(GUID, nil):bagsUpdated()
     a:logout()
@@ -758,7 +758,7 @@ describe("Hand-me-downs whose item has left the bags", function()
     a:bagsUpdated()
     assert.equal(2, #gone(a))
     assert.equal("ask", gone(a)[2].action)
-    assert(a.core:giveHandMeDown(id, told[1].winner.memberId))
+    assert(a.core:giveSpare(id, told[1].winner.memberId))
   end)
 
   it("are kept when the item is back by the next login", function()
@@ -778,7 +778,7 @@ describe("Hand-me-downs whose item has left the bags", function()
   it("are never checked without a stored item GUID", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a = clients[1]
-    local id = assert(a.core:postHandMeDown(BARB, 18))
+    local id = assert(a.core:postSpare(BARB, 18))
     a:logout()
     net:run(5)
     a:login()

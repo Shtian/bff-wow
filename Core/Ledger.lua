@@ -30,8 +30,8 @@ local function newMemberId(random)
 end
 
 -- db is the whole saved table; the Ledger keeps `memberId`, `records`,
--- `heard`, `via`, `removed`, `nextHandMeDown` and `handMeDownItems` (per
--- Character GUID, the item GUID of each own open Hand-me-down it posted).
+-- `heard`, `via`, `removed`, `nextSpare` and `spareItems` (per
+-- Character GUID, the item GUID of each own open Spare it posted).
 -- Last-heard times survive a reload but not a logout, since nobody was
 -- heard while you were logged out.
 function Ledger.new(db, now, random, initialLogin)
@@ -61,26 +61,26 @@ local function ownRecord(self)
   return record
 end
 
--- Whether the Hand-me-down a Claim points at is still open, as far as the
+-- Whether the Spare a Claim points at is still open, as far as the
 -- held copy of its owner's record says: an owner not held, left or
 -- Removed has ended it too.
 local function claimOpen(self, owner, id)
   local record = self.db.records[owner]
   if not record or record.left or self.db.removed[owner] then return false end
-  for _, handMeDown in ipairs(ns.HandMeDowns.inRecord(record)) do
-    if handMeDown.id == id then return ns.HandMeDowns.isOpen(handMeDown, self.now()) end
+  for _, spare in ipairs(ns.Spares.inRecord(record)) do
+    if spare.id == id then return ns.Spares.isOpen(spare, self.now()) end
   end
   return false
 end
 
--- Forgets the item GUIDs of own Hand-me-downs that are no longer open:
+-- Forgets the item GUIDs of own Spares that are no longer open:
 -- withdrawn, Given or past their 30 days.
 local function pruneItems(self)
-  local items = self.db.handMeDownItems
+  local items = self.db.spareItems
   if not items then return end
   local open = {}
-  for _, handMeDown in ipairs(ns.HandMeDowns.inRecord(self:own())) do
-    if ns.HandMeDowns.isOpen(handMeDown, self.now()) then open[handMeDown.id] = true end
+  for _, spare in ipairs(ns.Spares.inRecord(self:own())) do
+    if ns.Spares.isOpen(spare, self.now()) then open[spare.id] = true end
   end
   for character, list in pairs(items) do
     for id in pairs(list) do
@@ -88,18 +88,18 @@ local function pruneItems(self)
     end
     if next(list) == nil then items[character] = nil end
   end
-  if next(items) == nil then self.db.handMeDownItems = nil end
+  if next(items) == nil then self.db.spareItems = nil end
 end
 
--- Every write of the own record also prunes its Reactions, Hand-me-downs
+-- Every write of the own record also prunes its Reactions, Spares
 -- and Claims, so pruning alone never sends DATA.
 local function bump(self, record)
   local now = self.now()
   record.version = math.max(now, record.version + 1)
   if record.reactions then ns.Reactions.prune(record.reactions, now) end
-  if record.handMeDowns then ns.HandMeDowns.prune(record.handMeDowns, now) end
+  if record.spares then ns.Spares.prune(record.spares, now) end
   if record.claims then
-    ns.HandMeDowns.pruneClaims(record.claims, now, function(owner, id) return claimOpen(self, owner, id) end)
+    ns.Spares.pruneClaims(record.claims, now, function(owner, id) return claimOpen(self, owner, id) end)
   end
   if record.id == self.db.memberId then pruneItems(self) end
 end
@@ -228,78 +228,78 @@ function Ledger:addReaction(key)
   bump(self, record)
 end
 
--- Posts a Hand-me-down (a trimmed item string and its required level)
+-- Posts a Spare (a trimmed item string and its required level)
 -- into the own record, now. Returns its id: never reused, even after
 -- leaving, nor after the counter is lost while the record still holds
 -- higher ids. itemGuid (optional) is the item's GUID in the bags: it's
 -- kept for the Character being played, outside the record, so it never
 -- leaves this client.
-function Ledger:postHandMeDown(item, level, itemGuid)
+function Ledger:postSpare(item, level, itemGuid)
   local record = ownRecord(self)
-  local id = self.db.nextHandMeDown or 1
-  for _, held in ipairs(record.handMeDowns or {}) do
+  local id = self.db.nextSpare or 1
+  for _, held in ipairs(record.spares or {}) do
     if type(held.i) == "number" and held.i >= id then id = held.i + 1 end
   end
-  self.db.nextHandMeDown = id + 1
-  record.handMeDowns = record.handMeDowns or {}
-  record.handMeDowns[#record.handMeDowns + 1] = ns.HandMeDowns.item(id, item, level, self.now())
+  self.db.nextSpare = id + 1
+  record.spares = record.spares or {}
+  record.spares[#record.spares + 1] = ns.Spares.item(id, item, level, self.now())
   local character = self.playingGuid
   if type(itemGuid) == "string" and itemGuid ~= "" and character then
-    self.db.handMeDownItems = self.db.handMeDownItems or {}
-    self.db.handMeDownItems[character] = self.db.handMeDownItems[character] or {}
-    self.db.handMeDownItems[character][id] = itemGuid
+    self.db.spareItems = self.db.spareItems or {}
+    self.db.spareItems[character] = self.db.spareItems[character] or {}
+    self.db.spareItems[character][id] = itemGuid
   end
   bump(self, record)
   return id
 end
 
--- The item GUIDs of the open Hand-me-downs the Character being played
+-- The item GUIDs of the open Spares the Character being played
 -- posted: { [id] = itemGuid }.
-function Ledger:handMeDownItems()
+function Ledger:spareItems()
   pruneItems(self)
   local list = {}
-  local items = self.db.handMeDownItems
+  local items = self.db.spareItems
   for id, itemGuid in pairs(items and self.playingGuid and items[self.playingGuid] or {}) do
     list[id] = itemGuid
   end
   return list
 end
 
--- The own record, an own Hand-me-down as stored and its index, or nil.
-local function ownHandMeDown(self, id)
+-- The own record, an own Spare as stored and its index, or nil.
+local function ownSpare(self, id)
   local record = self:own()
-  for index, item in ipairs(record and record.handMeDowns or {}) do
+  for index, item in ipairs(record and record.spares or {}) do
     if item.i == id then return record, item, index end
   end
 end
 
--- Takes an own Hand-me-down out of the record. Returns false if it isn't
+-- Takes an own Spare out of the record. Returns false if it isn't
 -- there.
-function Ledger:withdrawHandMeDown(id)
-  local record, _, index = ownHandMeDown(self, id)
+function Ledger:withdrawSpare(id)
+  local record, _, index = ownSpare(self, id)
   if not record then return false end
-  table.remove(record.handMeDowns, index)
+  table.remove(record.spares, index)
   bump(self, record)
   return true
 end
 
--- Records the Give of an own Hand-me-down to a Member's Character. It
+-- Records the Give of an own Spare to a Member's Character. It
 -- stays in the record, so every client sees it, until its 30 days run
 -- out. Returns false if it isn't there.
-function Ledger:giveHandMeDown(id, memberId, guid)
-  local record, item = ownHandMeDown(self, id)
+function Ledger:giveSpare(id, memberId, guid)
+  local record, item = ownSpare(self, id)
   if not record then return false end
   item.r, item.c = memberId, guid
   bump(self, record)
   return true
 end
 
--- Adds a Claim on another Member's Hand-me-down for one of your own
+-- Adds a Claim on another Member's Spare for one of your own
 -- Characters, made now.
 function Ledger:addClaim(owner, id, guid)
   local record = ownRecord(self)
   record.claims = record.claims or {}
-  record.claims[#record.claims + 1] = ns.HandMeDowns.claim(owner, id, guid, self.now())
+  record.claims[#record.claims + 1] = ns.Spares.claim(owner, id, guid, self.now())
   bump(self, record)
 end
 
@@ -316,12 +316,12 @@ function Ledger:withdrawClaim(owner, id)
   return false
 end
 
--- Leaving the Crew clears the own Hand-me-downs and Claims. Not a write,
+-- Leaving the Crew clears the own Spares and Claims. Not a write,
 -- like clearReactions.
-function Ledger:clearHandMeDowns()
+function Ledger:clearSpares()
   local record = self:own()
-  if record then record.handMeDowns, record.claims = nil, nil end
-  self.db.handMeDownItems = nil
+  if record then record.spares, record.claims = nil, nil end
+  self.db.spareItems = nil
 end
 
 -- Leaving the Crew clears the own Reactions. Not a write: the tombstone

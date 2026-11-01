@@ -15,7 +15,7 @@ ToastQueue.__index = ToastQueue
 ns.ToastQueue = ToastQueue
 
 ToastQueue.MAX = 3
-ToastQueue.DURATION = 6
+ToastQueue.DURATION = 10
 ToastQueue.SOUND_GAP = 2
 
 -- reactionText(names, phrase) words a merged Reaction toast
@@ -112,6 +112,11 @@ end
 function ToastQueue:remaining(toast, now)
   if toast.hovered then return toast.left end
   return toast.expiresAt - now
+end
+
+-- The share of its full time the toast has left, from 1 down to 0.
+function ToastQueue:share(toast, now)
+  return math.max(0, math.min(1, self:remaining(toast, now) / ToastQueue.DURATION))
 end
 
 -- Gives a toast its full time.

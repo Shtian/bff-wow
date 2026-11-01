@@ -4,7 +4,7 @@
 -- where no one else is known yet: start a test Crew for it. Also the dev
 -- console (/bffdev, opened by /bff sim too): buttons that make each
 -- simulated Member ding, die, move, react to your newest entry, offer a
--- test Hand-me-down, Claim your newest one or log out,
+-- test Spare, Claim your newest one or log out,
 -- one that plays out a stretch of you being away so While you were away
 -- shows (with Reactions to your entries), one that reaches the next Crew
 -- deaths goal, and a live log of what
@@ -269,7 +269,7 @@ local function reactToYou(client, you)
   return false
 end
 
--- Test Hand-me-downs, as links the way the game hands them out: one
+-- Test Spares, as links the way the game hands them out: one
 -- plain, one with an enchant, one with a scaling random suffix.
 local TEST_ITEMS = {
   { link = "|cff1eff00|Hitem:5191::::::::18:::::::|h[Cruel Barb]|h|r", level = 19 },
@@ -277,17 +277,17 @@ local TEST_ITEMS = {
   { link = "|cff1eff00|Hitem:15210::::::-19:1238425:30:::::::|h[Raider Shortsword of the Monkey]|h|r", level = 15 },
 }
 
--- Offers a test Hand-me-down to the Crew.
+-- Offers a test Spare to the Crew.
 local function offer(client, i)
   local item = TEST_ITEMS[(i - 1) % #TEST_ITEMS + 1]
-  return client.core:postHandMeDown(item.link, item.level)
+  return client.core:postSpare(item.link, item.level)
 end
 
--- Claims your newest Hand-me-down the client hasn't claimed yet.
+-- Claims your newest Spare the client hasn't claimed yet.
 local function claimYours(client, you)
-  for _, row in ipairs(client.core:handMeDowns().crew) do
+  for _, row in ipairs(client.core:spares().crew) do
     if row.ownerId == you and row.canClaim then
-      return client.core:claimHandMeDown(row.ownerId, row.id)
+      return client.core:claimSpare(row.ownerId, row.id)
     end
   end
   return false
@@ -566,8 +566,8 @@ local function onEvent(event, arg)
     log(color(EVENT, "feed  ") .. arg.text)
   elseif event == "reaction" then
     log(color(EVENT, "reaction  ") .. arg.text)
-  elseif event == "handMeDown" then
-    log(color(EVENT, "hand-me-down  ") .. arg.text)
+  elseif event == "spare" then
+    log(color(EVENT, "spare  ") .. arg.text)
   elseif event == "awaySummary" then
     log(color(EVENT, "away summary  ") .. tostring(arg.count) .. " entries from " .. #arg.members .. " Members")
   else
@@ -783,8 +783,8 @@ local SAMPLE_TOASTS = {
   { kind = "joined", text = "Simbad joined the Crew" },
   { kind = "left", text = "Simba left the Crew" },
   { kind = "goal", text = "The Crew reached 300 Crew levels!" },
-  { kind = "claimed", text = "Simone claimed [Cruel Barb] for Simonette", opens = "handMeDowns" },
-  { kind = "given", text = "Simbad sent you [Staff of Westfall]. Check Simonette's mailbox.", opens = "handMeDowns" },
+  { kind = "claimed", text = "Simone claimed [Cruel Barb] for Simonette", opens = "spares" },
+  { kind = "given", text = "Simbad sent you [Staff of Westfall]. Check Simonette's mailbox.", opens = "spares" },
   { kind = "gave", text = "Simbad gave Simone [Staff of Westfall]" },
 }
 

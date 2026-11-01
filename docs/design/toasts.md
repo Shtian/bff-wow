@@ -19,8 +19,8 @@ Two independent settings, both on by default. Core fires `feedEntry` when **eith
 
 ## How it looks and behaves
 
-- The Skin's flat window look: the kind's Feed icon (shared with the Feed tab through `Skin.FEED_ICONS`), then the entry's text. Max level, joined and left get a gold accent bar and gold text.
-- Each toast shows for **6 s** and fades out over the last 0.6 s. Hovering stops its clock, and leaving starts it again where it stopped.
+- The Skin's flat window look, without a border: the kind's Feed picture (shared with the Feed tab through `Skin.feedPicture`; a Reaction's icon for a Reaction), then the entry's text. A thin line along the bottom shrinks with the time the toast has left; max level, joined, left and goals get it in gold, with gold text.
+- Each toast shows for **10 s** and fades out over the last 0.6 s. Hovering stops its clock, and leaving starts it again where it stopped.
 - **At most 3** at once. The newest sits where toasts are placed and pushes older ones away. They grow downward when placed in the top half of the screen and upward in the bottom half.
 - A burst that doesn't fit (a lockdown flush, the end of combat) fills the free slots and ends in one **"+N more in the Feed"** toast, with the Feed's sidebar icon. Later entries add to it, and give it its full time again, while it shows. With the screen full and no such toast, entries wait for a slot.
 - **Left-click** opens the panel on the Feed tab. **Right-click** dismisses.
@@ -39,7 +39,7 @@ A **Toasts** section on the settings page, under Notifications and display:
 | Setting | Default |
 |---|---|
 | Show toasts for live events | on |
-| Sound: a menu of game sounds, plus a **Play** button | Friend online (`UI_BNET_TOAST`) |
+| Sound: a dropdown of game sounds (the game's own select box), plus a **Play** button | Friend online (`UI_BNET_TOAST`) |
 | **Move toasts** button | |
 
 The sound and Move toasts are greyed out while toasts are off. Choosing a sound plays it. There's no duration setting.

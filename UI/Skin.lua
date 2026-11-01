@@ -1,5 +1,5 @@
 -- Skin: BFF's own flat look, shared by the panel, the While you were away
--- popup, toasts and map pins. Dark windows with a 1px border, a gold accent, Arial Narrow
+-- popup, toasts and map pins. Dark windows, a gold accent, Arial Narrow
 -- for text and Friz Quadrata for titles. Built from solid colour textures
 -- and a few long-standing game textures, so it doesn't depend on Blizzard's
 -- frame templates looking the same in every client.
@@ -27,11 +27,12 @@ Skin.HEADER_HEIGHT = 30
 
 -- Feed entries shown in gold.
 Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, left = true, goal = true }
--- Each Feed kind's icon, on the Feed tab and on toasts. The icons tell kinds
--- apart, not colour: they are all drawn in the same grey. A ding is a plus
--- drawn as text, which centres better than any texture.
+-- A muted grey for a picture's edge when its kind has no colour, and for
+-- the overflow toast's icon.
 Skin.FEED_ICON_COLOR = { 0.82, 0.8, 0.86 }
-Skin.FEED_GLYPHS = { ding = "+" }
+-- Each Feed kind's small icon, inline in the While you were away popup,
+-- and the Goals and Spares tabs' sidebar icons. The Feed tab and toasts
+-- draw Skin.FEED_PICTURES instead.
 Skin.FEED_ICONS = {
   maxLevel = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1",
   death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
@@ -39,23 +40,69 @@ Skin.FEED_ICONS = {
   joined = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
   left = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
   goal = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_3",
-  -- Hand-me-downs: a Give in the Feed, and the notices.
+  -- Spares: a Give in the Feed, and the notices.
   gave = "Interface\\GossipFrame\\VendorGossipIcon",
   claimed = "Interface\\GossipFrame\\VendorGossipIcon",
   given = "Interface\\MINIMAP\\TRACKING\\Mailbox",
 }
 
--- Draws a Feed kind's icon: the glyph as text, or else the icon texture.
--- A kind with neither gets a plus.
-function Skin.feedIcon(icon, glyphLabel, kind)
-  local glyph = Skin.FEED_GLYPHS[kind] or not Skin.FEED_ICONS[kind] and "+" or nil
-  glyphLabel:SetText(glyph or "")
-  icon:SetShown(glyph == nil)
-  if not glyph then
-    icon:SetTexture(Skin.FEED_ICONS[kind])
-    icon:SetDesaturated(true)
-    Skin.color(icon, Skin.FEED_ICON_COLOR)
+-- Each Feed kind's picture, on the Feed tab and on toasts: a full-colour
+-- spell or item icon, square, with a faded 1px edge in the kind's colour.
+-- The small grey icons were hard to see on the dark window. A kind with no
+-- picture gets the ding's plus.
+Skin.FEED_PICTURES = {
+  ding = "Interface\\Icons\\Spell_ChargePositive",
+  maxLevel = "Interface\\Icons\\Achievement_Level_80",
+  death = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01",
+  newCharacter = "Interface\\Icons\\INV_Misc_GroupNeedMore",
+  joined = "Interface\\Icons\\INV_Misc_GroupLooking",
+  left = "Interface\\Icons\\Ability_Vanish",
+  goal = "Interface\\Icons\\Achievement_General",
+  gave = "Interface\\Icons\\INV_Misc_Bag_08",
+  claimed = "Interface\\Icons\\INV_Misc_Bag_08",
+  given = "Interface\\Icons\\INV_Letter_15",
+}
+local SPARE = { 0.78, 0.6, 1 }
+local CREW = { 0.4, 0.75, 1 }
+Skin.FEED_EDGES = {
+  ding = Skin.ONLINE,
+  maxLevel = Skin.GOLD,
+  goal = Skin.GOLD,
+  death = { 0.95, 0.4, 0.36 },
+  newCharacter = CREW,
+  joined = CREW,
+  left = { 0.6, 0.6, 0.66 },
+  gave = SPARE,
+  claimed = SPARE,
+  given = SPARE,
+}
+local EDGE_ALPHA = 0.55
+
+-- A square picture `size` wide: an opaque back (so a line behind it is
+-- covered), the edge, and the icon inset 1px with its own bevel cropped.
+-- :SetKind(kind) draws a Feed kind; :SetPicture(texture, edgeColor) any
+-- icon.
+function Skin.feedPicture(parent, size)
+  local frame = CreateFrame("Frame", nil, parent)
+  frame:SetSize(size, size)
+  frame.back = frame:CreateTexture(nil, "ARTWORK", nil, 1)
+  frame.back:SetAllPoints()
+  frame.back:SetColorTexture(Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1)
+  frame.edge = frame:CreateTexture(nil, "ARTWORK", nil, 2)
+  frame.edge:SetAllPoints()
+  frame.picture = frame:CreateTexture(nil, "ARTWORK", nil, 3)
+  frame.picture:SetPoint("TOPLEFT", 1, -1)
+  frame.picture:SetPoint("BOTTOMRIGHT", -1, 1)
+  frame.picture:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+  function frame:SetPicture(texture, edgeColor)
+    local color = edgeColor or Skin.FEED_ICON_COLOR
+    self.edge:SetColorTexture(color[1], color[2], color[3], EDGE_ALPHA)
+    self.picture:SetTexture(texture)
   end
+  function frame:SetKind(kind)
+    self:SetPicture(Skin.FEED_PICTURES[kind] or Skin.FEED_PICTURES.ding, Skin.FEED_EDGES[kind])
+  end
+  return frame
 end
 
 -- Each Reaction's icon and name, on the Feed tab, While you were away and
@@ -128,7 +175,6 @@ Skin.fonts = {
   text = font("BFFFontText", NARROW, 14),
   small = font("BFFFontSmall", NARROW, 12),
   tiny = font("BFFFontTiny", NARROW, 10),
-  glyph = font("BFFFontGlyph", NARROW, 20),
 }
 
 -- A class's colour as r, g, b; white for an unknown class.
@@ -165,6 +211,37 @@ function Skin.fill(frame, color, layer, sublevel)
   texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
   texture:SetAllPoints()
   return texture
+end
+
+-- A flat chip filling `frame` inset by x and y, with its corners stepped
+-- in over `radius` pixels so it reads as rounded (textures have no corner
+-- radius). Returns an object whose :SetShown shows or hides every part.
+function Skin.chip(frame, color, x, y, radius, layer)
+  local chip = { parts = {} }
+  local function part()
+    local texture = frame:CreateTexture(nil, layer or "BACKGROUND")
+    texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+    chip.parts[#chip.parts + 1] = texture
+    return texture
+  end
+  local middle = part()
+  middle:SetPoint("TOPLEFT", x, -(y + radius))
+  middle:SetPoint("BOTTOMRIGHT", -x, y + radius)
+  for row = 0, radius - 1 do
+    local inset = x + radius - row
+    local top = part()
+    top:SetPoint("TOPLEFT", inset, -(y + row))
+    top:SetPoint("TOPRIGHT", -inset, -(y + row))
+    top:SetHeight(1)
+    local bottom = part()
+    bottom:SetPoint("BOTTOMLEFT", inset, y + row)
+    bottom:SetPoint("BOTTOMRIGHT", -inset, y + row)
+    bottom:SetHeight(1)
+  end
+  function chip:SetShown(shown)
+    for _, texture in ipairs(self.parts) do texture:SetShown(shown) end
+  end
+  return chip
 end
 
 -- A 1px line along one edge of `frame`.
