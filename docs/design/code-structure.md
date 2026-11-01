@@ -65,12 +65,11 @@ Outputs:
 
 These are internal seams: separate files for locality, tested only through Core's interface, with nothing swappable behind them.
 
-- **Ledger** (`Core/Ledger.lua`): what we know. Holds the own record and copies of everyone else's, the item GUIDs of own Spares (local only), the merge rule (a higher version wins), the Remove list, the "left" flag, last-heard times, and 180-day pruning. Removing a Member deletes their record and drops future copies. Re-adding takes them off the list and sends a DIGEST, and peers reply with DATA.
+- **Ledger** (`Core/Ledger.lua`): what we know. Holds the own record and copies of everyone else's, the merge rule (a higher version wins), the Remove list, the "left" flag, last-heard times, and 180-day pruning. It stores and writes records (versions, the bump, what Gossip sends) and prunes on every own write, but never reads the Spares layout: the Spares module writes its part of the own record through `changeOwn`, and prunes it through the pruner it hands over with `pruneWith` at setup, since only Spares knows which Spares and Claims have ended. Removing a Member deletes their record and drops future copies. Re-adding takes them off the list and sends a DIGEST, and peers reply with DATA.
 - **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, XP piggyback, 5-minute heartbeat), the "record changed" and "reply owed" flags, and Pause.
-- **Feed** (`Core/Feed.lua`): turns a before/after record pair from Ledger into Feed entries, including skipped versions such as 22 → 24. Also owns the capped log, seen flags, and when While you were away is ready. See `docs/design/feed.md`.
+- **Feed** (`Core/Feed.lua`): turns a before/after record pair from Ledger into Feed entries, including skipped versions such as 22 → 24. For others' "gave" entries it asks Spares (`Spares.newlyGiven`) what was newly Given between the two; your own come from Spares when you Give. Feed owns how a "gave" entry looks. Also owns the capped log, seen flags, and when While you were away is ready. See `docs/design/feed.md`.
 - **Reactions** (`Core/Reactions.lua`): the pure parts of Reactions: which Reaction each entry kind has, the key a Reaction points at an entry by, how keys are stored in a record and pruned, and the wording the owner sees. Feed attaches Reactions to its entries. See `docs/design/reactions.md`.
-- **Spares** (`Core/Spares.lua`): the pure parts of Spares: the trimmed item string, whether an item can be traded, how Spares and Claims are stored in records, the caps and pruning, and who wins a Claim (ADR 0003). See `docs/design/spares.md`.
-- **Giving** (`Core/Giving.lua`): the Spares tab's rows and the Roster's count, worked out from Ledger's records, who wins each of your own, and the notices with their seen flags. Feed makes the "gave" entries.
+- **Spares** (`Core/Spares.lua`, with `Core/SpareRules.lua`): the whole Spare lifecycle, and the only Spare interface Core uses. Owns posting, withdrawing and Giving, making and withdrawing Claims, expiry, who wins (ADR 0003), the item-gone state and bag check (ADR 0004), the item GUIDs of own Spares (local only), the Spares tab's rows, the Roster's count and the notices with their seen flags. Core's Spares commands only delegate to it. Behind it, SpareRules is a private file of stateless helpers: the trimmed item string, whether an item can be traded, how Spares and Claims are stored in records, the caps and pruning, the item-gone decision and the winner's tie-break. See `docs/design/spares.md`.
 - **Settle** (`Core/Settle.lua`): when sync has gone quiet after the link came up (10 s with no new DATA, at most 30 s). Feed uses it for While you were away, Goals for its silent baseline.
 - **Goals** (`Core/Goals.lua`): the built-in Crew goal tracks and their rungs, progress worked out from Ledger's records, the reached rungs, the silent baseline and the Goals tab's rows. See `docs/design/goals.md`.
 - **PlayTimes** (`Core/PlayTimes.lua`): counts the own Member's seconds played per UTC hour of the week for the last 4 weeks, makes the summary their record shares, ages summaries by the viewer's clock and shifts them into local time. See `docs/design/play-times.md`.
@@ -98,6 +97,7 @@ Every file starts with `local _, ns = ...` and attaches itself to `ns`, the addo
 
 - **Runner:** busted under LuaJIT, linted with luacheck.
 - **The interface is the test surface.** Tests create Cores and check `rows()`, the While you were away summary, Feed entries, and the recorded listener events and sent messages. They never look inside `db`, Ledger or Gossip.
+- **Pure, stateless helper files may be tested directly**, table-style, as `codec_spec` does for Codec and `spare_rules_spec` for SpareRules. Anything with state or lifecycle is tested through Core.
 - **Fake network** (`Dev/FakeNet.lua`):
   - One shared virtual clock and scheduler, so every run plays out the same way.
   - Each simulated client is a real Core with a fake link and its own `db`.
@@ -138,7 +138,7 @@ Not embedded: AceDB (Core owns plain SavedVariables), AceConsole and AceEvent (a
 BFF.toc
 BFF.lua
 Bindings.xml                         -- key binding to open the panel
-Core/  Core.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  Spares.lua  Feed.lua  Giving.lua  Roster.lua  Goals.lua  PlayTimes.lua  CrewCode.lua  Codec.lua
+Core/  Core.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  SpareRules.lua  Spares.lua  Feed.lua  Roster.lua  Goals.lua  PlayTimes.lua  CrewCode.lua  Codec.lua
 Game/  Snapshot.lua  Bags.lua  ChannelLink.lua
 UI/    Skin.lua  Panel.lua  Minimap.lua  MapPins.lua  Away.lua  ToastQueue.lua  Toasts.lua  Settings.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases

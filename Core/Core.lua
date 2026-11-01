@@ -64,16 +64,20 @@ function Core.new(deps)
     ledger = ns.Ledger.new(deps.db, deps.now, deps.random, deps.initialLogin == true),
     utcOffset = type(deps.utcOffset) == "number" and deps.utcOffset or 0,
     linkUp = false,
-    findItem = type(deps.findItem) == "function" and deps.findItem or nil,
-    -- Own Spare ids whose item has left the bags this session.
-    goneItems = {},
-    -- Whether the check that may end Spares is still to come: the
-    -- first after a real login, never after a /reload (buyback survives it).
-    loginCheckDue = deps.initialLogin == true,
   }, Core)
   local itemLink = type(deps.itemLink) == "function" and deps.itemLink or nil
   self.log = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin, itemLink)
-  self.giving = ns.Giving.new(deps.db, self.ledger, deps.now, itemLink)
+  -- The Spares module (self.spares is the method that reads its tab).
+  self.spareLife = ns.Spares.new({
+    db = deps.db,
+    ledger = self.ledger,
+    feed = self.log,
+    now = deps.now,
+    listener = deps.listener,
+    initialLogin = self.initialLogin,
+    itemLink = itemLink,
+    findItem = type(deps.findItem) == "function" and deps.findItem or nil,
+  })
   self.crewGoals = ns.Goals.new(deps.db, self.ledger, deps.now, deps.maxLevel)
   -- Every message carries the sender's Member id. Where you stand is only
   -- read when own DATA goes out, so moving alone never sends anything.
@@ -116,8 +120,8 @@ local function announce(self, entries, reactions, notices)
     self.listener("reaction", self.log:news(item))
   end
   for _, news in ipairs(notices or {}) do
-    self.giving:markSeen(news)
-    self.listener("spare", self.giving:describe(news))
+    self.spareLife:markSeen(news)
+    self.listener("spare", self.spareLife:describe(news))
   end
 end
 
@@ -219,7 +223,7 @@ end
 -- open Spares one of your Characters is high enough level for).
 function Core:summary()
   local summary = ns.Roster.summary(self.ledger, self.now())
-  summary.spares = self.giving:usableCount()
+  summary.spares = self.spareLife:usableCount()
   return summary
 end
 
@@ -257,7 +261,7 @@ end
 -- ("claimed", "given" or "gave"), text, time }.
 local function awaySummary(self)
   if not self:isAwayPopupOn() then return end
-  local summary = self.log:takeSummary(self.giving:takeNews())
+  local summary = self.log:takeSummary(self.spareLife:takeNews())
   if not summary then return end
   self.listener("awaySummary", summary)
   self.listener("changed")
@@ -271,7 +275,7 @@ function Core:tick()
   self.gossip:tick()
   if self.log:tick() then awaySummary(self) end
   if self.db.crew and self.crewGoals:tick() then self.listener("changed") end
-  if self.db.crew then self.giving:tick() end
+  if self.db.crew then self.spareLife:tick() end
   checkOnline(self)
 end
 
@@ -382,11 +386,7 @@ end
 -- yet shown, claims and open your open Claims and Spares, out of
 -- maxClaims and maxOpen.
 function Core:spares()
-  local view = self.giving:view()
-  for _, row in ipairs(view.yours) do
-    if self.goneItems[row.id] and not row.given then row.gone = true end
-  end
-  return view
+  return self.spareLife:view()
 end
 
 -- An own write that others should get now.
@@ -404,33 +404,23 @@ end
 -- "noCrew", "invalidItem", "bound", "questItem", "accountBound" or
 -- "tooMany" (20 open already).
 function Core:postSpare(link, level, inBags)
-  if not self.db.crew then return nil, "noCrew" end
-  local item = ns.Spares.itemString(link)
-  if not item then return nil, "invalidItem" end
-  inBags = type(inBags) == "table" and inBags or {}
-  local ok, reason = ns.Spares.tradeable(inBags.isBound, inBags.bindType)
-  if not ok then return nil, reason end
-  if self.giving:openCount() >= ns.Spares.MAX_OPEN then return nil, "tooMany" end
-  level = type(level) == "number" and level >= 0 and math.floor(level) or 0
-  local id = self.ledger:postSpare(item, level, inBags.guid)
-  ownWrite(self)
-  return id
+  local id, reason = self.spareLife:post(link, level, inBags)
+  if id then ownWrite(self) end
+  return id, reason
 end
 
 -- The item GUIDs of the open Spares the Character being played
 -- posted, { [id] = itemGuid }, so the game side can tell when an item
 -- has left the bags.
 function Core:spareItems()
-  return self.ledger:spareItems()
+  return self.spareLife:items()
 end
 
 -- Withdraws an own open Spare. Returns true, or nil and "unknown".
 function Core:withdrawSpare(id)
-  if not self.giving:ownOpen(id) then return nil, "unknown" end
-  self.ledger:withdrawSpare(id)
-  self.giving:check(true)
-  ownWrite(self)
-  return true
+  local ok, reason = self.spareLife:withdraw(id)
+  if ok then ownWrite(self) end
+  return ok, reason
 end
 
 -- Gives an own open Spare to the winning Claim's Character, which
@@ -440,16 +430,9 @@ end
 -- unseen. Returns true, or nil and "unknown", "noClaim" or
 -- "winnerChanged".
 function Core:giveSpare(id, expected)
-  local spare = self.giving:ownOpen(id)
-  if not spare then return nil, "unknown" end
-  local winner = self.giving:winnerOf(id)
-  if not winner then return nil, "noClaim" end
-  if expected ~= nil and winner.memberId ~= expected then return nil, "winnerChanged" end
-  self.ledger:giveSpare(id, winner.memberId, winner.guid)
-  self.log:ownGave({ id = id, item = spare.item, to = winner.memberId, guid = winner.guid })
-  self.giving:check(true)
-  ownWrite(self)
-  return true
+  local ok, reason = self.spareLife:give(id, expected)
+  if ok then ownWrite(self) end
+  return ok, reason
 end
 
 -- The bags have settled (BAG_UPDATE_DELAYED): checks where the item of
@@ -461,30 +444,7 @@ end
 -- = "withdrawn", id, item, link }), and for one with a Claim, ({ action =
 -- "ask", id, item, link, winner }), to ask whether to Give or withdraw it.
 function Core:bagsUpdated()
-  if not (self.findItem and self.ledger:playing()) then return end
-  local isNextLogin = self.loginCheckDue
-  self.loginCheckDue = false
-  local rows, changed = {}, false
-  for _, row in ipairs(self.giving:view().yours) do rows[row.id] = row end
-  for id, itemGuid in pairs(self.ledger:spareItems()) do
-    local row = rows[id]
-    local isOpen = row ~= nil and self.giving:ownOpen(id) ~= nil
-    local hasClaim = isOpen and row.winner ~= nil
-    local inInventory, isEquipped = self.findItem(itemGuid)
-    local action = ns.Spares.itemCheck(isOpen, hasClaim, inInventory, isEquipped, isNextLogin)
-    local isGone = action == "note" or action == "ask"
-    if isGone ~= (self.goneItems[id] == true) then
-      self.goneItems[id] = isGone or nil
-      changed = true
-    end
-    if action == "withdraw" then
-      self:withdrawSpare(id)
-      self.listener("spareGone", { action = "withdrawn", id = id, item = row.item, link = row.link })
-    elseif action == "ask" then
-      self.listener("spareGone", { action = "ask", id = id, item = row.item, link = row.link, winner = row.winner })
-    end
-  end
-  if changed then self.listener("changed") end
+  if self.spareLife:bagsUpdated(function() ownWrite(self) end) then self.listener("changed") end
 end
 
 -- Claims another Member's open Spare for one of your Characters by
@@ -493,32 +453,27 @@ end
 -- true, or nil and "own", "unknown", "claimed", "tooManyClaims"
 -- (20 open) or "unknownCharacter".
 function Core:claimSpare(owner, id, guid)
-  local reason
-  guid, reason = self.giving:canClaim(owner, id, guid)
-  if not guid then return nil, reason end
-  self.ledger:addClaim(owner, id, guid)
-  ownWrite(self)
-  return true
+  local ok, reason = self.spareLife:claim(owner, id, guid)
+  if ok then ownWrite(self) end
+  return ok, reason
 end
 
 -- Withdraws your Claim, until the Spare is Given. Returns true, or
 -- nil and "notClaimed" or "given".
 function Core:withdrawClaim(owner, id)
-  local ok, reason = self.giving:canWithdrawClaim(owner, id)
-  if not ok then return nil, reason end
-  self.ledger:withdrawClaim(owner, id)
-  ownWrite(self)
-  return true
+  local ok, reason = self.spareLife:withdrawClaim(owner, id)
+  if ok then ownWrite(self) end
+  return ok, reason
 end
 
 -- How many Spare notices haven't been shown yet, for the sidebar.
 function Core:unseenSpares()
-  return self.giving:unseen()
+  return self.spareLife:unseen()
 end
 
 -- The Spares tab was opened: every notice is seen.
 function Core:sparesSeen()
-  if self.giving:markAllSeen() then self.listener("changed") end
+  if self.spareLife:markAllSeen() then self.listener("changed") end
 end
 
 -- The Feed tab was opened: every entry and Reaction is seen.
@@ -707,7 +662,7 @@ function Core:removeMember(id)
   if not self.ledger:remove(id) then return nil, "unknownMember" end
   self.gossip:forget(id)
   self.log:dropMember(id)
-  self.giving:check(true)
+  self.spareLife:memberRemoved()
   self.online[id] = nil
   checkGoals(self, true)
   self.listener("changed")
@@ -781,8 +736,7 @@ local function finishLeaving(self)
   self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } })
   self.ledger:forgetOthers()
   self.ledger:clearReactions()
-  self.ledger:clearSpares()
-  self.giving:clear()
+  self.spareLife:clear()
   self.log:clear()
   self.crewGoals:clear()
   self.online = {}
@@ -833,7 +787,7 @@ local function dataReceived(self, records, from)
       self.log:dataMerged()
       self.crewGoals:dataMerged()
       local entries, reactions = self.log:recordChanged(before, record)
-      announce(self, entries, reactions, self.giving:recordChanged(before, record))
+      announce(self, entries, reactions, self.spareLife:recordChanged(before, record))
       -- A Member first seen, leaving or back counts or stops counting.
       if before == nil or (before.left == true) ~= (record.left == true) then checkGoals(self, true) end
     end

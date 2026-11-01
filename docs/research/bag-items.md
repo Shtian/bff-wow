@@ -77,7 +77,7 @@ Only the posting character can check its own bags, so the local GUID store has t
 
 ## 4. Item links (confirm only)
 
-What the code assumes (`Core/Spares.lua`): fields after `item:` are 1 item ID, 2 enchant, 3–6 gems, 7 suffix, 8 unique ID. `itemString` keeps `id[:enchant[:suffix[:unique]]]`, with the unique ID only for a negative suffix. `fullItemString` puts them back at positions 1, 2, 7 and 8 and leaves everything after field 8 empty (`item:15210::::::-19:1238425`). `Snapshot.itemLink` / `Snapshot.requiredLevel` call `C_Item.GetItemInfo` (falling back to `GetItemInfo`) and read returns 2 and 5. `C_Item.GetItemInfo` returns `itemLink` 2nd and `itemMinLevel` 5th in Forever's docs ([L636–L656](https://github.com/Gethe/wow-ui-source/blob/ca8368f2f2380cbe696854f7f2646387c278a61b/Interface/AddOns/Blizzard_APIDocumentationGenerated/ItemDocumentation.lua#L636-L656)).
+What the code assumes (`Core/SpareRules.lua`): fields after `item:` are 1 item ID, 2 enchant, 3–6 gems, 7 suffix, 8 unique ID. `itemString` keeps `id[:enchant[:suffix[:unique]]]`, with the unique ID only for a negative suffix. `fullItemString` puts them back at positions 1, 2, 7 and 8 and leaves everything after field 8 empty (`item:15210::::::-19:1238425`). `Snapshot.itemLink` / `Snapshot.requiredLevel` call `C_Item.GetItemInfo` (falling back to `GetItemInfo`) and read returns 2 and 5. `C_Item.GetItemInfo` returns `itemLink` 2nd and `itemMinLevel` 5th in Forever's docs ([L636–L656](https://github.com/Gethe/wow-ui-source/blob/ca8368f2f2380cbe696854f7f2646387c278a61b/Interface/AddOns/Blizzard_APIDocumentationGenerated/ItemDocumentation.lua#L636-L656)).
 
 | Check | Finding | Status |
 |---|---|---|
