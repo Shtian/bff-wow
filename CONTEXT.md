@@ -84,7 +84,7 @@ _Avoid_: Race, leaderboard (when meaning the contest)
 ### Passing things on
 
 **Hand-me-down**:
-An item a Member offers free to the Crew, to be sent by in-game mail to whichever Member Claims it. It ends when it is Given, withdrawn by its owner, or after 30 days.
+An item a Member offers free to the Crew, to be sent by in-game mail to whichever Member Claims it. It ends when it is Given, withdrawn by its owner, or after 30 days. If its item has left the owner's bags and bank (sold, mailed, traded, destroyed or equipped) and is still gone at the owner's next login, BFF withdraws it for them. If it has a Claim, BFF asks the owner whether to Give it or withdraw it (ADR 0004).
 _Avoid_: Gift, offer, listing, loot
 
 **Claim**:

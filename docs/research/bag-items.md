@@ -1,6 +1,6 @@
 # Research: marking bag items, tradeability, items leaving the bags, item links
 
-Results for [#65](https://github.com/Shtian/bff-wow/issues/65), feeding [#67](https://github.com/Shtian/bff-wow/issues/67). Desk research only, done on 2026-11-01. **Nothing here has been confirmed in the game.**
+Results for [#65](https://github.com/Shtian/bff-wow/issues/65), feeding [#67](https://github.com/Shtian/bff-wow/issues/67). Desk research done on 2026-11-01, then partly tested on retail the same day: see [Results on retail](#results-on-retail). Where the results contradict the desk research, the results win.
 
 Main source: Blizzard's UI source for Forever itself. The [Gethe/wow-ui-source](https://github.com/Gethe/wow-ui-source) mirror has a `forever` branch, **1.60.1 (70532)**, commit [`ca8368f`](https://github.com/Gethe/wow-ui-source/tree/ca8368f2f2380cbe696854f7f2646387c278a61b). Links below go to that commit; `UI:` is short for `https://github.com/Gethe/wow-ui-source/blob/ca8368f2f2380cbe696854f7f2646387c278a61b/Interface/AddOns/`. Forever loads the **Mainline** bag code (`[Family]\ContainerFrame.lua [AllowLoadGameType mainline]`) with a small Camelot override that doesn't touch item buttons ([toc lines 118–124](https://github.com/Gethe/wow-ui-source/blob/ca8368f2f2380cbe696854f7f2646387c278a61b/Interface/AddOns/Blizzard_UIPanels_Game/Blizzard_UIPanels_Game.toc#L118-L124), [Camelot/ContainerFrame.lua](https://github.com/Gethe/wow-ui-source/blob/ca8368f2f2380cbe696854f7f2646387c278a61b/Interface/AddOns/Blizzard_UIPanels_Game/Camelot/ContainerFrame.lua)). API facts come from the generated API docs in that branch (`Blizzard_APIDocumentationGenerated`) and from warcraft.wiki.gg.
 
@@ -99,11 +99,45 @@ A modifier-click shortcut (b), e.g. Alt+Right-click through `hooksecurefunc("Han
 
 ### Recommended way to detect items leaving
 
-**Item GUID first, item string as fallback.** When posting, store `{ hand-me-down id → item GUID, item string }` locally for the posting Character (SavedVariables only, never in the record). On each `BAG_UPDATE_DELAYED` (and after the bank closes), and only after the bags have loaded since login:
+**Item GUID, checked with `C_Item.IsItemGUIDInInventory`.** Tested on retail (see the results below). When posting, store `{ hand-me-down id → item GUID }` locally for the posting Character (SavedVariables only, never in the record). On each `BAG_UPDATE_DELAYED`, and only after the first one since login:
 
-1. Resolve `C_Item.GetItemLocation(guid)`. A bag or bank location means kept. An equipment slot means gone.
-2. If it's nil, look for the item string in the bags and the bank. A match means kept: store that item's GUID. No match means gone, and the Hand-me-down ends.
-3. If GUIDs turn out not to survive a relog, drop step 1 and use the item string alone. Two identical items then count as one.
+1. `C_Item.IsItemGUIDInInventory(guid)` false means the item has left (sold, destroyed, traded or mailed). It covers the bank even while the bank is closed, and right after login.
+2. If it's true, `C_Item.GetItemLocation(guid)` with `IsEquipmentSlot()` tells whether it's been equipped, which also means gone. Read the location's fields only after `IsItemGUIDInInventory` is true. Don't call `IsValid()` on it (see below).
+3. A sold item can be bought back with the same GUID. So don't end the Hand-me-down the moment the item disappears (to be decided).
+
+The item-string scan isn't needed. It also can't see the bank while the bank is closed.
+
+## Results on retail
+
+Run on 2026-11-01 on **retail 12.1.5.70688 (interface 120105)**, one character, default bags. Spike addon: branch `spike/bag-items` (`Spike/BFFBagSpike`, throwaway). Steps refer to the checklist below. Steps 4–7 (the Alt+Right-click hook), 10 (trying to mail each item), 15 (stacks), 17–19 (item links) and parts of 13 (destroy, trade, mail) were **not run**. We stopped once the design questions were answered.
+
+### Answer
+
+- **Marking by drag or click works everywhere:** out of combat, in combat, in a dungeon, and during a boss fight with chat lockdown on. No blocked-action errors.
+- **Tradeability:** `C_Item.IsBound` gave the expected answer for every item tested. An heirloom reports `bindType` 1, not 7–9, but `IsBound` is true, so it's refused anyway.
+- **Leaving the bags:** use `C_Item.IsItemGUIDInInventory(guid)`, not `GetItemLocation(guid) == nil`. `GetItemLocation` never returned nil. For an item that was gone, or banked with the bank closed, it returned an empty location, and calling `IsValid()` on that raises a Lua error.
+- **Login timing:** after a real login the bags are empty until the first `BAG_UPDATE_DELAYED`. Deciding earlier would end every Hand-me-down.
+
+### Findings
+
+| Step | Check | Result |
+|---|---|---|
+| 1 | Drag a bag item onto a frame | `OnReceiveDrag` fires. `GetCursorInfo` gives `item, id, link`. `C_Cursor.GetCursorItem()` gives bag and slot. `ClearCursor()` puts the item back in its slot. |
+| 2 | Pick up, then click the frame | Works. The click may arrive as `OnClick` or as `OnReceiveDrag`; handle both the same. |
+| 3 | Same, in combat / dungeon / boss fight | Works in all three. `InChatMessagingLockdown()` was **false** in combat in a dungeon and **true** only during the boss encounter. |
+| 8–9 | `IsBound` and `bindType` | Unbound BoE (Heavy Woolen Pants): false, 2. Same BoE **after equipping**: true, 2. Soulbound (Grasp of the Broken Totem): true, 1. Trade goods (Aquamarine, Linen Cloth): false, 0. Heirloom (Dignified Headmaster's Charge, quality 7): true, **1**. Hearthstone: true, 1. Not tested: quest items, conjured items, "Warbound until equipped". |
+| 11 | GUID stability | The same GUID after moving the item, `/reload`, a full logout and login, moving it to the character bank, and **equipping** it. Two copies of the same item have different GUIDs. |
+| 11–12 | Bank | With the bank **open**: `GetItemLocation(guid)` gives bag 6 (`CharacterBankTab_1`), and `IsItemGUIDInInventory` is true. With the bank **closed**: `GetItemLocation` returns an ItemLocation with every field nil, and `IsValid()` on it errors (`bad argument #1 to 'DoesItemExist'`). Every bank container reports 0 slots, but `IsItemGUIDInInventory` is still **true**. After a fresh login, without opening the bank: still true. The account bank wasn't tested. |
+| 13 | Sold | `IsItemGUIDInInventory` false, `GetItemLocation` empty (not nil). **Bought back:** same GUID, back in the same slot. |
+| 14 | Equipped | `GetItemLocation(guid)` gives `equipped, slot 7`. |
+| 16 | Login timing | Fresh login: `ADDON_LOADED` backpack 0 slots. `PLAYER_LOGIN` and `PLAYER_ENTERING_WORLD`: 20 slots, **0 filled**, `IsItemGUIDInInventory` false. First `BAG_UPDATE_DELAYED`: 12 filled, item found. On `/reload`, the bags are already filled at `ADDON_LOADED`. |
+| — | Bag indices | The reagent bag is bag 5. `Enum.BagIndex` on retail has character bank tabs 6–11, account bank tabs 12–16, and still lists `Keyring` (−1). Forever's numbering differs (see section 3). |
+
+### Still open
+
+- Forever-only: whether `IsItemGUIDInInventory` behaves the same, its bank layout, and random-suffix item links (steps 17–19). Re-check at Forever launch.
+- Mail to an alt, trade, destroy: expected to read as false like selling, not tested.
+- Whether a mailed item keeps its GUID on the receiving alt.
 
 ## Test on retail
 
