@@ -12,7 +12,7 @@
 --   C  Bare        no disc or ring, a 24px full-colour icon on the line
 --   D  Picture     a round full-colour Interface\Icons picture fills the node
 --   E  Current     what ships today
---   F  Square      D's pictures as squares in a kind-coloured frame, uncropped
+--   F  Square      D's pictures as squares, a faded 1px kind-coloured edge
 
 local _, ns = ...
 local Skin = ns.Skin
@@ -80,6 +80,7 @@ local function reset(line)
   if line.picture then line.picture:Hide() end
   if line.square then
     line.square:Hide()
+    line.squareBack:Hide()
     line.squarePicture:Hide()
   end
 end
@@ -130,24 +131,30 @@ end
 
 function style.E() end
 
--- Square: a kind-coloured frame on the line (covering it), the picture
--- inset 2px, cropped only by the icon's own border.
+-- Square: a faded 1px kind-coloured edge on the line (a window-coloured
+-- square under it covers the line), the picture inset 1px, cropped only
+-- by the icon's own border.
 function style.F(line, kind)
   local accent = ACCENT[kind] or Skin.FEED_ICON_COLOR
   if not line.square then
+    line.squareBack = line.node:CreateTexture(nil, "OVERLAY", nil, 2)
+    line.squareBack:SetSize(NODE, NODE)
+    line.squareBack:SetPoint("CENTER")
+    setColor(line.squareBack, Skin.WINDOW)
     line.square = line.node:CreateTexture(nil, "OVERLAY", nil, 3)
     line.square:SetSize(NODE, NODE)
     line.square:SetPoint("CENTER")
     line.squarePicture = line.node:CreateTexture(nil, "OVERLAY", nil, 4)
-    line.squarePicture:SetSize(NODE - 4, NODE - 4)
+    line.squarePicture:SetSize(NODE - 2, NODE - 2)
     line.squarePicture:SetPoint("CENTER")
     line.squarePicture:SetTexCoord(0.07, 0.93, 0.07, 0.93)
   end
   line.ring:Hide()
   line.gap:Hide()
   line.disc:Hide()
-  setColor(line.square, accent)
+  setColor(line.square, accent, 0.55)
   line.square:Show()
+  line.squareBack:Show()
   line.squarePicture:SetTexture(PICTURES[kind] or "Interface\\Icons\\INV_Misc_QuestionMark")
   line.squarePicture:Show()
   line.icon:Hide()
