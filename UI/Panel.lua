@@ -616,9 +616,10 @@ local function createFeedEntry()
   local node = CreateFrame("Frame", nil, entry)
   node:SetSize(NODE + 2, NODE + 2)
   node:SetPoint("TOPLEFT", INSET - 1, -3)
-  roundTexture(node, NODE + 2, { 1, 1, 1, 0.12 }, 1)
-  roundTexture(node, NODE, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3] }, 2)
-  roundTexture(node, NODE - 4, { 0.13, 0.12, 0.16 }, 3)
+  entry.node = node
+  entry.ring = roundTexture(node, NODE + 2, { 1, 1, 1, 0.12 }, 1)
+  entry.gap = roundTexture(node, NODE, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3] }, 2)
+  entry.disc = roundTexture(node, NODE - 4, { 0.13, 0.12, 0.16 }, 3)
   entry.icon = node:CreateTexture(nil, "OVERLAY")
   entry.icon:SetSize(16, 16)
   entry.icon:SetPoint("CENTER")
@@ -677,6 +678,8 @@ local function drawFeedEntry(line, entry)
     line.react:SetReaction(entry.reaction, entry.reacted)
   end
   Skin.feedIcon(line.icon, line.glyph, entry.kind)
+  -- PROTOTYPE: Dev/FeedIcons.prototype.lua restyles the node per variant.
+  if ns.FeedIconsPrototype then ns.FeedIconsPrototype.style(line, entry.kind) end
   line.text:SetText(entry.text)
   Skin.color(line.text, HIGHLIGHT[entry.kind] and GOLD or entry.own and MUTED or TEXT)
   line.time:SetText(date("%H:%M", entry.time))

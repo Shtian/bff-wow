@@ -47,6 +47,7 @@ UI/Settings.lua
 #@do-not-package@
 Dev/FakeNet.lua
 Dev/Sim.lua
+Dev/FeedIcons.prototype.lua
 #@end-do-not-package@
 
 BFF.lua
