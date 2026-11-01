@@ -30,7 +30,7 @@ The Hand-me-downs tab has a **drop slot** above your own list (#74, after the re
 
 `/bff hmd add`, then shift-click the item into the chat box, still works. It offers the first item in the bags with the same trimmed item string, and refuses the item if there isn't one.
 
-Either way the item must be tradeable (`HandMeDowns.tradeable`): it's refused if `C_Item.IsBound` says it's bound (soulbound, or account-bound at any scope; heirlooms report `bindType` 1 but are bound), or its `bindType` is Quest (4) or one of the account bindings (7, 8, 9). Conjured items aren't caught; the mail window refuses them. The required level comes from the game's item info.
+Either way Core checks the item can be traded (`HandMeDowns.tradeable`): it's refused if `C_Item.IsBound` says it's bound (soulbound, or account-bound at any scope; heirlooms report `bindType` 1 but are bound), or its `bindType` is Quest (4) or one of the account bindings (7, 8, 9). Conjured items aren't caught; the mail window refuses them. The required level comes from the game's item info.
 
 When an item is posted, its **item GUID** (`C_Item.GetItemGUID`) is kept locally in `BFF_DB.handMeDownItems`, by the posting Character's GUID and the Hand-me-down's id. It's never in the record, so it never goes out. It's dropped once the Hand-me-down is withdrawn, Given or ends, and when you leave the Crew. The follow-up (ADR 0004) uses it to notice the item has gone.
 
@@ -106,7 +106,7 @@ The Crew heading shows "2 Hand-me-downs for you": other Members' open Hand-me-do
 
 ## Changes to Core's interface
 
-- **Commands:** `postHandMeDown(link, level, itemGuid?)` (the item GUID is kept locally, never in the record), `withdrawHandMeDown(id)`, `giveHandMeDown(id)`, `claimHandMeDown(ownerId, id, guid?)`, `withdrawClaim(ownerId, id)` and `handMeDownsSeen()`. Each write bumps the own record's version and goes out now. Like Reactions, they're local writes that work in combat and offline.
+- **Commands:** `postHandMeDown(link, level, inBags?)`, where `inBags` is `{ guid, isBound, bindType }` from the bags: an untradeable item is refused, and the item GUID is kept locally, never in the record, `withdrawHandMeDown(id)`, `giveHandMeDown(id)`, `claimHandMeDown(ownerId, id, guid?)`, `withdrawClaim(ownerId, id)` and `handMeDownsSeen()`. Each write bumps the own record's version and goes out now. Like Reactions, they're local writes that work in combat and offline.
 - **Reads:** `handMeDowns()` for the tab, `summary().handMeDowns` for the Roster's count, and `handMeDownItems()`, the item GUIDs of the open Hand-me-downs the Character being played posted (`{ [id] = itemGuid }`).
 - **Listener events:** `handMeDown(news)`, like `reaction`. `awaySummary(summary)` gains `handMeDowns`, the notices then the Gives, newest first.
 - **Ports:** `itemLink(itemString)`, optional: the game's link for an item string, or nil while it isn't cached.

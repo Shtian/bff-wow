@@ -198,9 +198,9 @@ function commands.goals()
   ns.Panel.show("goals")
 end
 
--- Says how offering a bag item went, from Bags.offer's returns: the
+-- Says how posting a bag item went, from Bags' returns: the
 -- Hand-me-down's id and the item's link, or nil and a reason.
-function ns.sayOffered(id, result)
+function ns.sayPosted(id, result)
   if id then
     say(result .. " is up for your Crew. See /bff hmd.")
   else
@@ -213,8 +213,7 @@ end
 function commands.hmd(rest)
   local sub, link = rest:match("^(%S*)%s*(.-)$")
   if sub:lower() ~= "add" then return ns.Panel.show("handMeDowns") end
-  if not ns.HandMeDowns.itemString(link) then return say(MESSAGES.invalidItem) end
-  ns.sayOffered(ns.Bags.offer(ns.core, ns.Bags.find(link)))
+  ns.sayPosted(ns.Bags.postLink(ns.core, link))
 end
 
 function commands.when()

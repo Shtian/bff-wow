@@ -383,18 +383,23 @@ local function ownWrite(self)
 end
 
 -- Offers an item to the Crew: an item link (or item string), the level it
--- needs and, optionally, the item's GUID in the bags. The GUID is kept
--- for the Character being played (see handMeDownItems) and never goes in
--- the record. Checking the item can be traded is up to the caller
--- (HandMeDowns.tradeable). Returns the Hand-me-down's id, or nil and
--- "noCrew", "invalidItem" or "tooMany" (20 open already).
-function Core:postHandMeDown(link, level, itemGuid)
+-- needs and, optionally, what the bags say about it: { guid (its item
+-- GUID), isBound (C_Item.IsBound), bindType (14th return of
+-- C_Item.GetItemInfo) }. An item that can't be traded is refused. The
+-- GUID is kept for the Character being played (see handMeDownItems) and
+-- never goes in the record. Returns the Hand-me-down's id, or nil and
+-- "noCrew", "invalidItem", "bound", "questItem", "accountBound" or
+-- "tooMany" (20 open already).
+function Core:postHandMeDown(link, level, inBags)
   if not self.db.crew then return nil, "noCrew" end
   local item = ns.HandMeDowns.itemString(link)
   if not item then return nil, "invalidItem" end
+  inBags = type(inBags) == "table" and inBags or {}
+  local ok, reason = ns.HandMeDowns.tradeable(inBags.isBound, inBags.bindType)
+  if not ok then return nil, reason end
   if self.giving:openCount() >= ns.HandMeDowns.MAX_OPEN then return nil, "tooMany" end
   level = type(level) == "number" and level >= 0 and math.floor(level) or 0
-  local id = self.ledger:postHandMeDown(item, level, itemGuid)
+  local id = self.ledger:postHandMeDown(item, level, inBags.guid)
   ownWrite(self)
   return id
 end

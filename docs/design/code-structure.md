@@ -12,7 +12,7 @@ Almost all behaviour lives in one deep, pure-Lua module, **Core**, behind a smal
 |---|---|---|
 | **Core** (`Core/`) | yes | Everything BFF knows and decides: Member records, sync, Feed, panel rows, saved-data layout. Details below. |
 | **Snapshot** (`Game/Snapshot.lua`) | no | Reads level, XP, zone, class, gold and GUID, counts deaths (kept per Character in `BFF_CharacterDB`), and calls `core:updateOwn(character)`. `Snapshot.locate()` reads where the Character stands, for Core's `locate`. |
-| **Bags** (`Game/Bags.lua`) | no | Offers a bag item as a Hand-me-down: the item on the cursor (the Hand-me-downs tab's drop slot) or the first bag item matching a link (`/bff hmd add`). Checks it can be traded (`HandMeDowns.tradeable`) and passes its item GUID to `core:postHandMeDown`. |
+| **Bags** (`Game/Bags.lua`) | no | Offers a bag item as a Hand-me-down: the item on the cursor (the Hand-me-downs tab's drop slot) or the first bag item matching a link (`/bff hmd add`). Passes its item GUID and binding to `core:postHandMeDown`, which refuses an item that can't be traded. |
 | **Channel link** (`Game/ChannelLink.lua`) | no | The production link adapter: joins and hides the Crew channel (including filtering its system notices out of chat), AceComm with ChatThrottleLib, decides when the link is up or down, reports Members leaving the channel, and has an echo mode. See `docs/research/channel-spike.md`. |
 | **UI** (`UI/Skin.lua`, `UI/Panel.lua`, `UI/Minimap.lua`, `UI/MapPins.lua`, `UI/Away.lua`, `UI/ToastQueue.lua`, `UI/Toasts.lua`, `UI/Settings.lua`) | no | Renders Core's rows and summaries and sends user commands to Core. Shows no state it worked out itself. Skin is the shared flat look (colours, fonts, window, buttons, Feed icons) for the panel, the popup, toasts and map pins. ToastQueue is pure and tested offline (`docs/design/toasts.md`). |
 | **App** (`BFF.lua`) | no | Wiring only: creates Core, routes WoW events, runs a 1 s `C_Timer` ticker that calls `core:tick()`, and handles slash commands. |
@@ -40,7 +40,7 @@ Inputs:
 - `updateOwn(character)`: the current state of the Character being played, from Snapshot.
 - `tick()`: once a second. Core decides what is due (reply delays, debounced sends, heartbeat, online timeouts, pruning), and counts the second towards Play times.
 - `received(string)`, `up()`, `down()` and `gone(name)`: the incoming half of the link port.
-- Commands: start, join and leave a Crew, change the display name, Set as Main, Remove and re-add a Member, Pause sharing, and settings (see `docs/design/joining-a-crew.md`). Hand-me-downs: post (with the item's GUID, kept locally), withdraw and Give one, and make and withdraw a Claim (`docs/design/hand-me-downs.md`).
+- Commands: start, join and leave a Crew, change the display name, Set as Main, Remove and re-add a Member, Pause sharing, and settings (see `docs/design/joining-a-crew.md`). Hand-me-downs: post (with the item's GUID, kept locally, and its binding: an item that can't be traded is refused), withdraw and Give one, and make and withdraw a Claim (`docs/design/hand-me-downs.md`).
 
 Outputs:
 

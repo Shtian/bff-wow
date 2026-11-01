@@ -31,8 +31,9 @@ end
 
 -- db is the whole saved table; the Ledger keeps `memberId`, `records`,
 -- `heard`, `via`, `removed`, `nextHandMeDown` and `handMeDownItems` (per
--- Character GUID, the item GUID of each own open Hand-me-down it posted). Last-heard times survive a reload but not a
--- logout, since nobody was heard while you were logged out.
+-- Character GUID, the item GUID of each own open Hand-me-down it posted).
+-- Last-heard times survive a reload but not a logout, since nobody was
+-- heard while you were logged out.
 function Ledger.new(db, now, random, initialLogin)
   db.memberId = db.memberId or newMemberId(random)
   db.records = db.records or {}

@@ -1003,7 +1003,7 @@ end
 -- same. The item always goes back to its bag slot.
 local function onHandMeDownDrop()
   if not GetCursorInfo() then return end
-  ns.sayOffered(ns.Bags.offerFromCursor(core))
+  ns.sayPosted(ns.Bags.postFromCursor(core))
 end
 
 -- The drop slot: an empty item slot with a line saying what it's for.
