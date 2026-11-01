@@ -47,18 +47,69 @@ local ZONES = {
   "Durotar", "The Barrens", "Ashenvale", "Stranglethorn Vale", "Ironforge",
 }
 
--- Each zone's uiMapID, as the classic-era clients number them, so the
--- simulated Members get world map pins.
+-- Each zone's uiMapID as the classic-era clients number them, then as
+-- retail does, so the simulated Members get world map pins. Which
+-- numbering a client uses isn't known up front (Forever may have its
+-- own), so mapIdFor asks C_Map and takes the one whose map has the
+-- zone's name, or else looks the name up in the client's map tree.
 local MAP_IDS = {
-  ["Elwynn Forest"] = 1429, ["Westfall"] = 1436, ["Duskwood"] = 1431,
-  ["Redridge Mountains"] = 1433, ["Stormwind City"] = 1453, ["Durotar"] = 1411,
-  ["The Barrens"] = 1413, ["Ashenvale"] = 1440, ["Stranglethorn Vale"] = 1434,
-  ["Ironforge"] = 1455, ["Teldrassil"] = 1438, ["Darkshore"] = 1439, ["Wetlands"] = 1437,
+  ["Elwynn Forest"] = { 1429, 37 }, ["Westfall"] = { 1436, 52 }, ["Duskwood"] = { 1431, 47 },
+  ["Redridge Mountains"] = { 1433, 49 }, ["Stormwind City"] = { 1453, 84 }, ["Durotar"] = { 1411, 1 },
+  -- Retail splits the Barrens; its Northern Barrens is 10.
+  ["The Barrens"] = { 1413, 10 }, ["Ashenvale"] = { 1440, 63 }, ["Stranglethorn Vale"] = { 1434, 224 },
+  ["Ironforge"] = { 1455, 87 }, ["Teldrassil"] = { 1438, 57 }, ["Darkshore"] = { 1439, 62 },
+  ["Wetlands"] = { 1437, 56 },
 }
+-- Names other than the zone's own that count as a match.
+local MAP_ALIASES = { ["The Barrens"] = "Northern Barrens" }
+-- zone -> resolved uiMapID. Misses aren't kept: inside an instance the
+-- tree can't be read, and it can be once you're back out.
+local resolved = {}
+
+local function named(info, zone)
+  return info and (info.name == zone or info.name == MAP_ALIASES[zone])
+end
+
+-- The top of the map tree you stand in (the cosmic or world map).
+local function rootMap()
+  local id = C_Map.GetBestMapForUnit("player")
+  local info = id and C_Map.GetMapInfo(id)
+  while info and info.parentMapID and info.parentMapID ~= 0 do
+    id = info.parentMapID
+    info = C_Map.GetMapInfo(id)
+  end
+  return id
+end
+
+-- A zone or city map under the root with the zone's name, for clients
+-- that number maps neither way.
+local function searchTree(zone)
+  local root = rootMap()
+  if not root then return nil end
+  local wanted = { [Enum.UIMapType.Zone] = true, [Enum.UIMapType.City] = true }
+  for _, info in ipairs(C_Map.GetMapChildrenInfo(root, nil, true) or {}) do
+    if wanted[info.mapType] and named(info, zone) then return info.mapID end
+  end
+  return nil
+end
+
+local function mapIdFor(zone)
+  if resolved[zone] then return resolved[zone] end
+  local found
+  for _, id in ipairs(MAP_IDS[zone] or {}) do
+    if named(C_Map.GetMapInfo(id), zone) then
+      found = id
+      break
+    end
+  end
+  found = found or searchTree(zone)
+  resolved[zone] = found
+  return found
+end
 
 -- A made-up spot somewhere in the middle of the zone, for locate().
 local function spotIn(zone)
-  local mapId = MAP_IDS[zone]
+  local mapId = mapIdFor(zone)
   if not mapId then return nil end
   return { mapId = mapId, x = 0.3 + 0.4 * math.random(), y = 0.3 + 0.4 * math.random() }
 end

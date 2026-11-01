@@ -33,6 +33,7 @@ stds.wow = {
     "CLOSE",
     "CreateFont",
     "CreateFrame",
+    "Enum",
     "date",
     "ERR_TOO_MANY_CHAT_CHANNELS",
     "GameTooltip",
