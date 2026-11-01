@@ -36,6 +36,9 @@ local ROW_HEIGHT = 44
 local ALT_HEIGHT = 20
 local SECTION = 26
 local INSET = 12
+-- Buttons inside rows and headings, and the pickers that open a menu.
+-- Window actions keep Skin.button's 24.
+local SMALL_BUTTON = 20
 -- One height for every view, so switching tabs never resizes the window;
 -- the Roster and the Feed scroll inside it.
 local HEIGHT = 380
@@ -146,12 +149,26 @@ StaticPopupDialogs.BFF_REMOVE_MEMBER = {
   hideOnEscape = true,
 }
 
+-- The tooltip goes beside the panel, level with the row under the mouse,
+-- on whichever side has room. ANCHOR_RIGHT on a row near the top of the
+-- screen put it in the screen's corner.
+local TOOLTIP_ROOM = 280
+local function placeBeside(owner)
+  GameTooltip:SetOwner(owner, "ANCHOR_NONE")
+  local y = owner:GetTop() - frame:GetTop()
+  if frame:GetRight() + TOOLTIP_ROOM > UIParent:GetRight() then
+    GameTooltip:SetPoint("TOPRIGHT", frame, "TOPLEFT", -6, y)
+  else
+    GameTooltip:SetPoint("TOPLEFT", frame, "TOPRIGHT", 6, y)
+  end
+end
+
 -- The Character under the mouse: owner.row is its Member's row, and
 -- owner.character the Character (the row itself for the shown one).
 local function showTooltip(owner)
   local row, character = owner.row, owner.character
   if not row then return end
-  GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+  placeBeside(owner)
   GameTooltip:AddLine(character.name, classColor(character.classFilename))
   GameTooltip:AddLine(("Level %d %s %s"):format(character.level, className(character.classFilename),
     character.main and "(Main)" or "(Alt)"), 1, 1, 1)
@@ -306,7 +323,7 @@ local function createRow()
   row.xp:SetPoint("BOTTOMRIGHT", -INSET, 4)
   row.xp:SetHeight(2)
   row.xp:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-  Skin.fill(row.xp, { 1, 1, 1, 0.06 })
+  Skin.fill(row.xp, Skin.TRACK)
 
   rowFrames[#rowFrames + 1] = row
   return row
@@ -338,7 +355,7 @@ local function drawRow(row, data)
   local maxXp = data.maxXp or 0
   row.xp:SetMinMaxValues(0, math.max(maxXp, 1))
   row.xp:SetValue(maxXp > 0 and (data.xp or 0) or 0)
-  row.xp:SetStatusBarColor(classColor(data.classFilename))
+  row.xp:SetStatusBarColor(Skin.BAR[1], Skin.BAR[2], Skin.BAR[3], Skin.BAR[4])
   row.xp:SetShown(maxXp > 0)
   row:SetAlpha(data.online and 1 or 0.75)
   row:Show()
@@ -410,8 +427,9 @@ local function createSection()
   label:SetText("CREW")
 
   section.sort = CreateFrame("Button", nil, section)
-  section.sort:SetHeight(18)
+  section.sort:SetHeight(SMALL_BUTTON)
   section.sort:SetPoint("RIGHT", -INSET, -2)
+  Skin.fill(section.sort, { 1, 1, 1, 0.06 })
   Skin.border(section.sort, Skin.BORDER)
   Skin.fill(section.sort, Skin.HOVER, "HIGHLIGHT")
   section.sort.label = Skin.label(section.sort, "small", MUTED)
@@ -447,31 +465,17 @@ local function drawSection(count)
   section.line:SetPoint("RIGHT", count > 0 and section.spares or section.sort, "LEFT", -8, 0)
 end
 
--- The sidebar: Roster, Feed, Goals, When and Spares on top, Settings at the bottom, each with a
--- greyed game icon tinted like its label.
-local NAV_ICONS = {
-  roster = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
-  feed = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon",
-  goals = Skin.FEED_ICONS.goal,
-  when = "Interface\\FriendsFrame\\StatusIcon-Away",
-  spares = Skin.FEED_ICONS.gave,
-  settings = "Interface\\Buttons\\UI-OptionsButton",
-}
-
-local function navButton(label, icon, onClick)
+-- The sidebar: Roster, Feed, Goals, When and Spares on top, Settings at
+-- the bottom, as plain labels. The selected one's chip marks it.
+local function navButton(label, onClick)
   local button = CreateFrame("Button", nil, frame.sidebar)
   button:SetHeight(NAV_HEIGHT)
   -- The selected tab and the hovered one get a light chip, inset from
   -- the sidebar's edges.
   button.selected = Skin.chip(button, { 1, 1, 1, 0.08 }, NAV_CHIP_X, NAV_CHIP_Y, NAV_CHIP_RADIUS)
   Skin.chip(button, { 1, 1, 1, 0.04 }, NAV_CHIP_X, NAV_CHIP_Y, NAV_CHIP_RADIUS, "HIGHLIGHT")
-  button.icon = button:CreateTexture(nil, "ARTWORK")
-  button.icon:SetSize(14, 14)
-  button.icon:SetPoint("LEFT", 12, 0)
-  button.icon:SetTexture(icon)
-  button.icon:SetDesaturated(true)
   button.label = Skin.label(button, "text", MUTED)
-  button.label:SetPoint("LEFT", button.icon, "RIGHT", 7, 0)
+  button.label:SetPoint("LEFT", NAV_CHIP_X + 10, 0)
   button.label:SetText(label)
   button:SetScript("OnClick", onClick)
   return button
@@ -480,7 +484,6 @@ end
 local function setSelected(button, selected)
   button.selected:SetShown(selected)
   Skin.color(button.label, selected and TEXT or MUTED)
-  Skin.color(button.icon, selected and TEXT or MUTED)
 end
 
 local function createNav()
@@ -491,28 +494,27 @@ local function createNav()
       Panel.refresh()
     end
   end
-  nav.roster = navButton("Roster", NAV_ICONS.roster, open("roster"))
+  nav.roster = navButton("Roster", open("roster"))
   nav.roster:SetPoint("TOPLEFT", 0, -8)
   nav.roster:SetPoint("TOPRIGHT", 0, -8)
-  nav.feed = navButton("Feed", NAV_ICONS.feed, open("feed"))
+  nav.feed = navButton("Feed", open("feed"))
   nav.feed:SetPoint("TOPLEFT", nav.roster, "BOTTOMLEFT")
   nav.feed:SetPoint("TOPRIGHT", nav.roster, "BOTTOMRIGHT")
   nav.feed.badge = Skin.badge(nav.feed, "tiny", { 0.1, 0.08, 0 }, GOLD)
   nav.feed.badge:SetPoint("RIGHT", -10, 0)
-  nav.goals = navButton("Goals", NAV_ICONS.goals, open("goals"))
+  nav.goals = navButton("Goals", open("goals"))
   nav.goals:SetPoint("TOPLEFT", nav.feed, "BOTTOMLEFT")
   nav.goals:SetPoint("TOPRIGHT", nav.feed, "BOTTOMRIGHT")
-  nav.when = navButton("When", NAV_ICONS.when, open("when"))
+  nav.when = navButton("When", open("when"))
   nav.when:SetPoint("TOPLEFT", nav.goals, "BOTTOMLEFT")
   nav.when:SetPoint("TOPRIGHT", nav.goals, "BOTTOMRIGHT")
   nav.spares = navButton("Spares", NAV_ICONS.spares, open("spares"))
   nav.spares:SetPoint("TOPLEFT", nav.when, "BOTTOMLEFT")
   nav.spares:SetPoint("TOPRIGHT", nav.when, "BOTTOMRIGHT")
-  -- The label fills the button, so the badge sits on the icon's corner.
   nav.spares.badge = Skin.badge(nav.spares, "tiny", { 0.1, 0.08, 0 }, GOLD)
-  nav.spares.badge:SetPoint("CENTER", nav.spares.icon, "TOPRIGHT", 1, -1)
+  nav.spares.badge:SetPoint("RIGHT", -10, 0)
   -- The panel steps aside so it doesn't cover the settings.
-  nav.settings = navButton("Settings", NAV_ICONS.settings, function()
+  nav.settings = navButton("Settings", function()
     if ns.Settings.open() then frame:Hide() end
   end)
   nav.settings:SetPoint("BOTTOMLEFT", 0, 8)
@@ -611,14 +613,23 @@ local function createFeedView()
   feedView.empty = empty
 end
 
--- A day's label in a chip on the timeline's line.
+-- A day's label, like the Roster's CREW: on the window's colour so the
+-- timeline's line stops behind it, with a hairline running to the right.
 local function createFeedDay()
   local day = CreateFrame("Frame", nil, feedView.content)
   day:SetHeight(16)
-  Skin.fill(day, Skin.RAISED)
-  Skin.border(day, Skin.BORDER)
+  day.back = Skin.fill(day, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1 })
   day.label = Skin.label(day, "label", DIM)
-  day.label:SetPoint("CENTER", 0, 0)
+  day.label:SetPoint("LEFT", 4, 0)
+  day.back:ClearAllPoints()
+  day.back:SetPoint("TOPLEFT")
+  day.back:SetPoint("BOTTOMLEFT")
+  day.back:SetPoint("RIGHT", day.label, "RIGHT", 4, 0)
+  local line = day:CreateTexture(nil, "ARTWORK")
+  line:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
+  line:SetHeight(1)
+  line:SetPoint("LEFT", day.label, "RIGHT", 8, 0)
+  line:SetPoint("RIGHT")
   feedView.days[#feedView.days + 1] = day
   return day
 end
@@ -709,8 +720,8 @@ local function drawFeed(feed)
     local chip = feedView.days[dayCount] or createFeedDay()
     chip:ClearAllPoints()
     chip:SetPoint("TOPLEFT", feedView.content, "TOPLEFT", INSET - 4, y)
+    chip:SetPoint("RIGHT", feedView.content, "RIGHT", -INSET, 0)
     chip.label:SetText(dayTitle(day))
-    chip:SetWidth(chip.label:GetStringWidth() + 16)
     chip:Show()
     y = y - FEED_DAY
     for _, entry in ipairs(day.entries) do
@@ -767,7 +778,7 @@ local function goalRow(i)
   row.bar:SetPoint("RIGHT", -INSET, 0)
   row.bar:SetHeight(GOAL_BAR)
   row.bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-  Skin.fill(row.bar, { 1, 1, 1, 0.08 })
+  Skin.fill(row.bar, Skin.TRACK)
   row.last = Skin.label(row, "small", MUTED)
   row.last:SetPoint("TOPLEFT", row.bar, "BOTTOMLEFT", 0, -8)
   goalsView.rows[i] = row
@@ -799,7 +810,7 @@ local function drawGoal(row, goal)
   if goal.complete then
     row.bar:SetStatusBarColor(GOLD[1], GOLD[2], GOLD[3])
   else
-    row.bar:SetStatusBarColor(1, 1, 1, 0.3)
+    row.bar:SetStatusBarColor(Skin.BAR[1], Skin.BAR[2], Skin.BAR[3], Skin.BAR[4])
   end
   row.last:SetText(lastReached(goal))
   Skin.color(row.last, goal.complete and GOLD or MUTED)
@@ -860,8 +871,9 @@ local function createWhenView()
   whenView:SetAllPoints()
 
   whenView.pick = CreateFrame("Button", nil, whenView)
-  whenView.pick:SetHeight(20)
+  whenView.pick:SetHeight(SMALL_BUTTON)
   whenView.pick:SetPoint("TOPLEFT", INSET, -INSET)
+  Skin.fill(whenView.pick, { 1, 1, 1, 0.06 })
   Skin.border(whenView.pick, Skin.BORDER)
   Skin.fill(whenView.pick, Skin.HOVER, "HIGHLIGHT")
   whenView.pick.label = Skin.label(whenView.pick, "small", TEXT)
@@ -874,7 +886,7 @@ local function createWhenView()
   whenView.intro:SetWordWrap(true)
   whenView.intro:SetJustifyH("LEFT")
 
-  local top = -INSET - 20 - 8 - 36
+  local top = -INSET - SMALL_BUTTON - 8 - 36
   for hour = 0, 21, 3 do
     local label = Skin.label(whenView, "tiny", DIM)
     label:SetPoint("BOTTOMLEFT", whenView, "TOPLEFT", INSET + WHEN_DAYS + hour * WHEN_CELL, top + 2)
@@ -1147,10 +1159,10 @@ local function createSpareRow()
   row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
   row.primary = Skin.button(row, "Claim", onSparePrimary, true)
-  row.primary:SetSize(SPARE_BUTTON, 20)
+  row.primary:SetSize(SPARE_BUTTON, SMALL_BUTTON)
   row.primary:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   row.secondary = Skin.button(row, "Withdraw", onSpareSecondary)
-  row.secondary:SetSize(SPARE_BUTTON, 20)
+  row.secondary:SetSize(SPARE_BUTTON, SMALL_BUTTON)
 
   row.item = Skin.label(row, "body")
   row.item:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 1)
@@ -1192,7 +1204,8 @@ local function drawSpareText(row, data, width)
   row.item:SetWidth(0)
   row.item:SetText(data.link or "Loading...")
   row.item:SetWidth(math.min(row.item:GetStringWidth() + 1, width - 30))
-  row.level:SetText(data.level > 0 and data.level or "-")
+  row.level:SetShown(data.level > 0)
+  row.level:SetText(data.level)
   row.level:ClearAllPoints()
   row.level:SetPoint("LEFT", row.item, "RIGHT", 6, 0)
   row.info:SetWidth(width)

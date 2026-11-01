@@ -22,7 +22,7 @@ Two independent settings, both on by default. Core fires `feedEntry` when **eith
 - The Skin's flat window look, without a border: the kind's Feed picture (shared with the Feed tab through `Skin.feedPicture`; a Reaction's icon for a Reaction), then the entry's text. A thin, faint line along the bottom shrinks with the time the toast has left. Max level, joined and goals get gold text.
 - Each toast shows for **10 s** and fades out over the last 0.6 s. Hovering stops its clock, and leaving starts it again where it stopped.
 - **At most 3** at once. The newest sits where toasts are placed and pushes older ones away. They grow downward when placed in the top half of the screen and upward in the bottom half.
-- A burst that doesn't fit (a lockdown flush, the end of combat) fills the free slots and ends in one **"+N more in the Feed"** toast, with the Feed's sidebar icon. Later entries add to it, and give it its full time again, while it shows. With the screen full and no such toast, entries wait for a slot.
+- A burst that doesn't fit (a lockdown flush, the end of combat) fills the free slots and ends in one **"+N more in the Feed"** toast, with a small grey chat bubble. Later entries add to it, and give it its full time again, while it shows. With the screen full and no such toast, entries wait for a slot.
 - **Left-click** opens the panel on the Feed tab. **Right-click** dismisses.
 - **Combat:** nothing new shows in combat. Entries wait and show once it ends. Toasts already on screen fade as usual, and clicking one still opens the Feed, since the panel isn't protected.
 - **Turning toasts off** clears those on screen and those waiting.

@@ -28,7 +28,7 @@ local FADE = 0.6
 local TIMER = 2
 -- Where toasts start, down from the top centre, until moved.
 local DEFAULT_FROM_TOP = 160
--- The overflow toast's icon: the Feed's, as in the panel's sidebar.
+-- The overflow toast's icon: a small grey chat bubble.
 local MORE_ICON = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon"
 
 -- The sounds to pick from: game sounds by their SOUNDKIT name. One the

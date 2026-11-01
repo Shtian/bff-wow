@@ -24,6 +24,10 @@ Skin.RAISED = { 0.106, 0.102, 0.137, 1 }
 Skin.LINE = { 1, 1, 1, 0.07 }
 Skin.BORDER = { 1, 1, 1, 0.1 }
 Skin.HOVER = { 1, 1, 1, 0.05 }
+-- Every bar: a faint track and a neutral fill. Colour on a bar means
+-- something (levels gained, a goal complete).
+Skin.TRACK = { 1, 1, 1, 0.08 }
+Skin.BAR = { 1, 1, 1, 0.3 }
 
 Skin.HEADER_HEIGHT = 30
 
@@ -33,9 +37,8 @@ Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, goal = true }
 -- A muted grey for a picture's edge when its kind has no colour, and for
 -- the overflow toast's icon.
 Skin.FEED_ICON_COLOR = { 0.82, 0.8, 0.86 }
--- Each Feed kind's small icon, inline in the While you were away popup,
--- and the Goals and Spares tabs' sidebar icons. The Feed tab and toasts
--- draw Skin.FEED_PICTURES instead.
+-- Each Feed kind's small icon, inline in the While you were away popup.
+-- The Feed tab and toasts draw Skin.FEED_PICTURES instead.
 Skin.FEED_ICONS = {
   maxLevel = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1",
   death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
@@ -202,6 +205,11 @@ function Skin.ago(seconds)
   if seconds < 60 * 60 then return ("%dm"):format(math.floor(seconds / 60)) end
   if seconds < 24 * 60 * 60 then return ("%dh"):format(math.floor(seconds / 3600 + 0.5)) end
   return ("%dd"):format(math.floor(seconds / 86400 + 0.5))
+end
+
+-- A game icon inline in text, cropped inside its bevel: "|T...|t".
+function Skin.iconGlyph(texture, size)
+  return ("|T%s:%d:%d:0:0:64:64:5:59:5:59|t"):format(texture, size, size)
 end
 
 -- A colour as a text escape: "|cffrrggbb".

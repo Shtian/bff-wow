@@ -47,7 +47,7 @@ local NAME_WIDTH = LEVEL_X - 8
 local GAINED = Skin.ONLINE
 local STAR = "|T" .. Skin.FEED_ICONS.maxLevel .. ":12|t"
 local SKULL = "|T" .. Skin.FEED_ICONS.death .. ":12|t"
-local GOAL = "|T" .. Skin.FEED_ICONS.goal .. ":14|t"
+local GOAL = Skin.iconGlyph(Skin.FEED_PICTURES.goal, 14)
 
 local frame
 local rows = {}
@@ -134,10 +134,10 @@ local function row(index)
   item.character:SetWidth(NAME_WIDTH)
   item.character:SetWordWrap(false)
   item.level = Skin.label(item, "text")
-  item.track = Skin.fill(item, { 1, 1, 1, 0.08 }, "ARTWORK")
+  item.track = Skin.fill(item, Skin.TRACK, "ARTWORK")
   item.track:ClearAllPoints()
   item.track:SetSize(BAR, 4)
-  item.before = Skin.fill(item, Skin.MUTED, "ARTWORK", 1)
+  item.before = Skin.fill(item, Skin.BAR, "ARTWORK", 1)
   item.before:ClearAllPoints()
   item.gain = Skin.fill(item, GAINED, "ARTWORK", 1)
   item.gain:ClearAllPoints()
