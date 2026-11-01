@@ -29,6 +29,8 @@ local MESSAGES = {
   unknownCharacter = "That isn't one of your Characters.",
   noClaim = "Nobody has claimed that one yet.",
   given = "That one has been given already.",
+  notClaimed = "You haven't claimed that one.",
+  winnerChanged = "Someone claimed it earlier in the meantime. Have another look before you Give it.",
 }
 ns.MESSAGES = MESSAGES
 
@@ -81,16 +83,6 @@ local function utcOffset()
   return time(date("*t", now)) - time(date("!*t", now))
 end
 
--- Item info, through C_Item where the client has it.
-local getItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
-
--- The game's link for an item string, or nil until it's cached; asking
--- also starts loading it, and GET_ITEM_INFO_RECEIVED says when it has.
-local function itemLink(itemString)
-  local _, link = getItemInfo(itemString)
-  return link
-end
-
 -- Redraws the panel once a burst of item info has arrived.
 local itemRefreshDue = false
 local function itemInfoReceived()
@@ -114,7 +106,7 @@ local function start(isInitialLogin)
     maxLevel = GetMaxLevelForPlayerExpansion(),
     utcOffset = utcOffset(),
     locate = ns.Snapshot.locate,
-    itemLink = itemLink,
+    itemLink = ns.Snapshot.itemLink,
   })
   ns.ChannelLink.start(ns.core, function(kind) say(MESSAGES[kind]) end)
   ns.ChannelLink.setCrew(ns.core:crew())
@@ -209,8 +201,7 @@ function commands.hmd(rest)
   local sub, link = rest:match("^(%S*)%s*(.-)$")
   if sub:lower() ~= "add" then return ns.Panel.show("handMeDowns") end
   if link == "" then return say(MESSAGES.invalidItem) end
-  local level = select(5, getItemInfo(link))
-  local id, reason = ns.core:postHandMeDown(link, level)
+  local id, reason = ns.core:postHandMeDown(link, ns.Snapshot.requiredLevel(link))
   if id then
     say(link .. " is up for your Crew. See /bff hmd.")
   else

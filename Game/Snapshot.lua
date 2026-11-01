@@ -1,7 +1,8 @@
 -- Snapshot: reads the Character being played and hands it to Core. It also
 -- counts deaths, kept per Character in BFF_CharacterDB, so a client crash
 -- loses that session's deaths (see docs/design/code-structure.md), and
--- reads where the Character stands for Core's locate().
+-- reads where the Character stands for Core's locate(), and item info for
+-- Hand-me-downs.
 
 local _, ns = ...
 
@@ -77,6 +78,21 @@ end
 function Snapshot.locate()
   local ok, location = pcall(locate)
   return ok and location or nil
+end
+
+-- Item info, through C_Item where the client has it.
+local getItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
+
+-- The game's link for an item string, or nil until it's cached. Asking
+-- also starts loading it, and GET_ITEM_INFO_RECEIVED says when it has.
+function Snapshot.itemLink(itemString)
+  local _, link = getItemInfo(itemString)
+  return link
+end
+
+-- The level an item (link or item string) needs, or nil until it's cached.
+function Snapshot.requiredLevel(link)
+  return (select(5, getItemInfo(link)))
 end
 
 function Snapshot.start(core)

@@ -981,8 +981,8 @@ StaticPopupDialogs.BFF_GIVE_HAND_ME_DOWN = {
   text = "Give %s to %s? Send it by mail yourself: BFF only tells the Crew.",
   button1 = YES,
   button2 = NO,
-  OnAccept = function(_, id)
-    local ok, reason = core:giveHandMeDown(id)
+  OnAccept = function(_, data)
+    local ok, reason = core:giveHandMeDown(data.id, data.winner)
     if not ok then ns.say(ns.MESSAGES[reason]) end
   end,
   timeout = 0,
@@ -1073,7 +1073,8 @@ local function onHandMeDownPrimary(button, mouse)
   if not data then return end
   if row.yours then
     StaticPopup_Show("BFF_GIVE_HAND_ME_DOWN", data.link or "it",
-      data.winner and ("%s (%s)"):format(data.winner.name, data.winner.character) or "?", data.id)
+      data.winner and ("%s (%s)"):format(data.winner.name, data.winner.character) or "?",
+      { id = data.id, winner = data.winner and data.winner.memberId })
   elseif mouse == "RightButton" then
     showClaimMenu(button, data)
   else
@@ -1494,7 +1495,7 @@ function Panel.refresh()
   local summary = core:summary()
   frame.headerRight:SetText(("%d of %d online"):format(summary.online, summary.members))
   local feed = core:feed()
-  drawNav(feed.unseen, core:handMeDowns().unseen)
+  drawNav(feed.unseen, core:unseenHandMeDowns())
   hideViewsBut(tab)
   if tab == "feed" then
     drawFeed(feed)

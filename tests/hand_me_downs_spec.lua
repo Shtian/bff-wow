@@ -33,7 +33,7 @@ describe("HandMeDowns", function()
     it("rebuild to a string the game resolves, with the suffix where it was", function()
       local original = "item:15210:0:0:0:0:0:-19:1238425:30:0"
       local trimmed = H.itemString(original)
-      local rebuilt = H.itemLink(trimmed)
+      local rebuilt = H.fullItemString(trimmed)
       assert.equal("item:15210::::::-19:1238425", rebuilt)
       local fields = {}
       for field in (rebuilt .. ":"):gmatch("([^:]*):") do fields[#fields + 1] = field end
@@ -41,8 +41,8 @@ describe("HandMeDowns", function()
       assert.equal("-19", fields[8])
       assert.equal("1238425", fields[9])
       assert.equal(trimmed, H.itemString(rebuilt))
-      assert.equal("item:5191:1897", H.itemLink("5191:1897"))
-      assert.equal("item:5191", H.itemLink("5191"))
+      assert.equal("item:5191:1897", H.fullItemString("5191:1897"))
+      assert.equal("item:5191", H.fullItemString("5191"))
     end)
 
     it("validate what comes off the wire", function()

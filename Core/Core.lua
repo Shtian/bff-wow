@@ -407,12 +407,16 @@ end
 
 -- Gives an own open Hand-me-down to the winning Claim's Character, which
 -- is final: every client shows that recipient from then on. Sending the
--- mail is up to you. Returns true, or nil and "unknown" or "noClaim".
-function Core:giveHandMeDown(id)
+-- mail is up to you. expected is the winner's Member id as you were shown
+-- it, if any, so an earlier Claim arriving meanwhile isn't Given to
+-- unseen. Returns true, or nil and "unknown", "noClaim" or
+-- "winnerChanged".
+function Core:giveHandMeDown(id, expected)
   local handMeDown = self.giving:ownOpen(id)
   if not handMeDown then return nil, "unknown" end
   local winner = self.giving:winnerOf(id)
   if not winner then return nil, "noClaim" end
+  if expected ~= nil and winner.memberId ~= expected then return nil, "winnerChanged" end
   self.ledger:giveHandMeDown(id, winner.memberId, winner.guid)
   self.log:ownGave({ id = id, item = handMeDown.item, to = winner.memberId, guid = winner.guid })
   self.giving:check(true)
@@ -435,13 +439,18 @@ function Core:claimHandMeDown(owner, id, guid)
 end
 
 -- Withdraws your Claim, until the Hand-me-down is Given. Returns true, or
--- nil and "unknown" or "given".
+-- nil and "notClaimed" or "given".
 function Core:withdrawClaim(owner, id)
   local ok, reason = self.giving:canWithdrawClaim(owner, id)
   if not ok then return nil, reason end
   self.ledger:withdrawClaim(owner, id)
   ownWrite(self)
   return true
+end
+
+-- How many Hand-me-down notices haven't been shown yet, for the sidebar.
+function Core:unseenHandMeDowns()
+  return self.giving:unseen()
 end
 
 -- The Hand-me-downs tab was opened: every notice is seen.

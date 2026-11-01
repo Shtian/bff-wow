@@ -32,6 +32,7 @@ Core is created with:
 - `maxLevel`: from `GetMaxLevelForPlayerExpansion()`, for max level Feed entries.
 - `utcOffset`: how many seconds local time is ahead of server time, so `feed()` starts each day at local midnight and `playTimes()` shows local hours (default 0).
 - `locate()` (optional): where the Character being played stands, as `Snapshot.locate()` reads it: `{ mapId, x, y }` in the open world, `{ instance }` inside an instance, or nil when it can't be read. Core calls it just before its own DATA goes out (a zone change, a ding, the heartbeat), so moving alone never sends anything or changes the record. The Ledger rounds the position to 0.1%, keeps the last open-world spot inside an instance, and keeps the last known spot on nil.
+- `itemLink(itemString)` (optional): the game's link for an item string, as `Snapshot.itemLink` reads it, or nil while the item isn't cached. Hand-me-down texts say "an item" until then (`docs/design/hand-me-downs.md`).
 
 Inputs:
 

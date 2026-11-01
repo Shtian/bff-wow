@@ -294,7 +294,7 @@ describe("Hand-me-downs", function()
       net:run(5)
       assert.equal(b.memberId, yourRow(a, id).winner.memberId)
       assert.equal(b.memberId, crewRow(d, a, id).winner.memberId)
-      assert.same({ nil, "unknown" }, { c.core:withdrawClaim(a.memberId, id) })
+      assert.same({ nil, "notClaimed" }, { c.core:withdrawClaim(a.memberId, id) })
       -- Bob's and Cleo's Claims came in one DATA each: Bob first, then Cleo
       -- moved ahead of him, then she withdrew.
       assert.same({
@@ -380,7 +380,8 @@ describe("Hand-me-downs", function()
       assert.equal(b.memberId, yourRow(a, id).winner.memberId)
       assert.same({ nil, "unknown" }, { a.core:giveHandMeDown(99) })
 
-      assert.is_true(a.core:giveHandMeDown(id))
+      assert.same({ nil, "winnerChanged" }, { a.core:giveHandMeDown(id, c.memberId) })
+      assert.is_true(a.core:giveHandMeDown(id, b.memberId))
       local given = record(a).handMeDowns[1]
       assert.equal(b.memberId, given.r)
       assert.equal(b.character.guid, given.c)

@@ -167,10 +167,10 @@ function Giving:canClaim(owner, id, guid)
   return guid
 end
 
--- Whether you may withdraw your Claim. Returns true, or nil and "unknown"
--- (no such Claim) or "given".
+-- Whether you may withdraw your Claim. Returns true, or nil and
+-- "notClaimed" or "given".
 function Giving:canWithdrawClaim(owner, id)
-  if not ownClaim(self, owner, id) then return nil, "unknown" end
+  if not ownClaim(self, owner, id) then return nil, "notClaimed" end
   local handMeDown = find(self, owner, id)
   if handMeDown and handMeDown.to then return nil, "given" end
   return true
@@ -191,7 +191,7 @@ local function crewRow(self, record, handMeDown, highest)
     state = memberName(self, self.ledger:record(winner.memberId)) .. " claimed it first"
     if mine then state = state .. " (you claimed it for " .. characterName(self.ledger:own(), mine.guid) .. ")" end
   end
-  local item = HandMeDowns.itemLink(handMeDown.item)
+  local item = HandMeDowns.fullItemString(handMeDown.item)
   return {
     ownerId = owner,
     owner = memberName(self, record),
@@ -227,7 +227,7 @@ local function yourRow(self, handMeDown)
   else
     state = "No claims yet"
   end
-  local item = HandMeDowns.itemLink(handMeDown.item)
+  local item = HandMeDowns.fullItemString(handMeDown.item)
   return {
     id = id,
     item = item,

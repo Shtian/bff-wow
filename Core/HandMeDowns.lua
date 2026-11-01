@@ -70,18 +70,13 @@ end
 
 -- The item string the game resolves a trimmed one from, with every field
 -- where an item link has it: "item:15210::::::-19:1238425".
-function HandMeDowns.itemLink(item)
+function HandMeDowns.fullItemString(item)
   local fields = fieldsOf(item)
   local id, enchant, suffix, unique = fields[1], fields[2] or "", fields[3] or "", fields[4] or ""
   if suffix == "" and unique == "" then
     return enchant == "" and "item:" .. id or ("item:%s:%s"):format(id, enchant)
   end
   return (("item:%s:%s:::::%s:%s"):format(id, enchant, suffix, unique):gsub(":$", ""))
-end
-
--- The item ID of a trimmed item string.
-function HandMeDowns.itemId(item)
-  return tonumber(item:match("^%d+"))
 end
 
 -- What the wire fields must be: a non-empty string, a number from 0.
@@ -94,7 +89,7 @@ function HandMeDowns.NO_LINK() return nil end
 -- The item's link for a text, from itemLink(itemString), or "an item"
 -- until the game has it.
 function HandMeDowns.linkText(itemLink, item)
-  return itemLink(HandMeDowns.itemLink(item)) or "an item"
+  return itemLink(HandMeDowns.fullItemString(item)) or "an item"
 end
 
 -- A new Hand-me-down as stored in the owner's record.
