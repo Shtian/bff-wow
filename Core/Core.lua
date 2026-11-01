@@ -105,6 +105,15 @@ local function writePlayTimes(self)
   return self.ledger:setPlayTimes(self.playTracker:summary())
 end
 
+-- Play times changing alone rides the next send. Along with another
+-- change, that change's send and changed event cover it.
+local function sharePlayTimes(self, otherChange)
+  if writePlayTimes(self) and not otherChange then
+    self.gossip:ownChanged("later")
+    self.listener("changed")
+  end
+end
+
 -- The own record's display name or left flag changed: it goes out now.
 local function sendOwnNow(self)
   self.gossip:ownChanged("now")
@@ -114,11 +123,8 @@ end
 -- name, classFilename, level, xp, maxXp, zone and deaths.
 function Core:updateOwn(character)
   local changed, before = self.ledger:updateOwn(character)
-  -- The first report after login carries the Play times along.
-  if writePlayTimes(self) and not changed then
-    self.gossip:ownChanged("later")
-    self.listener("changed")
-  end
+  -- The first report after login brings the Play times up to date.
+  sharePlayTimes(self, changed)
   if changed then
     -- Your own events go into the Feed only while in a Crew.
     if self.db.crew then self.log:ownChanged(before, character.guid) end
@@ -187,15 +193,11 @@ local function awaySummary(self)
   self.listener("changed")
 end
 
-
 -- Called once a second. Core decides what is due.
 function Core:tick()
-  -- Counts the second played. A changed summary rides the next send.
+  -- Counts the second played.
   if self.playTracker:tick() then self.playTimesDue = true end
-  if writePlayTimes(self) then
-    self.gossip:ownChanged("later")
-    self.listener("changed")
-  end
+  sharePlayTimes(self)
   self.gossip:tick()
   if self.log:tick() then awaySummary(self) end
   if self.db.crew and self.crewGoals:tick() then self.listener("changed") end
@@ -226,21 +228,12 @@ function Core:feed()
   return self.log:view(self.utcOffset)
 end
 
-local function emptyGrid(values)
-  for _, value in ipairs(values) do
-    if value > 0 then return false end
-  end
-  return true
-end
-
--- A Member "usually plays" an hour played in at least this many of the
--- last 4 weeks.
-local USUALLY = 2
-
 -- The When tab, in the viewer's local time: grid (7 days from Monday, each
--- 24 hours from 00:00), max (the most a cell can hold) and empty (every
--- cell 0). Without memberId, the Crew: each cell counts the Members your
--- Roster shows who usually play then, out of members. With one, that
+-- 24 hours from 00:00), max (the most a cell can hold), empty (every cell
+-- 0), and the rules for the wording: weeks (how many are kept), usually
+-- (weeks played to usually play) and minutes (to count as played). Without
+-- memberId, the Crew: each cell counts the Members your Roster shows who
+-- usually play then, out of max. With one, that
 -- Member's weeks played (0–4) per hour, displayName, collectingSince (when
 -- they started, while under a week ago) and noData (their BFF shares no
 -- Play times); nil for a Member the Roster doesn't show.
@@ -248,46 +241,36 @@ function Core:playTimes(memberId)
   local now = self.now()
   local PlayTimes = ns.PlayTimes
   local rows = ns.Roster.rows(self.ledger, now)
-  local function weeks(id)
-    local summary = self.ledger:record(id).playTimes
-    return summary and PlayTimes.weeksPlayed(summary, now), summary
+  local function view(values, max)
+    return {
+      grid = PlayTimes.grid(values, self.utcOffset),
+      max = max,
+      empty = PlayTimes.isEmpty(values),
+      weeks = PlayTimes.WEEKS,
+      usually = PlayTimes.USUALLY,
+      minutes = PlayTimes.PLAYED_MINUTES,
+    }
   end
 
   if memberId == nil then
-    local counts = {}
-    for slot = 1, 7 * 24 do counts[slot] = 0 end
+    local summaries = {}
     for _, row in ipairs(rows) do
-      local played = weeks(row.memberId)
-      for slot = 1, played and #played or 0 do
-        if played[slot] >= USUALLY then counts[slot] = counts[slot] + 1 end
-      end
+      summaries[#summaries + 1] = self.ledger:record(row.memberId).playTimes
     end
-    return {
-      grid = PlayTimes.grid(counts, self.utcOffset),
-      max = #rows,
-      members = #rows,
-      empty = emptyGrid(counts),
-    }
+    return view(PlayTimes.usuallyPlaying(summaries, now), #rows)
   end
 
   for _, row in ipairs(rows) do
     if row.memberId == memberId then
-      local played, summary = weeks(memberId)
-      if not played then
-        played = {}
-        for slot = 1, 7 * 24 do played[slot] = 0 end
-      end
+      local summary = self.ledger:record(memberId).playTimes
       local since = summary and summary.since
-      return {
-        memberId = memberId,
-        displayName = row.displayName,
-        own = row.own == true,
-        grid = PlayTimes.grid(played, self.utcOffset),
-        max = PlayTimes.WEEKS,
-        empty = emptyGrid(played),
-        noData = summary == nil,
-        collectingSince = since and now - since < PlayTimes.WEEK and since or nil,
-      }
+      local result = view(PlayTimes.weeksPlayed(summary, now), PlayTimes.WEEKS)
+      result.memberId = memberId
+      result.displayName = row.displayName
+      result.own = row.own == true
+      result.noData = summary == nil
+      result.collectingSince = since and now - since < PlayTimes.WEEK and since or nil
+      return result
     end
   end
   return nil

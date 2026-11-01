@@ -813,9 +813,10 @@ local function showCellTooltip(cell)
   GameTooltip:AddLine(("%s %02d:00-%02d:00"):format(DAY_NAMES[cell.day], cell.hour - 1, cell.hour % 24), 1, 1, 1)
   if view.memberId then
     local who = view.own and "You" or view.displayName or "They"
-    GameTooltip:AddLine(("%s played %d of the last 4 weeks"):format(who, value), MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:AddLine(("%s played %d of the last %d weeks"):format(who, value, view.weeks),
+      MUTED[1], MUTED[2], MUTED[3])
   else
-    GameTooltip:AddLine(("%d of %d Members usually play"):format(value, view.members), MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:AddLine(("%d of %d Members usually play"):format(value, view.max), MUTED[1], MUTED[2], MUTED[3])
   end
   GameTooltip:Show()
 end
@@ -866,10 +867,10 @@ local function createWhenView()
   end
 
   local below = top - 7 * WHEN_ROW - 10
-  whenView.fewer = Skin.label(whenView, "tiny", DIM)
-  whenView.fewer:SetPoint("TOPLEFT", INSET + WHEN_DAYS, below)
+  whenView.legendLow = Skin.label(whenView, "tiny", DIM)
+  whenView.legendLow:SetPoint("TOPLEFT", INSET + WHEN_DAYS, below)
   whenView.legend = {}
-  local anchor = whenView.fewer
+  local anchor = whenView.legendLow
   for i = 1, 4 do
     local swatch = whenView:CreateTexture(nil, "ARTWORK")
     swatch:SetSize(WHEN_CELL - 1, WHEN_ROW - 2)
@@ -877,8 +878,8 @@ local function createWhenView()
     whenView.legend[i] = { texture = swatch }
     anchor = swatch
   end
-  whenView.more = Skin.label(whenView, "tiny", DIM)
-  whenView.more:SetPoint("LEFT", anchor, "RIGHT", 6, 0)
+  whenView.legendHigh = Skin.label(whenView, "tiny", DIM)
+  whenView.legendHigh:SetPoint("LEFT", anchor, "RIGHT", 6, 0)
 
   whenView.note = Skin.label(whenView, "small", MUTED)
   whenView.note:SetPoint("TOPLEFT", INSET, below - 24)
@@ -894,21 +895,22 @@ end
 -- What the grid shows, and a note when there's little or nothing to see.
 local function whenTexts(view)
   if not view.memberId then
-    local intro = ("How many of the %d Members usually play each hour: in 2 of the last 4 weeks. Your local time.")
-      :format(view.members)
-    local note = view.empty and "Nobody usually plays at any hour yet. It takes two weeks of play to show." or ""
+    local intro = ("How many of the %d Members usually play each hour: in %d of the last %d weeks. Your local time.")
+      :format(view.max, view.usually, view.weeks)
+    local note = view.empty and ("Nobody usually plays at any hour yet. It takes %d weeks of play to show.")
+      :format(view.usually) or ""
     return "The Crew", intro, note
   end
   local name = view.own and "You" or view.displayName or "?"
-  local intro = ("How many of the last 4 weeks %s played each hour. Your local time."):format(
-    view.own and "you" or name)
+  local intro = ("How many of the last %d weeks %s played each hour. Your local time."):format(
+    view.weeks, view.own and "you" or name)
   local note = ""
   if view.noData then
     note = ("%s's BFF doesn't share Play times yet."):format(name)
   elseif view.collectingSince then
     note = ("Collecting since %s: less than a week of data so far."):format(shortDate(view.collectingSince))
   elseif view.empty then
-    note = "No hour played for 10 minutes or more in the last 4 weeks."
+    note = ("No hour played for %d minutes or more in the last %d weeks."):format(view.minutes, view.weeks)
   end
   return name, intro, note
 end
@@ -929,8 +931,8 @@ local function drawWhen()
   for _, cell in ipairs(whenView.cells) do
     shadeCell(cell, view.grid[cell.day][cell.hour], view.max)
   end
-  whenView.fewer:SetText(view.memberId and "0" or "None")
-  whenView.more:SetText(view.memberId and "4 weeks" or "Everyone")
+  whenView.legendLow:SetText(view.memberId and "0" or "None")
+  whenView.legendHigh:SetText(view.memberId and ("%d weeks"):format(view.weeks) or "Everyone")
   for i, swatch in ipairs(whenView.legend) do
     shadeCell(swatch, i - 1, 3)
   end

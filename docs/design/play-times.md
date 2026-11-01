@@ -19,7 +19,7 @@ The own record gains `playTimes = { since, week, slots }`:
 
 - `slots` is 168 hex digits, one per UTC slot. Each digit is a bit per week the slot had at least 10 minutes: 1 for `week` (the week the summary was made in), 2 for the week before, 4 and 8 for the two before that.
 - **A mask, not a count.** The brief asked for the number of weeks (0–4). The mask holds the same and lets a viewer **age** a summary: one made 2 weeks ago only has its last 2 weeks left in the viewer's 4-week window, so a Member who stopped playing fades out instead of counting for ever. It costs the same 168 characters.
-- Written into the record when it may have changed: at the first Character report after login (in the same write), when a slot reaches 10 minutes, and when a week begins. That's at most about once an hour of play.
+- Written into the record when it may have changed: at the first Character report after login (a second write right after the Character's, so the same send carries both), when a slot reaches 10 minutes, and when a week begins. That's at most about once an hour of play.
 - **Never forces a send:** it's `"later"` urgency, like XP, so it goes out with the next send or the 5-minute heartbeat.
 - Shared by default; Pause sharing already silences everything. No setting.
 - Validated on merge (a table with numeric `since` and `week` and 168 hex digits); a record with malformed Play times is dropped like any malformed record. Older clients ignore the field, and records from them merge and show "no data".

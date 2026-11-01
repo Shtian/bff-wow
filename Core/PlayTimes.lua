@@ -20,6 +20,9 @@ local MONDAY_SHIFT = 3 * DAY
 local WEEKS = 4
 -- A slot counts as played in a week at this many seconds.
 local PLAYED = 10 * 60
+-- A Member usually plays an hour they played in at least this many of the
+-- last WEEKS weeks.
+local USUALLY = 2
 -- Ticks further apart than this are a loading screen, logout or crash,
 -- not play.
 local MAX_GAP = 60
@@ -27,6 +30,8 @@ local HEX = "0123456789abcdef"
 
 PlayTimes.WEEK = WEEK
 PlayTimes.WEEKS = WEEKS
+PlayTimes.USUALLY = USUALLY
+PlayTimes.PLAYED_MINUTES = PLAYED / 60
 
 -- The UTC hour of the week a server time falls in, 0 (Monday 00:00) to 167.
 function PlayTimes.slot(t)
@@ -131,10 +136,18 @@ function PlayTimes.same(a, b)
   return a.since == b.since and a.week == b.week and a.slots == b.slots
 end
 
+local function zeros()
+  local values = {}
+  for slot = 1, SLOTS do values[slot] = 0 end
+  return values
+end
+
 -- How many of the last WEEKS weeks, as of `now`, a summary's Member played
--- each UTC slot in: 168 numbers, 0 to 4. A summary made weeks ago has
--- fewer of them left, so a Member who stopped playing fades out.
+-- each UTC slot in: 168 numbers, 0 to 4 (all 0 without a summary). A
+-- summary made weeks ago has fewer of them left, so a Member who stopped
+-- playing fades out.
 function PlayTimes.weeksPlayed(summary, now)
+  if not summary then return zeros() end
   local age = PlayTimes.week(now) - summary.week
   local keep = WEEKS - math.max(age, 0)
   local counts = {}
@@ -147,6 +160,26 @@ function PlayTimes.weeksPlayed(summary, now)
     counts[slot] = count
   end
   return counts
+end
+
+-- How many of the given summaries' Members usually play each UTC slot, as
+-- of `now`: 168 numbers.
+function PlayTimes.usuallyPlaying(summaries, now)
+  local counts = zeros()
+  for _, summary in ipairs(summaries) do
+    for slot, weeks in ipairs(PlayTimes.weeksPlayed(summary, now)) do
+      if weeks >= USUALLY then counts[slot] = counts[slot] + 1 end
+    end
+  end
+  return counts
+end
+
+-- Whether every value is 0.
+function PlayTimes.isEmpty(values)
+  for _, value in ipairs(values) do
+    if value > 0 then return false end
+  end
+  return true
 end
 
 -- 168 values by UTC slot as a grid in local time: 7 days from Monday, each

@@ -65,7 +65,7 @@ describe("The When tab", function()
     anotherMonday(net, 1)
     view = b.core:playTimes()
     assert.equal(3, mondayEvening(view))
-    assert.equal(3, view.members)
+    assert.equal(3, view.max)
     assert.is_false(view.empty)
     assert.equal(0, view.grid[1][23])
     assert.equal(0, view.grid[2][21])
@@ -84,7 +84,7 @@ describe("The When tab", function()
 
     a.core:removeMember(b.memberId)
     assert.equal(2, mondayEvening(a.core:playTimes()))
-    assert.equal(2, a.core:playTimes().members)
+    assert.equal(2, a.core:playTimes().max)
     assert.is_nil(a.core:playTimes(b.memberId))
 
     c.core:leaveCrew()
@@ -143,7 +143,7 @@ describe("The When tab", function()
     local view = a.core:playTimes("olderone")
     assert.is_true(view.noData)
     assert.equal(0, mondayEvening(view))
-    assert.equal(3, a.core:playTimes().members)
+    assert.equal(3, a.core:playTimes().max)
 
     -- Malformed Play times aren't kept.
     a.core:received(ns.Codec.encode({
