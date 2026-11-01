@@ -38,4 +38,8 @@ npm install
 npx bumpy add --packages "bff:patch" --message "What changed, for the changelog."
 ```
 
-Merging to `main` opens or updates the "Versioned release" PR. Merging that publishes the GitHub release `bff@X.Y.Z` with the zip and `release.json`.
+Merging to `main` opens or updates the "Versioned release" PR. Merging that publishes the GitHub release `bff@X.Y.Z` with the zip and `release.json`, and uploads the zip to CurseForge once the `CF_API_KEY` secret and `CURSEFORGE_PROJECT_ID` variable are set.
+
+## License
+
+MIT, see [`LICENSE`](LICENSE). The libraries in `Libs/` keep their own licenses.

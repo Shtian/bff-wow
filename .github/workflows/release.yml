@@ -2,7 +2,8 @@ name: release
 
 # Merging to main opens or updates the "Versioned release" PR. Merging that PR
 # publishes: bumpy creates a draft release for tag bff@X.Y.Z, runs
-# scripts/package.sh to build and upload the zip and release.json, then
+# scripts/package.sh to build the zip, upload it to CurseForge and upload it
+# and release.json to the release, then
 # finalises the release and pushes the tag. See
 # docs/design/settings-and-release.md.
 on:
@@ -84,3 +85,6 @@ jobs:
           BUMPY_VERSION: ${{ needs.plan.outputs.bumpy_version }}
           GH_TOKEN: ${{ github.token }}
           BUMPY_GH_TOKEN: ${{ secrets.BUMPY_GH_TOKEN }}
+          # scripts/package.sh uploads to CurseForge when both are set.
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
