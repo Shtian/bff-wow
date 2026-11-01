@@ -36,7 +36,7 @@ local HEIGHT = 380
 local FEED_ENTRY = 38
 local REACT = 20
 local FEED_DAY = 26
--- The timeline's line runs through the middle of the entry icons.
+-- The timeline's line runs through the middle of the entry pictures.
 local NODE = 26
 local LINE_X = INSET + NODE / 2 - 1
 -- Last seen goes stale, so the open panel redraws this often.
@@ -600,30 +600,14 @@ local function createFeedDay()
   return day
 end
 
-local function roundTexture(parent, size, color, sublevel)
-  local texture = parent:CreateTexture(nil, "ARTWORK", nil, sublevel)
-  texture:SetSize(size, size)
-  texture:SetPoint("CENTER")
-  texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
-  return Skin.round(parent, texture)
-end
-
--- An entry: a round node on the line with the kind's icon, the text, and
--- the time under it.
+-- An entry: the kind's picture on the line, the text, and the time under
+-- it.
 local function createFeedEntry()
   local entry = CreateFrame("Frame", nil, feedView.content)
   entry:SetHeight(FEED_ENTRY)
-  local node = CreateFrame("Frame", nil, entry)
-  node:SetSize(NODE + 2, NODE + 2)
-  node:SetPoint("TOPLEFT", INSET - 1, -3)
-  roundTexture(node, NODE + 2, { 1, 1, 1, 0.12 }, 1)
-  roundTexture(node, NODE, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3] }, 2)
-  roundTexture(node, NODE - 4, { 0.13, 0.12, 0.16 }, 3)
-  entry.icon = node:CreateTexture(nil, "OVERLAY")
-  entry.icon:SetSize(16, 16)
-  entry.icon:SetPoint("CENTER")
-  entry.glyph = Skin.label(node, "glyph", Skin.FEED_ICON_COLOR)
-  entry.glyph:SetPoint("CENTER", 0, 0)
+  local node = Skin.feedPicture(entry, NODE)
+  node:SetPoint("TOPLEFT", INSET, -4)
+  entry.node = node
 
   entry.text = Skin.label(entry, "text")
   entry.text:SetPoint("TOPLEFT", node, "TOPRIGHT", 10, -2)
@@ -676,7 +660,7 @@ local function drawFeedEntry(line, entry)
   if entry.canReact then
     line.react:SetReaction(entry.reaction, entry.reacted)
   end
-  Skin.feedIcon(line.icon, line.glyph, entry.kind)
+  line.node:SetKind(entry.kind)
   line.text:SetText(entry.text)
   Skin.color(line.text, HIGHLIGHT[entry.kind] and GOLD or entry.own and MUTED or TEXT)
   line.time:SetText(date("%H:%M", entry.time))

@@ -19,6 +19,7 @@ local WIDTH = 300
 local HEIGHT = 40
 local GAP = 6
 local ICON = 18
+local PICTURE = 24
 local REACT = 20
 -- Seconds a toast takes to fade out at the end of its time.
 local FADE = 0.6
@@ -116,13 +117,17 @@ local function createToast()
   toast.accent:SetWidth(2)
   Skin.fill(toast, Skin.HOVER, "HIGHLIGHT")
 
+  toast.picture = Skin.feedPicture(toast, PICTURE)
+  toast.picture:SetPoint("LEFT", 10, 0)
+  -- The overflow toast's small grey icon, centred where the picture goes.
   toast.icon = toast:CreateTexture(nil, "ARTWORK")
   toast.icon:SetSize(ICON, ICON)
-  toast.icon:SetPoint("LEFT", 12, 0)
-  toast.glyph = Skin.label(toast, "glyph", Skin.FEED_ICON_COLOR)
-  toast.glyph:SetPoint("CENTER", toast.icon, "CENTER", 0, 0)
+  toast.icon:SetPoint("CENTER", toast.picture)
+  toast.icon:SetTexture(MORE_ICON)
+  toast.icon:SetDesaturated(true)
+  Skin.color(toast.icon, Skin.FEED_ICON_COLOR)
   toast.text = Skin.label(toast, "body")
-  toast.text:SetPoint("LEFT", toast.icon, "RIGHT", 10, 0)
+  toast.text:SetPoint("LEFT", toast.picture, "RIGHT", 10, 0)
   toast.text:SetWordWrap(false)
   toast.react = Skin.reactionButton(toast, REACT, onReact)
   toast.react:SetPoint("RIGHT", -10, 0)
@@ -134,19 +139,13 @@ local function createToast()
 end
 
 -- A Reaction toast (news from Core's reaction event, which has an
--- entryKey) shows the Reaction's icon and has no button.
-local function drawIcon(frame, entry)
-  if not entry.entryKey then
-    frame.icon:SetTexCoord(0, 1, 0, 1)
-    Skin.feedIcon(frame.icon, frame.glyph, entry.kind)
-    return
+-- entryKey) shows the Reaction's icon, edged in gold, and has no button.
+local function drawPicture(frame, entry)
+  if entry.entryKey then
+    frame.picture:SetPicture(Skin.REACTION_ICONS[entry.reaction], Skin.GOLD)
+  else
+    frame.picture:SetKind(entry.kind)
   end
-  frame.glyph:SetText("")
-  frame.icon:SetShown(true)
-  frame.icon:SetTexture(Skin.REACTION_ICONS[entry.reaction])
-  frame.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  frame.icon:SetDesaturated(false)
-  frame.icon:SetVertexColor(1, 1, 1)
 end
 
 local function drawToast(frame, toast)
@@ -157,17 +156,13 @@ local function drawToast(frame, toast)
   frame.react:SetShown(canReact)
   if canReact then frame.react:SetReaction(entry.reaction, entry.reacted) end
   frame.text:SetPoint("RIGHT", canReact and -(REACT + 16) or -10, 0)
+  frame.picture:SetShown(entry ~= nil)
+  frame.icon:SetShown(entry == nil)
   if entry then
-    drawIcon(frame, entry)
+    drawPicture(frame, entry)
     frame.text:SetText(entry.text)
     Skin.color(frame.text, highlight and Skin.GOLD or Skin.TEXT)
   else
-    frame.glyph:SetText("")
-    frame.icon:SetShown(true)
-    frame.icon:SetTexture(MORE_ICON)
-    frame.icon:SetTexCoord(0, 1, 0, 1)
-    frame.icon:SetDesaturated(true)
-    Skin.color(frame.icon, Skin.FEED_ICON_COLOR)
     frame.text:SetText(("+%d more in the Feed"):format(toast.more))
     Skin.color(frame.text, Skin.MUTED)
   end

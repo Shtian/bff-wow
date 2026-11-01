@@ -91,7 +91,7 @@ After the summary has settled, every new entry from another Member prints one ch
 
 ## Feed tab
 
-A **Feed** tab in the panel's sidebar, below the Roster: a timeline, newest first, of all kept entries (up to 200), grouped by day, with an icon per kind. Entries that were unseen when you opened it are tagged "new" until you leave it. Opening it marks everything as seen. `/bff feed` opens the panel on it.
+A **Feed** tab in the panel's sidebar, below the Roster: a timeline, newest first, of all kept entries (up to 200), grouped by day, with a picture per kind: a square, full-colour game icon with a faded 1px edge in the kind's colour (`Skin.FEED_PICTURES`, `Skin.FEED_EDGES`). Entries that were unseen when you opened it are tagged "new" until you leave it. Opening it marks everything as seen. `/bff feed` opens the panel on it.
 
 ## Settings
 
