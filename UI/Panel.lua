@@ -86,23 +86,13 @@ local order = "online"
 local expanded = {}
 local fresh = {}
 
-local function classColor(classFilename)
-  local color = classFilename and RAID_CLASS_COLORS[classFilename]
-  if color then return color.r, color.g, color.b end
-  return 1, 1, 1
-end
+local classColor = Skin.classColor
 
 local function className(classFilename)
   return LOCALIZED_CLASS_NAMES_MALE[classFilename] or classFilename or ""
 end
 
--- "online", or how long ago: 5m, 3h, 2d.
-local function ago(seconds)
-  seconds = math.max(0, seconds)
-  if seconds < 60 * 60 then return ("%dm"):format(math.floor(seconds / 60)) end
-  if seconds < 24 * 60 * 60 then return ("%dh"):format(math.floor(seconds / 3600 + 0.5)) end
-  return ("%dd"):format(math.floor(seconds / 86400 + 0.5))
-end
+local ago = Skin.ago
 
 local function lastSeenText(online, sinceSeen)
   if online then return "online" end

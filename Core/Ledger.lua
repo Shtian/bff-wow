@@ -16,6 +16,9 @@ local ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
 
 -- The fields Snapshot reports for a Character.
 local CHARACTER_FIELDS = { "name", "classFilename", "level", "xp", "maxXp", "zone", "deaths" }
+-- Where a Character was last seen, from locate(): written only by
+-- Ledger:locate, and kept when Snapshot reports the Character.
+local LOCATION_FIELDS = { "mapId", "x", "y", "instance" }
 
 local function newMemberId(random)
   local chars = {}
@@ -86,6 +89,7 @@ function Ledger:updateOwn(character)
   local before = saved
   saved = { guid = character.guid }
   for _, field in ipairs(CHARACTER_FIELDS) do saved[field] = character[field] end
+  for _, field in ipairs(LOCATION_FIELDS) do saved[field] = before and before[field] end
   saved.lastPlayed = self.now()
   record.characters[character.guid] = saved
   bump(self, record)
@@ -101,6 +105,42 @@ function Ledger:touch()
   saved.lastPlayed = self.now()
   bump(self, record)
   return true
+end
+
+-- Positions are kept to 0.1% of the map, so standing still isn't a change.
+local function round(value)
+  return math.floor(value * 1000 + 0.5) / 1000
+end
+
+-- Records where the Character being played is, from locate(): mapId, x
+-- and y (0–1 on that map) for the open world, which also clears the
+-- instance; or instance (its name) alone, keeping the last open-world spot.
+-- Nil, or anything else, keeps what was known. Returns true if the record
+-- changed.
+function Ledger:locate(location)
+  local record = self:own()
+  local saved = record and self.playingGuid and record.characters[self.playingGuid]
+  if not saved or type(location) ~= "table" then return false end
+
+  local mapId, x, y, instance = location.mapId, location.x, location.y, location.instance
+  local spot
+  if type(mapId) == "number" and type(x) == "number" and type(y) == "number" then
+    spot = { mapId = mapId, x = round(x), y = round(y) }
+  elseif type(instance) == "string" and instance ~= "" then
+    spot = { mapId = saved.mapId, x = saved.x, y = saved.y, instance = instance }
+  else
+    return false
+  end
+
+  local changed = false
+  for _, field in ipairs(LOCATION_FIELDS) do
+    if saved[field] ~= spot[field] then
+      saved[field] = spot[field]
+      changed = true
+    end
+  end
+  if changed then bump(self, record) end
+  return changed
 end
 
 function Ledger:displayName()
@@ -247,6 +287,7 @@ end
 
 local function isText(value) return type(value) == "string" end
 local function isNumber(value) return type(value) == "number" end
+local function isFraction(value) return isNumber(value) and value >= 0 and value <= 1 end
 local function isOptional(check)
   return function(value) return value == nil or check(value) end
 end
@@ -269,6 +310,10 @@ local CHARACTER_SHAPE = {
   maxXp = isOptional(isNumber),
   zone = isOptional(isText),
   deaths = isOptional(isNumber),
+  mapId = isOptional(isNumber),
+  x = isOptional(isFraction),
+  y = isOptional(isFraction),
+  instance = isOptional(isText),
   lastPlayed = isNumber,
 }
 

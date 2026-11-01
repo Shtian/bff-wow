@@ -25,8 +25,10 @@ Core.reactionText = ns.Reactions.text
 Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
 
 -- deps: db, now(), random(), link (with send(string)), listener(event, ...),
--- initialLogin, maxLevel and utcOffset (seconds local time is
--- ahead of server time, for the Feed's days; default 0).
+-- initialLogin, maxLevel, utcOffset (seconds local time is ahead of server
+-- time, for the Feed's days; default 0) and locate() (optional: where the
+-- Character being played stands, read just before own DATA goes out; see
+-- Snapshot.locate).
 function Core.new(deps)
   for name, kind in pairs(required) do
     if type(deps[name]) ~= kind then
@@ -51,11 +53,13 @@ function Core.new(deps)
   }, Core)
   self.log = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin)
   self.crewGoals = ns.Goals.new(deps.db, self.ledger, deps.now, deps.maxLevel)
-  -- Every message carries the sender's Member id.
+  -- Every message carries the sender's Member id. Where you stand is only
+  -- read when own DATA goes out, so moving alone never sends anything.
+  local locate = type(deps.locate) == "function" and deps.locate or nil
   self.gossip = ns.Gossip.new(self.ledger, deps.now, deps.random, function(message)
     message.from = self.ledger:memberId()
     self.link.send(ns.Codec.encode(message))
-  end)
+  end, locate and function() self.ledger:locate(locate()) end)
   self.gossip:setPaused(self:isPaused())
   self.playTracker = ns.PlayTimes.new(deps.db, deps.now)
   -- The own record's Play times may be out of date until the first tick.
@@ -142,11 +146,40 @@ end
 -- altsCanPlay, via (display name of the Member whose message brought their
 -- record, if not their own) and alts, plus the shown Character: the one
 -- being played while online, else the Main. A Character, shown or alt, has
--- guid, name, classFilename, level, xp, maxXp, zone, deaths, lastPlayed,
--- sinceSeen, playing (being played right now), main and canPlay (within
+-- guid, name, classFilename, level, xp, maxXp, zone, deaths, mapId, x, y and
+-- instance (where last seen; see mapPins()), lastPlayed, sinceSeen, playing (being played right now), main and canPlay (within
 -- Core.CAN_PLAY_LEVELS of the Character you play).
 function Core:rows(order)
   return ns.Roster.rows(self.ledger, self.now(), order)
+end
+
+-- The world map's pins: one per other Member the panel shows whose shown
+-- Character (being played while online, else the Main) has a known spot,
+-- unsorted. A pin has memberId, displayName, name, classFilename, level,
+-- mapId, x and y (0–1 on that map), zone, instance (the instance's name
+-- while inside one, the spot then being the last one outside), online and
+-- sinceSeen (seconds since the Member was last seen).
+function Core:mapPins()
+  local pins = {}
+  for _, row in ipairs(ns.Roster.rows(self.ledger, self.now())) do
+    if not row.own and row.mapId and row.x and row.y then
+      pins[#pins + 1] = {
+        memberId = row.memberId,
+        displayName = row.displayName,
+        name = row.name,
+        classFilename = row.classFilename,
+        level = row.level,
+        mapId = row.mapId,
+        x = row.x,
+        y = row.y,
+        zone = row.zone,
+        instance = row.instance,
+        online = row.online,
+        sinceSeen = row.sinceSeen,
+      }
+    end
+  end
+  return pins
 end
 
 -- Counts for the title and minimap button: online, members, canPlay (online

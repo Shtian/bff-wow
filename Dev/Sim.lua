@@ -46,6 +46,22 @@ local ZONES = {
   "Durotar", "The Barrens", "Ashenvale", "Stranglethorn Vale", "Ironforge",
 }
 
+-- Each zone's uiMapID, as the classic-era clients number them, so the
+-- simulated Members get world map pins.
+local MAP_IDS = {
+  ["Elwynn Forest"] = 1429, ["Westfall"] = 1436, ["Duskwood"] = 1431,
+  ["Redridge Mountains"] = 1433, ["Stormwind City"] = 1453, ["Durotar"] = 1411,
+  ["The Barrens"] = 1413, ["Ashenvale"] = 1440, ["Stranglethorn Vale"] = 1434,
+  ["Ironforge"] = 1455, ["Teldrassil"] = 1438, ["Darkshore"] = 1439, ["Wetlands"] = 1437,
+}
+
+-- A made-up spot somewhere in the middle of the zone, for locate().
+local function spotIn(zone)
+  local mapId = MAP_IDS[zone]
+  if not mapId then return nil end
+  return { mapId = mapId, x = 0.3 + 0.4 * math.random(), y = 0.3 + 0.4 * math.random() }
+end
+
 local net
 local ticker
 local members
@@ -78,6 +94,7 @@ local function playHistory(client, i, spec, yourLevel, now)
     client.characters[j] = character(i, j, spec.characters[j], yourLevel)
     client.current = j
     client.character = client.characters[j]
+    client:move(spotIn(client.character.zone))
     if client.core then client:play() else client:login() end
   end
   net.clock = now
@@ -194,12 +211,17 @@ local ACTIONS = {
     client:play({ xp = math.min(c.maxXp - 1, c.xp + math.floor(c.maxXp / 4)) })
   end,
   die = function(client) client:play({ deaths = (client.character.deaths or 0) + 1 }) end,
-  zone = function(client) client:play({ zone = otherZone(client.character.zone) }) end,
+  zone = function(client)
+    local zone = otherZone(client.character.zone)
+    client:move(spotIn(zone))
+    client:play({ zone = zone })
+  end,
   max = function(client) client:play({ level = net.maxLevel, xp = 0 }) end,
   -- Switches to the Member's next Character, as logging in on an Alt would.
   alt = function(client)
     client.current = client.current % #client.characters + 1
     client.character = client.characters[client.current]
+    client:move(spotIn(client.character.zone))
     client:play()
   end,
   react = function(client) reactToYou(client, yourId) end,
