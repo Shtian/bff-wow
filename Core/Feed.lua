@@ -1,6 +1,6 @@
 -- Feed: turns a record as it was and as it is now into Feed entries (ding,
 -- death, new Character, max level, joined and left the Crew, and gave: a
--- Hand-me-down Given, matched by owner and id), adds the
+-- Spare Given, matched by owner and id), adds the
 -- Crew-wide entries for Crew goals reached, and keeps the
 -- account-wide log with its seen flags. A jump over skipped versions makes
 -- at most one entry of each kind per Character, and the first sight of a
@@ -9,7 +9,7 @@
 -- at, each with a seen flag on your own entries, and knows when sync has
 -- settled after an initial login.
 -- See docs/design/feed.md, docs/design/reactions.md and
--- docs/design/hand-me-downs.md.
+-- docs/design/spares.md.
 
 local _, ns = ...
 
@@ -18,7 +18,7 @@ Feed.__index = Feed
 ns.Feed = Feed
 
 local Reactions = ns.Reactions
-local HandMeDowns = ns.HandMeDowns
+local Spares = ns.Spares
 
 local DAY = 24 * 60 * 60
 -- Entries are kept this long, and at most this many.
@@ -49,7 +49,7 @@ function Feed.new(db, ledger, now, maxLevel, initialLogin, itemLink)
     ledger = ledger,
     now = now,
     maxLevel = maxLevel,
-    itemLink = itemLink or HandMeDowns.NO_LINK,
+    itemLink = itemLink or Spares.NO_LINK,
     settle = ns.Settle.new(now, not initialLogin),
   }, Feed)
 end
@@ -202,30 +202,30 @@ local function crewEntry(self, kind, record)
   return entry
 end
 
--- Whether the log has the gave entry for this owner's Hand-me-down.
+-- Whether the log has the gave entry for this owner's Spare.
 local function hasGave(self, owner, id)
   for _, entry in ipairs(self.db.feed) do
-    if entry.kind == "gave" and entry.memberId == owner and entry.handMeDown == id then return true end
+    if entry.kind == "gave" and entry.memberId == owner and entry.spare == id then return true end
   end
   return false
 end
 
--- A gave entry: owner, the Hand-me-down's id and item, and who it went to.
+-- A gave entry: owner, the Spare's id and item, and who it went to.
 -- Its text is worked out when it's described, once the item is cached.
-local function gaveEntry(self, record, own, handMeDown)
+local function gaveEntry(self, record, own, spare)
   local entry = newEntry("gave", record, own, nil)
   entry.time = own and self.now() or record.version
-  entry.handMeDown, entry.item, entry.recipient = handMeDown.id, handMeDown.item, handMeDown.to
+  entry.spare, entry.item, entry.recipient = spare.id, spare.item, spare.to
   -- The recipient's own notice already tells them.
-  if handMeDown.to == self.ledger:memberId() then entry.seen = true end
+  if spare.to == self.ledger:memberId() then entry.seen = true end
   return entry
 end
 
--- The Hand-me-downs Given in after that weren't in before, each once.
+-- The Spares Given in after that weren't in before, each once.
 local function gaveEntries(self, before, after, list)
-  for _, handMeDown in ipairs(HandMeDowns.newlyGiven(before, after)) do
-    if not hasGave(self, after.id, handMeDown.id) then
-      list[#list + 1] = gaveEntry(self, after, false, handMeDown)
+  for _, spare in ipairs(Spares.newlyGiven(before, after)) do
+    if not hasGave(self, after.id, spare.id) then
+      list[#list + 1] = gaveEntry(self, after, false, spare)
     end
   end
 end
@@ -275,11 +275,11 @@ function Feed:ownChanged(was, guid)
   return insert(self, list)
 end
 
--- You Gave one of your Hand-me-downs ({ id, item, to } as in
--- HandMeDowns.inRecord): your own gave entry. Returns the new entries.
-function Feed:ownGave(handMeDown)
-  if hasGave(self, self.ledger:memberId(), handMeDown.id) then return {} end
-  return insert(self, { gaveEntry(self, self.ledger:own(), true, handMeDown) })
+-- You Gave one of your Spares ({ id, item, to } as in
+-- Spares.inRecord): your own gave entry. Returns the new entries.
+function Feed:ownGave(spare)
+  if hasGave(self, self.ledger:memberId(), spare.id) then return {} end
+  return insert(self, { gaveEntry(self, self.ledger:own(), true, spare) })
 end
 
 -- Crew goals were reached: one Crew-wide entry each ({ track, rung, text }
@@ -363,7 +363,7 @@ end
 local function gaveText(self, entry)
   local giver = entry.own and "You" or reactorName(self, entry.memberId)
   local recipient = entry.recipient == self.ledger:memberId() and "you" or reactorName(self, entry.recipient)
-  return ("%s gave %s %s"):format(giver, recipient, HandMeDowns.linkText(self.itemLink, entry.item))
+  return ("%s gave %s %s"):format(giver, recipient, Spares.linkText(self.itemLink, entry.item))
 end
 
 -- An entry's text: stored, except a gave entry's, worked out as shown.
@@ -603,12 +603,12 @@ end
 -- While you were away: the unseen entries from other Members, one block
 -- per Member, most recent activity first, the Crew goals reached, newest
 -- first ({ text, time }), the unseen Reactions to your own, and
--- handMeDowns: the Hand-me-down notices given (Giving:takeNews), then the
+-- spares: the Spare notices given (Giving:takeNews), then the
 -- Gives, newest first ({ kind = "gave", text, time }), as { members,
--- goals, handMeDowns, count, noticed }. Marks them seen. Nil when there
+-- goals, spares, count, noticed }. Marks them seen. Nil when there
 -- are none.
-function Feed:takeSummary(handMeDowns)
-  handMeDowns = handMeDowns or {}
+function Feed:takeSummary(spares)
+  spares = spares or {}
   local byMember, ids, goals, gives, count = {}, {}, {}, {}, 0
   for _, entry in ipairs(self.db.feed) do
     if not entry.seen and entry.kind == "goal" then
@@ -632,8 +632,8 @@ function Feed:takeSummary(handMeDowns)
     end
   end
   local noticed = takeNoticed(self)
-  if count == 0 and #noticed == 0 and #handMeDowns == 0 then return nil end
-  for _, give in ipairs(gives) do handMeDowns[#handMeDowns + 1] = give end
+  if count == 0 and #noticed == 0 and #spares == 0 then return nil end
+  for _, give in ipairs(gives) do spares[#spares + 1] = give end
 
   local members = {}
   for i, id in ipairs(ids) do members[i] = memberBlock(self, id, byMember[id]) end
@@ -641,7 +641,7 @@ function Feed:takeSummary(handMeDowns)
     if a.time ~= b.time then return a.time > b.time end
     return a.memberId < b.memberId
   end)
-  return { members = members, goals = goals, handMeDowns = handMeDowns, count = count, noticed = noticed }
+  return { members = members, goals = goals, spares = spares, count = count, noticed = noticed }
 end
 
 -- An entry as handed out: a fresh table UI may keep. Seen is false while

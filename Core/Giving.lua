@@ -1,12 +1,12 @@
--- Giving: the Hand-me-downs tab's state, worked out from the Ledger's
--- records. Each Hand-me-down is in its owner's record and each Claim in
+-- Giving: the Spares tab's state, worked out from the Ledger's
+-- records. Each Spare is in its owner's record and each Claim in
 -- its claimer's; this finds the Claims every held record makes on a
--- Hand-me-down and shows the earliest as winning, until the owner's Give
+-- Spare and shows the earliest as winning, until the owner's Give
 -- names the recipient instead (docs/adr/0003). Removed Members aren't
--- held, so their Hand-me-downs and Claims are gone too; Left ones are
+-- held, so their Spares and Claims are gone too; Left ones are
 -- skipped. Also keeps the notices: the owner hears when a Claim becomes
 -- the winning one, and the winning claimer when it's Given, each with a
--- seen flag like Reactions. See docs/design/hand-me-downs.md.
+-- seen flag like Reactions. See docs/design/spares.md.
 
 local _, ns = ...
 
@@ -14,7 +14,7 @@ local Giving = {}
 Giving.__index = Giving
 ns.Giving = Giving
 
-local HandMeDowns = ns.HandMeDowns
+local Spares = ns.Spares
 
 local DAY = 24 * 60 * 60
 -- Notices are kept this long, and at most this many.
@@ -24,18 +24,18 @@ local KEEP_MAX = 50
 -- often so one moving up that way is silent.
 local QUIET_CHECK_EVERY = 60
 
--- db is the whole saved table; Giving keeps `handMeDownNews` (the
--- notices, oldest first) and `handMeDownWinners` (the winning Member id
--- last told of, per own Hand-me-down id). itemLink(itemString) is the
+-- db is the whole saved table; Giving keeps `spareNews` (the
+-- notices, oldest first) and `spareWinners` (the winning Member id
+-- last told of, per own Spare id). itemLink(itemString) is the
 -- game's link for an item string, or nil while it isn't cached.
 function Giving.new(db, ledger, now, itemLink)
-  db.handMeDownNews = db.handMeDownNews or {}
-  db.handMeDownWinners = db.handMeDownWinners or {}
+  db.spareNews = db.spareNews or {}
+  db.spareWinners = db.spareWinners or {}
   return setmetatable({
     db = db,
     ledger = ledger,
     now = now,
-    itemLink = itemLink or HandMeDowns.NO_LINK,
+    itemLink = itemLink or Spares.NO_LINK,
     lastQuietCheck = now(),
   }, Giving)
 end
@@ -54,15 +54,15 @@ local function shown(self, record)
   return record ~= nil and not record.left and not self.ledger:isRemoved(record.id)
 end
 
--- The Claims every counted record makes on one Hand-me-down, as
+-- The Claims every counted record makes on one Spare, as
 -- { memberId, guid, time }. The owner's own never count.
 local function claimsOn(self, owner, id)
   local now = self.now()
   local list = {}
   for memberId, record in self.ledger:records() do
     if memberId ~= owner and shown(self, record) then
-      for _, claim in ipairs(HandMeDowns.claimsIn(record)) do
-        if claim.owner == owner and claim.id == id and now - claim.time <= HandMeDowns.KEEP_FOR then
+      for _, claim in ipairs(Spares.claimsIn(record)) do
+        if claim.owner == owner and claim.id == id and now - claim.time <= Spares.KEEP_FOR then
           list[#list + 1] = { memberId = memberId, guid = claim.guid, time = claim.time }
         end
       end
@@ -83,27 +83,27 @@ local function who(self, memberId, guid)
   }
 end
 
--- A Hand-me-down by owner and id, as in HandMeDowns.inRecord, while its
+-- A Spare by owner and id, as in Spares.inRecord, while its
 -- owner counts. Nil otherwise.
 local function find(self, owner, id)
   local record = self.ledger:record(owner)
   if not shown(self, record) then return nil end
-  for _, handMeDown in ipairs(HandMeDowns.inRecord(record)) do
-    if handMeDown.id == id then return handMeDown, record end
+  for _, spare in ipairs(Spares.inRecord(record)) do
+    if spare.id == id then return spare, record end
   end
   return nil
 end
 
--- The winning Claim on a Hand-me-down, { memberId, guid, time }, and how
+-- The winning Claim on a Spare, { memberId, guid, time }, and how
 -- many Claims there are.
 local function winnerOf(self, owner, id)
   local claims = claimsOn(self, owner, id)
-  return HandMeDowns.winner(claims), #claims
+  return Spares.winner(claims), #claims
 end
 
--- The own Claim on a Hand-me-down, as stored, or nil.
+-- The own Claim on a Spare, as stored, or nil.
 local function ownClaim(self, owner, id)
-  for _, claim in ipairs(HandMeDowns.claimsIn(self.ledger:own())) do
+  for _, claim in ipairs(Spares.claimsIn(self.ledger:own())) do
     if claim.owner == owner and claim.id == id then return claim end
   end
   return nil
@@ -119,48 +119,48 @@ local function highestLevel(self)
   return highest
 end
 
--- How many own Hand-me-downs are open.
+-- How many own Spares are open.
 function Giving:openCount()
   local count = 0
-  for _, handMeDown in ipairs(HandMeDowns.inRecord(self.ledger:own())) do
-    if HandMeDowns.isOpen(handMeDown, self.now()) then count = count + 1 end
+  for _, spare in ipairs(Spares.inRecord(self.ledger:own())) do
+    if Spares.isOpen(spare, self.now()) then count = count + 1 end
   end
   return count
 end
 
--- How many own Claims are open: their Hand-me-down still is.
+-- How many own Claims are open: their Spare still is.
 function Giving:claimCount()
   local count = 0
-  for _, claim in ipairs(HandMeDowns.claimsIn(self.ledger:own())) do
-    local handMeDown = find(self, claim.owner, claim.id)
-    if handMeDown and HandMeDowns.isOpen(handMeDown, self.now()) then count = count + 1 end
+  for _, claim in ipairs(Spares.claimsIn(self.ledger:own())) do
+    local spare = find(self, claim.owner, claim.id)
+    if spare and Spares.isOpen(spare, self.now()) then count = count + 1 end
   end
   return count
 end
 
--- An own open Hand-me-down by id, or nil.
+-- An own open Spare by id, or nil.
 function Giving:ownOpen(id)
-  for _, handMeDown in ipairs(HandMeDowns.inRecord(self.ledger:own())) do
-    if handMeDown.id == id and HandMeDowns.isOpen(handMeDown, self.now()) then return handMeDown end
+  for _, spare in ipairs(Spares.inRecord(self.ledger:own())) do
+    if spare.id == id and Spares.isOpen(spare, self.now()) then return spare end
   end
   return nil
 end
 
--- Who an own Hand-me-down would go to now: { memberId, guid, time }, or nil.
+-- Who an own Spare would go to now: { memberId, guid, time }, or nil.
 function Giving:winnerOf(id)
   return (winnerOf(self, self.ledger:memberId(), id))
 end
 
--- Whether you may Claim another Member's Hand-me-down for a Character
+-- Whether you may Claim another Member's Spare for a Character
 -- (default the one being played). Returns the GUID, or nil and "own",
 -- "unknown" (not held, ended, or its owner Removed or Left), "claimed",
 -- "tooManyClaims" or "unknownCharacter".
 function Giving:canClaim(owner, id, guid)
   if owner == self.ledger:memberId() then return nil, "own" end
-  local handMeDown = type(owner) == "string" and find(self, owner, id)
-  if not handMeDown or not HandMeDowns.isOpen(handMeDown, self.now()) then return nil, "unknown" end
+  local spare = type(owner) == "string" and find(self, owner, id)
+  if not spare or not Spares.isOpen(spare, self.now()) then return nil, "unknown" end
   if ownClaim(self, owner, id) then return nil, "claimed" end
-  if self:claimCount() >= HandMeDowns.MAX_CLAIMS then return nil, "tooManyClaims" end
+  if self:claimCount() >= Spares.MAX_CLAIMS then return nil, "tooManyClaims" end
   guid = guid or self.ledger:playing()
   local own = self.ledger:own()
   if type(guid) ~= "string" or not (own and own.characters[guid]) then return nil, "unknownCharacter" end
@@ -171,14 +171,14 @@ end
 -- "notClaimed" or "given".
 function Giving:canWithdrawClaim(owner, id)
   if not ownClaim(self, owner, id) then return nil, "notClaimed" end
-  local handMeDown = find(self, owner, id)
-  if handMeDown and handMeDown.to then return nil, "given" end
+  local spare = find(self, owner, id)
+  if spare and spare.to then return nil, "given" end
   return true
 end
 
--- A row of "From the Crew": another Member's open Hand-me-down.
-local function crewRow(self, record, handMeDown, highest)
-  local owner, id = record.id, handMeDown.id
+-- A row of "From the Crew": another Member's open Spare.
+local function crewRow(self, record, spare, highest)
+  local owner, id = record.id, spare.id
   local winner, count = winnerOf(self, owner, id)
   local mine = ownClaim(self, owner, id)
   local me = self.ledger:memberId()
@@ -191,17 +191,17 @@ local function crewRow(self, record, handMeDown, highest)
     state = memberName(self, self.ledger:record(winner.memberId)) .. " claimed it first"
     if mine then state = state .. " (you claimed it for " .. characterName(self.ledger:own(), mine.guid) .. ")" end
   end
-  local item = HandMeDowns.fullItemString(handMeDown.item)
+  local item = Spares.fullItemString(spare.item)
   return {
     ownerId = owner,
     owner = memberName(self, record),
     id = id,
     item = item,
     link = self.itemLink(item),
-    level = handMeDown.level,
-    time = handMeDown.time,
-    expires = handMeDown.time + HandMeDowns.KEEP_FOR - self.now(),
-    usable = highest >= handMeDown.level,
+    level = spare.level,
+    time = spare.time,
+    expires = spare.time + Spares.KEEP_FOR - self.now(),
+    usable = highest >= spare.level,
     winner = winner and who(self, winner.memberId, winner.guid),
     claims = count,
     claimed = mine ~= nil,
@@ -211,11 +211,11 @@ local function crewRow(self, record, handMeDown, highest)
   }
 end
 
--- A row of "Yours": an own Hand-me-down, open or Given.
-local function yourRow(self, handMeDown)
-  local id = handMeDown.id
+-- A row of "Yours": an own Spare, open or Given.
+local function yourRow(self, spare)
+  local id = spare.id
   local winner, count = winnerOf(self, self.ledger:memberId(), id)
-  local given = handMeDown.to and who(self, handMeDown.to, handMeDown.guid)
+  local given = spare.to and who(self, spare.to, spare.guid)
   local state
   if given then
     state = ("Given to %s (%s)"):format(given.name, given.character)
@@ -227,14 +227,14 @@ local function yourRow(self, handMeDown)
   else
     state = "No claims yet"
   end
-  local item = HandMeDowns.fullItemString(handMeDown.item)
+  local item = Spares.fullItemString(spare.item)
   return {
     id = id,
     item = item,
     link = self.itemLink(item),
-    level = handMeDown.level,
-    time = handMeDown.time,
-    expires = handMeDown.time + HandMeDowns.KEEP_FOR - self.now(),
+    level = spare.level,
+    time = spare.time,
+    expires = spare.time + Spares.KEEP_FOR - self.now(),
     winner = winner and who(self, winner.memberId, winner.guid),
     claims = count,
     given = given,
@@ -251,14 +251,14 @@ local function newestFirst(a, b)
   return a.id > b.id
 end
 
--- Every other counted Member's open Hand-me-downs, as rows.
+-- Every other counted Member's open Spares, as rows.
 local function crewRows(self)
   local rows, now, highest = {}, self.now(), highestLevel(self)
   local me = self.ledger:memberId()
   for id, record in self.ledger:records() do
     if id ~= me and shown(self, record) then
-      for _, handMeDown in ipairs(HandMeDowns.inRecord(record)) do
-        if HandMeDowns.isOpen(handMeDown, now) then rows[#rows + 1] = crewRow(self, record, handMeDown, highest) end
+      for _, spare in ipairs(Spares.inRecord(record)) do
+        if Spares.isOpen(spare, now) then rows[#rows + 1] = crewRow(self, record, spare, highest) end
       end
     end
   end
@@ -269,8 +269,8 @@ end
 -- The tab: { crew, yours, unseen, claims, maxClaims, open, maxOpen }.
 function Giving:view()
   local yours, now = {}, self.now()
-  for _, handMeDown in ipairs(HandMeDowns.inRecord(self.ledger:own())) do
-    if handMeDown.to or HandMeDowns.isOpen(handMeDown, now) then yours[#yours + 1] = yourRow(self, handMeDown) end
+  for _, spare in ipairs(Spares.inRecord(self.ledger:own())) do
+    if spare.to or Spares.isOpen(spare, now) then yours[#yours + 1] = yourRow(self, spare) end
   end
   table.sort(yours, newestFirst)
   return {
@@ -278,13 +278,13 @@ function Giving:view()
     yours = yours,
     unseen = self:unseen(),
     claims = self:claimCount(),
-    maxClaims = HandMeDowns.MAX_CLAIMS,
+    maxClaims = Spares.MAX_CLAIMS,
     open = self:openCount(),
-    maxOpen = HandMeDowns.MAX_OPEN,
+    maxOpen = Spares.MAX_OPEN,
   }
 end
 
--- Other Members' open Hand-me-downs one of your Characters is high enough
+-- Other Members' open Spares one of your Characters is high enough
 -- level for, for the Roster.
 function Giving:usableCount()
   local count = 0
@@ -297,21 +297,21 @@ end
 -- Keeps a notice, made now and unseen. Returns it.
 local function addNews(self, news)
   news.time = self.now()
-  local list = self.db.handMeDownNews
+  local list = self.db.spareNews
   list[#list + 1] = news
   return news
 end
 
--- Works out who wins each own open Hand-me-down. A winner that changed
+-- Works out who wins each own open Spare. A winner that changed
 -- to a Member is news to you, unless quiet (first sight of a Member,
 -- removing one, Claims expiring). Returns the news.
 function Giving:check(quiet)
   local news, open = {}, {}
-  local winners = self.db.handMeDownWinners
+  local winners = self.db.spareWinners
   local me = self.ledger:memberId()
-  for _, handMeDown in ipairs(HandMeDowns.inRecord(self.ledger:own())) do
-    if HandMeDowns.isOpen(handMeDown, self.now()) then
-      local id = handMeDown.id
+  for _, spare in ipairs(Spares.inRecord(self.ledger:own())) do
+    if Spares.isOpen(spare, self.now()) then
+      local id = spare.id
       open[id] = true
       local winner = winnerOf(self, me, id)
       local memberId = winner and winner.memberId
@@ -319,7 +319,7 @@ function Giving:check(quiet)
         winners[id] = memberId
         if memberId and not quiet then
           news[#news + 1] = addNews(self, {
-            kind = "claimed", memberId = memberId, guid = winner.guid, id = id, item = handMeDown.item,
+            kind = "claimed", memberId = memberId, guid = winner.guid, id = id, item = spare.item,
           })
         end
       end
@@ -332,17 +332,17 @@ function Giving:check(quiet)
 end
 
 -- Someone else's record was kept: before is the copy held until now (nil
--- on first sight) and after the new one. A Hand-me-down newly Given to
+-- on first sight) and after the new one. A Spare newly Given to
 -- you is news, and so is a Claim becoming the winning one on yours; on
 -- first sight neither is. Returns the news.
 function Giving:recordChanged(before, after)
   local news = {}
   local me = self.ledger:memberId()
   if before ~= nil and not after.left then
-    for _, handMeDown in ipairs(HandMeDowns.newlyGiven(before, after)) do
-      if handMeDown.to == me then
+    for _, spare in ipairs(Spares.newlyGiven(before, after)) do
+      if spare.to == me then
         news[#news + 1] = addNews(self, {
-          kind = "given", memberId = after.id, guid = handMeDown.guid, id = handMeDown.id, item = handMeDown.item,
+          kind = "given", memberId = after.id, guid = spare.guid, id = spare.id, item = spare.item,
         })
       end
     end
@@ -359,12 +359,12 @@ function Giving:describe(news)
   local record = self.ledger:record(news.memberId)
   if news.kind == "claimed" then
     text = ("%s claimed %s for %s"):format(memberName(self, record),
-      HandMeDowns.linkText(self.itemLink, news.item), characterName(record, news.guid))
+      Spares.linkText(self.itemLink, news.item), characterName(record, news.guid))
   else
     text = ("%s sent you %s. Check %s's mailbox."):format(memberName(self, record),
-      HandMeDowns.linkText(self.itemLink, news.item), characterName(self.ledger:own(), news.guid))
+      Spares.linkText(self.itemLink, news.item), characterName(self.ledger:own(), news.guid))
   end
-  return { kind = news.kind, text = text, time = news.time, opens = "handMeDowns" }
+  return { kind = news.kind, text = text, time = news.time, opens = "spares" }
 end
 
 -- Marks a notice seen, as Core does when it fires.
@@ -376,7 +376,7 @@ end
 -- seen.
 function Giving:takeNews()
   local lines = {}
-  for _, news in ipairs(self.db.handMeDownNews) do
+  for _, news in ipairs(self.db.spareNews) do
     if not news.seen then
       news.seen = true
       table.insert(lines, 1, self:describe(news))
@@ -388,7 +388,7 @@ end
 -- Marks every notice seen. Returns true if any wasn't.
 function Giving:markAllSeen()
   local any = false
-  for _, news in ipairs(self.db.handMeDownNews) do
+  for _, news in ipairs(self.db.spareNews) do
     if not news.seen then
       news.seen = true
       any = true
@@ -400,7 +400,7 @@ end
 -- How many notices haven't been seen.
 function Giving:unseen()
   local count = 0
-  for _, news in ipairs(self.db.handMeDownNews) do
+  for _, news in ipairs(self.db.spareNews) do
     if not news.seen then count = count + 1 end
   end
   return count
@@ -408,15 +408,15 @@ end
 
 -- Leaving the Crew forgets the notices and winners.
 function Giving:clear()
-  self.db.handMeDownNews = {}
-  self.db.handMeDownWinners = {}
+  self.db.spareNews = {}
+  self.db.spareWinners = {}
 end
 
 -- Called once a second: prunes the notices, and now and then works out
 -- the winners quietly, so a Claim expiring isn't news.
 function Giving:tick()
   local now = self.now()
-  local list = self.db.handMeDownNews
+  local list = self.db.spareNews
   while list[1] and (#list > KEEP_MAX or now - list[1].time > KEEP_FOR) do
     table.remove(list, 1)
   end

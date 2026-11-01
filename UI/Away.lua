@@ -1,7 +1,7 @@
 -- Away: the While you were away popup from the Feed decision (#14), in the
 -- Skin's flat look. Your Crew noticed comes first: a line per entry of
 -- yours others reacted to, then Crew goals reached, in gold, then
--- Hand-me-downs: Claims on yours, what was sent to you and Gives. Then Core's
+-- Spares: Claims on yours, what was sent to you and Gives. Then Core's
 -- summary as a scoreboard, Members by
 -- most recent activity: a row per Character with its level now, a bar for
 -- the jump (gold when it reached max level), levels gained, deaths, and
@@ -49,7 +49,7 @@ local frame
 local rows = {}
 local lines = {}
 local goalLines = {}
-local handMeDownLines = {}
+local spareLines = {}
 
 local hex = Skin.hex
 
@@ -78,8 +78,8 @@ local function create()
   frame.noticed:SetText("YOUR CREW NOTICED")
   frame.goals = Skin.label(frame, "tiny", Skin.DIM)
   frame.goals:SetText("CREW GOALS")
-  frame.handMeDowns = Skin.label(frame, "tiny", Skin.DIM)
-  frame.handMeDowns:SetText("HAND-ME-DOWNS")
+  frame.spares = Skin.label(frame, "tiny", Skin.DIM)
+  frame.spares:SetText("SPARES")
   frame.intro = Skin.label(frame, "small", Skin.MUTED)
 
   frame.headings = {}
@@ -295,23 +295,23 @@ local function drawGoals(goals, y)
   return drawSection(frame.goals, texts, goalLines, y)
 end
 
--- Hand-me-down notices and Gives, each with its kind's icon.
-local function drawHandMeDowns(notices, y)
+-- Spare notices and Gives, each with its kind's icon.
+local function drawSpares(notices, y)
   local texts = {}
   for i, notice in ipairs(notices) do
     texts[i] = "|T" .. Skin.FEED_ICONS[notice.kind] .. ":14|t  " .. notice.text
   end
-  return drawSection(frame.handMeDowns, texts, handMeDownLines, y)
+  return drawSection(frame.spares, texts, spareLines, y)
 end
 
 -- Shows the summary from Core's awaySummary: { members, goals,
--- handMeDowns, count, noticed }. With no Member news, only Your Crew
--- noticed, Crew goals and Hand-me-downs show.
+-- spares, count, noticed }. With no Member news, only Your Crew
+-- noticed, Crew goals and Spares show.
 function Away.show(summary)
   if not frame then create() end
   local y = drawNoticed(summary.noticed or {}, -Skin.HEADER_HEIGHT)
   y = drawGoals(summary.goals or {}, y)
-  y = drawHandMeDowns(summary.handMeDowns or {}, y)
+  y = drawSpares(summary.spares or {}, y)
 
   local scoreboard = #summary.members > 0
   frame.intro:SetShown(scoreboard)

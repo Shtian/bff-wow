@@ -20,16 +20,16 @@ local MESSAGES = {
   minimapHidden = "Minimap button hidden. Type /bff minimap to show it again.",
   settingsInCombat = "BFF's settings open once you're out of combat.",
   outOfDate = "BFF is out of date: someone in your Crew has a newer version. Update to keep seeing them.",
-  invalidItem = "That isn't an item. Drop one on the Hand-me-downs tab (/bff hmd), or type /bff hmd add and shift-click it into the chat box.",
+  invalidItem = "That isn't an item. Drop one on the Spares tab (/bff spares), or type /bff spares add and shift-click it into the chat box.",
   bound = "That item is bound to you, so it can't be passed on.",
   questItem = "That's a quest item, so it can't be passed on.",
   accountBound = "That item is bound to your account, so only your own characters can have it.",
   notInBags = "That item isn't in your bags. BFF can only offer what you're carrying.",
-  tooMany = "You have 20 Hand-me-downs up already. Withdraw one first (/bff hmd).",
+  tooMany = "You have 20 Spares up already. Withdraw one first (/bff spares).",
   tooManyClaims = "You have 20 open Claims already. Withdraw one first.",
   claimed = "You've claimed that one already.",
-  own = "That's your own Hand-me-down.",
-  unknown = "That Hand-me-down isn't up any more.",
+  own = "That's your own Spare.",
+  unknown = "That Spare isn't up any more.",
   unknownCharacter = "That isn't one of your Characters.",
   noClaim = "Nobody has claimed that one yet.",
   given = "That one has been given already.",
@@ -58,7 +58,7 @@ local function showAway(summary)
   end
 end
 
--- Hand-me-downs whose item left the bags and that have a Claim, asked
+-- Spares whose item left the bags and that have a Claim, asked
 -- about one at a time: Give to the winner, withdraw, or not now (the
 -- question comes back next login). Escape is "not now".
 local goneAsks = {}
@@ -68,23 +68,23 @@ local function askNextGone()
   if not ask then return end
   -- No free popup: drop the rest rather than wait for an OnHide that
   -- won't come. They're asked again next login.
-  if not StaticPopup_Show("BFF_HAND_ME_DOWN_GONE", ask.link or "Your Hand-me-down",
+  if not StaticPopup_Show("BFF_SPARE_GONE", ask.link or "Your Spare",
     ask.winner and ask.winner.character or "?", ask) then
     goneAsks = {}
   end
 end
 
-StaticPopupDialogs.BFF_HAND_ME_DOWN_GONE = {
+StaticPopupDialogs.BFF_SPARE_GONE = {
   text = "%s left your bags. Did you mail it to %s?",
   button1 = "Give",
   button2 = "Not now",
   button3 = "Withdraw",
   OnAccept = function(_, ask)
-    local ok, reason = ns.core:giveHandMeDown(ask.id, ask.winner and ask.winner.memberId)
+    local ok, reason = ns.core:giveSpare(ask.id, ask.winner and ask.winner.memberId)
     if not ok then say(MESSAGES[reason]) end
   end,
   OnAlt = function(_, ask)
-    local ok, reason = ns.core:withdrawHandMeDown(ask.id)
+    local ok, reason = ns.core:withdrawSpare(ask.id)
     if not ok then say(MESSAGES[reason]) end
   end,
   OnHide = function()
@@ -96,10 +96,10 @@ StaticPopupDialogs.BFF_HAND_ME_DOWN_GONE = {
   hideOnEscape = true,
 }
 
--- Core found a Hand-me-down's item gone at login: it withdrew it, or asks.
-local function handMeDownGone(gone)
+-- Core found a Spare's item gone at login: it withdrew it, or asks.
+local function spareGone(gone)
   if gone.action == "withdrawn" then
-    say(("%s has left your bags, so your Hand-me-down is withdrawn."):format(gone.link or "An item"))
+    say(("%s has left your bags, so your Spare is withdrawn."):format(gone.link or "An item"))
   elseif gone.action == "ask" then
     goneAsks[#goneAsks + 1] = gone
     if #goneAsks == 1 then askNextGone() end
@@ -120,13 +120,13 @@ local function onCoreEvent(event, kind)
     ns.Settings.refresh()
   elseif event == "notice" then
     say(MESSAGES[kind])
-  elseif event == "feedEntry" or event == "reaction" or event == "handMeDown" then
+  elseif event == "feedEntry" or event == "reaction" or event == "spare" then
     if ns.core:isChatLinesOn() then chatLine(kind) end
     if ns.core:isToastsOn() then ns.Toasts.show(kind) end
   elseif event == "awaySummary" then
     showAway(kind)
-  elseif event == "handMeDownGone" then
-    handMeDownGone(kind)
+  elseif event == "spareGone" then
+    spareGone(kind)
   end
 end
 
@@ -180,7 +180,7 @@ end
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 -- After a real login the bags read as empty until the first of these, so
--- Core checks Hand-me-down items only on it.
+-- Core checks Spare items only on it.
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_ENTERING_WORLD" and not ns.core then
@@ -255,20 +255,20 @@ function commands.goals()
 end
 
 -- Says how posting a bag item went, from Bags' returns: the
--- Hand-me-down's id and the item's link, or nil and a reason.
+-- Spare's id and the item's link, or nil and a reason.
 function ns.sayPosted(id, result)
   if id then
-    say(result .. " is up for your Crew. See /bff hmd.")
+    say(result .. " is up for your Crew. See /bff spares.")
   else
     say(MESSAGES[result])
   end
 end
 
--- /bff hmd opens the Hand-me-downs tab; /bff hmd add <item link> offers
+-- /bff spares opens the Spares tab; /bff spares add <item link> offers
 -- the first matching item in your bags to the Crew, if it can be traded.
-function commands.hmd(rest)
+function commands.spares(rest)
   local sub, link = rest:match("^(%S*)%s*(.-)$")
-  if sub:lower() ~= "add" then return ns.Panel.show("handMeDowns") end
+  if sub:lower() ~= "add" then return ns.Panel.show("spares") end
   ns.sayPosted(ns.Bags.postLink(ns.core, link))
 end
 
@@ -321,7 +321,7 @@ SlashCmdList.BFF = function(input)
   elseif commands[command] then
     commands[command](rest)
   else
-    say("/bff, /bff feed, /bff goals, /bff when, /bff hmd, /bff hmd add <item>, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
+    say("/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
   end
 end
 

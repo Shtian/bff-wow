@@ -38,7 +38,7 @@ Skin.FEED_ICONS = {
   joined = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
   left = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
   goal = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_3",
-  -- Hand-me-downs: a Give in the Feed, and the notices.
+  -- Spares: a Give in the Feed, and the notices.
   gave = "Interface\\GossipFrame\\VendorGossipIcon",
   claimed = "Interface\\GossipFrame\\VendorGossipIcon",
   given = "Interface\\MINIMAP\\TRACKING\\Mailbox",
@@ -60,7 +60,7 @@ Skin.FEED_PICTURES = {
   claimed = "Interface\\Icons\\INV_Misc_Bag_08",
   given = "Interface\\Icons\\INV_Letter_15",
 }
-local HAND_ME_DOWN = { 0.78, 0.6, 1 }
+local SPARE = { 0.78, 0.6, 1 }
 Skin.FEED_EDGES = {
   ding = { 0.44, 0.89, 0.44 },
   maxLevel = Skin.GOLD,
@@ -69,9 +69,9 @@ Skin.FEED_EDGES = {
   newCharacter = { 0.4, 0.75, 1 },
   joined = { 0.4, 0.75, 1 },
   left = { 0.6, 0.6, 0.66 },
-  gave = HAND_ME_DOWN,
-  claimed = HAND_ME_DOWN,
-  given = HAND_ME_DOWN,
+  gave = SPARE,
+  claimed = SPARE,
+  given = SPARE,
 }
 local EDGE_ALPHA = 0.55
 

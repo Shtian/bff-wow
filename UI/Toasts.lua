@@ -1,9 +1,9 @@
--- Toasts: live Feed entries, Reactions to yours and Hand-me-down notices
+-- Toasts: live Feed entries, Reactions to yours and Spare notices
 -- as small notices on screen, from the toasts decision. ToastQueue decides
 -- what shows; this draws it in the Skin's look, plays the chosen sound,
 -- and has the move mode Settings opens. Toasts stack away from where
 -- they're placed: down from the top half of the screen, up from the
--- bottom half. A left click opens the Feed (the Hand-me-downs tab for a
+-- bottom half. A left click opens the Feed (the Spares tab for a
 -- notice), a right click dismisses, and an entry you can react to has a
 -- Reaction button at its right edge. See docs/design/toasts.md and
 -- docs/design/reactions.md.
@@ -82,8 +82,8 @@ local function position()
   return x, y, y > height / 2
 end
 
--- Opens the tab the toast is about: the Feed, or the Hand-me-downs tab
--- for a Hand-me-down notice.
+-- Opens the tab the toast is about: the Feed, or the Spares tab
+-- for a Spare notice.
 local function openFeed(toast)
   queue:dismiss(toast)
   ns.Panel.show(toast.entry and toast.entry.opens or "feed")
@@ -221,7 +221,7 @@ local function onUpdate()
 end
 
 -- Shows a live Feed entry (from Core's feedEntry), Reaction (from its
--- reaction event) or Hand-me-down notice (handMeDown) as a toast.
+-- reaction event) or Spare notice (spare) as a toast.
 function Toasts.show(entry)
   queue:push(entry)
   driver:Show()

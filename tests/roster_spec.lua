@@ -266,7 +266,7 @@ describe("Roster", function()
       })
       clients[4]:logout()
       net:run(2)
-      assert.same({ online = 2, members = 3, canPlay = 1, hidden = 0, handMeDowns = 0 }, clients[1].core:summary())
+      assert.same({ online = 2, members = 3, canPlay = 1, hidden = 0, spares = 0 }, clients[1].core:summary())
     end)
   end)
 

@@ -83,14 +83,14 @@ _Avoid_: Race, leaderboard (when meaning the contest)
 
 ### Passing things on
 
-**Hand-me-down**:
+**Spare**:
 An item a Member offers free to the Crew, to be sent by in-game mail to whichever Member Claims it. It ends when it is Given, withdrawn by its owner, or after 30 days. If its item has left the owner's bags and bank (sold, mailed, traded, destroyed or equipped) and is still gone at the owner's next login, BFF withdraws it for them. If it has a Claim, BFF asks the owner whether to Give it or withdraw it (ADR 0004).
 _Avoid_: Gift, offer, listing, loot
 
 **Claim**:
-A Member asking for a Hand-me-down, for one of their own Characters to receive it. The earliest Claim gets the Hand-me-down; a claimer can withdraw their Claim until it is Given.
+A Member asking for a Spare, for one of their own Characters to receive it. The earliest Claim gets the Spare; a claimer can withdraw their Claim until it is Given.
 _Avoid_: Request, reserve, dibs
 
 **Give**:
-What the owner of a Hand-me-down does once they have mailed it to the Character named in the winning Claim. It ends the Hand-me-down and makes a Feed entry.
+What the owner of a Spare does once they have mailed it to the Character named in the winning Claim. It ends the Spare and makes a Feed entry.
 _Avoid_: Deliver, trade, send (when meaning the act in BFF)

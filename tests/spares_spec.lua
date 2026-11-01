@@ -1,12 +1,12 @@
--- The pure parts of Hand-me-downs: item strings, what a record carries,
+-- The pure parts of Spares: item strings, what a record carries,
 -- tradeability, pruning and who wins.
 local load = require("tests.load")
 
 local DAY = 24 * 60 * 60
 
-describe("HandMeDowns", function()
+describe("Spares", function()
   local H
-  before_each(function() H = load().HandMeDowns end)
+  before_each(function() H = load().Spares end)
 
   describe("item strings", function()
     it("keep the item ID and nothing unset", function()
@@ -56,8 +56,8 @@ describe("HandMeDowns", function()
   end)
 
   describe("in a record", function()
-    it("read the well-formed Hand-me-downs and skip the rest", function()
-      local record = { handMeDowns = {
+    it("read the well-formed Spares and skip the rest", function()
+      local record = { spares = {
         { i = 1, s = "5191", l = 18, t = 100 },
         { i = 2, s = "nonsense", l = 18, t = 100 },
         "junk",
@@ -69,12 +69,12 @@ describe("HandMeDowns", function()
       assert.equal(2, #list)
       assert.same({ id = 1, item = "5191", level = 18, time = 100 }, list[1])
       assert.same({ id = 3, item = "5191", level = 18, time = 100, to = "bobbobbo", guid = "Player-0-Jaina" }, list[2])
-      assert.same({}, H.inRecord({ handMeDowns = "junk" }))
+      assert.same({}, H.inRecord({ spares = "junk" }))
       assert.same({}, H.inRecord({}))
       assert.same({}, H.inRecord(nil))
     end)
 
-    it("read the well-formed Claims, one per Hand-me-down, the earliest", function()
+    it("read the well-formed Claims, one per Spare, the earliest", function()
       local record = { claims = {
         { m = "annannan", i = 1, c = "Player-0-Bob", t = 100 },
         { m = "annannan", i = 1, c = "Player-0-Bob", t = 50 },
@@ -88,7 +88,7 @@ describe("HandMeDowns", function()
   end)
 
   describe("pruning", function()
-    it("drops Hand-me-downs 30 days after posting, given or not", function()
+    it("drops Spares 30 days after posting, given or not", function()
       local list = {
         { i = 1, s = "1", l = 1, t = 0 },
         { i = 2, s = "1", l = 1, t = 0, r = "bob", c = "g" },
@@ -99,7 +99,7 @@ describe("HandMeDowns", function()
       assert.same({ { i = 3, s = "1", l = 1, t = 2 * DAY } }, list)
     end)
 
-    it("drops Claims whose Hand-me-down ended, and after 30 days", function()
+    it("drops Claims whose Spare ended, and after 30 days", function()
       local list = {
         { m = "ann", i = 1, c = "g", t = 0 },
         { m = "ann", i = 2, c = "g", t = 5 * DAY },
@@ -109,7 +109,7 @@ describe("HandMeDowns", function()
       assert.same({ { m = "ann", i = 2, c = "g", t = 5 * DAY } }, list)
     end)
 
-    it("knows when a Hand-me-down is open", function()
+    it("knows when a Spare is open", function()
       assert.is_true(H.isOpen({ time = 0 }, 30 * DAY))
       assert.is_false(H.isOpen({ time = 0 }, 30 * DAY + 1))
       assert.is_false(H.isOpen({ time = 0, to = "bob" }, 10))
