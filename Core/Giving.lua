@@ -35,26 +35,18 @@ function Giving.new(db, ledger, now, itemLink)
     db = db,
     ledger = ledger,
     now = now,
-    itemLink = itemLink or function() return nil end,
+    itemLink = itemLink or HandMeDowns.NO_LINK,
     lastQuietCheck = now(),
   }, Giving)
 end
 
 local function memberName(self, record)
-  if not record then return "Someone" end
-  if record.displayName then return record.displayName end
-  local main = ns.Roster.main(record, self.now())
-  return main and main.name or "Someone"
+  return ns.Roster.memberName(record, self.now())
 end
 
 local function characterName(record, guid)
   local character = record and record.characters and record.characters[guid]
   return character and character.name or "?"
-end
-
--- The item's link for the texts, "an item" until the game has it.
-local function linkText(self, item)
-  return self.itemLink(HandMeDowns.itemLink(item)) or "an item"
 end
 
 -- Whether a Member's record counts: held, not Left, not Removed.
@@ -162,14 +154,14 @@ end
 -- Whether you may Claim another Member's Hand-me-down for a Character
 -- (default the one being played). Returns the GUID, or nil and "own",
 -- "unknown" (not held, ended, or its owner Removed or Left), "claimed",
--- "tooMany" or "unknownCharacter".
+-- "tooManyClaims" or "unknownCharacter".
 function Giving:canClaim(owner, id, guid)
   if owner == self.ledger:memberId() then return nil, "own" end
   local handMeDown = type(owner) == "string" and find(self, owner, id)
   if not handMeDown or not HandMeDowns.isOpen(handMeDown, self.now()) then return nil, "unknown" end
   if ownClaim(self, owner, id) then return nil, "claimed" end
-  if self:claimCount() >= HandMeDowns.MAX_CLAIMS then return nil, "tooMany" end
-  guid = guid or self.ledger.playingGuid
+  if self:claimCount() >= HandMeDowns.MAX_CLAIMS then return nil, "tooManyClaims" end
+  guid = guid or self.ledger:playing()
   local own = self.ledger:own()
   if type(guid) ~= "string" or not (own and own.characters[guid]) then return nil, "unknownCharacter" end
   return guid
@@ -252,6 +244,7 @@ local function yourRow(self, handMeDown)
   }
 end
 
+-- Rows newest first; ties by owner, then the later id first.
 local function newestFirst(a, b)
   if a.time ~= b.time then return a.time > b.time end
   if (a.ownerId or "") ~= (b.ownerId or "") then return (a.ownerId or "") < (b.ownerId or "") end
@@ -301,6 +294,7 @@ function Giving:usableCount()
   return count
 end
 
+-- Keeps a notice, made now and unseen. Returns it.
 local function addNews(self, news)
   news.time = self.now()
   local list = self.db.handMeDownNews
@@ -345,12 +339,8 @@ function Giving:recordChanged(before, after)
   local news = {}
   local me = self.ledger:memberId()
   if before ~= nil and not after.left then
-    local had = {}
-    for _, handMeDown in ipairs(HandMeDowns.inRecord(before)) do
-      if handMeDown.to then had[handMeDown.id] = true end
-    end
-    for _, handMeDown in ipairs(HandMeDowns.inRecord(after)) do
-      if handMeDown.to == me and not had[handMeDown.id] then
+    for _, handMeDown in ipairs(HandMeDowns.newlyGiven(before, after)) do
+      if handMeDown.to == me then
         news[#news + 1] = addNews(self, {
           kind = "given", memberId = after.id, guid = handMeDown.guid, id = handMeDown.id, item = handMeDown.item,
         })
@@ -368,15 +358,16 @@ function Giving:describe(news)
   local text
   local record = self.ledger:record(news.memberId)
   if news.kind == "claimed" then
-    text = ("%s claimed %s for %s"):format(memberName(self, record), linkText(self, news.item),
-      characterName(record, news.guid))
+    text = ("%s claimed %s for %s"):format(memberName(self, record),
+      HandMeDowns.linkText(self.itemLink, news.item), characterName(record, news.guid))
   else
-    text = ("%s sent you %s. Check %s's mailbox."):format(memberName(self, record), linkText(self, news.item),
-      characterName(self.ledger:own(), news.guid))
+    text = ("%s sent you %s. Check %s's mailbox."):format(memberName(self, record),
+      HandMeDowns.linkText(self.itemLink, news.item), characterName(self.ledger:own(), news.guid))
   end
   return { kind = news.kind, text = text, time = news.time, opens = "handMeDowns" }
 end
 
+-- Marks a notice seen, as Core does when it fires.
 function Giving:markSeen(news)
   news.seen = true
 end
@@ -406,6 +397,7 @@ function Giving:markAllSeen()
   return any
 end
 
+-- How many notices haven't been seen.
 function Giving:unseen()
   local count = 0
   for _, news in ipairs(self.db.handMeDownNews) do

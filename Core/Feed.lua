@@ -49,15 +49,13 @@ function Feed.new(db, ledger, now, maxLevel, initialLogin, itemLink)
     ledger = ledger,
     now = now,
     maxLevel = maxLevel,
-    itemLink = itemLink or function() return nil end,
+    itemLink = itemLink or HandMeDowns.NO_LINK,
     settle = ns.Settle.new(now, not initialLogin),
   }, Feed)
 end
 
 local function memberName(self, record)
-  if record.displayName then return record.displayName end
-  local main = ns.Roster.main(record, self.now())
-  return main and main.name or "Someone"
+  return ns.Roster.memberName(record, self.now())
 end
 
 -- Who an event happened to: "Ana", "Ana's Alt Jaina", "You" or "Your Alt
@@ -225,12 +223,8 @@ end
 
 -- The Hand-me-downs Given in after that weren't in before, each once.
 local function gaveEntries(self, before, after, list)
-  local had = {}
-  for _, handMeDown in ipairs(HandMeDowns.inRecord(before)) do
-    if handMeDown.to then had[handMeDown.id] = true end
-  end
-  for _, handMeDown in ipairs(HandMeDowns.inRecord(after)) do
-    if handMeDown.to and not had[handMeDown.id] and not hasGave(self, after.id, handMeDown.id) then
+  for _, handMeDown in ipairs(HandMeDowns.newlyGiven(before, after)) do
+    if not hasGave(self, after.id, handMeDown.id) then
       list[#list + 1] = gaveEntry(self, after, false, handMeDown)
     end
   end
@@ -369,10 +363,10 @@ end
 local function gaveText(self, entry)
   local giver = entry.own and "You" or reactorName(self, entry.memberId)
   local recipient = entry.recipient == self.ledger:memberId() and "you" or reactorName(self, entry.recipient)
-  local link = self.itemLink(HandMeDowns.itemLink(entry.item)) or "an item"
-  return ("%s gave %s %s"):format(giver, recipient, link)
+  return ("%s gave %s %s"):format(giver, recipient, HandMeDowns.linkText(self.itemLink, entry.item))
 end
 
+-- An entry's text: stored, except a gave entry's, worked out as shown.
 local function textOf(self, entry)
   if entry.kind == "gave" then return gaveText(self, entry) end
   return entry.text
@@ -607,13 +601,15 @@ local function takeNoticed(self)
 end
 
 -- While you were away: the unseen entries from other Members, one block
--- per Member, most recent activity first, the Crew goals reached and the
--- Hand-me-downs Given, each newest first ({ text, time }, gifts with kind
--- "gave"), and the unseen Reactions to your own, as { members, goals,
--- gifts, count, noticed }. Marks them seen. Nil when there are
--- none.
-function Feed:takeSummary()
-  local byMember, ids, goals, gifts, count = {}, {}, {}, {}, 0
+-- per Member, most recent activity first, the Crew goals reached, newest
+-- first ({ text, time }), the unseen Reactions to your own, and
+-- handMeDowns: the Hand-me-down notices given (Giving:takeNews), then the
+-- Gives, newest first ({ kind = "gave", text, time }), as { members,
+-- goals, handMeDowns, count, noticed }. Marks them seen. Nil when there
+-- are none.
+function Feed:takeSummary(handMeDowns)
+  handMeDowns = handMeDowns or {}
+  local byMember, ids, goals, gives, count = {}, {}, {}, {}, 0
   for _, entry in ipairs(self.db.feed) do
     if not entry.seen and entry.kind == "goal" then
       entry.seen = true
@@ -622,7 +618,7 @@ function Feed:takeSummary()
     elseif not entry.seen and entry.kind == "gave" then
       entry.seen = true
       count = count + 1
-      table.insert(gifts, 1, { kind = "gave", text = gaveText(self, entry), time = entry.time })
+      table.insert(gives, 1, { kind = "gave", text = gaveText(self, entry), time = entry.time })
     elseif not entry.seen then
       entry.seen = true
       count = count + 1
@@ -636,7 +632,8 @@ function Feed:takeSummary()
     end
   end
   local noticed = takeNoticed(self)
-  if count == 0 and #noticed == 0 then return nil end
+  if count == 0 and #noticed == 0 and #handMeDowns == 0 then return nil end
+  for _, give in ipairs(gives) do handMeDowns[#handMeDowns + 1] = give end
 
   local members = {}
   for i, id in ipairs(ids) do members[i] = memberBlock(self, id, byMember[id]) end
@@ -644,7 +641,7 @@ function Feed:takeSummary()
     if a.time ~= b.time then return a.time > b.time end
     return a.memberId < b.memberId
   end)
-  return { members = members, goals = goals, gifts = gifts, count = count, noticed = noticed }
+  return { members = members, goals = goals, handMeDowns = handMeDowns, count = count, noticed = noticed }
 end
 
 -- An entry as handed out: a fresh table UI may keep. Seen is false while

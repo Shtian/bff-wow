@@ -184,6 +184,16 @@ describe("Hand-me-downs", function()
     net:run(3)
   end)
 
+  it("never reuse an id the record still holds, even if the counter is lost", function()
+    local net, clients = crew({ "Ann" })
+    local a = clients[1]
+    local first = post(net, a)
+    local second = post(net, a)
+    a.db.nextHandMeDown = nil
+    local third = post(net, a)
+    assert.is_true(third > second and second > first)
+  end)
+
   it("end 30 days after posting, and are pruned at the owner's next write", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
@@ -255,7 +265,7 @@ describe("Hand-me-downs", function()
       net:run(40)
       local extra = c.core:postHandMeDown(BARB, 18)
       net:run(3)
-      assert.same({ nil, "tooMany" }, { b.core:claimHandMeDown(c.memberId, extra) })
+      assert.same({ nil, "tooManyClaims" }, { b.core:claimHandMeDown(c.memberId, extra) })
       assert.equal(20, view(b).claims)
       assert.equal(20, view(b).maxClaims)
 

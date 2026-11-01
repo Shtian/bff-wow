@@ -161,6 +161,11 @@ function Ledger:locate(location)
   return changed
 end
 
+-- The GUID of the Character being played, or nil before the first report.
+function Ledger:playing()
+  return self.playingGuid
+end
+
 function Ledger:displayName()
   local record = self:own()
   return record and record.displayName
@@ -204,10 +209,14 @@ end
 
 -- Posts a Hand-me-down (a trimmed item string and its required level)
 -- into the own record, now. Returns its id: never reused, even after
--- leaving.
+-- leaving, nor after the counter is lost while the record still holds
+-- higher ids.
 function Ledger:postHandMeDown(item, level)
   local record = ownRecord(self)
   local id = self.db.nextHandMeDown or 1
+  for _, held in ipairs(record.handMeDowns or {}) do
+    if type(held.i) == "number" and held.i >= id then id = held.i + 1 end
+  end
   self.db.nextHandMeDown = id + 1
   record.handMeDowns = record.handMeDowns or {}
   record.handMeDowns[#record.handMeDowns + 1] = ns.HandMeDowns.item(id, item, level, self.now())
@@ -215,6 +224,7 @@ function Ledger:postHandMeDown(item, level)
   return id
 end
 
+-- The own record, an own Hand-me-down as stored and its index, or nil.
 local function ownHandMeDown(self, id)
   local record = self:own()
   for index, item in ipairs(record and record.handMeDowns or {}) do

@@ -248,13 +248,8 @@ end
 -- ("claimed", "given" or "gave"), text, time }.
 local function awaySummary(self)
   if not self:isAwayPopupOn() then return end
-  local summary = self.log:takeSummary()
-  local notices = self.giving:takeNews()
-  if not summary and #notices == 0 then return end
-  summary = summary or { members = {}, goals = {}, gifts = {}, count = 0, noticed = {} }
-  for _, gift in ipairs(summary.gifts) do notices[#notices + 1] = gift end
-  summary.gifts = nil
-  summary.handMeDowns = notices
+  local summary = self.log:takeSummary(self.giving:takeNews())
+  if not summary then return end
   self.listener("awaySummary", summary)
   self.listener("changed")
 end
@@ -419,8 +414,7 @@ function Core:giveHandMeDown(id)
   local winner = self.giving:winnerOf(id)
   if not winner then return nil, "noClaim" end
   self.ledger:giveHandMeDown(id, winner.memberId, winner.guid)
-  handMeDown.to, handMeDown.guid = winner.memberId, winner.guid
-  self.log:ownGave(handMeDown)
+  self.log:ownGave({ id = id, item = handMeDown.item, to = winner.memberId, guid = winner.guid })
   self.giving:check(true)
   ownWrite(self)
   return true
@@ -429,8 +423,8 @@ end
 -- Claims another Member's open Hand-me-down for one of your Characters by
 -- GUID, by default the one being played. It goes into your record and
 -- out with your next DATA, so it works in combat and offline. Returns
--- true, or nil and "own", "unknown", "claimed", "tooMany" (20 open
--- Claims) or "unknownCharacter".
+-- true, or nil and "own", "unknown", "claimed", "tooManyClaims"
+-- (20 open) or "unknownCharacter".
 function Core:claimHandMeDown(owner, id, guid)
   local reason
   guid, reason = self.giving:canClaim(owner, id, guid)

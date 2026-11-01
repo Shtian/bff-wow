@@ -49,7 +49,7 @@ local frame
 local rows = {}
 local lines = {}
 local goalLines = {}
-local giftLines = {}
+local handMeDownLines = {}
 
 local hex = Skin.hex
 
@@ -78,8 +78,8 @@ local function create()
   frame.noticed:SetText("YOUR CREW NOTICED")
   frame.goals = Skin.label(frame, "tiny", Skin.DIM)
   frame.goals:SetText("CREW GOALS")
-  frame.gifts = Skin.label(frame, "tiny", Skin.DIM)
-  frame.gifts:SetText("HAND-ME-DOWNS")
+  frame.handMeDowns = Skin.label(frame, "tiny", Skin.DIM)
+  frame.handMeDowns:SetText("HAND-ME-DOWNS")
   frame.intro = Skin.label(frame, "small", Skin.MUTED)
 
   frame.headings = {}
@@ -296,12 +296,12 @@ local function drawGoals(goals, y)
 end
 
 -- Hand-me-down notices and Gives, each with its kind's icon.
-local function drawGifts(gifts, y)
+local function drawHandMeDowns(notices, y)
   local texts = {}
-  for i, gift in ipairs(gifts) do
-    texts[i] = "|T" .. Skin.FEED_ICONS[gift.kind] .. ":14|t  " .. gift.text
+  for i, notice in ipairs(notices) do
+    texts[i] = "|T" .. Skin.FEED_ICONS[notice.kind] .. ":14|t  " .. notice.text
   end
-  return drawSection(frame.gifts, texts, giftLines, y)
+  return drawSection(frame.handMeDowns, texts, handMeDownLines, y)
 end
 
 -- Shows the summary from Core's awaySummary: { members, goals,
@@ -311,7 +311,7 @@ function Away.show(summary)
   if not frame then create() end
   local y = drawNoticed(summary.noticed or {}, -Skin.HEADER_HEIGHT)
   y = drawGoals(summary.goals or {}, y)
-  y = drawGifts(summary.handMeDowns or {}, y)
+  y = drawHandMeDowns(summary.handMeDowns or {}, y)
 
   local scoreboard = #summary.members > 0
   frame.intro:SetShown(scoreboard)

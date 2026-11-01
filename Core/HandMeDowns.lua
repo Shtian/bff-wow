@@ -22,12 +22,14 @@ HandMeDowns.MAX_CLAIMS = 20
 -- 7 suffix, 8 unique ID.
 local ITEM_ID, ENCHANT, SUFFIX, UNIQUE = 1, 2, 7, 8
 
+-- A colon-separated string's fields, empty ones kept.
 local function fieldsOf(text)
   local fields = {}
   for field in (text .. ":"):gmatch("([^:]*):") do fields[#fields + 1] = field end
   return fields
 end
 
+-- Whether a link field holds a number other than 0.
 local function isSet(field)
   return field ~= nil and field ~= "" and tonumber(field) ~= nil and tonumber(field) ~= 0
 end
@@ -82,8 +84,18 @@ function HandMeDowns.itemId(item)
   return tonumber(item:match("^%d+"))
 end
 
+-- What the wire fields must be: a non-empty string, a number from 0.
 local function isText(value) return type(value) == "string" and value ~= "" end
 local function isCount(value) return type(value) == "number" and value >= 0 end
+
+-- itemLink for a client that can't resolve items: never cached.
+function HandMeDowns.NO_LINK() return nil end
+
+-- The item's link for a text, from itemLink(itemString), or "an item"
+-- until the game has it.
+function HandMeDowns.linkText(itemLink, item)
+  return itemLink(HandMeDowns.itemLink(item)) or "an item"
+end
 
 -- A new Hand-me-down as stored in the owner's record.
 function HandMeDowns.item(id, item, level, time)
@@ -141,6 +153,7 @@ function HandMeDowns.isOpen(handMeDown, now)
   return handMeDown.to == nil and now - handMeDown.time <= HandMeDowns.KEEP_FOR
 end
 
+-- Whether a stored item is malformed or past its 30 days.
 local function expired(item, now)
   return type(item) ~= "table" or type(item.t) ~= "number" or now - item.t > HandMeDowns.KEEP_FOR
 end
@@ -159,6 +172,19 @@ function HandMeDowns.pruneClaims(list, now, isOpen)
     local item = list[i]
     if expired(item, now) or not isOpen(item.m, item.i) then table.remove(list, i) end
   end
+end
+
+-- The Hand-me-downs Given in the after record that weren't in before (nil
+-- on first sight counts as none), as in inRecord.
+function HandMeDowns.newlyGiven(before, after)
+  local had, list = {}, {}
+  for _, handMeDown in ipairs(HandMeDowns.inRecord(before)) do
+    if handMeDown.to then had[handMeDown.id] = true end
+  end
+  for _, handMeDown in ipairs(HandMeDowns.inRecord(after)) do
+    if handMeDown.to and not had[handMeDown.id] then list[#list + 1] = handMeDown end
+  end
+  return list
 end
 
 -- The winning Claim among { memberId, time, ... }: the earliest, ties
