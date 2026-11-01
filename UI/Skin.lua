@@ -61,8 +61,8 @@ end
 -- Each Reaction's icon and name, on the Feed tab, While you were away and
 -- toasts. Long-standing spell and achievement icons.
 Skin.REACTION_ICONS = {
-  cheer = "Interface\\Icons\\Ability_Warrior_BattleShout",
-  respects = "Interface\\Icons\\Spell_Holy_Resurrection",
+  cheer = "Interface\\Icons\\INV_Misc_MissileSmall_Red",
+  respects = "Interface\\Icons\\INV_Misc_Flower_04",
   welcome = "Interface\\Icons\\Achievement_Reputation_01",
 }
 Skin.REACTION_NAMES = { cheer = "Cheer", respects = "Pay respects", welcome = "Welcome" }
@@ -83,7 +83,6 @@ local function reactionHover(button, over)
   elseif not over then
     GameTooltip:Hide()
   end
-  if button.onHover then button.onHover(over) end
 end
 
 -- A small square button with a Reaction's icon. :SetReaction(reaction,
