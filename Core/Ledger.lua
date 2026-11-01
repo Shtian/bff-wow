@@ -126,6 +126,16 @@ function Ledger:writeOwn(fields)
   return changed
 end
 
+-- Writes the own Play times summary (from PlayTimes) into the own record,
+-- once it exists. Returns true if the record changed.
+function Ledger:setPlayTimes(summary)
+  local record = self:own()
+  if not record or ns.PlayTimes.same(record.playTimes, summary) then return false end
+  record.playTimes = summary
+  bump(self, record)
+  return true
+end
+
 -- Adds a Reaction (a key from Reactions) to the own record, made now.
 function Ledger:addReaction(key)
   local record = ownRecord(self)
@@ -248,6 +258,7 @@ local RECORD_SHAPE = {
   main = isOptional(isText),
   left = isOptional(function(value) return value == true end),
   joinedAt = isOptional(isNumber),
+  playTimes = isOptional(ns.PlayTimes.valid),
 }
 local CHARACTER_SHAPE = {
   guid = isText,

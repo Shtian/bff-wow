@@ -94,8 +94,9 @@ function FakeNet:run(seconds)
 end
 
 -- A simulated Member's account. options: random (default a
--- generator seeded by name), db (default empty) and character (the one it
--- plays: guid, name, classFilename, level, xp, maxXp, zone, deaths).
+-- generator seeded by name), db (default empty), character (the one it
+-- plays: guid, name, classFilename, level, xp, maxXp, zone, deaths) and
+-- utcOffset (seconds its local time is ahead of server time, default 0).
 function FakeNet:add(name, options)
   options = options or {}
   local client = setmetatable({
@@ -103,6 +104,7 @@ function FakeNet:add(name, options)
     name = name,
     db = options.db or {},
     random = options.random or seeded(seedFor(name)),
+    utcOffset = options.utcOffset,
     character = copy(options.character) or {
       guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
       level = 10, xp = 0, maxXp = 1000, zone = "Elwynn Forest", deaths = 0,
@@ -148,6 +150,7 @@ local function newCore(client, initialLogin)
     listener = function(...) client.events[#client.events + 1] = { ... } end,
     initialLogin = initialLogin,
     maxLevel = net.maxLevel,
+    utcOffset = client.utcOffset,
   })
   client.core:updateOwn(copy(client.character))
   client.memberId = client.core:rows()[1].memberId
