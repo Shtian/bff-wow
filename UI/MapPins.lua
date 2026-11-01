@@ -15,6 +15,8 @@ local HBDPins = LibStub("HereBeDragons-Pins-2.0")
 
 local SIZE = 12
 local RING = 3
+-- A dark keyline outside the ring, so a green ring reads on a bright map.
+local KEYLINE = 1
 local OFFLINE_ALPHA = 0.5
 
 local core
@@ -48,10 +50,15 @@ end
 
 local function createFrame()
   local frame = CreateFrame("Frame", nil, UIParent)
-  frame:SetSize(SIZE + 2 * RING, SIZE + 2 * RING)
+  frame:SetSize(SIZE + 2 * (RING + KEYLINE), SIZE + 2 * (RING + KEYLINE))
   frame:EnableMouse(true)
+  frame.keyline = frame:CreateTexture(nil, "OVERLAY", nil, 0)
+  frame.keyline:SetAllPoints()
+  frame.keyline:SetColorTexture(Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1)
+  Skin.round(frame, frame.keyline)
   frame.ring = frame:CreateTexture(nil, "OVERLAY", nil, 1)
-  frame.ring:SetAllPoints()
+  frame.ring:SetSize(SIZE + 2 * RING, SIZE + 2 * RING)
+  frame.ring:SetPoint("CENTER")
   frame.ring:SetColorTexture(1, 1, 1, 1)
   Skin.round(frame, frame.ring)
   frame.dot = frame:CreateTexture(nil, "OVERLAY", nil, 2)

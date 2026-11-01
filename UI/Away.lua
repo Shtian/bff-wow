@@ -19,14 +19,18 @@ local Skin = ns.Skin
 
 local WIDTH = 400
 local INSET = 14
-local INTRO = 30
+-- The intro line's slot above the column headings.
+local INTRO = 34
 local HEADINGS = 18
 local BUTTONS = 46
 local ICON = 14
 local ROW = 26
-local NOTICED_TITLE = 18
-local NOTICED_LINE = 22
-local NOTICED_GAP = 12
+-- Above each section title (and the intro line), the title's slot, each
+-- line's slot, and what's left under a section's last line.
+local SECTION_TOP = 12
+local NOTICED_TITLE = 16
+local NOTICED_LINE = 20
+local NOTICED_GAP = 4
 -- The Reaction buttons, in a column at the right of each row.
 local REACT = 18
 local REACT_GAP = 4
@@ -43,7 +47,7 @@ local NAME_WIDTH = LEVEL_X - 8
 local GAINED = Skin.ONLINE
 local STAR = "|T" .. Skin.FEED_ICONS.maxLevel .. ":12|t"
 local SKULL = "|T" .. Skin.FEED_ICONS.death .. ":12|t"
-local GOAL = "|T" .. Skin.FEED_ICONS.goal .. ":14|t"
+local GOAL = Skin.iconGlyph(Skin.FEED_PICTURES.goal, 14)
 
 local frame
 local rows = {}
@@ -62,7 +66,7 @@ end
 -- A column heading, placed by show(): x is from the left, or from the
 -- right when negative.
 local function heading(text, x)
-  local label = Skin.label(frame, "tiny", Skin.DIM)
+  local label = Skin.label(frame, "label", Skin.DIM)
   label:SetText(text)
   label.x = x
   if x < 0 then label:SetJustifyH("RIGHT") end
@@ -74,11 +78,11 @@ local function create()
   frame = Skin.window("BFFAway", WIDTH, "While you were away")
   frame:SetPoint("CENTER", 0, 120)
 
-  frame.noticed = Skin.label(frame, "tiny", Skin.DIM)
+  frame.noticed = Skin.label(frame, "label", Skin.DIM)
   frame.noticed:SetText("YOUR CREW NOTICED")
-  frame.goals = Skin.label(frame, "tiny", Skin.DIM)
+  frame.goals = Skin.label(frame, "label", Skin.DIM)
   frame.goals:SetText("CREW GOALS")
-  frame.spares = Skin.label(frame, "tiny", Skin.DIM)
+  frame.spares = Skin.label(frame, "label", Skin.DIM)
   frame.spares:SetText("SPARES")
   frame.intro = Skin.label(frame, "small", Skin.MUTED)
 
@@ -130,10 +134,10 @@ local function row(index)
   item.character:SetWidth(NAME_WIDTH)
   item.character:SetWordWrap(false)
   item.level = Skin.label(item, "text")
-  item.track = Skin.fill(item, { 1, 1, 1, 0.08 }, "ARTWORK")
+  item.track = Skin.fill(item, Skin.TRACK, "ARTWORK")
   item.track:ClearAllPoints()
   item.track:SetSize(BAR, 4)
-  item.before = Skin.fill(item, Skin.MUTED, "ARTWORK", 1)
+  item.before = Skin.fill(item, Skin.BAR, "ARTWORK", 1)
   item.before:ClearAllPoints()
   item.gain = Skin.fill(item, GAINED, "ARTWORK", 1)
   item.gain:ClearAllPoints()
@@ -152,9 +156,9 @@ local function row(index)
   return item
 end
 
--- The level column: the level now (gold with a star at max level) over a
--- bar from 0 to max level, the part before in grey and the jump in green,
--- or gold at max level. A dash for a Character that only died.
+-- The level column: the level now (with a star at max level) over a bar
+-- from 0 to max level, the part before in grey and the jump in green. A
+-- dash for a Character that only died.
 local function drawLevel(item, character, maxLevel)
   local shown = character.level ~= nil
   item.track:SetShown(shown)
@@ -167,8 +171,7 @@ local function drawLevel(item, character, maxLevel)
     return
   end
 
-  item.level:SetText(character.maxLevel and hex(Skin.GOLD) .. character.level .. "|r " .. STAR
-    or tostring(character.level))
+  item.level:SetText(character.maxLevel and character.level .. " " .. STAR or tostring(character.level))
   item.level:SetPoint("BOTTOMLEFT", item, "LEFT", LEVEL_X, -1)
   item.track:SetPoint("TOPLEFT", item, "LEFT", LEVEL_X, -3)
 
@@ -179,8 +182,7 @@ local function drawLevel(item, character, maxLevel)
     item.before:SetSize(from * scale, 4)
     item.before:Show()
   end
-  local color = character.maxLevel and Skin.GOLD or GAINED
-  item.gain:SetColorTexture(color[1], color[2], color[3])
+  item.gain:SetColorTexture(GAINED[1], GAINED[2], GAINED[3])
   item.gain:SetPoint("TOPLEFT", item.track, "TOPLEFT", from * scale, 0)
   item.gain:SetSize(math.max(2, (character.level - from) * scale), 4)
   item.gain:Show()
@@ -194,12 +196,16 @@ local function drawRow(item, member, character, first, maxLevel)
   item.member:SetShown(first)
   if first then
     item.icon:SetAtlas("classicon-" .. (member.classFilename or ""):lower())
+    -- Joined is news, in gold; left is said plainly.
     local tags = {}
     for _, highlight in ipairs(member.highlights) do
-      if highlight.kind ~= "maxLevel" then tags[#tags + 1] = highlight.kind end
+      if highlight.kind ~= "maxLevel" then
+        local color = Skin.FEED_HIGHLIGHT[highlight.kind] and Skin.GOLD or Skin.MUTED
+        tags[#tags + 1] = hex(color) .. highlight.kind .. "|r"
+      end
     end
     local text = classHex(member.classFilename) .. member.displayName .. "|r"
-    if #tags > 0 then text = text .. "  " .. hex(Skin.GOLD) .. table.concat(tags, ", ") .. "|r" end
+    if #tags > 0 then text = text .. "  " .. table.concat(tags, ", ") end
     item.member:SetText(text)
   end
   -- The Welcome sits just after the gold joined tag.
@@ -234,7 +240,7 @@ local function drawRow(item, member, character, first, maxLevel)
 
   drawLevel(item, character or {}, maxLevel)
   if character and character.new then
-    item.gained:SetText(hex(Skin.GOLD) .. "new|r")
+    item.gained:SetText(hex(GAINED) .. "new|r")
   elseif character and character.from then
     item.gained:SetText(hex(GAINED) .. "+" .. (character.level - character.from) .. "|r")
   else
@@ -262,7 +268,7 @@ local function drawSection(title, texts, pool, y)
   title:SetShown(#texts > 0)
   for i = #texts + 1, #pool do pool[i]:Hide() end
   if #texts == 0 then return y end
-  y = y - 10
+  y = y - SECTION_TOP
   title:SetPoint("TOPLEFT", INSET, y)
   y = y - NOTICED_TITLE
   for i, text in ipairs(texts) do
@@ -320,12 +326,12 @@ function Away.show(summary)
     frame.intro:SetText(summary.count == 1 and "1 thing happened while you were away."
       or ("%d things happened while you were away."):format(summary.count))
     frame.intro:ClearAllPoints()
-    frame.intro:SetPoint("TOPLEFT", INSET, y - 10)
+    frame.intro:SetPoint("TOPLEFT", INSET, y - SECTION_TOP)
     for _, label in ipairs(frame.headings) do
       label:ClearAllPoints()
-      label:SetPoint(label.x < 0 and "TOPRIGHT" or "TOPLEFT", label.x, y - INTRO)
+      label:SetPoint(label.x < 0 and "TOPRIGHT" or "TOPLEFT", label.x, y - SECTION_TOP - INTRO)
     end
-    y = y - INTRO - HEADINGS
+    y = y - SECTION_TOP - INTRO - HEADINGS
   end
 
   local maxLevel = GetMaxLevelForPlayerExpansion()

@@ -64,12 +64,15 @@ local function onClick(owner, mouse)
   end
 end
 
--- The count of Members online, over the icon's lower right.
+-- The count of Members online on a small dark plate over the icon's lower
+-- right, like the panel's badges, so it doesn't sit on the icon's rings.
 local function createBadge()
   local button = icons:GetMinimapButton(NAME)
   if not button then return end
-  badge = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-  badge:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -4, 5)
+  local Skin = ns.Skin
+  badge = Skin.badge(button, "tiny", Skin.TEXT, Skin.WINDOW)
+  badge:SetFrameLevel(button:GetFrameLevel() + 5)
+  badge:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 4)
 end
 
 -- Shows or hides the button and redraws the badge, from Core.
@@ -81,7 +84,8 @@ function Minimap.refresh()
   end
   if not badge then return end
   local online = core:crew() and core:summary().online or 0
-  badge:SetText(online > 0 and online or "")
+  badge:SetText(online)
+  badge:SetShown(online > 0)
 end
 
 function Minimap.start(theCore)

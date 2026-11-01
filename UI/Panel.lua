@@ -36,6 +36,9 @@ local ROW_HEIGHT = 44
 local ALT_HEIGHT = 20
 local SECTION = 26
 local INSET = 12
+-- Buttons inside rows and headings, and the pickers that open a menu.
+-- Window actions keep Skin.button's 24.
+local SMALL_BUTTON = 20
 -- One height for every view, so switching tabs never resizes the window;
 -- the Roster and the Feed scroll inside it.
 local HEIGHT = 380
@@ -53,13 +56,21 @@ local TITLE = "Best Friends in Forever"
 local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
 local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
 local PAUSED = "You appear offline: the others don't see you. Change it in Settings."
-local FEED_EMPTY = "Nothing yet. Dings, deaths and new Characters show up here."
+local FEED_EMPTY_TITLE = "Nothing yet"
+local FEED_EMPTY = "Dings, deaths and new Characters show up here."
+-- The stretch of timeline behind an empty Feed's one node.
+local FEED_EMPTY_LINE = 120
+-- The setup view's block, centred in the window: Display name across it,
+-- Start and Join in two columns below.
+local SETUP_WIDTH = 320
+local SETUP_COLUMN = 150
+local SETUP_COLUMNS_Y = -72
 local GOALS_INTRO = "Reached together: everyone's progress counts."
-local GOAL_ROW = 74
+local GOAL_ROW = 84
 local GOAL_BAR = 6
 -- The When grid: a cell per hour, a row per day.
 local WHEN_CELL = 11
-local WHEN_ROW = 15
+local WHEN_ROW = 18
 local WHEN_DAYS = 30
 local DAY_NAMES = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" }
 -- Spares: a row per item, under a section heading.
@@ -138,12 +149,26 @@ StaticPopupDialogs.BFF_REMOVE_MEMBER = {
   hideOnEscape = true,
 }
 
+-- The tooltip goes beside the panel, level with the row under the mouse,
+-- on whichever side has room. ANCHOR_RIGHT on a row near the top of the
+-- screen put it in the screen's corner.
+local TOOLTIP_ROOM = 280
+local function placeBeside(owner)
+  GameTooltip:SetOwner(owner, "ANCHOR_NONE")
+  local y = owner:GetTop() - frame:GetTop()
+  if frame:GetRight() + TOOLTIP_ROOM > UIParent:GetRight() then
+    GameTooltip:SetPoint("TOPRIGHT", frame, "TOPLEFT", -6, y)
+  else
+    GameTooltip:SetPoint("TOPLEFT", frame, "TOPRIGHT", 6, y)
+  end
+end
+
 -- The Character under the mouse: owner.row is its Member's row, and
 -- owner.character the Character (the row itself for the shown one).
 local function showTooltip(owner)
   local row, character = owner.row, owner.character
   if not row then return end
-  GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+  placeBeside(owner)
   GameTooltip:AddLine(character.name, classColor(character.classFilename))
   GameTooltip:AddLine(("Level %d %s %s"):format(character.level, className(character.classFilename),
     character.main and "(Main)" or "(Alt)"), 1, 1, 1)
@@ -269,13 +294,6 @@ local function createRow()
 
   row.ownBackground = Skin.fill(row, { GOLD[1], GOLD[2], GOLD[3], 0.05 })
 
-  -- The gold left border for "can play with you".
-  row.border = row:CreateTexture(nil, "ARTWORK")
-  row.border:SetColorTexture(GOLD[1], GOLD[2], GOLD[3])
-  row.border:SetPoint("TOPLEFT")
-  row.border:SetPoint("BOTTOMLEFT")
-  row.border:SetWidth(2)
-
   row.icon = row:CreateTexture(nil, "ARTWORK")
   row.icon:SetSize(28, 28)
   row.icon:SetPoint("TOPLEFT", INSET, -7)
@@ -305,7 +323,7 @@ local function createRow()
   row.xp:SetPoint("BOTTOMRIGHT", -INSET, 4)
   row.xp:SetHeight(2)
   row.xp:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-  Skin.fill(row.xp, { 1, 1, 1, 0.06 })
+  Skin.fill(row.xp, Skin.TRACK)
 
   rowFrames[#rowFrames + 1] = row
   return row
@@ -314,7 +332,6 @@ end
 local function drawRow(row, data)
   row.row, row.character = data, data
   row.ownBackground:SetShown(data.own)
-  row.border:SetShown(data.canPlay)
   setDot(row.dot, data.online)
   row.icon:SetAtlas("classicon-" .. (data.classFilename or ""):lower())
   row.name:SetText(data.name)
@@ -338,7 +355,7 @@ local function drawRow(row, data)
   local maxXp = data.maxXp or 0
   row.xp:SetMinMaxValues(0, math.max(maxXp, 1))
   row.xp:SetValue(maxXp > 0 and (data.xp or 0) or 0)
-  row.xp:SetStatusBarColor(classColor(data.classFilename))
+  row.xp:SetStatusBarColor(Skin.BAR[1], Skin.BAR[2], Skin.BAR[3], Skin.BAR[4])
   row.xp:SetShown(maxXp > 0)
   row:SetAlpha(data.online and 1 or 0.75)
   row:Show()
@@ -405,13 +422,14 @@ end
 local function createSection()
   section = CreateFrame("Frame", nil, rosterView.content)
   section:SetHeight(SECTION)
-  local label = Skin.label(section, "tiny", DIM)
+  local label = Skin.label(section, "label", DIM)
   label:SetPoint("LEFT", INSET, -2)
   label:SetText("CREW")
 
   section.sort = CreateFrame("Button", nil, section)
-  section.sort:SetHeight(18)
+  section.sort:SetHeight(SMALL_BUTTON)
   section.sort:SetPoint("RIGHT", -INSET, -2)
+  Skin.fill(section.sort, Skin.SECONDARY)
   Skin.border(section.sort, Skin.BORDER)
   Skin.fill(section.sort, Skin.HOVER, "HIGHLIGHT")
   section.sort.label = Skin.label(section.sort, "small", MUTED)
@@ -447,31 +465,17 @@ local function drawSection(count)
   section.line:SetPoint("RIGHT", count > 0 and section.spares or section.sort, "LEFT", -8, 0)
 end
 
--- The sidebar: Roster, Feed, Goals, When and Spares on top, Settings at the bottom, each with a
--- greyed game icon tinted like its label.
-local NAV_ICONS = {
-  roster = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
-  feed = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon",
-  goals = Skin.FEED_ICONS.goal,
-  when = "Interface\\FriendsFrame\\StatusIcon-Away",
-  spares = Skin.FEED_ICONS.gave,
-  settings = "Interface\\Buttons\\UI-OptionsButton",
-}
-
-local function navButton(label, icon, onClick)
+-- The sidebar: Roster, Feed, Goals, When and Spares on top, Settings at
+-- the bottom, as plain labels. The selected one's chip marks it.
+local function navButton(label, onClick)
   local button = CreateFrame("Button", nil, frame.sidebar)
   button:SetHeight(NAV_HEIGHT)
   -- The selected tab and the hovered one get a light chip, inset from
   -- the sidebar's edges.
   button.selected = Skin.chip(button, { 1, 1, 1, 0.08 }, NAV_CHIP_X, NAV_CHIP_Y, NAV_CHIP_RADIUS)
   Skin.chip(button, { 1, 1, 1, 0.04 }, NAV_CHIP_X, NAV_CHIP_Y, NAV_CHIP_RADIUS, "HIGHLIGHT")
-  button.icon = button:CreateTexture(nil, "ARTWORK")
-  button.icon:SetSize(14, 14)
-  button.icon:SetPoint("LEFT", 12, 0)
-  button.icon:SetTexture(icon)
-  button.icon:SetDesaturated(true)
   button.label = Skin.label(button, "text", MUTED)
-  button.label:SetPoint("LEFT", button.icon, "RIGHT", 7, 0)
+  button.label:SetPoint("LEFT", NAV_CHIP_X + 10, 0)
   button.label:SetText(label)
   button:SetScript("OnClick", onClick)
   return button
@@ -480,7 +484,6 @@ end
 local function setSelected(button, selected)
   button.selected:SetShown(selected)
   Skin.color(button.label, selected and TEXT or MUTED)
-  Skin.color(button.icon, selected and TEXT or MUTED)
 end
 
 local function createNav()
@@ -491,28 +494,27 @@ local function createNav()
       Panel.refresh()
     end
   end
-  nav.roster = navButton("Roster", NAV_ICONS.roster, open("roster"))
+  nav.roster = navButton("Roster", open("roster"))
   nav.roster:SetPoint("TOPLEFT", 0, -8)
   nav.roster:SetPoint("TOPRIGHT", 0, -8)
-  nav.feed = navButton("Feed", NAV_ICONS.feed, open("feed"))
+  nav.feed = navButton("Feed", open("feed"))
   nav.feed:SetPoint("TOPLEFT", nav.roster, "BOTTOMLEFT")
   nav.feed:SetPoint("TOPRIGHT", nav.roster, "BOTTOMRIGHT")
   nav.feed.badge = Skin.badge(nav.feed, "tiny", { 0.1, 0.08, 0 }, GOLD)
   nav.feed.badge:SetPoint("RIGHT", -10, 0)
-  nav.goals = navButton("Goals", NAV_ICONS.goals, open("goals"))
+  nav.goals = navButton("Goals", open("goals"))
   nav.goals:SetPoint("TOPLEFT", nav.feed, "BOTTOMLEFT")
   nav.goals:SetPoint("TOPRIGHT", nav.feed, "BOTTOMRIGHT")
-  nav.when = navButton("When", NAV_ICONS.when, open("when"))
+  nav.when = navButton("When", open("when"))
   nav.when:SetPoint("TOPLEFT", nav.goals, "BOTTOMLEFT")
   nav.when:SetPoint("TOPRIGHT", nav.goals, "BOTTOMRIGHT")
-  nav.spares = navButton("Spares", NAV_ICONS.spares, open("spares"))
+  nav.spares = navButton("Spares", open("spares"))
   nav.spares:SetPoint("TOPLEFT", nav.when, "BOTTOMLEFT")
   nav.spares:SetPoint("TOPRIGHT", nav.when, "BOTTOMRIGHT")
-  -- The label fills the button, so the badge sits on the icon's corner.
   nav.spares.badge = Skin.badge(nav.spares, "tiny", { 0.1, 0.08, 0 }, GOLD)
-  nav.spares.badge:SetPoint("CENTER", nav.spares.icon, "TOPRIGHT", 1, -1)
+  nav.spares.badge:SetPoint("RIGHT", -10, 0)
   -- The panel steps aside so it doesn't cover the settings.
-  nav.settings = navButton("Settings", NAV_ICONS.settings, function()
+  nav.settings = navButton("Settings", function()
     if ns.Settings.open() then frame:Hide() end
   end)
   nav.settings:SetPoint("BOTTOMLEFT", 0, 8)
@@ -584,20 +586,51 @@ local function createFeedView()
   feedView.line:SetWidth(2)
   feedView.days = {}
   feedView.entries = {}
-  feedView.empty = Skin.label(feedView.content, "text", MUTED)
-  feedView.empty:SetPoint("TOPLEFT", INSET, -INSET)
-  feedView.empty:SetWidth(CONTENT_WIDTH - 2 * INSET)
-  feedView.empty:SetText(FEED_EMPTY)
+
+  -- An empty Feed: a short stretch of the timeline with one faint node,
+  -- centred in the view, and what will show up beside it.
+  local empty = CreateFrame("Frame", nil, feedView)
+  empty:SetPoint("LEFT")
+  empty:SetPoint("RIGHT")
+  empty:SetHeight(FEED_EMPTY_LINE)
+  local line = empty:CreateTexture(nil, "BACKGROUND")
+  line:SetColorTexture(1, 1, 1, 1)
+  Skin.color(line, Skin.TRACK)
+  line:SetWidth(2)
+  line:SetPoint("TOPLEFT", LINE_X, 0)
+  line:SetPoint("BOTTOMLEFT", LINE_X, 0)
+  local node = Skin.feedPicture(empty, NODE)
+  node:SetPoint("LEFT", INSET, 0)
+  node:SetPicture(Skin.FEED_PICTURES.ding)
+  node.picture:SetDesaturated(true)
+  node.picture:SetAlpha(0.5)
+  local title = Skin.label(empty, "heading", TEXT)
+  title:SetPoint("BOTTOMLEFT", node, "RIGHT", 10, 1)
+  title:SetText(FEED_EMPTY_TITLE)
+  local text = Skin.label(empty, "small", MUTED)
+  text:SetPoint("TOPLEFT", node, "RIGHT", 10, -3)
+  text:SetWidth(CONTENT_WIDTH - 2 * INSET - NODE - 10)
+  text:SetText(FEED_EMPTY)
+  feedView.empty = empty
 end
 
--- A day's label in a chip on the timeline's line.
+-- A day's label, like the Roster's CREW: on the window's colour so the
+-- timeline's line stops behind it, with a hairline running to the right.
 local function createFeedDay()
   local day = CreateFrame("Frame", nil, feedView.content)
   day:SetHeight(16)
-  Skin.fill(day, Skin.RAISED)
-  Skin.border(day, Skin.BORDER)
-  day.label = Skin.label(day, "tiny", DIM)
-  day.label:SetPoint("CENTER", 0, 0)
+  day.back = Skin.fill(day, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1 })
+  day.label = Skin.label(day, "label", DIM)
+  day.label:SetPoint("LEFT", 4, 0)
+  day.back:ClearAllPoints()
+  day.back:SetPoint("TOPLEFT")
+  day.back:SetPoint("BOTTOMLEFT")
+  day.back:SetPoint("RIGHT", day.label, "RIGHT", 4, 0)
+  local line = day:CreateTexture(nil, "ARTWORK")
+  line:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
+  line:SetHeight(1)
+  line:SetPoint("LEFT", day.label, "RIGHT", 8, 0)
+  line:SetPoint("RIGHT")
   feedView.days[#feedView.days + 1] = day
   return day
 end
@@ -645,12 +678,12 @@ local function entryKey(entry)
 end
 
 -- Who reacted, after the time: the Reaction's icon and their names, You
--- in gold.
+-- a step brighter than the others.
 local function reactorsText(entry)
   if #entry.reactors == 0 then return "" end
   local names = {}
   for i, reactor in ipairs(entry.reactors) do
-    names[i] = reactor.you and Skin.hex(GOLD) .. "You|r" or reactor.name
+    names[i] = reactor.you and Skin.hex(TEXT) .. "You|r" or reactor.name
   end
   return Skin.reactionGlyph(entry.reaction, 12) .. " " .. table.concat(names, ", ")
 end
@@ -688,8 +721,8 @@ local function drawFeed(feed)
     local chip = feedView.days[dayCount] or createFeedDay()
     chip:ClearAllPoints()
     chip:SetPoint("TOPLEFT", feedView.content, "TOPLEFT", INSET - 4, y)
+    chip:SetPoint("RIGHT", feedView.content, "RIGHT", -INSET, 0)
     chip.label:SetText(dayTitle(day))
-    chip:SetWidth(chip.label:GetStringWidth() + 16)
     chip:Show()
     y = y - FEED_DAY
     for _, entry in ipairs(day.entries) do
@@ -735,17 +768,18 @@ local function goalRow(i)
   row:SetPoint("TOPLEFT", 0, -INSET - 22 - (i - 1) * GOAL_ROW)
   row:SetPoint("RIGHT")
   Skin.edge(row, "TOP", Skin.LINE)
-  row.title = Skin.label(row, "body")
-  row.title:SetPoint("TOPLEFT", INSET, -12)
+  row.title = Skin.label(row, "heading")
+  row.title:SetPoint("TOPLEFT", INSET, -18)
   row.numbers = Skin.label(row, "text")
   row.numbers:SetJustifyH("RIGHT")
-  row.numbers:SetPoint("TOPRIGHT", -INSET, -13)
+  row.numbers:SetPoint("RIGHT", -INSET, 0)
+  row.numbers:SetPoint("BOTTOM", row.title, "BOTTOM", 0, -1)
   row.bar = CreateFrame("StatusBar", nil, row)
-  row.bar:SetPoint("TOPLEFT", INSET, -36)
+  row.bar:SetPoint("TOPLEFT", INSET, -42)
   row.bar:SetPoint("RIGHT", -INSET, 0)
   row.bar:SetHeight(GOAL_BAR)
   row.bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-  Skin.fill(row.bar, { 1, 1, 1, 0.08 })
+  Skin.fill(row.bar, Skin.TRACK)
   row.last = Skin.label(row, "small", MUTED)
   row.last:SetPoint("TOPLEFT", row.bar, "BOTTOMLEFT", 0, -8)
   goalsView.rows[i] = row
@@ -773,7 +807,12 @@ local function drawGoal(row, goal)
     row.bar:SetMinMaxValues(0, math.max(goal.goal, 1))
     row.bar:SetValue(math.min(goal.value, goal.goal))
   end
-  row.bar:SetStatusBarColor(GOLD[1], GOLD[2], GOLD[3], goal.complete and 1 or 0.85)
+  -- Gold only once complete: a bar on its way is progress, not news.
+  if goal.complete then
+    row.bar:SetStatusBarColor(GOLD[1], GOLD[2], GOLD[3])
+  else
+    row.bar:SetStatusBarColor(Skin.BAR[1], Skin.BAR[2], Skin.BAR[3], Skin.BAR[4])
+  end
   row.last:SetText(lastReached(goal))
   Skin.color(row.last, goal.complete and GOLD or MUTED)
 end
@@ -833,8 +872,9 @@ local function createWhenView()
   whenView:SetAllPoints()
 
   whenView.pick = CreateFrame("Button", nil, whenView)
-  whenView.pick:SetHeight(20)
+  whenView.pick:SetHeight(SMALL_BUTTON)
   whenView.pick:SetPoint("TOPLEFT", INSET, -INSET)
+  Skin.fill(whenView.pick, Skin.SECONDARY)
   Skin.border(whenView.pick, Skin.BORDER)
   Skin.fill(whenView.pick, Skin.HOVER, "HIGHLIGHT")
   whenView.pick.label = Skin.label(whenView.pick, "small", TEXT)
@@ -847,7 +887,7 @@ local function createWhenView()
   whenView.intro:SetWordWrap(true)
   whenView.intro:SetJustifyH("LEFT")
 
-  local top = -INSET - 20 - 8 - 36
+  local top = -INSET - SMALL_BUTTON - 8 - 36
   for hour = 0, 21, 3 do
     local label = Skin.label(whenView, "tiny", DIM)
     label:SetPoint("BOTTOMLEFT", whenView, "TOPLEFT", INSET + WHEN_DAYS + hour * WHEN_CELL, top + 2)
@@ -1019,7 +1059,7 @@ local function spareHeading(index)
   if heading then return heading end
   heading = CreateFrame("Frame", nil, sparesView.content)
   heading:SetHeight(SPARE_SECTION)
-  heading.label = Skin.label(heading, "tiny", DIM)
+  heading.label = Skin.label(heading, "label", DIM)
   heading.label:SetPoint("LEFT", INSET, -2)
   heading.count = Skin.label(heading, "small", MUTED)
   heading.count:SetPoint("RIGHT", -INSET, -2)
@@ -1120,10 +1160,10 @@ local function createSpareRow()
   row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
   row.primary = Skin.button(row, "Claim", onSparePrimary, true)
-  row.primary:SetSize(SPARE_BUTTON, 20)
+  row.primary:SetSize(SPARE_BUTTON, SMALL_BUTTON)
   row.primary:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   row.secondary = Skin.button(row, "Withdraw", onSpareSecondary)
-  row.secondary:SetSize(SPARE_BUTTON, 20)
+  row.secondary:SetSize(SPARE_BUTTON, SMALL_BUTTON)
 
   row.item = Skin.label(row, "body")
   row.item:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 1)
@@ -1165,7 +1205,8 @@ local function drawSpareText(row, data, width)
   row.item:SetWidth(0)
   row.item:SetText(data.link or "Loading...")
   row.item:SetWidth(math.min(row.item:GetStringWidth() + 1, width - 30))
-  row.level:SetText(data.level > 0 and data.level or "-")
+  row.level:SetShown(data.level > 0)
+  row.level:SetText(data.level)
   row.level:ClearAllPoints()
   row.level:SetPoint("LEFT", row.item, "RIGHT", 6, 0)
   row.info:SetWidth(width)
@@ -1185,7 +1226,6 @@ local function drawSpareRow(row, data, yours)
     drawSpareText(row, data, placeSpareButtons(row, not data.given and "Give" or nil,
       data.canWithdraw and "Withdraw" or nil))
     row.primary:SetEnabled(data.canGive)
-    row.primary:SetAlpha(data.canGive and 1 or 0.4)
     row:SetAlpha(data.given and 0.6 or 1)
   else
     row.info:SetText(("%s · %s"):format(data.owner, data.state))
@@ -1193,7 +1233,6 @@ local function drawSpareRow(row, data, yours)
     drawSpareText(row, data, placeSpareButtons(row, data.canClaim and "Claim" or nil,
       data.claimed and "Withdraw" or nil))
     row.primary:SetEnabled(true)
-    row.primary:SetAlpha(1)
     row:SetAlpha(data.usable and 1 or 0.45)
   end
   row:Show()
@@ -1294,34 +1333,43 @@ local function layout(inCrew)
   if not inCrew then frame.headerRight:SetText("") end
 end
 
--- The setup view: display name, then Start a Crew or Join a Crew.
+-- The setup view, centred in the window: Display name, then Start a Crew
+-- and Join a Crew side by side, a hairline between them.
 local function createSetup()
   setup = CreateFrame("Frame", nil, frame.content)
-  setup:SetPoint("TOPLEFT", INSET + 4, -INSET)
-  setup:SetPoint("BOTTOMRIGHT", -INSET - 4, INSET)
+  setup:SetSize(SETUP_WIDTH, -SETUP_COLUMNS_Y + 90)
+  setup:SetPoint("CENTER", 0, 10)
 
-  local nameLabel = Skin.label(setup, "small", MUTED)
-  nameLabel:SetPoint("TOPLEFT", 0, -4)
+  local nameLabel = Skin.label(setup, "label", DIM)
+  nameLabel:SetPoint("TOPLEFT")
   nameLabel:SetText("DISPLAY NAME")
-  setup.name = Skin.editBox(setup, 220)
+  setup.name = Skin.editBox(setup, SETUP_WIDTH)
   setup.name:SetMaxLetters(16)
   setup.name:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -6)
   setup.nameError = Skin.label(setup, "small", ERROR)
   setup.nameError:SetPoint("TOPLEFT", setup.name, "BOTTOMLEFT", 0, -4)
+  setup.nameError:SetWidth(SETUP_WIDTH)
 
-  local startLabel = Skin.label(setup, "small", MUTED)
-  startLabel:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -62)
+  local startLabel = Skin.label(setup, "label", DIM)
+  startLabel:SetPoint("TOPLEFT", 0, SETUP_COLUMNS_Y)
   startLabel:SetText("START A CREW")
   setup.start = Skin.button(setup, "Start", function()
     local _, reason = core:startCrew(setup.name:GetText())
     setup.nameError:SetText(reason and ns.MESSAGES[reason] or "")
   end, true)
+  setup.start:SetWidth(SETUP_COLUMN)
   setup.start:SetPoint("TOPLEFT", startLabel, "BOTTOMLEFT", 0, -6)
 
-  local joinLabel = Skin.label(setup, "small", MUTED)
-  joinLabel:SetPoint("TOPLEFT", startLabel, "BOTTOMLEFT", 0, -50)
+  local divider = setup:CreateTexture(nil, "ARTWORK")
+  divider:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
+  divider:SetWidth(1)
+  divider:SetHeight(70)
+  divider:SetPoint("TOP", setup, "TOPLEFT", SETUP_WIDTH / 2, SETUP_COLUMNS_Y)
+
+  local joinLabel = Skin.label(setup, "label", DIM)
+  joinLabel:SetPoint("TOPLEFT", SETUP_WIDTH - SETUP_COLUMN, SETUP_COLUMNS_Y)
   joinLabel:SetText("JOIN A CREW")
-  setup.code = Skin.editBox(setup, 140)
+  setup.code = Skin.editBox(setup, SETUP_COLUMN)
   setup.code:SetMaxLetters(12)
   setup.code:SetPoint("TOPLEFT", joinLabel, "BOTTOMLEFT", 0, -6)
   local function join()
@@ -1331,9 +1379,11 @@ local function createSetup()
   end
   setup.code:SetScript("OnEnterPressed", join)
   setup.join = Skin.button(setup, "Join", join)
-  setup.join:SetPoint("LEFT", setup.code, "RIGHT", 8, 0)
+  setup.join:SetWidth(SETUP_COLUMN)
+  setup.join:SetPoint("TOPLEFT", setup.code, "BOTTOMLEFT", 0, -6)
   setup.codeError = Skin.label(setup, "small", ERROR)
-  setup.codeError:SetPoint("TOPLEFT", setup.code, "BOTTOMLEFT", 0, -4)
+  setup.codeError:SetPoint("TOPLEFT", setup.join, "BOTTOMLEFT", 0, -4)
+  setup.codeError:SetWidth(SETUP_COLUMN)
 end
 
 local function showSetup()
@@ -1394,6 +1444,9 @@ local function createFooter()
   footer.code:SetHeight(22)
   footer.code:SetJustifyH("CENTER")
   footer.code:SetPoint("LEFT", codeLabel, "RIGHT", 8, 0)
+  -- The text stays selected for copying; a faint selection keeps the code
+  -- from being the brightest thing in the panel.
+  footer.code:SetHighlightColor(1, 1, 1, 0.15)
   footer.code:SetScript("OnEditFocusGained", function(box) box:HighlightText() end)
   footer.code:SetScript("OnTextChanged", function(box, userInput)
     if userInput then

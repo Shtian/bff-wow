@@ -79,8 +79,8 @@ Entries that arrive while settling go into the summary and print no chat line.
 A small frame in the panel's style (#7), laid out as a scoreboard:
 
 - Members ordered by most recent activity, and a row per Character with unseen events: the Main's first, then the rest by latest activity. The Member's name and class icon sit on their first row, with the Character's name under it when it differs ("Alt Jaina").
-- Columns for the **level** now, **levels gained** and **deaths**. Under the level, a bar from 0 to max level shows the jump: grey for where they started, green for what they gained, gold with a star when it reached max level. A new Character shows its level and "new" instead of levels gained. The level range goes from the lowest "before" to the highest "after" across that Character's unseen entries.
-- Joined and left show in gold beside the Member's name; a Member with nothing else gets just that row.
+- Columns for the **level** now, **levels gained** and **deaths**. Under the level, a bar from 0 to max level shows the jump: grey for where they started, green for what they gained, and a star beside the level when it reached max level. A new Character shows its level and "new" in green instead of levels gained. The level range goes from the lowest "before" to the highest "after" across that Character's unseen entries.
+- Joined shows in gold beside the Member's name and left in grey; a Member with nothing else gets just that row.
 - **Open Feed** and **Dismiss** buttons.
 
 The summary is marked as seen once Core has fired it.

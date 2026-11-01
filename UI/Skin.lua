@@ -15,31 +15,39 @@ Skin.MUTED = { 0.68, 0.67, 0.72 }
 Skin.DIM = { 0.55, 0.54, 0.6 }
 Skin.ONLINE = { 0.44, 0.89, 0.44 }
 Skin.OFFLINE = { 0.33, 0.32, 0.37 }
-Skin.WINDOW = { 0.055, 0.051, 0.078, 0.95 }
+-- 97% opaque: at 95%, bright world text read through a panel's empty
+-- space.
+Skin.WINDOW = { 0.055, 0.051, 0.078, 0.97 }
 Skin.HEADER = { 0.1, 0.095, 0.13, 1 }
 Skin.SIDEBAR = { 0, 0, 0, 0.25 }
 Skin.RAISED = { 0.106, 0.102, 0.137, 1 }
 Skin.LINE = { 1, 1, 1, 0.07 }
 Skin.BORDER = { 1, 1, 1, 0.1 }
 Skin.HOVER = { 1, 1, 1, 0.05 }
+-- Every bar: a faint track and a neutral fill. Colour on a bar means
+-- something (levels gained, a goal complete).
+Skin.TRACK = { 1, 1, 1, 0.08 }
+Skin.BAR = { 1, 1, 1, 0.3 }
+-- A secondary button's plate: the small buttons and the Skin buttons.
+Skin.SECONDARY = { 1, 1, 1, 0.06 }
 
 Skin.HEADER_HEIGHT = 30
 
--- Feed entries shown in gold.
-Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, left = true, goal = true }
+-- Feed entries shown in gold: the news. Leaving keeps its grey edge and
+-- plain text.
+Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, goal = true }
 -- A muted grey for a picture's edge when its kind has no colour, and for
 -- the overflow toast's icon.
 Skin.FEED_ICON_COLOR = { 0.82, 0.8, 0.86 }
--- Each Feed kind's small icon, inline in the While you were away popup,
--- and the Goals and Spares tabs' sidebar icons. The Feed tab and toasts
--- draw Skin.FEED_PICTURES instead.
+-- Small icons inline in the While you were away popup: the max-level star,
+-- the death skull and the Spare lines. The Feed tab and toasts draw
+-- Skin.FEED_PICTURES instead.
 Skin.FEED_ICONS = {
   maxLevel = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1",
   death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
   newCharacter = "Interface\\FriendsFrame\\UI-Toast-FriendRequestIcon",
   joined = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
   left = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
-  goal = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_3",
   -- Spares: a Give in the Feed, and the notices.
   gave = "Interface\\GossipFrame\\VendorGossipIcon",
   claimed = "Interface\\GossipFrame\\VendorGossipIcon",
@@ -77,6 +85,9 @@ Skin.FEED_EDGES = {
   given = SPARE,
 }
 local EDGE_ALPHA = 0.55
+-- A given Reaction's edge: a quiet frame, not gold, so the Feed's gold stays
+-- on the news.
+local GIVEN_EDGE = { 1, 1, 1, 0.3 }
 
 -- A square picture `size` wide: an opaque back (so a line behind it is
 -- covered), the edge, and the icon inset 1px with its own bevel cropped.
@@ -118,7 +129,7 @@ Skin.REACTION_NAMES = { cheer = "Cheer", respects = "Pay respects", welcome = "W
 function Skin.reactionGlyph(reaction, size)
   local icon = Skin.REACTION_ICONS[reaction]
   if not icon then return "" end
-  return ("|T%s:%d:%d:0:0:64:64:5:59:5:59|t"):format(icon, size, size)
+  return Skin.iconGlyph(icon, size)
 end
 
 local function reactionHover(button, over)
@@ -133,7 +144,8 @@ local function reactionHover(button, over)
 end
 
 -- A small square button with a Reaction's icon. :SetReaction(reaction,
--- done) shows it dim and clickable, or bright with a gold edge once given.
+-- done) shows it dim and clickable, or in full colour with a faint edge
+-- once given.
 function Skin.reactionButton(parent, size, onClick)
   local button = CreateFrame("Button", nil, parent)
   button:SetSize(size, size)
@@ -142,7 +154,7 @@ function Skin.reactionButton(parent, size, onClick)
   button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   button.edges = {}
   for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
-    button.edges[#button.edges + 1] = Skin.edge(button, side, Skin.GOLD, "OVERLAY")
+    button.edges[#button.edges + 1] = Skin.edge(button, side, GIVEN_EDGE, "OVERLAY")
   end
   button.restAlpha = 0.55
   button:SetScript("OnClick", onClick)
@@ -169,12 +181,17 @@ local function font(name, path, size)
   return object
 end
 
+-- Friz names things: window titles, headings (goal names) and labels
+-- (section, day and column labels, written in capitals). Arial Narrow
+-- carries everything else; tiny is for badges and chart captions.
 Skin.fonts = {
   title = font("BFFFontTitle", FRIZ, 13),
+  heading = font("BFFFontHeading", FRIZ, 12),
+  label = font("BFFFontLabel", FRIZ, 10),
   body = font("BFFFontBody", NARROW, 15),
   text = font("BFFFontText", NARROW, 14),
   small = font("BFFFontSmall", NARROW, 12),
-  tiny = font("BFFFontTiny", NARROW, 10),
+  tiny = font("BFFFontTiny", NARROW, 11),
 }
 
 -- A class's colour as r, g, b; white for an unknown class.
@@ -190,6 +207,11 @@ function Skin.ago(seconds)
   if seconds < 60 * 60 then return ("%dm"):format(math.floor(seconds / 60)) end
   if seconds < 24 * 60 * 60 then return ("%dh"):format(math.floor(seconds / 3600 + 0.5)) end
   return ("%dd"):format(math.floor(seconds / 86400 + 0.5))
+end
+
+-- A game icon inline in text, cropped inside its bevel: "|T...|t".
+function Skin.iconGlyph(texture, size)
+  return ("|T%s:%d:%d:0:0:64:64:5:59:5:59|t"):format(texture, size, size)
 end
 
 -- A colour as a text escape: "|cffrrggbb".
@@ -260,8 +282,13 @@ function Skin.edge(frame, side, color, layer)
   return line
 end
 
+-- 1px lines round `frame`. Returns them.
 function Skin.border(frame, color)
-  for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do Skin.edge(frame, side, color or Skin.BORDER) end
+  local lines = {}
+  for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+    lines[#lines + 1] = Skin.edge(frame, side, color or Skin.BORDER)
+  end
+  return lines
 end
 
 function Skin.label(parent, fontName, color, layer)
@@ -299,20 +326,41 @@ local function hover(button, shown)
   if button:IsEnabled() then button.hover:SetShown(shown) end
 end
 
--- A flat button. Primary ones are gold with dark text.
+local ON_GOLD = { 0.1, 0.08, 0 }
+
+-- A button's plate and label for its kind and state. A disabled button,
+-- primary or not, is a secondary plate with dim text: faded gold read as a
+-- second primary.
+local function look(button, enabled)
+  local gold = button.primary and enabled
+  local fill = gold and Skin.GOLD or Skin.SECONDARY
+  button.background:SetColorTexture(fill[1], fill[2], fill[3], fill[4] or 1)
+  for _, line in ipairs(button.lines) do line:SetShown(not gold) end
+  button.hover:SetColorTexture(1, 1, 1, gold and 0.18 or 0.06)
+  button.hover:SetShown(enabled and button:IsMouseOver())
+  Skin.color(button.label, gold and ON_GOLD or enabled and Skin.TEXT or Skin.DIM)
+end
+
+-- A flat button. Primary ones are gold with dark text. It restyles itself
+-- from OnEnable and OnDisable, so callers add to those with HookScript, not
+-- SetScript.
 function Skin.button(parent, text, onClick, primary)
   local button = CreateFrame("Button", nil, parent)
   button:SetSize(96, 24)
-  button.background = Skin.fill(button, primary and Skin.GOLD or { 1, 1, 1, 0.06 })
-  if not primary then Skin.border(button, Skin.BORDER) end
-  button.hover = Skin.fill(button, { 1, 1, 1, primary and 0.18 or 0.06 }, "HIGHLIGHT")
+  button.primary = primary == true
+  button.background = Skin.fill(button, Skin.SECONDARY)
+  button.lines = Skin.border(button, Skin.BORDER)
+  button.hover = Skin.fill(button, { 1, 1, 1, 0.06 }, "HIGHLIGHT")
   button.hover:SetBlendMode("ADD")
-  button.label = Skin.label(button, "text", primary and { 0.1, 0.08, 0 } or Skin.TEXT)
+  button.label = Skin.label(button, "text")
   button.label:SetPoint("CENTER")
   button.label:SetText(text)
+  look(button, true)
   button:SetScript("OnClick", onClick)
   button:SetScript("OnEnter", function(self) hover(self, true) end)
   button:SetScript("OnLeave", function(self) hover(self, false) end)
+  button:SetScript("OnEnable", function(self) look(self, true) end)
+  button:SetScript("OnDisable", function(self) look(self, false) end)
   function button:SetText(value) self.label:SetText(value) end
   return button
 end
