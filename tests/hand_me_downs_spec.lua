@@ -1,5 +1,5 @@
 -- The pure parts of Hand-me-downs: item strings, what a record carries,
--- pruning and who wins.
+-- tradeability, pruning and who wins.
 local load = require("tests.load")
 
 local DAY = 24 * 60 * 60
@@ -113,6 +113,30 @@ describe("HandMeDowns", function()
       assert.is_true(H.isOpen({ time = 0 }, 30 * DAY))
       assert.is_false(H.isOpen({ time = 0 }, 30 * DAY + 1))
       assert.is_false(H.isOpen({ time = 0, to = "bob" }, 10))
+    end)
+  end)
+
+  describe("tradeable", function()
+    it("takes an unbound item that binds on equip, or not at all", function()
+      assert.is_true(H.tradeable(false, 2))
+      assert.is_true(H.tradeable(false, 0))
+      assert.is_true(H.tradeable(false, nil))
+    end)
+
+    it("refuses a bound item, whatever its binding says", function()
+      assert.same({ nil, "bound" }, { H.tradeable(true, 2) })
+      -- An heirloom reports bindType 1 and IsBound true.
+      assert.same({ nil, "bound" }, { H.tradeable(true, 1) })
+    end)
+
+    it("refuses a quest item", function()
+      assert.same({ nil, "questItem" }, { H.tradeable(false, 4) })
+    end)
+
+    it("refuses an account-bound item", function()
+      for _, bindType in ipairs({ 7, 8, 9 }) do
+        assert.same({ nil, "accountBound" }, { H.tradeable(false, bindType) })
+      end
     end)
   end)
 

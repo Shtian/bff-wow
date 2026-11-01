@@ -62,7 +62,8 @@ local HAND_ME_DOWN_ICON = 28
 local HAND_ME_DOWN_BUTTON = 58
 local HAND_ME_DOWN_SECTION = 28
 local HAND_ME_DOWNS_NONE = "No Hand-me-downs from the Crew right now."
-local HAND_ME_DOWNS_HOW = "Offer an item: type /bff hmd add, then shift-click it into the chat box. Mail it to the winner, then Give it."
+local HAND_ME_DOWNS_DROP = "Drop an item from your bags here to offer it to your Crew."
+local HAND_ME_DOWNS_HOW = "Offer an item: drop it on the slot above, or type /bff hmd add and shift-click it into the chat box. Mail it to the winner, then Give it."
 local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local GOLD = Skin.GOLD
@@ -997,6 +998,36 @@ local function placeHandMeDown(line, y)
   line:SetPoint("TOPRIGHT", handMeDownsView.content, "TOPRIGHT", 0, y)
 end
 
+-- An item dropped on the drop slot, or a click on it while holding one:
+-- a click with an item on the cursor may arrive as either, so both do the
+-- same. The item always goes back to its bag slot.
+local function onHandMeDownDrop()
+  if not GetCursorInfo() then return end
+  ns.sayPosted(ns.Bags.postFromCursor(core))
+end
+
+-- The drop slot: an empty item slot with a line saying what it's for.
+local function createHandMeDownDrop(parent)
+  local drop = CreateFrame("Button", nil, parent)
+  drop:SetHeight(HAND_ME_DOWN_ROW)
+  Skin.fill(drop, Skin.HOVER, "HIGHLIGHT")
+  drop.slot = CreateFrame("Frame", nil, drop)
+  drop.slot:SetSize(HAND_ME_DOWN_ICON, HAND_ME_DOWN_ICON)
+  drop.slot:SetPoint("LEFT", INSET, 0)
+  Skin.fill(drop.slot, Skin.RAISED)
+  Skin.border(drop.slot)
+  drop.plus = Skin.label(drop.slot, "body", DIM)
+  drop.plus:SetPoint("CENTER")
+  drop.plus:SetText("+")
+  drop.label = Skin.label(drop, "body", MUTED)
+  drop.label:SetPoint("LEFT", drop.slot, "RIGHT", 8, 0)
+  drop.label:SetPoint("RIGHT", -INSET, 0)
+  drop.label:SetText(HAND_ME_DOWNS_DROP)
+  drop:SetScript("OnReceiveDrag", onHandMeDownDrop)
+  drop:SetScript("OnClick", onHandMeDownDrop)
+  return drop
+end
+
 local function createHandMeDownsView()
   handMeDownsView = createScrollView()
   handMeDownsView:SetPoint("TOPLEFT")
@@ -1004,6 +1035,7 @@ local function createHandMeDownsView()
   handMeDownsView.headings = {}
   handMeDownsView.rows = {}
   handMeDownsView.notes = {}
+  handMeDownsView.drop = createHandMeDownDrop(handMeDownsView.content)
 end
 
 -- "FROM THE CREW ————— 2 of 20 Claims".
@@ -1225,6 +1257,8 @@ local function drawHandMeDowns()
   list(view.crew, false)
   y = y - 6
   heading("YOURS", ("%d of %d up"):format(view.open, view.maxOpen))
+  placeHandMeDown(handMeDownsView.drop, y)
+  y = y - HAND_ME_DOWN_ROW
   list(view.yours, true)
   note(HAND_ME_DOWNS_HOW)
 

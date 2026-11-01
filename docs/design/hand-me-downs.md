@@ -26,7 +26,13 @@ They live in the owner's record, in an optional `handMeDowns` list. Each one has
 
 ### Posting one
 
-Until marking items from the bags lands (#67, after the research in #65), it's a slash command: `/bff hmd add`, then shift-click the item into the chat box. The required level comes from the game's item info. BFF can't yet check that the item can be traded, so the owner is trusted.
+The Hand-me-downs tab has a **drop slot** above your own list (#74, after the research in #65 and #67, `docs/research/bag-items.md`). Dropping a bag item on it offers that item, and so does clicking it while holding one: on retail a click with an item held arrives as either `OnReceiveDrag` or `OnClick`, so both do the same. BFF reads the item's location from `C_Cursor.GetCursorItem()` and always calls `ClearCursor()`, so the item goes back to its bag slot whether it was taken or refused. It works with any bag addon that puts items on the cursor, and in combat, instances and encounters. While messaging is locked down the post waits and goes out when the lockdown lifts, like any other record change.
+
+`/bff hmd add`, then shift-click the item into the chat box, still works. It offers the first item in the bags with the same trimmed item string, and refuses the item if there isn't one.
+
+Either way Core checks the item can be traded (`HandMeDowns.tradeable`): it's refused if `C_Item.IsBound` says it's bound (soulbound, or account-bound at any scope; heirlooms report `bindType` 1 but are bound), or its `bindType` is Quest (4) or one of the account bindings (7, 8, 9). Conjured items aren't caught; the mail window refuses them. The required level comes from the game's item info.
+
+When an item is posted, its **item GUID** (`C_Item.GetItemGUID`) is kept locally in `BFF_DB.handMeDownItems`, by the posting Character's GUID and the Hand-me-down's id. It's never in the record, so it never goes out. It's dropped once the Hand-me-down is withdrawn, Given or ends, and when you leave the Crew. The follow-up (ADR 0004) uses it to notice the item has gone.
 
 ### The trimmed item string
 
@@ -100,8 +106,8 @@ The Crew heading shows "2 Hand-me-downs for you": other Members' open Hand-me-do
 
 ## Changes to Core's interface
 
-- **Commands:** `postHandMeDown(link, level)`, `withdrawHandMeDown(id)`, `giveHandMeDown(id)`, `claimHandMeDown(ownerId, id, guid?)`, `withdrawClaim(ownerId, id)` and `handMeDownsSeen()`. Each write bumps the own record's version and goes out now. Like Reactions, they're local writes that work in combat and offline.
-- **Reads:** `handMeDowns()` for the tab, and `summary().handMeDowns` for the Roster's count.
+- **Commands:** `postHandMeDown(link, level, inBags?)`, where `inBags` is `{ guid, isBound, bindType }` from the bags: an untradeable item is refused, and the item GUID is kept locally, never in the record, `withdrawHandMeDown(id)`, `giveHandMeDown(id)`, `claimHandMeDown(ownerId, id, guid?)`, `withdrawClaim(ownerId, id)` and `handMeDownsSeen()`. Each write bumps the own record's version and goes out now. Like Reactions, they're local writes that work in combat and offline.
+- **Reads:** `handMeDowns()` for the tab, `summary().handMeDowns` for the Roster's count, and `handMeDownItems()`, the item GUIDs of the open Hand-me-downs the Character being played posted (`{ [id] = itemGuid }`).
 - **Listener events:** `handMeDown(news)`, like `reaction`. `awaySummary(summary)` gains `handMeDowns`, the notices then the Gives, newest first.
 - **Ports:** `itemLink(itemString)`, optional: the game's link for an item string, or nil while it isn't cached.
 - **Member record:** gains `handMeDowns` and `claims`. Like `reactions`, they're not part of the record's checked shape, so a client that doesn't know them keeps and relays them unchanged, and a malformed item is skipped rather than getting the record dropped.
@@ -112,6 +118,7 @@ The `/bffdev` console has **Offer** (the simulated Member posts a test Hand-me-d
 
 ## Not decided here
 
-- Marking items from the bags, checking an item can be traded, and ending a Hand-me-down when it leaves the bags: #67, after #65.
+- Ending a Hand-me-down when its item leaves the bags: ADR 0004, the follow-up to #74.
+- A modifier-click on bag buttons to offer an item.
 - Detecting the mail being sent; Give is a button.
 - A Reaction on gave entries, a want/craft list, class or armour suitability.
