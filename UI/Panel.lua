@@ -638,21 +638,12 @@ local function createFeedEntry()
   entry.reactors:SetPoint("RIGHT", -INSET - 36, 0)
   entry.reactors:SetWordWrap(false)
 
-  -- The Reaction button. With no Reactions yet it only shows on hover.
+  -- The Reaction button, always shown like a toast's.
   entry.react = Skin.reactionButton(entry, REACT, function(self)
     local data = self:GetParent().data
     if data and data.key then core:react(data.key) end
   end)
   entry.react:SetPoint("TOPRIGHT", -INSET - 4, -4)
-  local function updateHoverOnly()
-    local button = entry.react
-    button:SetAlpha((not button.hoverOnly or entry:IsMouseOver()) and 1 or 0)
-  end
-  entry.react.onHover = updateHoverOnly
-  entry:EnableMouse(true)
-  entry:SetScript("OnEnter", updateHoverOnly)
-  entry:SetScript("OnLeave", updateHoverOnly)
-  entry.updateHoverOnly = updateHoverOnly
   feedView.entries[#feedView.entries + 1] = entry
   return entry
 end
@@ -684,8 +675,6 @@ local function drawFeedEntry(line, entry)
   line.react:SetShown(entry.canReact)
   if entry.canReact then
     line.react:SetReaction(entry.reaction, entry.reacted)
-    line.react.hoverOnly = #entry.reactors == 0
-    line.updateHoverOnly()
   end
   Skin.feedIcon(line.icon, line.glyph, entry.kind)
   line.text:SetText(entry.text)

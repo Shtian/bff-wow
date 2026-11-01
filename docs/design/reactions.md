@@ -87,7 +87,7 @@ Your own Reaction goes into your record right away, and is attached to the entry
 
 ### Feed tab
 
-An entry you can react to shows its Reaction icon and who reacted ("🎉 Bob, Cleo"). Click it to react. Your own shows as "You" and is highlighted. Entries with no Reactions show a faint icon on hover only. Entries of yours show who reacted, with no button.
+An entry you can react to shows its Reaction icon and who reacted ("🎉 Bob, Cleo"). Click it to react. Your own shows as "You" and is highlighted. Entries with no Reactions show the icon faint, always visible, like on a toast. Entries of yours show who reacted, with no button.
 
 ### While you were away
 
