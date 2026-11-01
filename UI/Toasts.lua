@@ -23,6 +23,10 @@ local PICTURE = 24
 local REACT = 20
 -- Seconds a toast takes to fade out at the end of its time.
 local FADE = 0.6
+-- The timer line along a toast's bottom edge: gold on the entries the
+-- Feed highlights, faint white otherwise.
+local TIMER = 2
+local TIMER_FAINT = { 1, 1, 1, 0.18 }
 -- Where toasts start, down from the top centre, until moved.
 local DEFAULT_FROM_TOP = 160
 -- The overflow toast's icon: the Feed's, as in the panel's sidebar.
@@ -108,13 +112,11 @@ local function createToast()
   toast:SetSize(WIDTH, HEIGHT)
   toast:SetFrameStrata("HIGH")
   toast:SetClampedToScreen(true)
-  Skin.fill(toast, Skin.WINDOW)
-  Skin.border(toast, Skin.BORDER)
-  toast.accent = Skin.fill(toast, Skin.GOLD, "ARTWORK")
-  toast.accent:ClearAllPoints()
-  toast.accent:SetPoint("TOPLEFT", 1, -1)
-  toast.accent:SetPoint("BOTTOMLEFT", 1, 1)
-  toast.accent:SetWidth(2)
+  Skin.fill(toast, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 0.88 })
+  toast.timer = toast:CreateTexture(nil, "ARTWORK")
+  toast.timer:SetColorTexture(1, 1, 1, 1)
+  toast.timer:SetPoint("BOTTOMLEFT")
+  toast.timer:SetHeight(TIMER)
   Skin.fill(toast, Skin.HOVER, "HIGHLIGHT")
 
   toast.picture = Skin.feedPicture(toast, PICTURE)
@@ -151,7 +153,7 @@ end
 local function drawToast(frame, toast)
   local entry = toast.entry
   local highlight = entry and Skin.FEED_HIGHLIGHT[entry.kind] == true
-  frame.accent:SetShown(highlight)
+  Skin.color(frame.timer, highlight and Skin.GOLD or TIMER_FAINT)
   local canReact = entry ~= nil and not entry.entryKey and entry.canReact == true
   frame.react:SetShown(canReact)
   if canReact then frame.react:SetReaction(entry.reaction, entry.reacted) end
@@ -196,11 +198,15 @@ local function hover(now)
 end
 
 -- Fades each toast over its last FADE seconds; a hovered one stays solid.
+-- Its timer line shrinks with the time it has left.
 local function fade(now)
   for _, frame in ipairs(toastFrames) do
     if frame:IsShown() then
-      local left = frame.toast.hovered and FADE or queue:remaining(frame.toast, now)
+      local remaining = queue:remaining(frame.toast, now)
+      local left = frame.toast.hovered and FADE or remaining
       frame:SetAlpha(math.max(0, math.min(1, left / FADE)))
+      local share = math.max(0, math.min(1, remaining / ns.ToastQueue.DURATION))
+      frame.timer:SetWidth(math.max(1, WIDTH * share))
     end
   end
 end

@@ -26,6 +26,8 @@ local SIDEBAR = 124
 local CONTENT_WIDTH = WIDTH - SIDEBAR - 1
 local HEADER = Skin.HEADER_HEIGHT
 local NAV_HEIGHT = 30
+local NAV_CHIP_X = 6
+local NAV_CHIP_Y = 2
 local ROW_HEIGHT = 44
 local ALT_HEIGHT = 20
 local SECTION = 26
@@ -455,13 +457,15 @@ local NAV_ICONS = {
 local function navButton(label, icon, onClick)
   local button = CreateFrame("Button", nil, frame.sidebar)
   button:SetHeight(NAV_HEIGHT)
-  button.selected = Skin.fill(button, { GOLD[1], GOLD[2], GOLD[3], 0.07 })
-  button.bar = button:CreateTexture(nil, "ARTWORK")
-  button.bar:SetColorTexture(GOLD[1], GOLD[2], GOLD[3])
-  button.bar:SetPoint("TOPLEFT")
-  button.bar:SetPoint("BOTTOMLEFT")
-  button.bar:SetWidth(2)
-  Skin.fill(button, { 1, 1, 1, 0.03 }, "HIGHLIGHT")
+  -- The selected tab and the hovered one get a light chip, inset from
+  -- the sidebar's edges.
+  button.selected = Skin.fill(button, { 1, 1, 1, 0.08 })
+  button.selected:ClearAllPoints()
+  button.selected:SetPoint("TOPLEFT", NAV_CHIP_X, -NAV_CHIP_Y)
+  button.selected:SetPoint("BOTTOMRIGHT", -NAV_CHIP_X, NAV_CHIP_Y)
+  local hover = Skin.fill(button, { 1, 1, 1, 0.04 }, "HIGHLIGHT")
+  hover:ClearAllPoints()
+  hover:SetAllPoints(button.selected)
   button.icon = button:CreateTexture(nil, "ARTWORK")
   button.icon:SetSize(14, 14)
   button.icon:SetPoint("LEFT", 12, 0)
@@ -476,9 +480,8 @@ end
 
 local function setSelected(button, selected)
   button.selected:SetShown(selected)
-  button.bar:SetShown(selected)
   Skin.color(button.label, selected and TEXT or MUTED)
-  Skin.color(button.icon, selected and GOLD or MUTED)
+  Skin.color(button.icon, selected and TEXT or MUTED)
 end
 
 local function createNav()
