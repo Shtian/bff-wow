@@ -93,11 +93,10 @@ end
 -- Reacts to the toast's entry and shows it done; the toast stays up.
 local function onReact(self)
   local entry = self:GetParent().toast.entry
-  if entry and entry.key and not entry.reacted then
-    core:react(entry.key)
-    entry.reacted = true
-  end
-  self:SetReaction(entry.reaction, true)
+  if not (entry and entry.key) or entry.reacted then return end
+  local ok, reason = core:react(entry.key)
+  entry.reacted = ok or reason == "reacted"
+  self:SetReaction(entry.reaction, entry.reacted)
 end
 
 local function createToast()
@@ -299,7 +298,7 @@ end
 
 function Toasts.start(theCore)
   core = theCore
-  queue = ns.ToastQueue.new()
+  queue = ns.ToastQueue.new(ns.Core.reactionText)
   driver = CreateFrame("Frame")
   driver:Hide()
   driver:SetScript("OnUpdate", onUpdate)

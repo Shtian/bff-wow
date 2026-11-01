@@ -46,9 +46,7 @@ local frame
 local rows = {}
 local lines = {}
 
-local function hex(color)
-  return ("|cff%02x%02x%02x"):format(color[1] * 255, color[2] * 255, color[3] * 255)
-end
+local hex = Skin.hex
 
 local function classHex(classFilename)
   local color = classFilename and RAID_CLASS_COLORS[classFilename]
@@ -90,10 +88,11 @@ local function create()
 end
 
 -- A Reaction button's click: reacts with the key it was drawn with, and
--- shows it done.
+-- shows it done once it is.
 local function react(button)
-  if button.key and not button.done then ns.core:react(button.key) end
-  button:SetReaction(button.reaction, true)
+  if not button.key or button.done then return end
+  local ok, reason = ns.core:react(button.key)
+  button:SetReaction(button.reaction, ok or reason == "reacted")
 end
 
 -- Draws a Reaction button from a summary button ({ key, reacted }), or

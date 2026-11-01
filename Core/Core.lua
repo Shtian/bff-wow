@@ -19,6 +19,9 @@ local required = {
 
 -- For the UI's wording.
 Core.CAN_PLAY_LEVELS = ns.Roster.CAN_PLAY
+-- A merged Reaction toast's text, from the names of who reacted and the
+-- phrase in reaction news: "Bob and Cleo cheered your ding to 30".
+Core.reactionText = ns.Reactions.text
 Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
 
 -- deps: db, now(), random(), link (with send(string)), listener(event, ...),
@@ -186,10 +189,11 @@ end
 -- summary. It goes into your record and out with your next DATA, so it
 -- works in combat and offline. Ignores your own entries, Removed Members,
 -- entries that can't be reacted to, and those you already reacted to.
--- Returns whether it reacted.
+-- Returns true, or false and "reacted" when you already had.
 function Core:react(key)
-  key = self.log:react(key)
-  if not key then return false end
+  local reason
+  key, reason = self.log:react(key)
+  if not key then return false, reason end
   self.ledger:addReaction(key)
   self.gossip:ownChanged("now")
   self.listener("changed")

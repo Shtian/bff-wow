@@ -18,8 +18,10 @@ ToastQueue.MAX = 3
 ToastQueue.DURATION = 6
 ToastQueue.SOUND_GAP = 2
 
-function ToastQueue.new()
-  return setmetatable({ pending = {}, shown = {} }, ToastQueue)
+-- reactionText(names, phrase) words a merged Reaction toast
+-- (Core.reactionText).
+function ToastQueue.new(reactionText)
+  return setmetatable({ pending = {}, shown = {}, reactionText = reactionText }, ToastQueue)
 end
 
 -- The Reaction toast showing or waiting for this entry, and whether it's
@@ -35,12 +37,12 @@ end
 
 -- Adds a Member's name to a Reaction toast: "Bob and Cleo cheered your
 -- ding to 30".
-local function merge(target, news)
+local function merge(self, target, news)
   for _, name in ipairs(target.names) do
     if name == news.name then return false end
   end
   target.names[#target.names + 1] = news.name
-  target.text = ns.Reactions.text(target.names, target.phrase)
+  target.text = self.reactionText(target.names, target.phrase)
   return true
 end
 
@@ -49,7 +51,7 @@ function ToastQueue:push(entry)
   if entry.entryKey then
     local target, toast = reactionFor(self, entry.entryKey)
     if target then
-      if merge(target, entry) and toast then toast.renew = true end
+      if merge(self, target, entry) and toast then toast.renew = true end
       return
     end
     local copy = {}

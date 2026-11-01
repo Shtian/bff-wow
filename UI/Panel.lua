@@ -586,15 +586,15 @@ local function createFeedEntry()
     if data and data.key then core:react(data.key) end
   end)
   entry.react:SetPoint("TOPRIGHT", -INSET - 4, -4)
-  local function faint()
+  local function updateHoverOnly()
     local button = entry.react
-    button:SetAlpha((not button.faint or entry:IsMouseOver()) and 1 or 0)
+    button:SetAlpha((not button.hoverOnly or entry:IsMouseOver()) and 1 or 0)
   end
-  entry.react.onHover = faint
+  entry.react.onHover = updateHoverOnly
   entry:EnableMouse(true)
-  entry:SetScript("OnEnter", faint)
-  entry:SetScript("OnLeave", faint)
-  entry.faint = faint
+  entry:SetScript("OnEnter", updateHoverOnly)
+  entry:SetScript("OnLeave", updateHoverOnly)
+  entry.updateHoverOnly = updateHoverOnly
   feedView.entries[#feedView.entries + 1] = entry
   return entry
 end
@@ -615,7 +615,7 @@ local function reactorsText(entry)
   if #entry.reactors == 0 then return "" end
   local names = {}
   for i, reactor in ipairs(entry.reactors) do
-    names[i] = reactor.you and "|cffffd14aYou|r" or reactor.name
+    names[i] = reactor.you and Skin.hex(GOLD) .. "You|r" or reactor.name
   end
   return Skin.reactionGlyph(entry.reaction, 12) .. " " .. table.concat(names, ", ")
 end
@@ -626,8 +626,8 @@ local function drawFeedEntry(line, entry)
   line.react:SetShown(entry.canReact)
   if entry.canReact then
     line.react:SetReaction(entry.reaction, entry.reacted)
-    line.react.faint = #entry.reactors == 0
-    line.faint()
+    line.react.hoverOnly = #entry.reactors == 0
+    line.updateHoverOnly()
   end
   Skin.feedIcon(line.icon, line.glyph, entry.kind)
   line.text:SetText(entry.text)

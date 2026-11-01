@@ -83,13 +83,13 @@ describe("Live events with toasts", function()
 end)
 
 describe("ToastQueue", function()
-  local ToastQueue
+  local ToastQueue, reactionText
 
   before_each(function()
     local ns = {}
-    assert(loadfile("Core/Reactions.lua"))("BFF", ns)
     assert(loadfile("UI/ToastQueue.lua"))("BFF", ns)
     ToastQueue = ns.ToastQueue
+    reactionText = load().Core.reactionText
   end)
 
   local function texts(queue)
@@ -211,7 +211,7 @@ describe("ToastQueue", function()
   end
 
   it("merges a Reaction for the same entry into its toast, and gives it its full time again", function()
-    local queue = ToastQueue.new()
+    local queue = ToastQueue.new(reactionText)
     queue:push(reaction("Bob", "30"))
     queue:update(100, false)
     queue:push(reaction("Cid", "30"))
@@ -226,7 +226,7 @@ describe("ToastQueue", function()
   end)
 
   it("merges Reactions waiting to show, and keeps other entries' apart", function()
-    local queue = ToastQueue.new()
+    local queue = ToastQueue.new(reactionText)
     queue:push(reaction("Bob", "30"))
     queue:push(reaction("Bob", "31"))
     queue:push(reaction("Cid", "30"))

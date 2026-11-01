@@ -364,14 +364,16 @@ end
 
 -- Your Reaction to someone else's entry. Ignores your own entries, Removed
 -- Members, entries that can't be reacted to or aren't in the log, and
--- entries you already reacted to. Returns the key to store, or nil.
+-- entries you already reacted to. Returns the key to store, or nil and
+-- "reacted" when you already had.
 function Feed:react(key)
   key = Reactions.validKey(key)
   if not key then return nil end
   local me = self.ledger:memberId()
   if key.memberId == me or self.ledger:isRemoved(key.memberId) then return nil end
   local entry = find(self, key)
-  if not entry or entry.own or hasReacted(self, entry) then return nil end
+  if not entry or entry.own then return nil end
+  if hasReacted(self, entry) then return nil, "reacted" end
   attach(entry, me, key, self.now(), true)
   return key
 end

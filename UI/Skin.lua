@@ -127,6 +127,11 @@ Skin.fonts = {
   glyph = font("BFFFontGlyph", NARROW, 20),
 }
 
+-- A colour as a text escape: "|cffrrggbb".
+function Skin.hex(color)
+  return ("|cff%02x%02x%02x"):format(color[1] * 255, color[2] * 255, color[3] * 255)
+end
+
 function Skin.color(target, color)
   if target.SetTextColor then
     target:SetTextColor(color[1], color[2], color[3], color[4] or 1)
