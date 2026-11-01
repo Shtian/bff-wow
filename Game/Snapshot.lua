@@ -14,10 +14,12 @@ local EVENTS = {
   "PLAYER_XP_UPDATE",
   "ZONE_CHANGED_NEW_AREA",
   "PLAYER_DEAD",
+  "PLAYER_MONEY",
 }
 
 local level = 0
 local zone
+local money
 
 local function read()
   local guid = UnitGUID("player")
@@ -29,6 +31,12 @@ local function read()
   -- The zone reads empty while loading; keep the last one.
   local currentZone = GetRealZoneText()
   if currentZone and currentZone ~= "" then zone = currentZone end
+  -- Money (copper) isn't a combat API, but should it ever read secret,
+  -- keep the last one rather than compare a secret.
+  local currentMoney = GetMoney()
+  if type(currentMoney) == "number" and not (issecretvalue and issecretvalue(currentMoney)) then
+    money = currentMoney
+  end
 
   local _, classFilename = UnitClass("player")
   return {
@@ -40,6 +48,7 @@ local function read()
     maxXp = UnitXPMax("player"),
     zone = zone,
     deaths = BFF_CharacterDB.deaths,
+    money = money,
   }
 end
 

@@ -66,6 +66,7 @@ local function describeCharacter(character, main, yourLevel, now)
     maxXp = character.maxXp,
     zone = character.zone,
     deaths = character.deaths,
+    money = character.money,
     mapId = character.mapId,
     x = character.x,
     y = character.y,

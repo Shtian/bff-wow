@@ -95,7 +95,7 @@ end
 
 -- A simulated Member's account. options: random (default a
 -- generator seeded by name), db (default empty), character (the one it
--- plays: guid, name, classFilename, level, xp, maxXp, zone, deaths),
+-- plays: guid, name, classFilename, level, xp, maxXp, zone, deaths, money),
 -- location (where it stands, as Snapshot.locate reports it: mapId, x and y,
 -- or instance; default nowhere known) and utcOffset (seconds its local time
 -- is ahead of server time, default 0).

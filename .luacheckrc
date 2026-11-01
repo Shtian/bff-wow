@@ -38,6 +38,7 @@ stds.wow = {
     "GetChannelName",
     "GetInstanceInfo",
     "GetMaxLevelForPlayerExpansion",
+    "GetMoney",
     "GetRealZoneText",
     "GetServerTime",
     "GetTime",
