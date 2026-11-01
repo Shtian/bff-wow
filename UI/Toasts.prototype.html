@@ -1,0 +1,85 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throw away. Question: toasts and the selected sidebar tab use
+  a gold bar down the left edge, which doesn't look good; what should they
+  look like instead? Each row shows today's look first, then the options.
+  Colours and fonts copy UI/Skin.lua; pictures load from Wowhead's icon CDN.
+-->
+<html><head><meta charset="utf-8"><title>PROTOTYPE · Toasts and sidebar</title>
+<style>
+  :root{--gold:rgb(255,209,74);--text:rgb(232,230,227);--muted:rgb(173,171,184);--dim:rgb(140,138,153);
+    --window:rgba(14,13,20,.95);--raised:rgb(27,26,35);--border:rgba(255,255,255,.1);--line:rgba(255,255,255,.07)}
+  *{box-sizing:border-box}
+  body{margin:0;color:var(--text);font-family:"Arial Narrow","Roboto Condensed",Arial,sans-serif;font-stretch:condensed}
+  .stage{background:radial-gradient(ellipse at 30% 20%,#3c4a3a,#1b2119 60%,#0d100c);border-radius:var(--radius,8px);padding:16px 20px}
+  h2{font:600 13px var(--font-sans,Arial);margin:0 0 4px;color:#fff}
+  .note{font:12px var(--font-sans,Arial);color:#c9c9c9;margin:0 0 12px;max-width:620px}
+  .grid{display:grid;grid-template-columns:repeat(2,300px);gap:18px 40px}
+  .opt h3{font:600 12px var(--font-sans,Arial);margin:0 0 6px;color:#fff}
+  .stack{display:flex;flex-direction:column;gap:6px}
+  .pic{width:24px;height:24px;padding:1px;flex:none;position:relative}
+  .pic img{width:100%;height:100%;display:block;object-fit:cover;transform:scale(1.16)}
+  .pic>div{width:100%;height:100%;overflow:hidden}
+  .react{width:20px;height:20px;flex:none;overflow:hidden;opacity:.55;filter:grayscale(1)}
+  .react img{width:100%;height:100%;transform:scale(1.18)}
+  .more{width:24px;height:24px;flex:none;display:grid;place-items:center;color:var(--muted);font-size:16px}
+  .t{width:300px;height:40px;display:flex;align-items:center;gap:10px;padding:0 10px;background:var(--window);border:1px solid var(--border);position:relative;font-size:15px}
+  .t .tx{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gold{color:var(--gold)} .mut{color:var(--muted)}
+  /* today */
+  .cur.hl::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--gold)}
+  /* A: gold outline */
+  .A.hl{border-color:rgba(255,209,74,.45)}
+  /* B: kicker line */
+  .B{height:44px}
+  .B .tx{display:flex;flex-direction:column;line-height:15px}
+  .B .k{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim)}
+  .B.hl .k{color:var(--gold)}
+  /* C: picture flush, full height */
+  .C{padding:0 10px 0 0}
+  .C .pic{width:38px;height:38px;padding:0}
+  .C.hl{background:linear-gradient(90deg,rgba(255,209,74,.16),rgba(14,13,20,.95) 55%)}
+  /* D: timer line along the bottom */
+  .D{border:none;background:rgba(14,13,20,.88)}
+  .D::after{content:"";position:absolute;left:0;bottom:0;height:2px;width:62%;background:rgba(255,255,255,.18)}
+  .D.hl::after{background:var(--gold)}
+  /* sidebar */
+  .sb{width:123px;background:rgba(0,0,0,.25);border:1px solid var(--border);padding:6px 0;background-color:rgba(14,13,20,.95)}
+  .nb{height:26px;display:flex;align-items:center;gap:7px;padding-left:12px;font-size:14px;color:var(--muted);position:relative}
+  .nb i{width:14px;height:14px;border-radius:3px;background:var(--muted);opacity:.7;display:block}
+  .sel-cur{background:rgba(255,209,74,.07);color:var(--text)} .sel-cur i{background:var(--gold);opacity:1}
+  .sel-cur::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--gold)}
+  .sel-1{background:rgba(255,255,255,.07);color:var(--text)} .sel-1 i{background:var(--text);opacity:1}
+  .sel-2{color:var(--gold)} .sel-2 i{background:var(--gold);opacity:1}
+  .sel-3{color:var(--text)} .sel-3::after{content:"";position:absolute;inset:2px 6px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04)} .sel-3 i{background:var(--gold);opacity:1}
+  .sel-4{color:#1a1508;font-weight:600} .sel-4::after{content:"";position:absolute;inset:2px 6px;background:var(--gold);z-index:0} .sel-4 i,.sel-4 span{position:relative;z-index:1} .sel-4 i{background:#1a1508;opacity:1}
+  .sbs{display:flex;gap:16px;flex-wrap:wrap}
+  .sbs .opt h3{width:123px}
+</style></head><body>
+<div class="stage">
+<h2>Toasts</h2>
+<p class="note">Each style shows four toasts: a ding you can react to, a max-level highlight (where the gold bar was), a Reaction to you, and the "+N more" toast.</p>
+<div class="grid" id="toasts"></div>
+<h2 style="margin-top:22px">Selected sidebar tab</h2>
+<p class="note">"Feed" is the selected tab.</p>
+<div class="sbs" id="sidebars"></div>
+</div>
+<script>
+const ICON=n=>`https://wow.zamimg.com/images/wow/icons/large/${n}.jpg`;
+const pic=(n,c)=>`<div class="pic" style="background:rgba(${c},.55)"><div><img src="${ICON(n)}"></div></div>`;
+const react=`<div class="react"><img src="${ICON('inv_misc_missilesmall_red')}"></div>`;
+const toasts=[
+ {p:pic('spell_chargepositive','112,227,112'),t:'Ana dinged 24',k:'Ding',r:true},
+ {p:pic('achievement_level_80','255,209,74'),t:'Simbad reached max level!',k:'Max level',hl:true,r:true},
+ {p:pic('inv_misc_missilesmall_red','255,209,74'),t:'Ana cheered your ding',k:'Reaction'},
+ {p:'<div class="more">💬</div>',t:'+3 more in the Feed',k:'',more:true},
+];
+const styles=[['cur','Today: gold bar on the left'],['A','A · Gold outline instead of a bar'],['B','B · A small label above the text, gold when it matters'],['C','C · Picture fills the left edge, gold wash behind'],['D','D · No border; a timer line along the bottom, gold when it matters']];
+document.getElementById('toasts').innerHTML=styles.map(([cls,name])=>`<div class="opt"><h3>${name}</h3><div class="stack">${toasts.map(x=>{
+  const text=cls==='B'&&x.k?`<span class="k">${x.k}</span><span class="${x.hl?'gold':x.more?'mut':''}">${x.t}</span>`:`<span class="${x.hl?'gold':x.more?'mut':''}">${x.t}</span>`;
+  return `<div class="t ${cls} ${x.hl?'hl':''}">${x.p}<div class="tx">${text}</div>${x.r?react:''}</div>`}).join('')}</div></div>`).join('');
+const tabs=['Roster','Feed','Goals','When','Spares'];
+const sbs=[['cur','Today: bar + tint'],['1','1 · Grey tint, no bar'],['2','2 · Gold text only'],['3','3 · Outlined chip'],['4','4 · Solid gold chip']];
+document.getElementById('sidebars').innerHTML=sbs.map(([k,name])=>`<div class="opt"><h3>${name}</h3><div class="sb">${tabs.map(t=>`<div class="nb ${t==='Feed'?'sel-'+k:''}"><i></i><span>${t}</span></div>`).join('')}</div></div>`).join('');
+</script>
+</body></html>
