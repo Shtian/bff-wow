@@ -45,12 +45,14 @@ Outputs:
 - Listener events:
   - `changed`: re-read whatever you show (`rows()`, `feed()`, settings such as Pause sharing and Show minimap button). Also fires when a Member passes the 12-minute online timeout, even though no record changed.
   - `feedEntry(entry)`: a live Feed event, fired only when the chat-line or toast setting is on. App prints `entry.text` and shows a toast, each if its setting is on.
+  - `reaction(news)`: a live Reaction to one of your entries, fired and shown the same way as `feedEntry`. Toasts for the same entry merge (see `docs/design/reactions.md`).
   - `awaySummary(summary)`: While you were away has settled after an initial login. Fired only when the popup setting is on and it isn't empty. App shows it once out of combat.
   - `notice(kind)`: one-off messages ("BFF is out of date", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
 - Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isPaused()`, `isMinimapShown()`, `isChatLinesOn()`, `isAwayPopupOn()`, `isToastsOn()`, `toastSound()` and `toastPosition()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
 - Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
 - `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` or `awaySummary`.
+- `react(key)` reacts to someone else's Feed entry, with a key from `feed()` or the summary.
 
 ### Inside Core
 
@@ -59,6 +61,7 @@ These are internal seams: separate files for locality, tested only through Core'
 - **Ledger** (`Core/Ledger.lua`): what we know. Holds the own record and copies of everyone else's, the merge rule (a higher version wins), the Remove list, the "left" flag, last-heard times, and 180-day pruning. Removing a Member deletes their record and drops future copies. Re-adding takes them off the list and sends a DIGEST, and peers reply with DATA.
 - **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, XP piggyback, 5-minute heartbeat), the "record changed" and "reply owed" flags, and Pause.
 - **Feed** (`Core/Feed.lua`): turns a before/after record pair from Ledger into Feed entries, including skipped versions such as 22 → 24. Also owns the capped log, seen flags, and when While you were away is ready. See `docs/design/feed.md`.
+- **Reactions** (`Core/Reactions.lua`): the pure parts of Reactions: which Reaction each entry kind has, the key a Reaction points at an entry by, how keys are stored in a record and pruned, and the wording the owner sees. Feed attaches Reactions to its entries. See `docs/design/reactions.md`.
 - **Roster** (`Core/Roster.lua`): builds panel rows from Ledger. Covers Main resolution, "on alt", online (heard within 12 min, and not seen leaving the channel since), Last seen, "can play with you" (±3 levels), the 30-day hide and sorting.
 - **CrewCode** (`Core/CrewCode.lua`): generates, normalises and checks Crew codes, and derives the channel name and password from them.
 - **Codec** (`Core/Codec.lua`): a plain-text protocol version header, then the LibSerialize + LibDeflate body (`1|<payload>`). A newer version is detected before anything is decoded.
@@ -122,7 +125,7 @@ Not embedded: AceDB (Core owns plain SavedVariables), AceConsole and AceEvent (a
 BFF.toc
 BFF.lua
 Bindings.xml                         -- key binding to open the panel
-Core/  Core.lua  Ledger.lua  Gossip.lua  Feed.lua  Roster.lua  CrewCode.lua  Codec.lua
+Core/  Core.lua  Ledger.lua  Gossip.lua  Reactions.lua  Feed.lua  Roster.lua  CrewCode.lua  Codec.lua
 Game/  Snapshot.lua  ChannelLink.lua
 UI/    Skin.lua  Panel.lua  Minimap.lua  Away.lua  ToastQueue.lua  Toasts.lua  Settings.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases

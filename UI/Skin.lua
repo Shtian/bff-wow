@@ -53,6 +53,60 @@ function Skin.feedIcon(icon, glyphLabel, kind)
   end
 end
 
+-- Each Reaction's icon and name, on the Feed tab, While you were away and
+-- toasts. Long-standing spell and achievement icons.
+Skin.REACTION_ICONS = {
+  cheer = "Interface\\Icons\\Ability_Warrior_BattleShout",
+  respects = "Interface\\Icons\\Spell_Holy_Resurrection",
+  welcome = "Interface\\Icons\\Achievement_Reputation_01",
+}
+Skin.REACTION_NAMES = { cheer = "Cheer", respects = "Pay respects", welcome = "Welcome" }
+
+-- A Reaction's icon inline in text: "|T...|t".
+function Skin.reactionGlyph(reaction, size)
+  local icon = Skin.REACTION_ICONS[reaction]
+  if not icon then return "" end
+  return ("|T%s:%d:%d:0:0:64:64:5:59:5:59|t"):format(icon, size, size)
+end
+
+local function reactionHover(button, over)
+  if not button.done then button.icon:SetAlpha(over and 1 or button.restAlpha) end
+  if over and button.reaction then
+    GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+    GameTooltip:SetText(button.done and "You reacted" or Skin.REACTION_NAMES[button.reaction])
+    GameTooltip:Show()
+  elseif not over then
+    GameTooltip:Hide()
+  end
+  if button.onHover then button.onHover(over) end
+end
+
+-- A small square button with a Reaction's icon. :SetReaction(reaction,
+-- done) shows it dim and clickable, or bright with a gold edge once given.
+function Skin.reactionButton(parent, size, onClick)
+  local button = CreateFrame("Button", nil, parent)
+  button:SetSize(size, size)
+  button.icon = button:CreateTexture(nil, "ARTWORK")
+  button.icon:SetAllPoints()
+  button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  button.edges = {}
+  for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+    button.edges[#button.edges + 1] = Skin.edge(button, side, Skin.GOLD, "OVERLAY")
+  end
+  button.restAlpha = 0.55
+  button:SetScript("OnClick", onClick)
+  button:SetScript("OnEnter", function(self) reactionHover(self, true) end)
+  button:SetScript("OnLeave", function(self) reactionHover(self, false) end)
+  function button:SetReaction(reaction, done)
+    self.reaction, self.done = reaction, done == true
+    self.icon:SetTexture(Skin.REACTION_ICONS[reaction])
+    self.icon:SetDesaturated(not self.done)
+    self.icon:SetAlpha(self.done and 1 or self.restAlpha)
+    for _, edge in ipairs(self.edges) do edge:SetShown(self.done) end
+  end
+  return button
+end
+
 local NARROW = "Fonts\\ARIALN.TTF"
 local FRIZ = "Fonts\\FRIZQT__.TTF"
 local CIRCLE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
@@ -72,6 +126,11 @@ Skin.fonts = {
   tiny = font("BFFFontTiny", NARROW, 10),
   glyph = font("BFFFontGlyph", NARROW, 20),
 }
+
+-- A colour as a text escape: "|cffrrggbb".
+function Skin.hex(color)
+  return ("|cff%02x%02x%02x"):format(color[1] * 255, color[2] * 255, color[3] * 255)
+end
 
 function Skin.color(target, color)
   if target.SetTextColor then

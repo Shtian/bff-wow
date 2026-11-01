@@ -1,9 +1,11 @@
--- Toasts: live Feed entries as small notices on screen, from the toasts
--- decision. ToastQueue decides what shows; this draws it in the Skin's
--- look, plays the chosen sound, and has the move mode Settings opens.
--- Toasts stack away from where they're placed: down from the top half of
--- the screen, up from the bottom half. A left click opens the Feed, a
--- right click dismisses. See docs/design/toasts.md.
+-- Toasts: live Feed entries and Reactions to yours as small notices on
+-- screen, from the toasts decision. ToastQueue decides what shows; this
+-- draws it in the Skin's look, plays the chosen sound, and has the move
+-- mode Settings opens. Toasts stack away from where they're placed: down
+-- from the top half of the screen, up from the bottom half. A left click
+-- opens the Feed, a right click dismisses, and an entry you can react to
+-- has a Reaction button at its right edge. See docs/design/toasts.md and
+-- docs/design/reactions.md.
 
 local _, ns = ...
 
@@ -16,6 +18,7 @@ local WIDTH = 300
 local HEIGHT = 40
 local GAP = 6
 local ICON = 18
+local REACT = 20
 -- Seconds a toast takes to fade out at the end of its time.
 local FADE = 0.6
 -- Where toasts start, down from the top centre, until moved.
@@ -87,6 +90,15 @@ local function onClick(self, button)
   Toasts.draw()
 end
 
+-- Reacts to the toast's entry and shows it done; the toast stays up.
+local function onReact(self)
+  local entry = self:GetParent().toast.entry
+  if not (entry and entry.key) or entry.reacted then return end
+  local ok, reason = core:react(entry.key)
+  entry.reacted = ok or reason == "reacted"
+  self:SetReaction(entry.reaction, entry.reacted)
+end
+
 local function createToast()
   local toast = CreateFrame("Button", nil, UIParent)
   toast:SetSize(WIDTH, HEIGHT)
@@ -108,8 +120,9 @@ local function createToast()
   toast.glyph:SetPoint("CENTER", toast.icon, "CENTER", 0, 0)
   toast.text = Skin.label(toast, "body")
   toast.text:SetPoint("LEFT", toast.icon, "RIGHT", 10, 0)
-  toast.text:SetPoint("RIGHT", -10, 0)
   toast.text:SetWordWrap(false)
+  toast.react = Skin.reactionButton(toast, REACT, onReact)
+  toast.react:SetPoint("RIGHT", -10, 0)
 
   toast:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   toast:SetScript("OnClick", onClick)
@@ -117,18 +130,39 @@ local function createToast()
   return toast
 end
 
+-- A Reaction toast (news from Core's reaction event, which has an
+-- entryKey) shows the Reaction's icon and has no button.
+local function drawIcon(frame, entry)
+  if not entry.entryKey then
+    frame.icon:SetTexCoord(0, 1, 0, 1)
+    Skin.feedIcon(frame.icon, frame.glyph, entry.kind)
+    return
+  end
+  frame.glyph:SetText("")
+  frame.icon:SetShown(true)
+  frame.icon:SetTexture(Skin.REACTION_ICONS[entry.reaction])
+  frame.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  frame.icon:SetDesaturated(false)
+  frame.icon:SetVertexColor(1, 1, 1)
+end
+
 local function drawToast(frame, toast)
   local entry = toast.entry
   local highlight = entry and Skin.FEED_HIGHLIGHT[entry.kind] == true
   frame.accent:SetShown(highlight)
+  local canReact = entry ~= nil and not entry.entryKey and entry.canReact == true
+  frame.react:SetShown(canReact)
+  if canReact then frame.react:SetReaction(entry.reaction, entry.reacted) end
+  frame.text:SetPoint("RIGHT", canReact and -(REACT + 16) or -10, 0)
   if entry then
-    Skin.feedIcon(frame.icon, frame.glyph, entry.kind)
+    drawIcon(frame, entry)
     frame.text:SetText(entry.text)
     Skin.color(frame.text, highlight and Skin.GOLD or Skin.TEXT)
   else
     frame.glyph:SetText("")
     frame.icon:SetShown(true)
     frame.icon:SetTexture(MORE_ICON)
+    frame.icon:SetTexCoord(0, 1, 0, 1)
     frame.icon:SetDesaturated(true)
     Skin.color(frame.icon, Skin.FEED_ICON_COLOR)
     frame.text:SetText(("+%d more in the Feed"):format(toast.more))
@@ -188,7 +222,8 @@ local function onUpdate()
   if queue:isIdle() then driver:Hide() end
 end
 
--- Shows a live Feed entry (from Core's feedEntry) as a toast.
+-- Shows a live Feed entry (from Core's feedEntry) or Reaction (from its
+-- reaction event) as a toast.
 function Toasts.show(entry)
   queue:push(entry)
   driver:Show()
@@ -263,7 +298,7 @@ end
 
 function Toasts.start(theCore)
   core = theCore
-  queue = ns.ToastQueue.new()
+  queue = ns.ToastQueue.new(ns.Core.reactionText)
   driver = CreateFrame("Frame")
   driver:Hide()
   driver:SetScript("OnUpdate", onUpdate)

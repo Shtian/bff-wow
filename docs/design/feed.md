@@ -38,6 +38,8 @@ The one exception is a Member who joined after you. The Member record gets one n
 
 New Characters on a Member you already know always make a "new Character" entry.
 
+Joining a Crew yourself makes one own "You joined the Crew" entry, which Welcomes attach to (`docs/design/reactions.md`).
+
 ### Your own events
 
 Your own Characters' events go into the log too, so the Feed tab reads as the Crew's whole history ("You dinged 24", "Your Alt Jaina dinged 12"). They are marked as seen when they are made, so they never appear in While you were away or as a chat line.

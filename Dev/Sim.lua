@@ -3,8 +3,9 @@
 -- records are kept and relayed like real ones, so it only runs in a Crew
 -- where no one else is known yet: start a test Crew for it. Also the dev
 -- console (/bffdev, opened by /bff sim too): buttons that make each
--- simulated Member ding, die, move or log out, one that plays out a stretch
--- of you being away so While you were away shows, and a live log of what
+-- simulated Member ding, die, move, react to your newest entry or log out,
+-- one that plays out a stretch of you being away so While you were away
+-- shows (with Reactions to your entries), and a live log of what
 -- your Core sends, receives and fires. /bffdev toast [n] shows sample
 -- toasts. Left out of releases; it lives here, not in a file of its own,
 -- so the .toc (a shipped file) stays as it is.
@@ -47,6 +48,8 @@ local ZONES = {
 local net
 local ticker
 local members
+-- Your Member id, whose entries the React button reacts to.
+local yourId
 
 -- The GUID of member i's Character j.
 local function guidFor(i, j)
@@ -92,6 +95,7 @@ function Sim.start(core)
   local yourLevel = own and own.level or 10
   net = ns.FakeNet.new({ clock = now, maxLevel = GetMaxLevelForPlayerExpansion() })
   local you = net:attach(core)
+  yourId = core.ledger:memberId()
   ns.ChannelLink.onSend = function(message) net:broadcast(you, message) end
   members = {}
   local current = members
@@ -145,6 +149,18 @@ local function otherZone(current)
   return zone
 end
 
+-- Reacts to your newest Feed entry the client can still react to.
+local function reactToYou(client, you)
+  for _, day in ipairs(client.core:feed().days) do
+    for _, entry in ipairs(day.entries) do
+      if entry.memberId == you and entry.canReact and not entry.reacted then
+        return client.core:react(entry.key)
+      end
+    end
+  end
+  return false
+end
+
 -- What each console button does to a simulated Member's client.
 local ACTIONS = {
   ding = function(client) client:play({ level = client.character.level + 1, xp = 0 }) end,
@@ -161,6 +177,7 @@ local ACTIONS = {
     client.character = client.characters[client.current]
     client:play()
   end,
+  react = function(client) reactToYou(client, yourId) end,
   online = function(client)
     if client.core then client:logout() else client:login() end
   end,
@@ -241,6 +258,7 @@ function Sim.away(core)
     local wasOffline = not client.core
     if wasOffline then client:login() end
     AWAY[i](client, i)
+    reactToYou(client, core.ledger:memberId())
     if wasOffline then
       C_Timer.After(AWAY_LOGOUT_AFTER, function()
         if members == current and client.core then client:logout() end
@@ -287,7 +305,7 @@ local DIM = "8c8a99"
 -- The console buttons on each simulated Member's row, left to right.
 local BUTTONS = {
   { "ding", "Ding" }, { "xp", "XP" }, { "die", "Die" }, { "zone", "Zone" },
-  { "alt", "Alt" }, { "max", "Max" }, { "online", "Log out" },
+  { "alt", "Alt" }, { "max", "Max" }, { "react", "React" }, { "online", "Log out" },
 }
 
 local frame
@@ -348,6 +366,8 @@ local function onEvent(event, arg)
     if showChanged then log(color(DIM, "changed")) end
   elseif event == "feedEntry" then
     log(color(EVENT, "feed  ") .. arg.text)
+  elseif event == "reaction" then
+    log(color(EVENT, "reaction  ") .. arg.text)
   elseif event == "awaySummary" then
     log(color(EVENT, "away summary  ") .. tostring(arg.count) .. " entries from " .. #arg.members .. " Members")
   else

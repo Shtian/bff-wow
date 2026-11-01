@@ -59,6 +59,7 @@ The record is only how a Reaction travels. Every client attaches the Reactions i
 - When an entry is made, Feed attaches the matching Reactions already in held records, so it doesn't matter which record arrives first.
 - Each entry keeps who reacted and when. On your own entries each Reaction also has a **seen** flag.
 - A Reaction whose entry isn't in the log (pruned, wiped, or never made) is ignored. Reactions go when their entry is pruned or Removed.
+- Joining a Crew makes your own "You joined the Crew" entry, seen like your other own entries, so Welcomes have an entry to attach to. Starting a Crew makes none, since nobody sees its starter join.
 
 ### Silent baseline
 

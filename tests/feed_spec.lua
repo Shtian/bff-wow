@@ -37,9 +37,13 @@ local function entries(client)
   return all
 end
 
+-- The texts of the client's entries, leaving out the "You joined the Crew"
+-- every joining client has.
 local function texts(client)
   local result = {}
-  for _, entry in ipairs(entries(client)) do result[#result + 1] = entry.text end
+  for _, entry in ipairs(entries(client)) do
+    if not (entry.own and entry.kind == "joined") then result[#result + 1] = entry.text end
+  end
   return result
 end
 
@@ -150,6 +154,9 @@ describe("The Feed", function()
     d:join(code)
     net:run(40)
     assert.same({}, texts(d))
+    local own = entries(d)[1]
+    assert.equal("You joined the Crew", own.text)
+    assert.is_true(own.own and own.seen)
     assert.same({ "Dee joined the Crew" }, texts(a))
     assert.same({ "Dee joined the Crew" }, texts(b))
     assert.same({ "Dee joined the Crew" }, chatLines(a))

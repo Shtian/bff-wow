@@ -83,12 +83,13 @@ describe("Live events with toasts", function()
 end)
 
 describe("ToastQueue", function()
-  local ToastQueue
+  local ToastQueue, reactionText
 
   before_each(function()
     local ns = {}
     assert(loadfile("UI/ToastQueue.lua"))("BFF", ns)
     ToastQueue = ns.ToastQueue
+    reactionText = load().Core.reactionText
   end)
 
   local function texts(queue)
@@ -202,5 +203,35 @@ describe("ToastQueue", function()
     queue:update(101, false)
     assert.same({}, texts(queue))
     assert.is_true(queue:isIdle())
+  end)
+
+  local function reaction(name, key)
+    local phrase = "cheered your ding to " .. key
+    return { reaction = "cheer", name = name, phrase = phrase, entryKey = key, text = name .. " " .. phrase }
+  end
+
+  it("merges a Reaction for the same entry into its toast, and gives it its full time again", function()
+    local queue = ToastQueue.new(reactionText)
+    queue:push(reaction("Bob", "30"))
+    queue:update(100, false)
+    queue:push(reaction("Cid", "30"))
+    queue:push(entry("Ann dinged 12"))
+    local changed = queue:update(104, false)
+    assert.is_true(changed)
+    assert.same({ "Bob and Cid cheered your ding to 30", "Ann dinged 12" }, texts(queue))
+    queue:update(109, false)
+    assert.same({ "Bob and Cid cheered your ding to 30", "Ann dinged 12" }, texts(queue))
+    queue:update(110, false)
+    assert.same({}, texts(queue))
+  end)
+
+  it("merges Reactions waiting to show, and keeps other entries' apart", function()
+    local queue = ToastQueue.new(reactionText)
+    queue:push(reaction("Bob", "30"))
+    queue:push(reaction("Bob", "31"))
+    queue:push(reaction("Cid", "30"))
+    queue:push(reaction("Cid", "30"))
+    queue:update(100, false)
+    assert.same({ "Bob and Cid cheered your ding to 30", "Bob cheered your ding to 31" }, texts(queue))
   end)
 end)

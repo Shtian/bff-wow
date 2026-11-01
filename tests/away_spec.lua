@@ -43,10 +43,31 @@ local function chatLines(client)
   return lines
 end
 
+local function events(client, name)
+  local list = {}
+  for _, event in ipairs(client.events) do
+    if event[1] == name then list[#list + 1] = event[2] end
+  end
+  return list
+end
+
 -- The first Character's level range in a summary's first Member.
 local function levels(summary)
   local character = summary.members[1].characters[1]
   return { from = character.from, level = character.level }
+end
+
+-- A Member's Character rows without their Reaction buttons.
+local function rows(member)
+  local list = {}
+  for i, character in ipairs(member.characters) do
+    local row = {}
+    for k, v in pairs(character) do
+      if k ~= "cheer" and k ~= "respects" then row[k] = v end
+    end
+    list[i] = row
+  end
+  return list
 end
 
 -- Logs the client back in with a clean event list.
@@ -83,7 +104,7 @@ describe("While you were away", function()
     assert.equal("WARRIOR", ann.classFilename)
     assert.same({
       { name = "Ann", main = true, from = 22, level = 24, deaths = 2 },
-    }, ann.characters)
+    }, rows(ann))
     assert.same({}, ann.highlights)
     assert.same({}, chatLines(c))
     assert.equal(0, c.core:feed().unseen)
@@ -233,11 +254,11 @@ describe("While you were away", function()
     assert.same({ "Eve", "Bob", "Cid", "Ann" }, names)
     assert.same({ { kind = "joined", text = "Eve joined the Crew" } }, members[1].highlights)
     assert.same({}, members[1].characters)
-    assert.same({ { name = "Bob", main = true, deaths = 1 } }, members[2].characters)
+    assert.same({ { name = "Bob", main = true, deaths = 1 } }, rows(members[2]))
     assert.same({ { kind = "left", text = "Cid left the Crew" } }, members[3].highlights)
     assert.same({
       { name = "Ann", main = true, from = 58, level = 60, maxLevel = true },
-    }, members[4].characters)
+    }, rows(members[4]))
     assert.same({ { kind = "maxLevel", text = "Ann reached max level!" } }, members[4].highlights)
     assert.equal(4, summaries(d)[1].count)
   end)
@@ -271,6 +292,40 @@ describe("While you were away", function()
       { name = "Ann", main = true, from = 18, level = 20 },
       { name = "Jaina", from = 10, level = 12, deaths = 1 },
       { name = "Rexxar", new = true, level = 7 },
-    }, ann.characters)
+    }, rows(ann))
+  end)
+
+  it("gives each row a Cheer and Respects, and a joined Member a Welcome", function()
+    local net, clients, code = crew({ "Ann", "Bob", "Cid" }, { Ann = 22 })
+    local a, c = clients[1], clients[3]
+    c:logout()
+    net:run(5)
+    a:play({ level = 23 })
+    net:run(3)
+    a:play({ level = 24, deaths = 1 })
+    net:run(3)
+    a:play({ deaths = 3 })
+    net:run(3)
+    local eve = net:add("Eve"):login()
+    eve:join(code)
+    net:run(40)
+
+    relog(net, c)
+    local members = summaries(c)[1].members
+    assert.equal("Eve", members[1].displayName)
+    local welcome = members[1].welcome
+    assert.same({ memberId = eve.memberId, kind = "joined", n = eve.core.ledger:own().joinedAt }, welcome.key)
+    assert.is_false(welcome.reacted)
+
+    local ann = members[2].characters[1]
+    assert.same({ memberId = a.memberId, guid = a.character.guid, kind = "ding", n = 24 }, ann.cheer.key)
+    assert.same({ memberId = a.memberId, guid = a.character.guid, kind = "death", n = 3 }, ann.respects.key)
+    assert.is_true(c.core:react(ann.cheer.key))
+    assert.is_true(c.core:react(ann.respects.key))
+    assert.is_true(c.core:react(welcome.key))
+    net:run(5)
+    assert.equal(2, #events(a, "reaction"))
+    assert.equal(1, #events(eve, "reaction"))
+    assert.equal("Cid welcomed you", events(eve, "reaction")[1].text)
   end)
 end)

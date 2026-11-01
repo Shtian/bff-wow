@@ -19,6 +19,9 @@ local required = {
 
 -- For the UI's wording.
 Core.CAN_PLAY_LEVELS = ns.Roster.CAN_PLAY
+-- A merged Reaction toast's text, from the names of who reacted and the
+-- phrase in reaction news: "Bob and Cleo cheered your ding to 30".
+Core.reactionText = ns.Reactions.text
 Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
 
 -- deps: db, now(), random(), link (with send(string)), listener(event, ...),
@@ -65,13 +68,18 @@ local function updateLink(self)
   self.gossip:setLink(up)
 end
 
--- New Feed entries from other Members each make a chat line, a toast or
--- both once settled, if either is on, and are seen once they have.
-local function announce(self, entries)
+-- New Feed entries from other Members, and new Reactions to your own, each
+-- make a chat line, a toast or both once settled, if either is on, and are
+-- seen once they have.
+local function announce(self, entries, reactions)
   if not (self.log:isSettled() and (self:isChatLinesOn() or self:isToastsOn())) then return end
   for _, entry in ipairs(entries) do
     self.log:markSeen(entry)
-    self.listener("feedEntry", ns.Feed.describe(entry))
+    self.listener("feedEntry", self.log:describe(entry))
+  end
+  for _, item in ipairs(reactions or {}) do
+    self.log:markSeen(item.reaction)
+    self.listener("reaction", self.log:news(item))
   end
 end
 
@@ -135,11 +143,14 @@ end
 
 -- Sync has settled after an initial login: While you were away goes out
 -- if the popup is on and there's anything unseen, which is then seen. The
--- summary is { members, count }: a Member has memberId, displayName, main
--- and classFilename (their Main), time (latest activity), characters (a
--- row per Character with events, the Main's first: name, main, from,
--- level, deaths, new, maxLevel, each nil when it doesn't apply)
--- and highlights ({ kind, text } for max level, joined and left).
+-- summary is { members, count, noticed }: a Member has memberId,
+-- displayName, main and classFilename (their Main), time (latest
+-- activity), characters (a row per Character with events, the Main's
+-- first: name, main, from, level, deaths, new, maxLevel, and the cheer and
+-- respects buttons, each nil when it doesn't apply), highlights ({ kind,
+-- text } for max level, joined and left) and welcome. A button is { key,
+-- reacted }, the key for react(). noticed is Your Crew noticed, newest
+-- first: { text, reaction, time } per own entry with unseen Reactions.
 local function awaySummary(self)
   if not self:isAwayPopupOn() then return end
   local summary = self.log:takeSummary()
@@ -156,20 +167,40 @@ function Core:tick()
 end
 
 -- The Feed tab: { days = { { daysAgo, time, entries } }, unseen }, newest
--- first, where unseen counts others' entries not yet shown. An entry has
--- kind ("ding", "death", "newCharacter", "maxLevel", "joined" or "left"),
--- time, memberId, guid (for Character events), text, from (the level
--- before a ding or max level), level, count (deaths), own and seen.
+-- first, where unseen counts others' entries and Reactions to your own not
+-- yet shown. An entry has kind ("ding", "death", "newCharacter",
+-- "maxLevel", "joined" or "left"), time, memberId, guid (for Character
+-- events), text, from (the level before a ding or max level), level, count
+-- (deaths), own and seen (false while it has unseen Reactions). And for
+-- Reactions: reaction ("cheer", "respects" or "welcome", nil for left),
+-- key (for react()), reactors ({ memberId, name, you }, in the order they
+-- reacted), reacted (you have) and canReact (not yours, and it has a key).
 function Core:feed()
   return self.log:view(self.utcOffset)
 end
 
--- How many of others' Feed entries haven't been shown yet.
+-- How many of others' Feed entries, and Reactions to your own, haven't
+-- been shown yet.
 function Core:unseen()
   return self.log:unseen()
 end
 
--- The Feed tab was opened: every entry is seen.
+-- Reacts to someone else's Feed entry, with a key from feed() or the
+-- summary. It goes into your record and out with your next DATA, so it
+-- works in combat and offline. Ignores your own entries, Removed Members,
+-- entries that can't be reacted to, and those you already reacted to.
+-- Returns true, or false and "reacted" when you already had.
+function Core:react(key)
+  local reason
+  key, reason = self.log:react(key)
+  if not key then return false, reason end
+  self.ledger:addReaction(key)
+  self.gossip:ownChanged("now")
+  self.listener("changed")
+  return true
+end
+
+-- The Feed tab was opened: every entry and Reaction is seen.
 function Core:feedSeen()
   if self.log:markAllSeen() then self.listener("changed") end
 end
@@ -280,10 +311,12 @@ local function nameOrCurrent(self, displayName)
   return validName(displayName)
 end
 
-local function enter(self, code, displayName)
+-- Joining (not starting) makes your own joined entry, for Welcomes.
+local function enter(self, code, displayName, joining)
   self.ledger:writeOwn({ displayName = displayName, left = false, joinedAt = self.now() })
   sendOwnNow(self)
   self.db.crew = { code = code }
+  if joining then self.log:ownJoined() end
   self.listener("crewChanged")
   updateLink(self)
   return self:crew()
@@ -308,7 +341,7 @@ function Core:joinCrew(code, displayName)
   if current and current.code ~= code then return nil, "inCrew" end
   local name = nameOrCurrent(self, displayName)
   if not name then return nil, "invalidName" end
-  if not current then return enter(self, code, name) end
+  if not current then return enter(self, code, name, true) end
 
   if current.leaving then
     current.leaving = nil
@@ -423,6 +456,7 @@ local function finishLeaving(self)
   updateLink(self)
   self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } })
   self.ledger:forgetOthers()
+  self.ledger:clearReactions()
   self.log:clear()
   self.online = {}
   self.listener("crewChanged")

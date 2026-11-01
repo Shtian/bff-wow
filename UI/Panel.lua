@@ -4,8 +4,9 @@
 -- then a row per Member with expandable Alts, a sort menu, a tooltip and
 -- right-click menu per Character, and a footer with the hidden count,
 -- removed Members and the Crew code. The Feed is a timeline
--- of Core's entries by day, an icon per kind, and marks them seen while
--- open. It never sees a Member record.
+-- of Core's entries by day, an icon per kind, who reacted to each and a
+-- button to react, and marks them seen while open. It never sees a Member
+-- record.
 
 local _, ns = ...
 
@@ -27,6 +28,7 @@ local INSET = 12
 -- the Roster and the Feed scroll inside it.
 local HEIGHT = 380
 local FEED_ENTRY = 38
+local REACT = 20
 local FEED_DAY = 26
 -- The timeline's line runs through the middle of the entry icons.
 local NODE = 26
@@ -573,6 +575,26 @@ local function createFeedEntry()
   entry.new:SetText("NEW")
   entry.time = Skin.label(entry, "small", MUTED)
   entry.time:SetPoint("TOPLEFT", entry.text, "BOTTOMLEFT", 0, -2)
+  entry.reactors = Skin.label(entry, "small", MUTED)
+  entry.reactors:SetPoint("LEFT", entry.time, "RIGHT", 8, 0)
+  entry.reactors:SetPoint("RIGHT", -INSET - 36, 0)
+  entry.reactors:SetWordWrap(false)
+
+  -- The Reaction button. With no Reactions yet it only shows on hover.
+  entry.react = Skin.reactionButton(entry, REACT, function(self)
+    local data = self:GetParent().data
+    if data and data.key then core:react(data.key) end
+  end)
+  entry.react:SetPoint("TOPRIGHT", -INSET - 4, -4)
+  local function updateHoverOnly()
+    local button = entry.react
+    button:SetAlpha((not button.hoverOnly or entry:IsMouseOver()) and 1 or 0)
+  end
+  entry.react.onHover = updateHoverOnly
+  entry:EnableMouse(true)
+  entry:SetScript("OnEnter", updateHoverOnly)
+  entry:SetScript("OnLeave", updateHoverOnly)
+  entry.updateHoverOnly = updateHoverOnly
   feedView.entries[#feedView.entries + 1] = entry
   return entry
 end
@@ -587,7 +609,26 @@ local function entryKey(entry)
   return ("%d:%s:%s:%s"):format(entry.time, entry.memberId or "", entry.kind, entry.guid or "")
 end
 
+-- Who reacted, after the time: the Reaction's icon and their names, You
+-- in gold.
+local function reactorsText(entry)
+  if #entry.reactors == 0 then return "" end
+  local names = {}
+  for i, reactor in ipairs(entry.reactors) do
+    names[i] = reactor.you and Skin.hex(GOLD) .. "You|r" or reactor.name
+  end
+  return Skin.reactionGlyph(entry.reaction, 12) .. " " .. table.concat(names, ", ")
+end
+
 local function drawFeedEntry(line, entry)
+  line.data = entry
+  line.reactors:SetText(reactorsText(entry))
+  line.react:SetShown(entry.canReact)
+  if entry.canReact then
+    line.react:SetReaction(entry.reaction, entry.reacted)
+    line.react.hoverOnly = #entry.reactors == 0
+    line.updateHoverOnly()
+  end
   Skin.feedIcon(line.icon, line.glyph, entry.kind)
   line.text:SetText(entry.text)
   Skin.color(line.text, HIGHLIGHT[entry.kind] and GOLD or entry.own and MUTED or TEXT)
