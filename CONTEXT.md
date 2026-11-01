@@ -67,20 +67,6 @@ _Avoid_: Schedule, availability, activity
 When a Member or Character was last played, as reported by that Member's own client rather than observed by others.
 _Avoid_: Last online, last active
 
-### Passing things on
-
-**Hand-me-down**:
-An item a Member offers to the rest of the Crew for free, kept in their own record until they Give it, withdraw it, or 30 days pass. Delivery is the game's own mail.
-_Avoid_: Offer, listing, gift (when meaning the item on offer)
-
-**Claim**:
-A Member's request for another Member's Hand-me-down, naming which of their Characters should receive it. The earliest Claim wins until the owner Gives it.
-_Avoid_: Bid, reservation, dibs
-
-**Give**:
-The owner's final word on a Hand-me-down: it records which Member and Character it went to, and every client shows that recipient from then on, whatever Claims they hold.
-_Avoid_: Award, assign, send (when meaning the record rather than the mail)
-
 ### Together and against each other
 
 **Crew goal**:
