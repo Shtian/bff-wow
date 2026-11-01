@@ -11,7 +11,7 @@ local Minimap = {}
 ns.Minimap = Minimap
 
 local NAME = "BFF"
-local ICON = "Interface\\Icons\\INV_Misc_GroupNeedMore"
+local ICON = "Interface\\AddOns\\BFF\\Media\\BFF"
 
 local core
 local icons

@@ -1,6 +1,7 @@
 ## Interface: 16001, 120105
 ## Title: BFF
 ## Notes: Best Friends in Forever: keep up with your friends' characters, even when you don't play at the same time.
+## IconTexture: Interface\AddOns\BFF\Media\BFF
 ## Author: Stian Haga
 ## Version: @project-version@
 ## SavedVariables: BFF_DB
