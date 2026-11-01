@@ -1,5 +1,6 @@
 -- HandMeDowns: the pure parts of Hand-me-downs. The trimmed item string a
--- Hand-me-down stores and the item string the game resolves it from, how
+-- Hand-me-down stores and the item string the game resolves it from,
+-- whether an item in the bags can be traded, how
 -- Hand-me-downs and Claims are stored in records (short field names, a
 -- malformed item skipped), the caps and pruning, and who wins: the
 -- earliest Claim by server time, ties broken by Member id (docs/adr/0003).
@@ -77,6 +78,23 @@ function HandMeDowns.fullItemString(item)
     return enchant == "" and "item:" .. id or ("item:%s:%s"):format(id, enchant)
   end
   return (("item:%s:%s:::::%s:%s"):format(id, enchant, suffix, unique):gsub(":$", ""))
+end
+
+-- Enum.ItemBind values an item can't be passed on with, whatever it reads
+-- now: Quest, and the account bindings (ToWoWAccount, ToBnetAccount,
+-- ToBnetAccountUntilEquipped).
+local REFUSED_BINDINGS = { [4] = "questItem", [7] = "accountBound", [8] = "accountBound", [9] = "accountBound" }
+
+-- Whether an item in the bags can be offered to the Crew, from
+-- C_Item.IsBound (its state now) and its bindType (14th return of
+-- C_Item.GetItemInfo). Returns true, or nil and "bound", "questItem" or
+-- "accountBound". isBound decides first: an heirloom reads bindType 1.
+-- Conjured items aren't caught; the mail window refuses them anyway.
+function HandMeDowns.tradeable(isBound, bindType)
+  if isBound then return nil, "bound" end
+  local reason = REFUSED_BINDINGS[bindType]
+  if reason then return nil, reason end
+  return true
 end
 
 -- What the wire fields must be: a non-empty string, a number from 0.

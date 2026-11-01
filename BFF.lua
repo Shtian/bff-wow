@@ -20,7 +20,11 @@ local MESSAGES = {
   minimapHidden = "Minimap button hidden. Type /bff minimap to show it again.",
   settingsInCombat = "BFF's settings open once you're out of combat.",
   outOfDate = "BFF is out of date: someone in your Crew has a newer version. Update to keep seeing them.",
-  invalidItem = "That isn't an item. Type /bff hmd add, then shift-click the item into the chat box.",
+  invalidItem = "That isn't an item. Drop one on the Hand-me-downs tab (/bff hmd), or type /bff hmd add and shift-click it into the chat box.",
+  bound = "That item is bound to you, so it can't be passed on.",
+  questItem = "That's a quest item, so it can't be passed on.",
+  accountBound = "That item is bound to your account, so only your own characters can have it.",
+  notInBags = "That item isn't in your bags. BFF can only offer what you're carrying.",
   tooMany = "You have 20 Hand-me-downs up already. Withdraw one first (/bff hmd).",
   tooManyClaims = "You have 20 open Claims already. Withdraw one first.",
   claimed = "You've claimed that one already.",
@@ -194,19 +198,23 @@ function commands.goals()
   ns.Panel.show("goals")
 end
 
+-- Says how offering a bag item went, from Bags.offer's returns: the
+-- Hand-me-down's id and the item's link, or nil and a reason.
+function ns.sayOffered(id, result)
+  if id then
+    say(result .. " is up for your Crew. See /bff hmd.")
+  else
+    say(MESSAGES[result])
+  end
+end
+
 -- /bff hmd opens the Hand-me-downs tab; /bff hmd add <item link> offers
--- the item to the Crew, with the level it needs. BFF can't check yet that
--- it can be traded (#67), so that's up to you.
+-- the first matching item in your bags to the Crew, if it can be traded.
 function commands.hmd(rest)
   local sub, link = rest:match("^(%S*)%s*(.-)$")
   if sub:lower() ~= "add" then return ns.Panel.show("handMeDowns") end
-  if link == "" then return say(MESSAGES.invalidItem) end
-  local id, reason = ns.core:postHandMeDown(link, ns.Snapshot.requiredLevel(link))
-  if id then
-    say(link .. " is up for your Crew. See /bff hmd.")
-  else
-    say(MESSAGES[reason])
-  end
+  if not ns.HandMeDowns.itemString(link) then return say(MESSAGES.invalidItem) end
+  ns.sayOffered(ns.Bags.offer(ns.core, ns.Bags.find(link)))
 end
 
 function commands.when()

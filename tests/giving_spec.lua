@@ -551,3 +551,86 @@ describe("Hand-me-downs", function()
     assert.is_nil(crewRow(b, a, id))
   end)
 end)
+
+describe("Hand-me-down items in the bags", function()
+  local GUID = "Item-0-0000000000A1B2C3"
+
+  -- Whether a value holds the text anywhere, keys included.
+  local function holds(value, text)
+    if type(value) == "string" then return value:find(text, 1, true) ~= nil end
+    if type(value) ~= "table" then return false end
+    for k, v in pairs(value) do
+      if holds(k, text) or holds(v, text) then return true end
+    end
+    return false
+  end
+
+  it("are remembered for the posting Character, and never sent", function()
+    local net, clients, ns = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local id = assert(a.core:postHandMeDown(BARB, 18, GUID))
+    net:run(5)
+    a:reload()
+    net:run(5)
+
+    assert.same({ [id] = GUID }, a.core:handMeDownItems())
+    assert.is_not_nil(crewRow(b, a, id))
+    assert.is_false(holds(record(a), GUID))
+    assert.is_false(holds(b.db, GUID))
+    assert.is_true(#net.wire > 0)
+    for _, sent in ipairs(net.wire) do
+      assert.is_false(holds(ns.Codec.decode(sent.message), GUID))
+    end
+  end)
+
+  it("are kept per Character", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    local id = assert(a.core:postHandMeDown(BARB, 18, GUID))
+    a:play({ guid = "Player-0-Annalt", name = "Annalt" })
+    local other = assert(a.core:postHandMeDown(SWORD, 25, "Item-0-0000000000D4E5F6"))
+    net:run(3)
+    assert.same({ [other] = "Item-0-0000000000D4E5F6" }, a.core:handMeDownItems())
+    a:play({ guid = "Player-0-Ann", name = "Ann" })
+    assert.same({ [id] = GUID }, a.core:handMeDownItems())
+  end)
+
+  it("are forgotten once the Hand-me-down is withdrawn, Given or ends", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local withdrawn = assert(a.core:postHandMeDown(BARB, 18, "Item-0-1"))
+    local given = assert(a.core:postHandMeDown(BARB, 18, "Item-0-2"))
+    net:run(3)
+    assert(a.core:withdrawHandMeDown(withdrawn))
+    assert(b.core:claimHandMeDown(a.memberId, given))
+    net:run(5)
+    assert(a.core:giveHandMeDown(given))
+    assert.same({}, a.core:handMeDownItems())
+
+    local ending = assert(a.core:postHandMeDown(BARB, 18, "Item-0-3"))
+    net:run(3)
+    assert.same({ [ending] = "Item-0-3" }, a.core:handMeDownItems())
+    net:step(net:now() + 31 * DAY)
+    assert.same({}, a.core:handMeDownItems())
+    assert.is_false(holds(a.db, "Item-0-3"))
+  end)
+
+  it("are forgotten when you leave the Crew", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    assert(a.core:postHandMeDown(BARB, 18, GUID))
+    net:run(3)
+    a.core:leaveCrew()
+    net:run(3)
+    assert.same({}, a.core:handMeDownItems())
+    assert.is_false(holds(a.db, GUID))
+  end)
+
+  it("aren't needed for a post", function()
+    local net, clients = crew({ "Ann" })
+    local a = clients[1]
+    assert(a.core:postHandMeDown(BARB, 18))
+    net:run(3)
+    assert.same({}, a.core:handMeDownItems())
+  end)
+end)

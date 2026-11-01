@@ -382,18 +382,28 @@ local function ownWrite(self)
   self.listener("changed")
 end
 
--- Offers an item to the Crew: an item link (or item string) and the level
--- it needs. Returns the Hand-me-down's id, or nil and "noCrew",
--- "invalidItem" or "tooMany" (20 open already).
-function Core:postHandMeDown(link, level)
+-- Offers an item to the Crew: an item link (or item string), the level it
+-- needs and, optionally, the item's GUID in the bags. The GUID is kept
+-- for the Character being played (see handMeDownItems) and never goes in
+-- the record. Checking the item can be traded is up to the caller
+-- (HandMeDowns.tradeable). Returns the Hand-me-down's id, or nil and
+-- "noCrew", "invalidItem" or "tooMany" (20 open already).
+function Core:postHandMeDown(link, level, itemGuid)
   if not self.db.crew then return nil, "noCrew" end
   local item = ns.HandMeDowns.itemString(link)
   if not item then return nil, "invalidItem" end
   if self.giving:openCount() >= ns.HandMeDowns.MAX_OPEN then return nil, "tooMany" end
   level = type(level) == "number" and level >= 0 and math.floor(level) or 0
-  local id = self.ledger:postHandMeDown(item, level)
+  local id = self.ledger:postHandMeDown(item, level, itemGuid)
   ownWrite(self)
   return id
+end
+
+-- The item GUIDs of the open Hand-me-downs the Character being played
+-- posted, { [id] = itemGuid }, so the game side can tell when an item
+-- has left the bags.
+function Core:handMeDownItems()
+  return self.ledger:handMeDownItems()
 end
 
 -- Withdraws an own open Hand-me-down. Returns true, or nil and "unknown".

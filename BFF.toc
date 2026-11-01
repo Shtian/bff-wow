@@ -31,6 +31,7 @@ Core/Goals.lua
 Core/Core.lua
 
 Game/Snapshot.lua
+Game/Bags.lua
 Game/ChannelLink.lua
 
 UI/Skin.lua

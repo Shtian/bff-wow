@@ -30,7 +30,8 @@ local function newMemberId(random)
 end
 
 -- db is the whole saved table; the Ledger keeps `memberId`, `records`,
--- `heard`, `via` and `removed`. Last-heard times survive a reload but not a
+-- `heard`, `via`, `removed`, `nextHandMeDown` and `handMeDownItems` (per
+-- Character GUID, the item GUID of each own open Hand-me-down it posted). Last-heard times survive a reload but not a
 -- logout, since nobody was heard while you were logged out.
 function Ledger.new(db, now, random, initialLogin)
   db.memberId = db.memberId or newMemberId(random)
@@ -71,6 +72,24 @@ local function claimOpen(self, owner, id)
   return false
 end
 
+-- Forgets the item GUIDs of own Hand-me-downs that are no longer open:
+-- withdrawn, Given or past their 30 days.
+local function pruneItems(self)
+  local items = self.db.handMeDownItems
+  if not items then return end
+  local open = {}
+  for _, handMeDown in ipairs(ns.HandMeDowns.inRecord(self:own())) do
+    if ns.HandMeDowns.isOpen(handMeDown, self.now()) then open[handMeDown.id] = true end
+  end
+  for character, list in pairs(items) do
+    for id in pairs(list) do
+      if not open[id] then list[id] = nil end
+    end
+    if next(list) == nil then items[character] = nil end
+  end
+  if next(items) == nil then self.db.handMeDownItems = nil end
+end
+
 -- Every write of the own record also prunes its Reactions, Hand-me-downs
 -- and Claims, so pruning alone never sends DATA.
 local function bump(self, record)
@@ -81,6 +100,7 @@ local function bump(self, record)
   if record.claims then
     ns.HandMeDowns.pruneClaims(record.claims, now, function(owner, id) return claimOpen(self, owner, id) end)
   end
+  if record.id == self.db.memberId then pruneItems(self) end
 end
 
 -- Records the current state of the Character being played. Returns true if
@@ -210,8 +230,10 @@ end
 -- Posts a Hand-me-down (a trimmed item string and its required level)
 -- into the own record, now. Returns its id: never reused, even after
 -- leaving, nor after the counter is lost while the record still holds
--- higher ids.
-function Ledger:postHandMeDown(item, level)
+-- higher ids. itemGuid (optional) is the item's GUID in the bags: it's
+-- kept for the Character being played, outside the record, so it never
+-- leaves this client.
+function Ledger:postHandMeDown(item, level, itemGuid)
   local record = ownRecord(self)
   local id = self.db.nextHandMeDown or 1
   for _, held in ipairs(record.handMeDowns or {}) do
@@ -220,8 +242,26 @@ function Ledger:postHandMeDown(item, level)
   self.db.nextHandMeDown = id + 1
   record.handMeDowns = record.handMeDowns or {}
   record.handMeDowns[#record.handMeDowns + 1] = ns.HandMeDowns.item(id, item, level, self.now())
+  local character = self.playingGuid
+  if type(itemGuid) == "string" and itemGuid ~= "" and character then
+    self.db.handMeDownItems = self.db.handMeDownItems or {}
+    self.db.handMeDownItems[character] = self.db.handMeDownItems[character] or {}
+    self.db.handMeDownItems[character][id] = itemGuid
+  end
   bump(self, record)
   return id
+end
+
+-- The item GUIDs of the open Hand-me-downs the Character being played
+-- posted: { [id] = itemGuid }.
+function Ledger:handMeDownItems()
+  pruneItems(self)
+  local list = {}
+  local items = self.db.handMeDownItems
+  for id, itemGuid in pairs(items and self.playingGuid and items[self.playingGuid] or {}) do
+    list[id] = itemGuid
+  end
+  return list
 end
 
 -- The own record, an own Hand-me-down as stored and its index, or nil.
@@ -280,6 +320,7 @@ end
 function Ledger:clearHandMeDowns()
   local record = self:own()
   if record then record.handMeDowns, record.claims = nil, nil end
+  self.db.handMeDownItems = nil
 end
 
 -- Leaving the Crew clears the own Reactions. Not a write: the tombstone

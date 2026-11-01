@@ -12,6 +12,7 @@ Almost all behaviour lives in one deep, pure-Lua module, **Core**, behind a smal
 |---|---|---|
 | **Core** (`Core/`) | yes | Everything BFF knows and decides: Member records, sync, Feed, panel rows, saved-data layout. Details below. |
 | **Snapshot** (`Game/Snapshot.lua`) | no | Reads level, XP, zone, class, gold and GUID, counts deaths (kept per Character in `BFF_CharacterDB`), and calls `core:updateOwn(character)`. `Snapshot.locate()` reads where the Character stands, for Core's `locate`. |
+| **Bags** (`Game/Bags.lua`) | no | Offers a bag item as a Hand-me-down: the item on the cursor (the Hand-me-downs tab's drop slot) or the first bag item matching a link (`/bff hmd add`). Checks it can be traded (`HandMeDowns.tradeable`) and passes its item GUID to `core:postHandMeDown`. |
 | **Channel link** (`Game/ChannelLink.lua`) | no | The production link adapter: joins and hides the Crew channel (including filtering its system notices out of chat), AceComm with ChatThrottleLib, decides when the link is up or down, reports Members leaving the channel, and has an echo mode. See `docs/research/channel-spike.md`. |
 | **UI** (`UI/Skin.lua`, `UI/Panel.lua`, `UI/Minimap.lua`, `UI/MapPins.lua`, `UI/Away.lua`, `UI/ToastQueue.lua`, `UI/Toasts.lua`, `UI/Settings.lua`) | no | Renders Core's rows and summaries and sends user commands to Core. Shows no state it worked out itself. Skin is the shared flat look (colours, fonts, window, buttons, Feed icons) for the panel, the popup, toasts and map pins. ToastQueue is pure and tested offline (`docs/design/toasts.md`). |
 | **App** (`BFF.lua`) | no | Wiring only: creates Core, routes WoW events, runs a 1 s `C_Timer` ticker that calls `core:tick()`, and handles slash commands. |
@@ -39,7 +40,7 @@ Inputs:
 - `updateOwn(character)`: the current state of the Character being played, from Snapshot.
 - `tick()`: once a second. Core decides what is due (reply delays, debounced sends, heartbeat, online timeouts, pruning), and counts the second towards Play times.
 - `received(string)`, `up()`, `down()` and `gone(name)`: the incoming half of the link port.
-- Commands: start, join and leave a Crew, change the display name, Set as Main, Remove and re-add a Member, Pause sharing, and settings (see `docs/design/joining-a-crew.md`). Hand-me-downs: post, withdraw and Give one, and make and withdraw a Claim (`docs/design/hand-me-downs.md`).
+- Commands: start, join and leave a Crew, change the display name, Set as Main, Remove and re-add a Member, Pause sharing, and settings (see `docs/design/joining-a-crew.md`). Hand-me-downs: post (with the item's GUID, kept locally), withdraw and Give one, and make and withdraw a Claim (`docs/design/hand-me-downs.md`).
 
 Outputs:
 
@@ -53,7 +54,7 @@ Outputs:
   - `notice(kind)`: one-off messages ("BFF is out of date", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
 - Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isPaused()`, `isMinimapShown()`, `isChatLinesOn()`, `isAwayPopupOn()`, `isToastsOn()`, `toastSound()` and `toastPosition()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
-- Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), `goals()` (the Goals tab's row per Crew goal track, `docs/design/goals.md`), `playTimes(memberId?)` (the When tab's grid for the Crew or one Member, `docs/design/play-times.md`), `mapPins()` (a world map pin per other Member the Roster shows, at their shown Character's last-seen spot), `handMeDowns()` (the Hand-me-downs tab's rows, From the Crew and Yours), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
+- Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), `goals()` (the Goals tab's row per Crew goal track, `docs/design/goals.md`), `playTimes(memberId?)` (the When tab's grid for the Crew or one Member, `docs/design/play-times.md`), `mapPins()` (a world map pin per other Member the Roster shows, at their shown Character's last-seen spot), `handMeDowns()` (the Hand-me-downs tab's rows, From the Crew and Yours), `handMeDownItems()` (the item GUIDs of the open Hand-me-downs the Character being played posted), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
 - `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` or `awaySummary`.
 - `react(key)` reacts to someone else's Feed entry, with a key from `feed()` or the summary.
 
@@ -61,11 +62,11 @@ Outputs:
 
 These are internal seams: separate files for locality, tested only through Core's interface, with nothing swappable behind them.
 
-- **Ledger** (`Core/Ledger.lua`): what we know. Holds the own record and copies of everyone else's, the merge rule (a higher version wins), the Remove list, the "left" flag, last-heard times, and 180-day pruning. Removing a Member deletes their record and drops future copies. Re-adding takes them off the list and sends a DIGEST, and peers reply with DATA.
+- **Ledger** (`Core/Ledger.lua`): what we know. Holds the own record and copies of everyone else's, the item GUIDs of own Hand-me-downs (local only), the merge rule (a higher version wins), the Remove list, the "left" flag, last-heard times, and 180-day pruning. Removing a Member deletes their record and drops future copies. Re-adding takes them off the list and sends a DIGEST, and peers reply with DATA.
 - **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, XP piggyback, 5-minute heartbeat), the "record changed" and "reply owed" flags, and Pause.
 - **Feed** (`Core/Feed.lua`): turns a before/after record pair from Ledger into Feed entries, including skipped versions such as 22 → 24. Also owns the capped log, seen flags, and when While you were away is ready. See `docs/design/feed.md`.
 - **Reactions** (`Core/Reactions.lua`): the pure parts of Reactions: which Reaction each entry kind has, the key a Reaction points at an entry by, how keys are stored in a record and pruned, and the wording the owner sees. Feed attaches Reactions to its entries. See `docs/design/reactions.md`.
-- **HandMeDowns** (`Core/HandMeDowns.lua`): the pure parts of Hand-me-downs: the trimmed item string, how Hand-me-downs and Claims are stored in records, the caps and pruning, and who wins a Claim (ADR 0003). See `docs/design/hand-me-downs.md`.
+- **HandMeDowns** (`Core/HandMeDowns.lua`): the pure parts of Hand-me-downs: the trimmed item string, whether an item can be traded, how Hand-me-downs and Claims are stored in records, the caps and pruning, and who wins a Claim (ADR 0003). See `docs/design/hand-me-downs.md`.
 - **Giving** (`Core/Giving.lua`): the Hand-me-downs tab's rows and the Roster's count, worked out from Ledger's records, who wins each of your own, and the notices with their seen flags. Feed makes the "gave" entries.
 - **Settle** (`Core/Settle.lua`): when sync has gone quiet after the link came up (10 s with no new DATA, at most 30 s). Feed uses it for While you were away, Goals for its silent baseline.
 - **Goals** (`Core/Goals.lua`): the built-in Crew goal tracks and their rungs, progress worked out from Ledger's records, the reached rungs, the silent baseline and the Goals tab's rows. See `docs/design/goals.md`.
@@ -135,7 +136,7 @@ BFF.toc
 BFF.lua
 Bindings.xml                         -- key binding to open the panel
 Core/  Core.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  HandMeDowns.lua  Feed.lua  Giving.lua  Roster.lua  Goals.lua  PlayTimes.lua  CrewCode.lua  Codec.lua
-Game/  Snapshot.lua  ChannelLink.lua
+Game/  Snapshot.lua  Bags.lua  ChannelLink.lua
 UI/    Skin.lua  Panel.lua  Minimap.lua  MapPins.lua  Away.lua  ToastQueue.lua  Toasts.lua  Settings.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases
 Libs/                                -- fetched, gitignored
