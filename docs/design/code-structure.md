@@ -38,7 +38,7 @@ Inputs:
 - `updateOwn(character)`: the current state of the Character being played, from Snapshot.
 - `tick()`: once a second. Core decides what is due (reply delays, debounced sends, heartbeat, online timeouts, pruning), and counts the second towards Play times.
 - `received(string)`, `up()`, `down()` and `gone(name)`: the incoming half of the link port.
-- Commands: start, join and leave a Crew, change the display name, Set as Main, Remove and re-add a Member, Pause sharing, and settings (see `docs/design/joining-a-crew.md`).
+- Commands: start, join and leave a Crew, change the display name, Set as Main, Remove and re-add a Member, Pause sharing, and settings (see `docs/design/joining-a-crew.md`). Hand-me-downs: post, withdraw and Give one, and make and withdraw a Claim (`docs/design/hand-me-downs.md`).
 
 Outputs:
 
@@ -47,11 +47,12 @@ Outputs:
   - `changed`: re-read whatever you show (`rows()`, `feed()`, settings such as Pause sharing and Show minimap button). Also fires when a Member passes the 12-minute online timeout, even though no record changed.
   - `feedEntry(entry)`: a live Feed event, fired only when the chat-line or toast setting is on. App prints `entry.text` and shows a toast, each if its setting is on.
   - `reaction(news)`: a live Reaction to one of your entries, fired and shown the same way as `feedEntry`. Toasts for the same entry merge (see `docs/design/reactions.md`).
+  - `handMeDown(news)`: a live Hand-me-down notice (a Claim now winning yours, or one Given to you), fired and shown the same way as `feedEntry` (see `docs/design/hand-me-downs.md`).
   - `awaySummary(summary)`: While you were away has settled after an initial login. Fired only when the popup setting is on and it isn't empty. App shows it once out of combat.
   - `notice(kind)`: one-off messages ("BFF is out of date", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
 - Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isPaused()`, `isMinimapShown()`, `isChatLinesOn()`, `isAwayPopupOn()`, `isToastsOn()`, `toastSound()` and `toastPosition()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
-- Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), `goals()` (the Goals tab's row per Crew goal track, `docs/design/goals.md`), `playTimes(memberId?)` (the When tab's grid for the Crew or one Member, `docs/design/play-times.md`), `mapPins()` (a world map pin per other Member the Roster shows, at their shown Character's last-seen spot), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
+- Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), `goals()` (the Goals tab's row per Crew goal track, `docs/design/goals.md`), `playTimes(memberId?)` (the When tab's grid for the Crew or one Member, `docs/design/play-times.md`), `mapPins()` (a world map pin per other Member the Roster shows, at their shown Character's last-seen spot), `handMeDowns()` (the Hand-me-downs tab's rows, From the Crew and Yours), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
 - `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` or `awaySummary`.
 - `react(key)` reacts to someone else's Feed entry, with a key from `feed()` or the summary.
 
@@ -63,6 +64,8 @@ These are internal seams: separate files for locality, tested only through Core'
 - **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, XP piggyback, 5-minute heartbeat), the "record changed" and "reply owed" flags, and Pause.
 - **Feed** (`Core/Feed.lua`): turns a before/after record pair from Ledger into Feed entries, including skipped versions such as 22 → 24. Also owns the capped log, seen flags, and when While you were away is ready. See `docs/design/feed.md`.
 - **Reactions** (`Core/Reactions.lua`): the pure parts of Reactions: which Reaction each entry kind has, the key a Reaction points at an entry by, how keys are stored in a record and pruned, and the wording the owner sees. Feed attaches Reactions to its entries. See `docs/design/reactions.md`.
+- **HandMeDowns** (`Core/HandMeDowns.lua`): the pure parts of Hand-me-downs: the trimmed item string, how Hand-me-downs and Claims are stored in records, the caps and pruning, and who wins a Claim (ADR 0003). See `docs/design/hand-me-downs.md`.
+- **Giving** (`Core/Giving.lua`): the Hand-me-downs tab's rows and the Roster's count, worked out from Ledger's records, who wins each of your own, and the notices with their seen flags. Feed makes the "gave" entries.
 - **Settle** (`Core/Settle.lua`): when sync has gone quiet after the link came up (10 s with no new DATA, at most 30 s). Feed uses it for While you were away, Goals for its silent baseline.
 - **Goals** (`Core/Goals.lua`): the built-in Crew goal tracks and their rungs, progress worked out from Ledger's records, the reached rungs, the silent baseline and the Goals tab's rows. See `docs/design/goals.md`.
 - **PlayTimes** (`Core/PlayTimes.lua`): counts the own Member's seconds played per UTC hour of the week for the last 4 weeks, makes the summary their record shares, ages summaries by the viewer's clock and shifts them into local time. See `docs/design/play-times.md`.
@@ -130,7 +133,7 @@ Not embedded: AceDB (Core owns plain SavedVariables), AceConsole and AceEvent (a
 BFF.toc
 BFF.lua
 Bindings.xml                         -- key binding to open the panel
-Core/  Core.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  Feed.lua  Roster.lua  Goals.lua  PlayTimes.lua  CrewCode.lua  Codec.lua
+Core/  Core.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  HandMeDowns.lua  Feed.lua  Giving.lua  Roster.lua  Goals.lua  PlayTimes.lua  CrewCode.lua  Codec.lua
 Game/  Snapshot.lua  ChannelLink.lua
 UI/    Skin.lua  Panel.lua  Minimap.lua  MapPins.lua  Away.lua  ToastQueue.lua  Toasts.lua  Settings.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases

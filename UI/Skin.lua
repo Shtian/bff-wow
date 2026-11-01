@@ -39,6 +39,10 @@ Skin.FEED_ICONS = {
   joined = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
   left = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
   goal = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_3",
+  -- Hand-me-downs: a Give in the Feed, and the notices.
+  gave = "Interface\\GossipFrame\\VendorGossipIcon",
+  claimed = "Interface\\GossipFrame\\VendorGossipIcon",
+  given = "Interface\\MINIMAP\\TRACKING\\Mailbox",
 }
 
 -- Draws a Feed kind's icon: the glyph as text, or else the icon texture.

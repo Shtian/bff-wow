@@ -38,7 +38,8 @@ end
 -- initialLogin, maxLevel, utcOffset (seconds local time is ahead of server
 -- time, for the Feed's days; default 0) and locate() (optional: where the
 -- Character being played stands, read just before own DATA goes out; see
--- Snapshot.locate).
+-- Snapshot.locate) and itemLink(itemString) (optional: the game's link for
+-- an item string, or nil while it isn't cached; texts say "an item" then).
 function Core.new(deps)
   for name, kind in pairs(required) do
     if type(deps[name]) ~= kind then
@@ -61,7 +62,9 @@ function Core.new(deps)
     utcOffset = type(deps.utcOffset) == "number" and deps.utcOffset or 0,
     linkUp = false,
   }, Core)
-  self.log = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin)
+  local itemLink = type(deps.itemLink) == "function" and deps.itemLink or nil
+  self.log = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin, itemLink)
+  self.giving = ns.Giving.new(deps.db, self.ledger, deps.now, itemLink)
   self.crewGoals = ns.Goals.new(deps.db, self.ledger, deps.now, deps.maxLevel)
   -- Every message carries the sender's Member id. Where you stand is only
   -- read when own DATA goes out, so moving alone never sends anything.
@@ -87,18 +90,25 @@ local function updateLink(self)
   self.gossip:setLink(up)
 end
 
--- New Feed entries from other Members, and new Reactions to your own, each
--- make a chat line, a toast or both once settled, if either is on, and are
--- seen once they have.
-local function announce(self, entries, reactions)
+-- New Feed entries from other Members, new Reactions to your own and
+-- Hand-me-down notices each make a chat line, a toast or both once
+-- settled, if either is on, and are seen once they have. Entries already
+-- seen (a gave entry your notice covers) make none.
+local function announce(self, entries, reactions, notices)
   if not (self.log:isSettled() and (self:isChatLinesOn() or self:isToastsOn())) then return end
   for _, entry in ipairs(entries) do
-    self.log:markSeen(entry)
-    self.listener("feedEntry", self.log:describe(entry))
+    if not entry.seen then
+      self.log:markSeen(entry)
+      self.listener("feedEntry", self.log:describe(entry))
+    end
   end
   for _, item in ipairs(reactions or {}) do
     self.log:markSeen(item.reaction)
     self.listener("reaction", self.log:news(item))
+  end
+  for _, news in ipairs(notices or {}) do
+    self.giving:markSeen(news)
+    self.listener("handMeDown", self.giving:describe(news))
   end
 end
 
@@ -195,10 +205,13 @@ function Core:mapPins()
 end
 
 -- Counts for the title and minimap button: online, members, canPlay (online
--- Members whose Character being played can play with you) and hidden
--- (Characters unseen for Core.HIDE_AFTER_DAYS).
+-- Members whose Character being played can play with you), hidden
+-- (Characters unseen for Core.HIDE_AFTER_DAYS) and handMeDowns (others'
+-- open Hand-me-downs one of your Characters is high enough level for).
 function Core:summary()
-  return ns.Roster.summary(self.ledger, self.now())
+  local summary = ns.Roster.summary(self.ledger, self.now())
+  summary.handMeDowns = self.giving:usableCount()
+  return summary
 end
 
 -- Whether someone went online or offline since last checked.
@@ -230,10 +243,18 @@ end
 -- text } for max level, joined and left) and welcome. A button is { key,
 -- reacted }, the key for react(). noticed is Your Crew noticed, newest
 -- first: { text, reaction, time } per own entry with unseen Reactions.
+-- goals is the Crew goals reached ({ text, time }), and handMeDowns the
+-- Hand-me-down notices, then the Gives, each newest first: { kind
+-- ("claimed", "given" or "gave"), text, time }.
 local function awaySummary(self)
   if not self:isAwayPopupOn() then return end
   local summary = self.log:takeSummary()
-  if not summary then return end
+  local notices = self.giving:takeNews()
+  if not summary and #notices == 0 then return end
+  summary = summary or { members = {}, goals = {}, gifts = {}, count = 0, noticed = {} }
+  for _, gift in ipairs(summary.gifts) do notices[#notices + 1] = gift end
+  summary.gifts = nil
+  summary.handMeDowns = notices
   self.listener("awaySummary", summary)
   self.listener("changed")
 end
@@ -246,6 +267,7 @@ function Core:tick()
   self.gossip:tick()
   if self.log:tick() then awaySummary(self) end
   if self.db.crew and self.crewGoals:tick() then self.listener("changed") end
+  if self.db.crew then self.giving:tick() end
   checkOnline(self)
 end
 
@@ -340,6 +362,97 @@ function Core:react(key)
   self.gossip:ownChanged("now")
   self.listener("changed")
   return true
+end
+
+-- The Hand-me-downs tab: { crew, yours, unseen, claims, maxClaims, open,
+-- maxOpen }. crew is other Members' open Hand-me-downs, newest first: {
+-- ownerId, owner (display name), id, item (the item string to resolve),
+-- link (the game's link, nil until cached), level (required), time
+-- (posted), expires (seconds left), usable (one of your Characters is
+-- high enough level), winner ({ memberId, name, character, you }, nil
+-- without Claims), claims (how many), claimed (you have), claimCharacter
+-- (yours is for), canClaim and state (the Claim state in words) }. yours
+-- is your own, open or Given, newest first: { id, item, link, level,
+-- time, expires, winner, claims, given ({ memberId, name, character }
+-- once Given), canGive, canWithdraw, state }. unseen counts notices not
+-- yet shown, claims and open your open Claims and Hand-me-downs, out of
+-- maxClaims and maxOpen.
+function Core:handMeDowns()
+  return self.giving:view()
+end
+
+-- An own write that others should get now.
+local function ownWrite(self)
+  self.gossip:ownChanged("now")
+  self.listener("changed")
+end
+
+-- Offers an item to the Crew: an item link (or item string) and the level
+-- it needs. Returns the Hand-me-down's id, or nil and "noCrew",
+-- "invalidItem" or "tooMany" (20 open already).
+function Core:postHandMeDown(link, level)
+  if not self.db.crew then return nil, "noCrew" end
+  local item = ns.HandMeDowns.itemString(link)
+  if not item then return nil, "invalidItem" end
+  if self.giving:openCount() >= ns.HandMeDowns.MAX_OPEN then return nil, "tooMany" end
+  level = type(level) == "number" and level >= 0 and math.floor(level) or 0
+  local id = self.ledger:postHandMeDown(item, level)
+  ownWrite(self)
+  return id
+end
+
+-- Withdraws an own open Hand-me-down. Returns true, or nil and "unknown".
+function Core:withdrawHandMeDown(id)
+  if not self.giving:ownOpen(id) then return nil, "unknown" end
+  self.ledger:withdrawHandMeDown(id)
+  self.giving:check(true)
+  ownWrite(self)
+  return true
+end
+
+-- Gives an own open Hand-me-down to the winning Claim's Character, which
+-- is final: every client shows that recipient from then on. Sending the
+-- mail is up to you. Returns true, or nil and "unknown" or "noClaim".
+function Core:giveHandMeDown(id)
+  local handMeDown = self.giving:ownOpen(id)
+  if not handMeDown then return nil, "unknown" end
+  local winner = self.giving:winnerOf(id)
+  if not winner then return nil, "noClaim" end
+  self.ledger:giveHandMeDown(id, winner.memberId, winner.guid)
+  handMeDown.to, handMeDown.guid = winner.memberId, winner.guid
+  self.log:ownGave(handMeDown)
+  self.giving:check(true)
+  ownWrite(self)
+  return true
+end
+
+-- Claims another Member's open Hand-me-down for one of your Characters by
+-- GUID, by default the one being played. It goes into your record and
+-- out with your next DATA, so it works in combat and offline. Returns
+-- true, or nil and "own", "unknown", "claimed", "tooMany" (20 open
+-- Claims) or "unknownCharacter".
+function Core:claimHandMeDown(owner, id, guid)
+  local reason
+  guid, reason = self.giving:canClaim(owner, id, guid)
+  if not guid then return nil, reason end
+  self.ledger:addClaim(owner, id, guid)
+  ownWrite(self)
+  return true
+end
+
+-- Withdraws your Claim, until the Hand-me-down is Given. Returns true, or
+-- nil and "unknown" or "given".
+function Core:withdrawClaim(owner, id)
+  local ok, reason = self.giving:canWithdrawClaim(owner, id)
+  if not ok then return nil, reason end
+  self.ledger:withdrawClaim(owner, id)
+  ownWrite(self)
+  return true
+end
+
+-- The Hand-me-downs tab was opened: every notice is seen.
+function Core:handMeDownsSeen()
+  if self.giving:markAllSeen() then self.listener("changed") end
 end
 
 -- The Feed tab was opened: every entry and Reaction is seen.
@@ -528,6 +641,7 @@ function Core:removeMember(id)
   if not self.ledger:remove(id) then return nil, "unknownMember" end
   self.gossip:forget(id)
   self.log:dropMember(id)
+  self.giving:check(true)
   self.online[id] = nil
   checkGoals(self, true)
   self.listener("changed")
@@ -601,6 +715,8 @@ local function finishLeaving(self)
   self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } })
   self.ledger:forgetOthers()
   self.ledger:clearReactions()
+  self.ledger:clearHandMeDowns()
+  self.giving:clear()
   self.log:clear()
   self.crewGoals:clear()
   self.online = {}
@@ -650,7 +766,8 @@ local function dataReceived(self, records, from)
       changed = true
       self.log:dataMerged()
       self.crewGoals:dataMerged()
-      announce(self, self.log:recordChanged(before, record))
+      local entries, reactions = self.log:recordChanged(before, record)
+      announce(self, entries, reactions, self.giving:recordChanged(before, record))
       -- A Member first seen, leaving or back counts or stops counting.
       if before == nil or (before.left == true) ~= (record.left == true) then checkGoals(self, true) end
     end

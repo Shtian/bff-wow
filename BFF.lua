@@ -20,6 +20,15 @@ local MESSAGES = {
   minimapHidden = "Minimap button hidden. Type /bff minimap to show it again.",
   settingsInCombat = "BFF's settings open once you're out of combat.",
   outOfDate = "BFF is out of date: someone in your Crew has a newer version. Update to keep seeing them.",
+  invalidItem = "That isn't an item. Type /bff hmd add, then shift-click the item into the chat box.",
+  tooMany = "You have 20 Hand-me-downs up already. Withdraw one first (/bff hmd).",
+  tooManyClaims = "You have 20 open Claims already. Withdraw one first.",
+  claimed = "You've claimed that one already.",
+  own = "That's your own Hand-me-down.",
+  unknown = "That Hand-me-down isn't up any more.",
+  unknownCharacter = "That isn't one of your Characters.",
+  noClaim = "Nobody has claimed that one yet.",
+  given = "That one has been given already.",
 }
 ns.MESSAGES = MESSAGES
 
@@ -57,7 +66,7 @@ local function onCoreEvent(event, kind)
     ns.Settings.refresh()
   elseif event == "notice" then
     say(MESSAGES[kind])
-  elseif event == "feedEntry" or event == "reaction" then
+  elseif event == "feedEntry" or event == "reaction" or event == "handMeDown" then
     if ns.core:isChatLinesOn() then chatLine(kind) end
     if ns.core:isToastsOn() then ns.Toasts.show(kind) end
   elseif event == "awaySummary" then
@@ -72,6 +81,27 @@ local function utcOffset()
   return time(date("*t", now)) - time(date("!*t", now))
 end
 
+-- Item info, through C_Item where the client has it.
+local getItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
+
+-- The game's link for an item string, or nil until it's cached; asking
+-- also starts loading it, and GET_ITEM_INFO_RECEIVED says when it has.
+local function itemLink(itemString)
+  local _, link = getItemInfo(itemString)
+  return link
+end
+
+-- Redraws the panel once a burst of item info has arrived.
+local itemRefreshDue = false
+local function itemInfoReceived()
+  if itemRefreshDue then return end
+  itemRefreshDue = true
+  C_Timer.After(0.2, function()
+    itemRefreshDue = false
+    ns.Panel.refresh()
+  end)
+end
+
 local function start(isInitialLogin)
   BFF_DB = BFF_DB or {}
   ns.core = ns.Core.new({
@@ -84,6 +114,7 @@ local function start(isInitialLogin)
     maxLevel = GetMaxLevelForPlayerExpansion(),
     utcOffset = utcOffset(),
     locate = ns.Snapshot.locate,
+    itemLink = itemLink,
   })
   ns.ChannelLink.start(ns.core, function(kind) say(MESSAGES[kind]) end)
   ns.ChannelLink.setCrew(ns.core:crew())
@@ -100,9 +131,12 @@ local function start(isInitialLogin)
 end
 
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_ENTERING_WORLD" and not ns.core then
     start((...))
+  elseif event == "GET_ITEM_INFO_RECEIVED" then
+    if ns.core then itemInfoReceived() end
   elseif event == "PLAYER_REGEN_ENABLED" then
     eventFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
     local summary = pendingAway
@@ -168,6 +202,22 @@ function commands.goals()
   ns.Panel.show("goals")
 end
 
+-- /bff hmd opens the Hand-me-downs tab; /bff hmd add <item link> offers
+-- the item to the Crew, with the level it needs. BFF can't check yet that
+-- it can be traded (#67), so that's up to you.
+function commands.hmd(rest)
+  local sub, link = rest:match("^(%S*)%s*(.-)$")
+  if sub:lower() ~= "add" then return ns.Panel.show("handMeDowns") end
+  if link == "" then return say(MESSAGES.invalidItem) end
+  local level = select(5, getItemInfo(link))
+  local id, reason = ns.core:postHandMeDown(link, level)
+  if id then
+    say(link .. " is up for your Crew. See /bff hmd.")
+  else
+    say(MESSAGES[reason])
+  end
+end
+
 function commands.when()
   ns.Panel.showWhen(nil)
 end
@@ -217,7 +267,7 @@ SlashCmdList.BFF = function(input)
   elseif commands[command] then
     commands[command](rest)
   else
-    say("/bff, /bff feed, /bff goals, /bff when, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
+    say("/bff, /bff feed, /bff goals, /bff when, /bff hmd, /bff hmd add <item>, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
   end
 end
 

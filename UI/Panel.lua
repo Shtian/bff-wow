@@ -1,6 +1,6 @@
 -- Panel: the BFF window, in the Skin's flat look. Without a Crew it shows
 -- the setup view (display name, Start or Join); in one, a sidebar with
--- Roster, Feed, Goals, When and Settings. The Roster has your own row pinned on top,
+-- Roster, Feed, Goals, When, Hand-me-downs and Settings. The Roster has your own row pinned on top,
 -- then a row per Member with expandable Alts, a sort menu, a tooltip and
 -- right-click menu per Character, and a footer with the hidden count,
 -- removed Members and the Crew code. The Feed is a timeline
@@ -9,7 +9,10 @@
 -- Crew goal track: the next rung, a progress bar with numbers and the last
 -- rung reached. When is a heatmap of the week in local time: how many
 -- Members usually play each hour, or one Member's weeks played, picked
--- from a menu. It never sees a Member record.
+-- from a menu. Hand-me-downs lists other Members' open ones with Claim
+-- and Withdraw-claim buttons, dimmed when none of your Characters is high
+-- enough level, then your own with their winning Claim and Give and
+-- Withdraw. It never sees a Member record.
 
 local _, ns = ...
 
@@ -18,8 +21,8 @@ ns.Panel = Panel
 
 local Skin = ns.Skin
 
-local WIDTH = 440
-local SIDEBAR = 104
+local WIDTH = 460
+local SIDEBAR = 124
 local CONTENT_WIDTH = WIDTH - SIDEBAR - 1
 local HEADER = Skin.HEADER_HEIGHT
 local NAV_HEIGHT = 30
@@ -53,6 +56,14 @@ local WHEN_CELL = 11
 local WHEN_ROW = 15
 local WHEN_DAYS = 30
 local DAY_NAMES = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" }
+-- Hand-me-downs: a row per item, under a section heading.
+local GIFT_ROW = 44
+local GIFT_ICON = 28
+local GIFT_BUTTON = 58
+local GIFT_SECTION = 28
+local GIFTS_NONE = "Nothing on offer from the Crew right now."
+local GIFTS_HOW = "Offer an item: type /bff hmd add, then shift-click it into the chat box. Mail it once you Give it."
+local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local GOLD = Skin.GOLD
 local MUTED = Skin.MUTED
@@ -73,6 +84,7 @@ local rosterView
 local feedView
 local goalsView
 local whenView
+local giftsView
 local footer
 local rowFrames = {}
 local altFrames = {}
@@ -381,7 +393,8 @@ local function showSortMenu(owner)
   end)
 end
 
--- "CREW ———— [Sort: Online first]" between your row and the Members'.
+-- "CREW ———— 2 Hand-me-downs for you [Sort: Online first]" between your
+-- row and the Members'.
 local function createSection()
   section = CreateFrame("Frame", nil, rosterView.content)
   section:SetHeight(SECTION)
@@ -398,28 +411,43 @@ local function createSection()
   section.sort.label:SetPoint("CENTER")
   section.sort:SetScript("OnClick", showSortMenu)
 
+  -- "2 Hand-me-downs for you", which opens their tab.
+  section.gifts = CreateFrame("Button", nil, section)
+  section.gifts:SetHeight(18)
+  section.gifts:SetPoint("RIGHT", section.sort, "LEFT", -8, 0)
+  section.gifts.label = Skin.label(section.gifts, "small", GOLD)
+  section.gifts.label:SetPoint("RIGHT")
+  section.gifts:SetScript("OnClick", function() Panel.show("handMeDowns") end)
+
   local line = section:CreateTexture(nil, "ARTWORK")
   line:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
   line:SetHeight(1)
   line:SetPoint("LEFT", label, "RIGHT", 8, 0)
-  line:SetPoint("RIGHT", section.sort, "LEFT", -8, 0)
+  section.line = line
 end
 
-local function drawSection()
+-- count is the open Hand-me-downs you could use.
+local function drawSection(count)
   if not section then createSection() end
   for _, sort in ipairs(SORTS) do
     if sort[1] == order then section.sort.label:SetText("Sort: " .. sort[2]) end
   end
   section.sort:SetWidth(section.sort.label:GetStringWidth() + 16)
+  section.gifts.label:SetText(count == 1 and "1 Hand-me-down for you"
+    or ("%d Hand-me-downs for you"):format(count))
+  section.gifts:SetWidth(section.gifts.label:GetStringWidth())
+  section.gifts:SetShown(count > 0)
+  section.line:SetPoint("RIGHT", count > 0 and section.gifts or section.sort, "LEFT", -8, 0)
 end
 
--- The sidebar: Roster, Feed, Goals and When on top, Settings at the bottom, each with a
+-- The sidebar: Roster, Feed, Goals, When and Hand-me-downs on top, Settings at the bottom, each with a
 -- greyed game icon tinted like its label.
 local NAV_ICONS = {
   roster = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
   feed = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon",
   goals = Skin.FEED_ICONS.goal,
   when = "Interface\\FriendsFrame\\StatusIcon-Away",
+  handMeDowns = Skin.FEED_ICONS.gave,
   settings = "Interface\\Buttons\\UI-OptionsButton",
 }
 
@@ -474,6 +502,12 @@ local function createNav()
   nav.when = navButton("When", NAV_ICONS.when, open("when"))
   nav.when:SetPoint("TOPLEFT", nav.goals, "BOTTOMLEFT")
   nav.when:SetPoint("TOPRIGHT", nav.goals, "BOTTOMRIGHT")
+  nav.handMeDowns = navButton("Hand-me-downs", NAV_ICONS.handMeDowns, open("handMeDowns"))
+  nav.handMeDowns:SetPoint("TOPLEFT", nav.when, "BOTTOMLEFT")
+  nav.handMeDowns:SetPoint("TOPRIGHT", nav.when, "BOTTOMRIGHT")
+  -- The label fills the button, so the badge sits on the icon's corner.
+  nav.handMeDowns.badge = Skin.badge(nav.handMeDowns, "tiny", { 0.1, 0.08, 0 }, GOLD)
+  nav.handMeDowns.badge:SetPoint("CENTER", nav.handMeDowns.icon, "TOPRIGHT", 1, -1)
   -- The panel steps aside so it doesn't cover the settings.
   nav.settings = navButton("Settings", NAV_ICONS.settings, function()
     if ns.Settings.open() then frame:Hide() end
@@ -482,15 +516,20 @@ local function createNav()
   nav.settings:SetPoint("BOTTOMRIGHT", 0, 8)
 end
 
-local function drawNav(unseen)
+-- unseen counts the Feed's unseen entries, and giftsUnseen the
+-- Hand-me-down notices not yet shown.
+local function drawNav(unseen, giftsUnseen)
   if not nav then createNav() end
   setSelected(nav.roster, tab == "roster")
   setSelected(nav.feed, tab == "feed")
   setSelected(nav.goals, tab == "goals")
   setSelected(nav.when, tab == "when")
+  setSelected(nav.handMeDowns, tab == "handMeDowns")
   setSelected(nav.settings, false)
   nav.feed.badge:SetText(unseen)
   nav.feed.badge:SetShown(unseen > 0 and tab ~= "feed")
+  nav.handMeDowns.badge:SetText(giftsUnseen)
+  nav.handMeDowns.badge:SetShown(giftsUnseen > 0 and tab ~= "handMeDowns")
 end
 
 -- A scroll frame that scrolls with the mouse wheel, with a thin thumb on
@@ -934,6 +973,269 @@ local function drawWhen()
   whenView:Show()
 end
 
+-- Hand-me-downs: From the Crew, then Yours, each under a heading, in one
+-- scrolling list.
+local getItemIcon = C_Item and C_Item.GetItemIconByID or GetItemIcon
+
+StaticPopupDialogs.BFF_GIVE_HAND_ME_DOWN = {
+  text = "Give %s to %s? Send it by mail yourself: BFF only tells the Crew.",
+  button1 = YES,
+  button2 = NO,
+  OnAccept = function(_, id)
+    local ok, reason = core:giveHandMeDown(id)
+    if not ok then ns.say(ns.MESSAGES[reason]) end
+  end,
+  timeout = 0,
+  whileDead = true,
+  hideOnEscape = true,
+}
+
+-- Places a heading or row across the list, at y from its top.
+local function placeGift(line, y)
+  line:ClearAllPoints()
+  line:SetPoint("TOPLEFT", giftsView.content, "TOPLEFT", 0, y)
+  line:SetPoint("TOPRIGHT", giftsView.content, "TOPRIGHT", 0, y)
+end
+
+local function createGiftsView()
+  giftsView = createScrollView()
+  giftsView:SetPoint("TOPLEFT")
+  giftsView:SetPoint("BOTTOMRIGHT", -6, 0)
+  giftsView.headings = {}
+  giftsView.rows = {}
+  giftsView.notes = {}
+end
+
+-- "FROM THE CREW ————— 2 of 20 Claims".
+local function giftHeading(index)
+  local heading = giftsView.headings[index]
+  if heading then return heading end
+  heading = CreateFrame("Frame", nil, giftsView.content)
+  heading:SetHeight(GIFT_SECTION)
+  heading.label = Skin.label(heading, "tiny", DIM)
+  heading.label:SetPoint("LEFT", INSET, -2)
+  heading.count = Skin.label(heading, "small", MUTED)
+  heading.count:SetPoint("RIGHT", -INSET, -2)
+  heading.line = heading:CreateTexture(nil, "ARTWORK")
+  heading.line:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
+  heading.line:SetHeight(1)
+  heading.line:SetPoint("LEFT", heading.label, "RIGHT", 8, 0)
+  heading.line:SetPoint("RIGHT", heading.count, "LEFT", -8, 0)
+  giftsView.headings[index] = heading
+  return heading
+end
+
+-- A line of muted text in the list: nothing on offer, or how to offer.
+local function giftNote(index)
+  local note = giftsView.notes[index]
+  if note then return note end
+  note = Skin.label(giftsView.content, "small", MUTED)
+  note:SetWidth(CONTENT_WIDTH - 2 * INSET - 6)
+  note:SetWordWrap(true)
+  giftsView.notes[index] = note
+  return note
+end
+
+local function showItemTooltip(row)
+  if not row.data then return end
+  GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+  GameTooltip:SetHyperlink(row.data.item)
+  GameTooltip:Show()
+end
+
+-- Claims for one of your Characters, saying why not if it can't.
+local function claim(data, guid)
+  local ok, reason = core:claimHandMeDown(data.ownerId, data.id, guid)
+  if not ok then ns.say(ns.MESSAGES[reason == "tooMany" and "tooManyClaims" or reason]) end
+end
+
+-- Right-click Claim: pick which of your Characters it's for.
+local function showClaimMenu(owner, data)
+  local own = core:rows()[1]
+  if not own then return end
+  MenuUtil.CreateContextMenu(owner, function(_, root)
+    root:CreateTitle("Claim it for")
+    local characters = { own }
+    for _, alt in ipairs(own.alts) do characters[#characters + 1] = alt end
+    for _, character in ipairs(characters) do
+      local label = ("%s (%d)"):format(character.name, character.level)
+      root:CreateButton(label, function() claim(data, character.guid) end)
+    end
+  end)
+end
+
+-- The buttons: Claim (left-click for the Character you play, right-click
+-- to pick one) or Withdraw your Claim on the Crew's; Give and Withdraw on
+-- yours.
+local function onGiftPrimary(button, mouse)
+  local row = button:GetParent()
+  local data = row.data
+  if not data then return end
+  if row.yours then
+    StaticPopup_Show("BFF_GIVE_HAND_ME_DOWN", data.link or "it",
+      data.winner and ("%s (%s)"):format(data.winner.name, data.winner.character) or "?", data.id)
+  elseif mouse == "RightButton" then
+    showClaimMenu(button, data)
+  else
+    claim(data)
+  end
+end
+
+local function onGiftSecondary(button)
+  local row = button:GetParent()
+  local data = row.data
+  if not data then return end
+  local ok, reason
+  if row.yours then
+    ok, reason = core:withdrawHandMeDown(data.id)
+  else
+    ok, reason = core:withdrawClaim(data.ownerId, data.id)
+  end
+  if not ok then ns.say(ns.MESSAGES[reason]) end
+end
+
+local function createGiftRow()
+  local row = CreateFrame("Button", nil, giftsView.content)
+  row:SetHeight(GIFT_ROW)
+  Skin.fill(row, Skin.HOVER, "HIGHLIGHT")
+  -- Shift-click puts the link in the chat box, like any item.
+  row:SetScript("OnClick", function(self)
+    local insertLink = ChatFrameUtil and ChatFrameUtil.InsertLink or ChatEdit_InsertLink
+    if self.data and self.data.link and insertLink and IsModifiedClick("CHATLINK") then insertLink(self.data.link) end
+  end)
+  row:SetScript("OnEnter", showItemTooltip)
+  row:SetScript("OnLeave", hideTooltip)
+
+  row.icon = row:CreateTexture(nil, "ARTWORK")
+  row.icon:SetSize(GIFT_ICON, GIFT_ICON)
+  row.icon:SetPoint("TOPLEFT", INSET, -8)
+  row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+  row.primary = Skin.button(row, "Claim", onGiftPrimary, true)
+  row.primary:SetSize(GIFT_BUTTON, 20)
+  row.primary:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  row.secondary = Skin.button(row, "Withdraw", onGiftSecondary)
+  row.secondary:SetSize(GIFT_BUTTON, 20)
+
+  row.item = Skin.label(row, "body")
+  row.item:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 1)
+  row.item:SetWordWrap(false)
+  row.level = Skin.badge(row)
+  row.info = Skin.label(row, "small", MUTED)
+  row.info:SetPoint("TOPLEFT", row.item, "BOTTOMLEFT", 0, -3)
+  row.info:SetWordWrap(false)
+  giftsView.rows[#giftsView.rows + 1] = row
+  return row
+end
+
+-- Places the buttons shown at the right. Returns the width left for the
+-- text.
+local function placeGiftButtons(row, primary, secondary)
+  row.primary:SetShown(primary ~= nil)
+  row.secondary:SetShown(secondary ~= nil)
+  local anchor
+  for _, pair in ipairs({ { row.primary, primary }, { row.secondary, secondary } }) do
+    local button, text = pair[1], pair[2]
+    if text then
+      button:SetText(text)
+      button:ClearAllPoints()
+      if anchor then
+        button:SetPoint("RIGHT", anchor, "LEFT", -4, 0)
+      else
+        button:SetPoint("RIGHT", row, "RIGHT", -INSET, 0)
+      end
+      anchor = button
+    end
+  end
+  local buttons = (primary and GIFT_BUTTON + 4 or 0) + (secondary and GIFT_BUTTON + 4 or 0)
+  return CONTENT_WIDTH - 6 - 2 * INSET - GIFT_ICON - 8 - buttons - 4
+end
+
+-- The item's link, then its required level on a badge, then a line under
+-- them, all short of the buttons (width).
+local function drawGiftText(row, data, width)
+  row.item:SetWidth(0)
+  row.item:SetText(data.link or "Loading...")
+  row.item:SetWidth(math.min(row.item:GetStringWidth() + 1, width - 30))
+  row.level:SetText(data.level > 0 and data.level or "-")
+  row.level:ClearAllPoints()
+  row.level:SetPoint("LEFT", row.item, "RIGHT", 6, 0)
+  row.info:SetWidth(width)
+end
+
+local function drawGiftRow(row, data, yours)
+  row.data, row.yours = data, yours
+  row.icon:SetTexture(getItemIcon and getItemIcon(data.item) or QUESTION_MARK)
+  local left = data.expires > 0 and ago(data.expires) .. " left" or "ending"
+  if yours then
+    row.info:SetText(data.given and data.state or ("%s · %s"):format(left, data.state))
+    Skin.color(row.info, data.winner and GOLD or MUTED)
+    drawGiftText(row, data, placeGiftButtons(row, not data.given and "Give" or nil,
+      data.canWithdraw and "Withdraw" or nil))
+    row.primary:SetEnabled(data.canGive)
+    row.primary:SetAlpha(data.canGive and 1 or 0.4)
+    row:SetAlpha(data.given and 0.6 or 1)
+  else
+    row.info:SetText(("%s · %s"):format(data.owner, data.state))
+    Skin.color(row.info, data.winner and data.winner.you and GOLD or MUTED)
+    drawGiftText(row, data, placeGiftButtons(row, data.canClaim and "Claim" or nil,
+      data.claimed and "Withdraw" or nil))
+    row.primary:SetEnabled(true)
+    row.primary:SetAlpha(1)
+    row:SetAlpha(data.usable and 1 or 0.45)
+  end
+  row:Show()
+end
+
+local function drawGifts()
+  if not giftsView then createGiftsView() end
+  local gifts = core:handMeDowns()
+  local y, headings, rows, notes = -4, 0, 0, 0
+  local function heading(text, count)
+    headings = headings + 1
+    local item = giftHeading(headings)
+    placeGift(item, y)
+    item.label:SetText(text)
+    item.count:SetText(count)
+    item:Show()
+    y = y - GIFT_SECTION
+  end
+  local function note(text)
+    notes = notes + 1
+    local item = giftNote(notes)
+    item:ClearAllPoints()
+    item:SetPoint("TOPLEFT", giftsView.content, "TOPLEFT", INSET, y - 2)
+    item:SetText(text)
+    item:Show()
+    y = y - item:GetStringHeight() - 12
+  end
+  local function list(data, yours)
+    for _, item in ipairs(data) do
+      rows = rows + 1
+      local row = giftsView.rows[rows] or createGiftRow()
+      placeGift(row, y)
+      drawGiftRow(row, item, yours)
+      y = y - GIFT_ROW
+    end
+  end
+
+  heading("FROM THE CREW", ("%d of %d Claims"):format(gifts.claims, gifts.maxClaims))
+  if #gifts.crew == 0 then note(GIFTS_NONE) end
+  list(gifts.crew, false)
+  y = y - 6
+  heading("YOURS", ("%d of %d up"):format(gifts.open, gifts.maxOpen))
+  list(gifts.yours, true)
+  note(GIFTS_HOW)
+
+  hideAll(giftsView.headings, headings + 1)
+  hideAll(giftsView.rows, rows + 1)
+  hideAll(giftsView.notes, notes + 1)
+  giftsView.content:SetHeight(-y + 6)
+  giftsView:Show()
+  updateThumb(giftsView)
+  if gifts.unseen > 0 then core:handMeDownsSeen() end
+end
+
 local function create()
   frame = Skin.window("BFFPanel", WIDTH, TITLE)
   frame:SetPoint("CENTER")
@@ -1123,8 +1425,9 @@ local function drawFooter(crew, summary)
   return height
 end
 
--- Hides every tab's view but the one named ("roster", "feed", "goals", "when";
--- nil hides them all). Each draw function shows its own.
+-- Hides every tab's view but the one named ("roster", "feed", "goals",
+-- "when", "handMeDowns"; nil hides them all). Each draw function shows
+-- its own.
 local function hideViewsBut(name)
   if name ~= "roster" then
     if rosterView then rosterView:Hide() end
@@ -1133,6 +1436,7 @@ local function hideViewsBut(name)
   if name ~= "feed" and feedView then feedView:Hide() end
   if name ~= "goals" and goalsView then goalsView:Hide() end
   if name ~= "when" and whenView then whenView:Hide() end
+  if name ~= "handMeDowns" and giftsView then giftsView:Hide() end
 end
 
 local function drawRoster(crew, summary)
@@ -1142,7 +1446,7 @@ local function drawRoster(crew, summary)
   rosterView:SetPoint("TOPLEFT")
   rosterView:SetPoint("BOTTOMRIGHT", -6, footerHeight)
   rosterView:Show()
-  drawSection()
+  drawSection(summary.handMeDowns)
   section:Hide()
 
   local y = -6
@@ -1190,7 +1494,7 @@ function Panel.refresh()
   local summary = core:summary()
   frame.headerRight:SetText(("%d of %d online"):format(summary.online, summary.members))
   local feed = core:feed()
-  drawNav(feed.unseen)
+  drawNav(feed.unseen, core:handMeDowns().unseen)
   hideViewsBut(tab)
   if tab == "feed" then
     drawFeed(feed)
@@ -1200,6 +1504,9 @@ function Panel.refresh()
   elseif tab == "when" then
     fresh = {}
     drawWhen()
+  elseif tab == "handMeDowns" then
+    fresh = {}
+    drawGifts()
   else
     fresh = {}
     drawRoster(crew, summary)
@@ -1211,7 +1518,8 @@ function Panel.toggle()
   frame:SetShown(not frame:IsShown())
 end
 
--- Opens the panel on a tab: "roster", "feed", "goals" or "when".
+-- Opens the panel on a tab: "roster", "feed", "goals", "when" or
+-- "handMeDowns".
 function Panel.show(name)
   if not frame then create() end
   tab = name

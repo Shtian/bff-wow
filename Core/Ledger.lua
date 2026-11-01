@@ -59,11 +59,28 @@ local function ownRecord(self)
   return record
 end
 
--- Every write of the own record also prunes its Reactions, so pruning
--- alone never sends DATA.
+-- Whether the Hand-me-down a Claim points at is still open, as far as the
+-- held copy of its owner's record says: an owner not held, left or
+-- Removed has ended it too.
+local function claimOpen(self, owner, id)
+  local record = self.db.records[owner]
+  if not record or record.left or self.db.removed[owner] then return false end
+  for _, handMeDown in ipairs(ns.HandMeDowns.inRecord(record)) do
+    if handMeDown.id == id then return ns.HandMeDowns.isOpen(handMeDown, self.now()) end
+  end
+  return false
+end
+
+-- Every write of the own record also prunes its Reactions, Hand-me-downs
+-- and Claims, so pruning alone never sends DATA.
 local function bump(self, record)
-  record.version = math.max(self.now(), record.version + 1)
-  if record.reactions then ns.Reactions.prune(record.reactions, self.now()) end
+  local now = self.now()
+  record.version = math.max(now, record.version + 1)
+  if record.reactions then ns.Reactions.prune(record.reactions, now) end
+  if record.handMeDowns then ns.HandMeDowns.prune(record.handMeDowns, now) end
+  if record.claims then
+    ns.HandMeDowns.pruneClaims(record.claims, now, function(owner, id) return claimOpen(self, owner, id) end)
+  end
 end
 
 -- Records the current state of the Character being played. Returns true if
@@ -183,6 +200,76 @@ function Ledger:addReaction(key)
   record.reactions = record.reactions or {}
   record.reactions[#record.reactions + 1] = ns.Reactions.item(key, self.now())
   bump(self, record)
+end
+
+-- Posts a Hand-me-down (a trimmed item string and its required level)
+-- into the own record, now. Returns its id: never reused, even after
+-- leaving.
+function Ledger:postHandMeDown(item, level)
+  local record = ownRecord(self)
+  local id = self.db.nextHandMeDown or 1
+  self.db.nextHandMeDown = id + 1
+  record.handMeDowns = record.handMeDowns or {}
+  record.handMeDowns[#record.handMeDowns + 1] = ns.HandMeDowns.item(id, item, level, self.now())
+  bump(self, record)
+  return id
+end
+
+local function ownHandMeDown(self, id)
+  local record = self:own()
+  for index, item in ipairs(record and record.handMeDowns or {}) do
+    if item.i == id then return record, item, index end
+  end
+end
+
+-- Takes an own Hand-me-down out of the record. Returns false if it isn't
+-- there.
+function Ledger:withdrawHandMeDown(id)
+  local record, _, index = ownHandMeDown(self, id)
+  if not record then return false end
+  table.remove(record.handMeDowns, index)
+  bump(self, record)
+  return true
+end
+
+-- Records the Give of an own Hand-me-down to a Member's Character. It
+-- stays in the record, so every client sees it, until its 30 days run
+-- out. Returns false if it isn't there.
+function Ledger:giveHandMeDown(id, memberId, guid)
+  local record, item = ownHandMeDown(self, id)
+  if not record then return false end
+  item.r, item.c = memberId, guid
+  bump(self, record)
+  return true
+end
+
+-- Adds a Claim on another Member's Hand-me-down for one of your own
+-- Characters, made now.
+function Ledger:addClaim(owner, id, guid)
+  local record = ownRecord(self)
+  record.claims = record.claims or {}
+  record.claims[#record.claims + 1] = ns.HandMeDowns.claim(owner, id, guid, self.now())
+  bump(self, record)
+end
+
+-- Takes an own Claim out of the record. Returns false if it isn't there.
+function Ledger:withdrawClaim(owner, id)
+  local record = self:own()
+  for index, item in ipairs(record and record.claims or {}) do
+    if item.m == owner and item.i == id then
+      table.remove(record.claims, index)
+      bump(self, record)
+      return true
+    end
+  end
+  return false
+end
+
+-- Leaving the Crew clears the own Hand-me-downs and Claims. Not a write,
+-- like clearReactions.
+function Ledger:clearHandMeDowns()
+  local record = self:own()
+  if record then record.handMeDowns, record.claims = nil, nil end
 end
 
 -- Leaving the Crew clears the own Reactions. Not a write: the tombstone
