@@ -1,6 +1,7 @@
 -- Away: the While you were away popup from the Feed decision (#14), in the
 -- Skin's flat look. Your Crew noticed comes first: a line per entry of
--- yours others reacted to. Then Core's summary as a scoreboard, Members by
+-- yours others reacted to, then Crew goals reached, in gold. Then Core's
+-- summary as a scoreboard, Members by
 -- most recent activity: a row per Character with its level now, a bar for
 -- the jump (gold when it reached max level), levels gained, deaths, and
 -- Cheer and Respects buttons. The Member's name sits on their first row,
@@ -41,10 +42,12 @@ local NAME_WIDTH = LEVEL_X - 8
 local GAINED = Skin.ONLINE
 local STAR = "|T" .. Skin.FEED_ICONS.maxLevel .. ":12|t"
 local SKULL = "|T" .. Skin.FEED_ICONS.death .. ":12|t"
+local GOAL = "|T" .. Skin.FEED_ICONS.goal .. ":14|t"
 
 local frame
 local rows = {}
 local lines = {}
+local goalLines = {}
 
 local hex = Skin.hex
 
@@ -71,6 +74,8 @@ local function create()
 
   frame.noticed = Skin.label(frame, "tiny", Skin.DIM)
   frame.noticed:SetText("YOUR CREW NOTICED")
+  frame.goals = Skin.label(frame, "tiny", Skin.DIM)
+  frame.goals:SetText("CREW GOALS")
   frame.intro = Skin.label(frame, "small", Skin.MUTED)
 
   frame.headings = {}
@@ -236,41 +241,63 @@ local function drawRow(item, member, character, first, maxLevel)
   return height
 end
 
--- A line in Your Crew noticed: the Reaction's icon and the text.
-local function line(index)
-  local item = lines[index]
+-- A line in Your Crew noticed or Crew goals: an icon and the text.
+local function line(pool, index)
+  local item = pool[index]
   if item then return item end
   item = Skin.label(frame, "text")
   item:SetWordWrap(false)
-  lines[index] = item
+  pool[index] = item
   return item
 end
 
--- Your Crew noticed, from y down. Returns the y below it.
-local function drawNoticed(noticed, y)
-  frame.noticed:SetShown(#noticed > 0)
-  for i = #noticed + 1, #lines do lines[i]:Hide() end
-  if #noticed == 0 then return y end
+-- A section of one-line items under a title (Your Crew noticed, Crew
+-- goals), from y down, with a line per text from the pool. Returns the y
+-- below it.
+local function drawSection(title, texts, pool, y)
+  title:SetShown(#texts > 0)
+  for i = #texts + 1, #pool do pool[i]:Hide() end
+  if #texts == 0 then return y end
   y = y - 10
-  frame.noticed:SetPoint("TOPLEFT", INSET, y)
+  title:SetPoint("TOPLEFT", INSET, y)
   y = y - NOTICED_TITLE
-  for i, notice in ipairs(noticed) do
-    local item = line(i)
+  for i, text in ipairs(texts) do
+    local item = line(pool, i)
     item:ClearAllPoints()
     item:SetPoint("TOPLEFT", INSET, y)
     item:SetPoint("RIGHT", -INSET, 0)
-    item:SetText(Skin.reactionGlyph(notice.reaction, 14) .. "  " .. notice.text)
+    item:SetText(text)
     item:Show()
     y = y - NOTICED_LINE
   end
   return y - NOTICED_GAP
 end
 
--- Shows the summary from Core's awaySummary: { members, count, noticed }.
--- With no Crew news, only Your Crew noticed shows.
+-- Your Crew noticed: each with its Reaction's icon.
+local function drawNoticed(noticed, y)
+  local texts = {}
+  for i, notice in ipairs(noticed) do
+    texts[i] = Skin.reactionGlyph(notice.reaction, 14) .. "  " .. notice.text
+  end
+  return drawSection(frame.noticed, texts, lines, y)
+end
+
+-- Crew goals reached, in gold.
+local function drawGoals(goals, y)
+  local texts = {}
+  for i, goal in ipairs(goals) do
+    texts[i] = GOAL .. "  " .. Skin.hex(Skin.GOLD) .. goal.text .. "|r"
+  end
+  return drawSection(frame.goals, texts, goalLines, y)
+end
+
+-- Shows the summary from Core's awaySummary: { members, goals, count,
+-- noticed }. With no Member news, only Your Crew noticed and Crew goals
+-- show.
 function Away.show(summary)
   if not frame then create() end
   local y = drawNoticed(summary.noticed or {}, -Skin.HEADER_HEIGHT)
+  y = drawGoals(summary.goals or {}, y)
 
   local scoreboard = #summary.members > 0
   frame.intro:SetShown(scoreboard)

@@ -286,18 +286,25 @@ describe("Reactions", function()
   it("are kept 50 at a time in the record, while the owner keeps them all", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
-    for deaths = 1, 51 do
-      a:play({ deaths = deaths })
+    -- The death entries, newest first, without the Crew goals they reach.
+    local function deaths(client)
+      local list = {}
+      for _, item in ipairs(entries(client)) do
+        if item.kind == "death" then list[#list + 1] = item end
+      end
+      return list
+    end
+    for count = 1, 51 do
+      a:play({ deaths = count })
       net:run(3)
-      local death = entries(b)[1]
-      assert.equal(deaths, death.key.n)
+      local death = deaths(b)[1]
+      assert.equal(count, death.key.n)
       assert.is_true(b.core:react(death.key))
       net:run(3)
     end
 
     assert.equal(50, #ownReactions(b))
-    local oldest = entries(a)[51]
-    assert.equal("death", oldest.kind)
+    local oldest = deaths(a)[51]
     assert.equal(1, #oldest.reactors)
   end)
 

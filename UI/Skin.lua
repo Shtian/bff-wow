@@ -26,7 +26,7 @@ Skin.HOVER = { 1, 1, 1, 0.05 }
 Skin.HEADER_HEIGHT = 30
 
 -- Feed entries shown in gold.
-Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, left = true }
+Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, left = true, goal = true }
 -- Each Feed kind's icon, on the Feed tab and on toasts. The icons tell kinds
 -- apart, not colour: they are all drawn in the same grey. A ding is a plus
 -- drawn as text, which centres better than any texture.
@@ -38,6 +38,7 @@ Skin.FEED_ICONS = {
   newCharacter = "Interface\\FriendsFrame\\UI-Toast-FriendRequestIcon",
   joined = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
   left = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
+  goal = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_3",
 }
 
 -- Draws a Feed kind's icon: the glyph as text, or else the icon texture.

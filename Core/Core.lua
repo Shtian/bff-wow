@@ -50,6 +50,7 @@ function Core.new(deps)
     linkUp = false,
   }, Core)
   self.log = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin)
+  self.crewGoals = ns.Goals.new(deps.db, self.ledger, deps.now, deps.maxLevel)
   -- Every message carries the sender's Member id.
   self.gossip = ns.Gossip.new(self.ledger, deps.now, deps.random, function(message)
     message.from = self.ledger:memberId()
@@ -65,6 +66,7 @@ end
 local function updateLink(self)
   local up = self.linkUp and self.db.crew ~= nil
   if up then self.log:linkUp() else self.log:linkDown() end
+  if up then self.crewGoals:linkUp() else self.crewGoals:linkDown() end
   self.gossip:setLink(up)
 end
 
@@ -83,6 +85,15 @@ local function announce(self, entries, reactions)
   end
 end
 
+-- A record changed: Crew goals newly reached each make a Crew-wide Feed
+-- entry, announced like any other. Quiet when the Members counted changed
+-- rather than their progress: those rungs are only recorded.
+local function checkGoals(self, quiet)
+  if not self.db.crew then return end
+  local reached = self.crewGoals:check(quiet)
+  if #reached > 0 then announce(self, self.log:goalsReached(reached)) end
+end
+
 -- The own record's display name or left flag changed: it goes out now.
 local function sendOwnNow(self)
   self.gossip:ownChanged("now")
@@ -96,6 +107,7 @@ function Core:updateOwn(character)
     -- Your own events go into the Feed only while in a Crew.
     if self.db.crew then self.log:ownChanged(before, character.guid) end
     self.gossip:ownChanged(ns.Gossip.urgency(before, character))
+    checkGoals(self)
     self.listener("changed")
   end
 end
@@ -163,13 +175,25 @@ end
 function Core:tick()
   self.gossip:tick()
   if self.log:tick() then awaySummary(self) end
+  if self.db.crew and self.crewGoals:tick() then self.listener("changed") end
   checkOnline(self)
+end
+
+-- The Goals tab: a row per Crew goal track (Crew levels, Everyone at level
+-- N, Crew deaths): { track, title, rung (the next one, nil when complete),
+-- value and goal (the progress bar, value out of goal; nil when complete),
+-- complete, last ({ rung, time }: the highest reached, or nil) }. For
+-- Everyone at level N, value counts the Members with a Character at the
+-- next rung, out of every Member. No Member is named.
+function Core:goals()
+  return self.crewGoals:rows()
 end
 
 -- The Feed tab: { days = { { daysAgo, time, entries } }, unseen }, newest
 -- first, where unseen counts others' entries and Reactions to your own not
 -- yet shown. An entry has kind ("ding", "death", "newCharacter",
--- "maxLevel", "joined" or "left"), time, memberId, guid (for Character
+-- "maxLevel", "joined", "left" or "goal": a Crew goal reached, with no
+-- memberId), time, memberId, guid (for Character
 -- events), text, from (the level before a ding or max level), level, count
 -- (deaths), own and seen (false while it has unseen Reactions). And for
 -- Reactions: reaction ("cheer", "respects" or "welcome", nil for left),
@@ -315,6 +339,7 @@ end
 local function enter(self, code, displayName, joining)
   self.ledger:writeOwn({ displayName = displayName, left = false, joinedAt = self.now() })
   sendOwnNow(self)
+  self.crewGoals:clear()
   self.db.crew = { code = code }
   if joining then self.log:ownJoined() end
   self.listener("crewChanged")
@@ -386,6 +411,7 @@ function Core:removeMember(id)
   self.gossip:forget(id)
   self.log:dropMember(id)
   self.online[id] = nil
+  checkGoals(self, true)
   self.listener("changed")
   return true
 end
@@ -458,6 +484,7 @@ local function finishLeaving(self)
   self.ledger:forgetOthers()
   self.ledger:clearReactions()
   self.log:clear()
+  self.crewGoals:clear()
   self.online = {}
   self.listener("crewChanged")
   self.listener("notice", "leftCrew")
@@ -504,12 +531,16 @@ local function dataReceived(self, records, from)
     if kept then
       changed = true
       self.log:dataMerged()
+      self.crewGoals:dataMerged()
       announce(self, self.log:recordChanged(before, record))
+      -- A Member first seen, leaving or back counts or stops counting.
+      if before == nil or (before.left == true) ~= (record.left == true) then checkGoals(self, true) end
     end
     if type(record) == "table" and type(record.id) == "string" and type(record.version) == "number" then
       self.gossip:recordSeen(record.id, record.version)
     end
   end
+  if changed then checkGoals(self) end
   return changed
 end
 

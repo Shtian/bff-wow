@@ -1,12 +1,13 @@
 -- Panel: the BFF window, in the Skin's flat look. Without a Crew it shows
 -- the setup view (display name, Start or Join); in one, a sidebar with
--- Roster, Feed and Settings. The Roster has your own row pinned on top,
+-- Roster, Feed, Goals and Settings. The Roster has your own row pinned on top,
 -- then a row per Member with expandable Alts, a sort menu, a tooltip and
 -- right-click menu per Character, and a footer with the hidden count,
 -- removed Members and the Crew code. The Feed is a timeline
 -- of Core's entries by day, an icon per kind, who reacted to each and a
--- button to react, and marks them seen while open. It never sees a Member
--- record.
+-- button to react, and marks them seen while open. Goals has a row per
+-- Crew goal track: the next rung, a progress bar with numbers and the last
+-- rung reached. It never sees a Member record.
 
 local _, ns = ...
 
@@ -42,6 +43,9 @@ local WAITING = "Waiting for your Crew. Members show up when they or someone who
 local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
 local PAUSED = "You appear offline: the others don't see you. Change it in Settings."
 local FEED_EMPTY = "Nothing yet. Dings, deaths and new Characters show up here."
+local GOALS_INTRO = "Reached together: everyone's progress counts."
+local GOAL_ROW = 74
+local GOAL_BAR = 6
 
 local GOLD = Skin.GOLD
 local MUTED = Skin.MUTED
@@ -60,6 +64,7 @@ local nav
 local section
 local rosterView
 local feedView
+local goalsView
 local footer
 local rowFrames = {}
 local altFrames = {}
@@ -410,6 +415,7 @@ end
 local NAV_ICONS = {
   roster = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
   feed = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon",
+  goals = Skin.FEED_ICONS.goal,
   settings = "Interface\\Buttons\\UI-OptionsButton",
 }
 
@@ -458,6 +464,9 @@ local function createNav()
   nav.feed:SetPoint("TOPRIGHT", nav.roster, "BOTTOMRIGHT")
   nav.feed.badge = Skin.badge(nav.feed, "tiny", { 0.1, 0.08, 0 }, GOLD)
   nav.feed.badge:SetPoint("RIGHT", -10, 0)
+  nav.goals = navButton("Goals", NAV_ICONS.goals, open("goals"))
+  nav.goals:SetPoint("TOPLEFT", nav.feed, "BOTTOMLEFT")
+  nav.goals:SetPoint("TOPRIGHT", nav.feed, "BOTTOMRIGHT")
   -- The panel steps aside so it doesn't cover the settings.
   nav.settings = navButton("Settings", NAV_ICONS.settings, function()
     if ns.Settings.open() then frame:Hide() end
@@ -470,6 +479,7 @@ local function drawNav(unseen)
   if not nav then createNav() end
   setSelected(nav.roster, tab == "roster")
   setSelected(nav.feed, tab == "feed")
+  setSelected(nav.goals, tab == "goals")
   setSelected(nav.settings, false)
   nav.feed.badge:SetText(unseen)
   nav.feed.badge:SetShown(unseen > 0 and tab ~= "feed")
@@ -683,6 +693,74 @@ local function drawFeed(feed)
   if feed.unseen > 0 then core:feedSeen() end
 end
 
+-- Goals: a row per track, in the panel's fixed height.
+local function createGoalsView()
+  goalsView = CreateFrame("Frame", nil, frame.content)
+  goalsView:SetAllPoints()
+  goalsView.intro = Skin.label(goalsView, "small", MUTED)
+  goalsView.intro:SetPoint("TOPLEFT", INSET, -INSET)
+  goalsView.intro:SetText(GOALS_INTRO)
+  goalsView.rows = {}
+end
+
+-- A track's row: title and numbers, the bar, and the last rung reached.
+local function goalRow(i)
+  local row = goalsView.rows[i]
+  if row then return row end
+  row = CreateFrame("Frame", nil, goalsView)
+  row:SetHeight(GOAL_ROW)
+  row:SetPoint("TOPLEFT", 0, -INSET - 22 - (i - 1) * GOAL_ROW)
+  row:SetPoint("RIGHT")
+  Skin.edge(row, "TOP", Skin.LINE)
+  row.title = Skin.label(row, "body")
+  row.title:SetPoint("TOPLEFT", INSET, -12)
+  row.numbers = Skin.label(row, "text")
+  row.numbers:SetJustifyH("RIGHT")
+  row.numbers:SetPoint("TOPRIGHT", -INSET, -13)
+  row.bar = CreateFrame("StatusBar", nil, row)
+  row.bar:SetPoint("TOPLEFT", INSET, -36)
+  row.bar:SetPoint("RIGHT", -INSET, 0)
+  row.bar:SetHeight(GOAL_BAR)
+  row.bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+  Skin.fill(row.bar, { 1, 1, 1, 0.08 })
+  row.last = Skin.label(row, "small", MUTED)
+  row.last:SetPoint("TOPLEFT", row.bar, "BOTTOMLEFT", 0, -8)
+  goalsView.rows[i] = row
+  return row
+end
+
+-- "Reached 200 on 14 Oct", or that nothing is yet.
+local function lastReached(goal)
+  if not goal.last then return "Not reached yet" end
+  local when = date("%d %b", goal.last.time):gsub("^0", "")
+  if goal.complete then return "Complete since " .. when end
+  return ("Reached %d on %s"):format(goal.last.rung, when)
+end
+
+local function drawGoal(row, goal)
+  row.title:SetText(goal.title)
+  if goal.complete then
+    row.numbers:SetText("Complete")
+    Skin.color(row.numbers, GOLD)
+    row.bar:SetMinMaxValues(0, 1)
+    row.bar:SetValue(1)
+  else
+    row.numbers:SetText(("%d / %d%s"):format(goal.value, goal.goal, goal.unit and " " .. goal.unit or ""))
+    Skin.color(row.numbers, TEXT)
+    row.bar:SetMinMaxValues(0, math.max(goal.goal, 1))
+    row.bar:SetValue(math.min(goal.value, goal.goal))
+  end
+  row.bar:SetStatusBarColor(GOLD[1], GOLD[2], GOLD[3], goal.complete and 1 or 0.85)
+  row.last:SetText(lastReached(goal))
+  Skin.color(row.last, goal.complete and GOLD or MUTED)
+end
+
+local function drawGoals()
+  if not goalsView then createGoalsView() end
+  for i, goal in ipairs(core:goals()) do drawGoal(goalRow(i), goal) end
+  goalsView:Show()
+end
+
 local function create()
   frame = Skin.window("BFFPanel", WIDTH, TITLE)
   frame:SetPoint("CENTER")
@@ -872,13 +950,18 @@ local function drawFooter(crew, summary)
   return height
 end
 
-local function hideRoster()
-  if rosterView then rosterView:Hide() end
-  if footer then footer:Hide() end
+-- Hides every tab's view but the one named ("roster", "feed", "goals";
+-- nil hides them all). Each draw function shows its own.
+local function hideViewsBut(name)
+  if name ~= "roster" then
+    if rosterView then rosterView:Hide() end
+    if footer then footer:Hide() end
+  end
+  if name ~= "feed" and feedView then feedView:Hide() end
+  if name ~= "goals" and goalsView then goalsView:Hide() end
 end
 
 local function drawRoster(crew, summary)
-  if feedView then feedView:Hide() end
   if not rosterView then rosterView = createScrollView() end
   local footerHeight = drawFooter(crew, summary)
   rosterView:ClearAllPoints()
@@ -924,8 +1007,7 @@ function Panel.refresh()
   local crew = core:crew()
   layout(crew ~= nil)
   if not crew then
-    hideRoster()
-    if feedView then feedView:Hide() end
+    hideViewsBut(nil)
     showSetup()
     return
   end
@@ -935,9 +1017,12 @@ function Panel.refresh()
   frame.headerRight:SetText(("%d of %d online"):format(summary.online, summary.members))
   local feed = core:feed()
   drawNav(feed.unseen)
+  hideViewsBut(tab)
   if tab == "feed" then
-    hideRoster()
     drawFeed(feed)
+  elseif tab == "goals" then
+    fresh = {}
+    drawGoals()
   else
     fresh = {}
     drawRoster(crew, summary)
@@ -949,7 +1034,7 @@ function Panel.toggle()
   frame:SetShown(not frame:IsShown())
 end
 
--- Opens the panel on a tab: "roster" or "feed".
+-- Opens the panel on a tab: "roster", "feed" or "goals".
 function Panel.show(name)
   if not frame then create() end
   tab = name

@@ -18,9 +18,11 @@ Core/Codec.lua
 Core/CrewCode.lua
 Core/Ledger.lua
 Core/Gossip.lua
+Core/Settle.lua
 Core/Reactions.lua
 Core/Feed.lua
 Core/Roster.lua
+Core/Goals.lua
 Core/Core.lua
 
 Game/Snapshot.lua

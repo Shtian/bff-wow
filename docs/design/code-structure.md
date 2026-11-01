@@ -50,7 +50,7 @@ Outputs:
   - `notice(kind)`: one-off messages ("BFF is out of date", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
 - Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isPaused()`, `isMinimapShown()`, `isChatLinesOn()`, `isAwayPopupOn()`, `isToastsOn()`, `toastSound()` and `toastPosition()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
-- Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
+- Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), `goals()` (the Goals tab's row per Crew goal track, `docs/design/goals.md`), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
 - `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` or `awaySummary`.
 - `react(key)` reacts to someone else's Feed entry, with a key from `feed()` or the summary.
 
@@ -62,6 +62,8 @@ These are internal seams: separate files for locality, tested only through Core'
 - **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, XP piggyback, 5-minute heartbeat), the "record changed" and "reply owed" flags, and Pause.
 - **Feed** (`Core/Feed.lua`): turns a before/after record pair from Ledger into Feed entries, including skipped versions such as 22 → 24. Also owns the capped log, seen flags, and when While you were away is ready. See `docs/design/feed.md`.
 - **Reactions** (`Core/Reactions.lua`): the pure parts of Reactions: which Reaction each entry kind has, the key a Reaction points at an entry by, how keys are stored in a record and pruned, and the wording the owner sees. Feed attaches Reactions to its entries. See `docs/design/reactions.md`.
+- **Settle** (`Core/Settle.lua`): when sync has gone quiet after the link came up (10 s with no new DATA, at most 30 s). Feed uses it for While you were away, Goals for its silent baseline.
+- **Goals** (`Core/Goals.lua`): the built-in Crew goal tracks and their rungs, progress worked out from Ledger's records, the reached rungs, the silent baseline and the Goals tab's rows. See `docs/design/goals.md`.
 - **Roster** (`Core/Roster.lua`): builds panel rows from Ledger. Covers Main resolution, "on alt", online (heard within 12 min, and not seen leaving the channel since), Last seen, "can play with you" (±3 levels), the 30-day hide and sorting.
 - **CrewCode** (`Core/CrewCode.lua`): generates, normalises and checks Crew codes, and derives the channel name and password from them.
 - **Codec** (`Core/Codec.lua`): a plain-text protocol version header, then the LibSerialize + LibDeflate body (`1|<payload>`). A newer version is detected before anything is decoded.
@@ -125,7 +127,7 @@ Not embedded: AceDB (Core owns plain SavedVariables), AceConsole and AceEvent (a
 BFF.toc
 BFF.lua
 Bindings.xml                         -- key binding to open the panel
-Core/  Core.lua  Ledger.lua  Gossip.lua  Reactions.lua  Feed.lua  Roster.lua  CrewCode.lua  Codec.lua
+Core/  Core.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  Feed.lua  Roster.lua  Goals.lua  CrewCode.lua  Codec.lua
 Game/  Snapshot.lua  ChannelLink.lua
 UI/    Skin.lua  Panel.lua  Minimap.lua  Away.lua  ToastQueue.lua  Toasts.lua  Settings.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases

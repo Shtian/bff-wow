@@ -5,7 +5,8 @@
 -- console (/bffdev, opened by /bff sim too): buttons that make each
 -- simulated Member ding, die, move, react to your newest entry or log out,
 -- one that plays out a stretch of you being away so While you were away
--- shows (with Reactions to your entries), and a live log of what
+-- shows (with Reactions to your entries), one that reaches the next Crew
+-- deaths goal, and a live log of what
 -- your Core sends, receives and fires. /bffdev toast [n] shows sample
 -- toasts. Left out of releases; it lives here, not in a file of its own,
 -- so the .toc (a shipped file) stays as it is.
@@ -251,7 +252,7 @@ local AWAY = {
 function Sim.away(core)
   if not net then return nil, "notRunning" end
   local log = core.log
-  log.settled, log.upSince, log.lastData = false, nil, nil
+  log.settle:restart()
   if core.linkUp then log:linkUp() end
   local current = members
   for i, client in ipairs(members) do
@@ -266,6 +267,24 @@ function Sim.away(core)
     end
   end
   return true
+end
+
+-- The first simulated Member online dies as many times as the Crew needs
+-- to reach its next Crew deaths goal, so the goal's Feed entry and toast
+-- show. Returns the rung, or nil and "notRunning" or "nobodyOnline".
+function Sim.goal(core)
+  if not net then return nil, "notRunning" end
+  local client
+  for _, member in ipairs(members) do
+    if member.core then client = client or member end
+  end
+  if not client then return nil, "nobodyOnline" end
+  for _, goal in ipairs(core:goals()) do
+    if goal.track == "deaths" then
+      client:play({ deaths = (client.character.deaths or 0) + goal.goal - goal.value })
+      return goal.rung
+    end
+  end
 end
 
 -- Logs the simulated Members out; you see them go offline.
@@ -509,10 +528,19 @@ local function create()
       or "sim  you were away, but the popup is off in Settings"))
   end)
   frame.away:SetPoint("LEFT", clear, "RIGHT", 6, 0)
+  frame.goal = Skin.button(frame, "Goal", function()
+    local rung, reason = Sim.goal(watched)
+    if rung then
+      log(color(DIM, ("sim  the Crew dies its way to %d deaths"):format(rung)))
+    elseif reason == "nobodyOnline" then
+      log(color(DIM, "sim  log a simulated Member in first"))
+    end
+  end)
+  frame.goal:SetPoint("LEFT", frame.away, "RIGHT", 6, 0)
   local changed = Skin.checkbox(frame, "Log every \"changed\"", function(self)
     showChanged = self:GetChecked()
   end)
-  changed:SetPoint("LEFT", frame.away, "RIGHT", 12, 0)
+  changed:SetPoint("LEFT", frame.goal, "RIGHT", 12, 0)
 
   frame.empty = Skin.label(frame, "small", Skin.MUTED)
   frame.empty:SetPoint("TOPLEFT", INSET, top - 38)
@@ -573,6 +601,7 @@ local SAMPLE_TOASTS = {
   { kind = "newCharacter", text = "Simone has a new Character: Simonette (Priest)" },
   { kind = "joined", text = "Simbad joined the Crew" },
   { kind = "left", text = "Simba left the Crew" },
+  { kind = "goal", text = "The Crew reached 300 Crew levels!" },
 }
 
 -- /bffdev toggles the console; /bffdev toast [n] shows n sample toasts
