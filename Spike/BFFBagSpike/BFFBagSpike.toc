@@ -1,0 +1,8 @@
+## Interface: 16001, 120105, 120107
+## Title: BFF Bag Spike
+## Notes: Throwaway test addon for the retail bag item tests (#67). Not part of BFF.
+## Author: Stian Haga
+## Version: 0.0.0-spike
+## SavedVariables: BFFBagSpikeDB
+
+Spike.lua
