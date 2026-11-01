@@ -95,7 +95,7 @@ What the code assumes (`Core/HandMeDowns.lua`): fields after `item:` are 1 item 
 
 **Fallback: keep `/bff hmd add` + shift-click.** It already works and uses Blizzard's own CHATLINK path, with no hook. It only gives a link, so to check tradeability and store the GUID it has to find the item in the bags by matching the item string (first match).
 
-A modifier-click shortcut (b), e.g. Alt+Right-click through `hooksecurefunc("HandleModifiedItemClick", …)`, can come later if the beta tests below show no taint and no clash with modifiers.
+A modifier-click shortcut (b), e.g. Alt+Right-click through `hooksecurefunc("HandleModifiedItemClick", …)`, can come later if the retail tests below show no taint and no clash with modifiers.
 
 ### Recommended way to detect items leaving
 
@@ -105,9 +105,13 @@ A modifier-click shortcut (b), e.g. Alt+Right-click through `hooksecurefunc("Han
 2. If it's nil, look for the item string in the bags and the bank. A match means kept: store that item's GUID. No match means gone, and the Hand-me-down ends.
 3. If GUIDs turn out not to survive a relog, drop step 1 and use the item string alone. Two identical items then count as one.
 
-## Test in the beta
+## Test on retail
 
-Run on the Forever client, default bags unless noted. Use `/dump` or a scratch addon.
+The Forever beta is over, so these run on **retail (Midnight)**, the closest live client, as in the [channel spike](channel-spike.md). Default bags unless noted. Use `/dump` or a scratch addon. Forever loads retail's (Mainline) bag code, so the marking, tradeability and GUID results should carry over (**inferred**). Retail can't settle everything:
+
+- Retail has no classic random-suffix "of the X" items, so steps 17–18 can only check plain and enchanted items there. Whether Forever's suffix items use suffix IDs or bonus IDs stays open until Forever launches.
+- Retail has no keyring (bag −1), and its bank layout may differ from Forever's `Camelot/BankFrame.lua`. Re-check steps 11–12 on Forever.
+- Forever-only API changes (GUID obfuscation, Patch 1.60.1) can't be seen on retail.
 
 **Marking**
 
