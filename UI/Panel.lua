@@ -5,9 +5,10 @@
 -- right-click menu per Character, and a footer with the hidden count,
 -- removed Members and the Crew code. The Feed is a timeline
 -- of Core's entries by day, an icon per kind, who reacted to each and a
--- button to react, and marks them seen while open. Goals has a row per
+-- button to react, and marks them seen while open. Goals scrolls a row per
 -- Crew goal track: the next rung, a progress bar with numbers and the last
--- rung reached. When is a heatmap of the week in local time: how many
+-- rung reached, and for Every profession in the Crew the twelve
+-- professions, the ones had lit. When is a heatmap of the week in local time: how many
 -- Members usually play each hour, or one Member's weeks played, picked
 -- from a menu. Spares lists other Members' open ones with Claim
 -- and Withdraw-claim buttons, dimmed when none of your Characters is high
@@ -67,8 +68,11 @@ local SETUP_WIDTH = 320
 local SETUP_COLUMN = 150
 local SETUP_COLUMNS_Y = -72
 local GOALS_INTRO = "Reached together: everyone's progress counts."
-local GOAL_ROW = 84
+local GOAL_ROW = 72
 local GOAL_BAR = 6
+-- Every profession in the Crew: a strip of the twelve under the bar.
+local GOAL_ICON = 18
+local GOAL_ICON_GAP = 4
 -- The When grid: a cell per hour, a row per day.
 local WHEN_CELL = 11
 local WHEN_ROW = 18
@@ -778,41 +782,77 @@ local function drawFeed(feed)
   if feed.unseen > 0 then core:feedSeen() end
 end
 
--- Goals: a row per track, in the panel's fixed height.
+-- Goals: a row per track, scrolling within the panel's fixed height.
 local function createGoalsView()
-  goalsView = CreateFrame("Frame", nil, frame.content)
-  goalsView:SetAllPoints()
-  goalsView.intro = Skin.label(goalsView, "small", MUTED)
+  goalsView = createScrollView()
+  goalsView:SetPoint("TOPLEFT")
+  goalsView:SetPoint("BOTTOMRIGHT", -6, 0)
+  goalsView.intro = Skin.label(goalsView.content, "small", MUTED)
   goalsView.intro:SetPoint("TOPLEFT", INSET, -INSET)
   goalsView.intro:SetText(GOALS_INTRO)
   goalsView.rows = {}
+end
+
+local function showGoalIconTooltip(icon)
+  GameTooltip:SetOwner(icon, "ANCHOR_RIGHT")
+  GameTooltip:AddLine(icon.name, 1, 1, 1)
+  GameTooltip:Show()
 end
 
 -- A track's row: title and numbers, the bar, and the last rung reached.
 local function goalRow(i)
   local row = goalsView.rows[i]
   if row then return row end
-  row = CreateFrame("Frame", nil, goalsView)
-  row:SetHeight(GOAL_ROW)
-  row:SetPoint("TOPLEFT", 0, -INSET - 22 - (i - 1) * GOAL_ROW)
+  row = CreateFrame("Frame", nil, goalsView.content)
   row:SetPoint("RIGHT")
   Skin.edge(row, "TOP", Skin.LINE)
   row.title = Skin.label(row, "heading")
-  row.title:SetPoint("TOPLEFT", INSET, -18)
+  row.title:SetPoint("TOPLEFT", INSET, -14)
   row.numbers = Skin.label(row, "text")
   row.numbers:SetJustifyH("RIGHT")
   row.numbers:SetPoint("RIGHT", -INSET, 0)
   row.numbers:SetPoint("BOTTOM", row.title, "BOTTOM", 0, -1)
   row.bar = CreateFrame("StatusBar", nil, row)
-  row.bar:SetPoint("TOPLEFT", INSET, -42)
+  row.bar:SetPoint("TOPLEFT", INSET, -38)
   row.bar:SetPoint("RIGHT", -INSET, 0)
   row.bar:SetHeight(GOAL_BAR)
   row.bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
   Skin.fill(row.bar, Skin.TRACK)
   row.last = Skin.label(row, "small", MUTED)
-  row.last:SetPoint("TOPLEFT", row.bar, "BOTTOMLEFT", 0, -8)
+  row.icons = {}
   goalsView.rows[i] = row
   return row
+end
+
+local function goalIcon(row, index)
+  local icon = row.icons[index]
+  if icon then return icon end
+  icon = CreateFrame("Frame", nil, row)
+  icon:SetSize(GOAL_ICON, GOAL_ICON)
+  icon:SetPoint("TOPLEFT", row.bar, "BOTTOMLEFT", (index - 1) * (GOAL_ICON + GOAL_ICON_GAP), -8)
+  icon:EnableMouse(true)
+  icon:SetScript("OnEnter", showGoalIconTooltip)
+  icon:SetScript("OnLeave", hideTooltip)
+  icon.texture = icon:CreateTexture(nil, "ARTWORK")
+  icon.texture:SetAllPoints()
+  icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  row.icons[index] = icon
+  return icon
+end
+
+-- Every profession in the Crew's strip: the ones had lit, the rest grey.
+-- Returns its height, 0 for any other track.
+local function drawGoalIcons(row, professions)
+  for i, p in ipairs(professions or {}) do
+    local icon = goalIcon(row, i)
+    icon.name = p.name
+    icon.texture:SetTexture(p.icon or QUESTION_MARK)
+    icon.texture:SetDesaturated(not p.lit)
+    icon.texture:SetAlpha(p.lit and 1 or 0.35)
+    icon:Show()
+  end
+  hideAll(row.icons, #(professions or {}) + 1)
+  return professions and GOAL_ICON + 8 or 0
 end
 
 -- "Reached 200 on 14 Oct", or that nothing is yet.
@@ -820,9 +860,10 @@ local function lastReached(goal)
   if not goal.last then return "Not reached yet" end
   local when = date("%d %b", goal.last.time):gsub("^0", "")
   if goal.complete then return "Complete since " .. when end
-  return ("Reached %d on %s"):format(goal.last.rung, when)
+  return ("Reached %s on %s"):format(goal.last.label, when)
 end
 
+-- Draws a goal's row. Returns its height.
 local function drawGoal(row, goal)
   row.title:SetText(goal.title)
   if goal.complete then
@@ -842,14 +883,32 @@ local function drawGoal(row, goal)
   else
     row.bar:SetStatusBarColor(Skin.BAR[1], Skin.BAR[2], Skin.BAR[3], Skin.BAR[4])
   end
+  local strip = drawGoalIcons(row, goal.professions)
+  row.last:ClearAllPoints()
+  row.last:SetPoint("TOPLEFT", row.bar, "BOTTOMLEFT", 0, -8 - strip)
   row.last:SetText(lastReached(goal))
   Skin.color(row.last, goal.complete and GOLD or MUTED)
+  local height = GOAL_ROW + strip
+  row:SetHeight(height)
+  return height
 end
 
 local function drawGoals()
   if not goalsView then createGoalsView() end
-  for i, goal in ipairs(core:goals()) do drawGoal(goalRow(i), goal) end
+  local y = -INSET - 22
+  local goals = core:goals()
+  for i, goal in ipairs(goals) do
+    local row = goalRow(i)
+    row:ClearAllPoints()
+    row:SetPoint("TOPLEFT", goalsView.content, "TOPLEFT", 0, y)
+    row:SetPoint("RIGHT", goalsView.content, "RIGHT")
+    y = y - drawGoal(row, goal)
+    row:Show()
+  end
+  hideAll(goalsView.rows, #goals + 1)
+  goalsView.content:SetHeight(-y)
   goalsView:Show()
+  updateThumb(goalsView)
 end
 
 -- When: a menu to pick the Crew or a Member, a line saying what the

@@ -29,10 +29,14 @@ local function crew(names, professions)
   return net, clients, ns
 end
 
+-- The client's Feed entries, newest first, but Crew goals, which
+-- profession_goals_spec covers.
 local function entries(client)
   local all = {}
   for _, day in ipairs(client.core:feed().days) do
-    for _, entry in ipairs(day.entries) do all[#all + 1] = entry end
+    for _, entry in ipairs(day.entries) do
+      if entry.kind ~= "goal" then all[#all + 1] = entry end
+    end
   end
   return all
 end
@@ -51,7 +55,7 @@ end
 local function chatLines(client)
   local lines = {}
   for _, event in ipairs(client.events) do
-    if event[1] == "feedEntry" then lines[#lines + 1] = event[2].text end
+    if event[1] == "feedEntry" and event[2].kind ~= "goal" then lines[#lines + 1] = event[2].text end
   end
   return lines
 end
@@ -224,7 +228,9 @@ describe("Profession Feed entries", function()
     b:login()
     net:run(40)
     local summary = events(b, "awaySummary")[1]
-    assert.equal(2, summary.count)
+    -- Tailoring is new to the Crew too: a Crew goal entry.
+    assert.equal(3, summary.count)
+    assert.same({ "The Crew has a Tailor now!" }, { summary.goals[1].text })
     assert.same({}, summary.members)
     assert.equal(2, #summary.professions)
     local said = {}
