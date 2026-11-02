@@ -51,6 +51,8 @@ stds.wow = {
     "GetItemInfo",
     "GetMaxLevelForPlayerExpansion",
     "GetMoney",
+    "GetProfessionInfo",
+    "GetProfessions",
     "GetRealZoneText",
     "GetServerTime",
     "GetTime",

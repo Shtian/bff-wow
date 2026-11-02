@@ -32,7 +32,7 @@ A World of Warcraft: Forever addon for friends who don't always play at the same
 | Command | What it does |
 |---|---|
 | `/bff` | Open or close the panel (also a key binding and the minimap button) |
-| `/bff feed`, `/bff goals`, `/bff when`, `/bff spares` | Open the panel on that tab |
+| `/bff feed`, `/bff goals`, `/bff when`, `/bff spares`, `/bff professions` | Open the panel on that tab |
 | `/bff spares add <item>` | Offer an item from your bags: shift-click it in after `add` |
 | `/bff start`, `/bff join <code>`, `/bff leave` | Start, join or leave a crew |
 | `/bff code` | Show your crew code |

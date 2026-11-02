@@ -167,7 +167,8 @@ local function sendOwnNow(self)
 end
 
 -- The current state of the Character being played, from Snapshot: guid,
--- name, classFilename, level, xp, maxXp, zone, deaths and money (copper).
+-- name, classFilename, level, xp, maxXp, zone, deaths, money (copper) and
+-- professions (as Professions.read reads them, nil if never read).
 function Core:updateOwn(character)
   local changed, before = self.ledger:updateOwn(character)
   -- The first report after login brings the Play times up to date.
@@ -190,12 +191,28 @@ end
 -- record, if not their own) and alts, plus the shown Character: the one
 -- being played while online, else the Main. A Character, shown or alt, has
 -- guid, name, classFilename, level, xp, maxXp, zone, deaths, money (copper,
--- nil if its client never shared it), mapId, x, y and
+-- nil if its client never shared it), professions (nil if its client never
+-- shared them, else up to 5 { skillLine, name, icon, skill, max, secondary,
+-- rank ("Apprentice" to "Artisan", from max), full (skill at max), capped
+-- (skill at Professions.CAP) }, main professions first), mapId, x, y and
 -- instance (where last seen; see mapPins()), lastPlayed, sinceSeen, playing
 -- (being played right now), main and canPlay (within Core.CAN_PLAY_LEVELS
 -- of the Character you play).
 function Core:rows(order)
   return ns.Roster.rows(self.ledger, self.now(), order)
+end
+
+-- The Professions tab: columns, a { skillLine, name, icon, secondary }
+-- for each profession a Character shown has, main professions first (by
+-- name), then cooking, fishing and first aid; and rows, one per Character
+-- the Roster shows, grouped by Member in the Roster's order (as rows(order)),
+-- the Main first and its Alts after. A row has memberId, own, displayName,
+-- name, classFilename, level, main, alt, first (the Member's first row),
+-- known (false if the Character's client never shared professions) and
+-- cells: per column, the Character's profession as in rows(), or false.
+-- Empty when unknown.
+function Core:professions(order)
+  return ns.Professions.grid(ns.Roster.rows(self.ledger, self.now(), order))
 end
 
 -- The world map's pins: one per other Member the panel shows whose shown

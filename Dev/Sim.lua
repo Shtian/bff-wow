@@ -21,19 +21,47 @@ local DAY = 24 * 60 * 60
 -- How long after starting the offline Member logs out.
 local LOGOUT_AFTER = 20
 
+-- Professions as Snapshot reads them: skill line ID, name, icon file ID,
+-- then skill and max per Character that has it.
+local PROFESSIONS = {
+  alchemy = { 171, "Alchemy", 136240 },
+  herbalism = { 182, "Herbalism", 136246 },
+  mining = { 186, "Mining", 136248 },
+  blacksmithing = { 164, "Blacksmithing", 136241 },
+  tailoring = { 197, "Tailoring", 136249 },
+  skinning = { 393, "Skinning", 134366 },
+  firstAid = { 129, "First Aid", 135966, true },
+  fishing = { 356, "Fishing", 136245, true },
+  cooking = { 185, "Cooking", 133971, true },
+}
+
+local function professions(...)
+  local list = {}
+  for i = 1, select("#", ...), 3 do
+    local key, skill, max = select(i, ...)
+    local p = PROFESSIONS[key]
+    list[#list + 1] = { skillLine = p[1], name = p[2], icon = p[3], skill = skill, max = max, secondary = p[4] }
+  end
+  return list
+end
+
 -- levelOffset is relative to the Character you play, so "can play" shows up.
 -- The first Character is the one being played; the others were played
 -- `ago` seconds earlier. main picks the Character set as Main, if any.
 local MEMBERS = {
   -- Online on their Main, and can play with you.
   { name = "Simone", characters = {
-    { name = "Simone", classFilename = "MAGE", levelOffset = 2, zone = "Westfall" },
-    { name = "Simonette", classFilename = "PRIEST", levelOffset = -8, zone = "Darkshore", ago = 2 * DAY },
+    { name = "Simone", classFilename = "MAGE", levelOffset = 2, zone = "Westfall",
+      professions = professions("herbalism", 300, 300, "alchemy", 287, 300, "cooking", 300, 300) },
+    { name = "Simonette", classFilename = "PRIEST", levelOffset = -8, zone = "Darkshore", ago = 2 * DAY,
+      professions = professions("tailoring", 140, 150, "firstAid", 150, 150) },
   } },
   -- On an Alt, with a Main that can play with you.
   { name = "Simbad", main = 2, characters = {
-    { name = "Simbad", classFilename = "ROGUE", levelOffset = 10, zone = "Redridge Mountains" },
-    { name = "Simbadsson", classFilename = "WARRIOR", levelOffset = -1, zone = "Wetlands", ago = DAY },
+    { name = "Simbad", classFilename = "ROGUE", levelOffset = 10, zone = "Redridge Mountains",
+      professions = professions("skinning", 120, 150, "fishing", 211, 225) },
+    { name = "Simbadsson", classFilename = "WARRIOR", levelOffset = -1, zone = "Wetlands", ago = DAY,
+      professions = professions("mining", 300, 300, "blacksmithing", 262, 300) },
   } },
   -- Logs out soon after, with an Alt unseen for 40 days (hidden).
   { name = "Simba", offline = true, characters = {
@@ -129,7 +157,7 @@ local function character(i, j, spec, yourLevel)
   return {
     guid = guidFor(i, j), name = spec.name, classFilename = spec.classFilename,
     level = math.max(1, yourLevel + spec.levelOffset), xp = 300 * j, maxXp = 1000 + 200 * i,
-    zone = spec.zone, deaths = i + j,
+    zone = spec.zone, deaths = i + j, professions = spec.professions,
   }
 end
 

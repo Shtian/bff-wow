@@ -1,8 +1,8 @@
 -- Snapshot: reads the Character being played and hands it to Core. It also
 -- counts deaths, kept per Character in BFF_CharacterDB, so a client crash
 -- loses that session's deaths (see docs/design/code-structure.md), and
--- reads where the Character stands for Core's locate(), and item info for
--- Spares.
+-- reads its professions (on PLAYER_ENTERING_WORLD and SKILL_LINES_CHANGED),
+-- where the Character stands for Core's locate(), and item info for Spares.
 
 local _, ns = ...
 
@@ -16,11 +16,28 @@ local EVENTS = {
   "ZONE_CHANGED_NEW_AREA",
   "PLAYER_DEAD",
   "PLAYER_MONEY",
+  "SKILL_LINES_CHANGED",
 }
+-- Professions are read again only on these.
+local PROFESSION_EVENTS = { PLAYER_ENTERING_WORLD = true, SKILL_LINES_CHANGED = true }
 
 local level = 0
 local zone
 local money
+local professions
+
+-- The professions, read through Professions.read, which keeps the last
+-- good list when a value reads secret or the read errors: that costs the
+-- professions, never the send.
+local PROFESSION_API = {
+  getProfessions = GetProfessions,
+  getProfessionInfo = GetProfessionInfo,
+  isSecret = issecretvalue,
+}
+local function readProfessions()
+  if not (GetProfessions and GetProfessionInfo) then return end
+  professions = ns.Professions.read(PROFESSION_API, professions)
+end
 
 local function read()
   local guid = UnitGUID("player")
@@ -50,6 +67,7 @@ local function read()
     zone = zone,
     deaths = BFF_CharacterDB.deaths,
     money = money,
+    professions = professions,
   }
 end
 
@@ -106,12 +124,14 @@ function Snapshot.start(core)
 
   local frame = CreateFrame("Frame")
   for _, event in ipairs(EVENTS) do frame:RegisterEvent(event) end
+  readProfessions()
   frame:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_LEVEL_UP" then
       level = math.max(level, (...))
     elseif event == "PLAYER_DEAD" then
       BFF_CharacterDB.deaths = BFF_CharacterDB.deaths + 1
     end
+    if PROFESSION_EVENTS[event] then readProfessions() end
     update()
   end)
   update()

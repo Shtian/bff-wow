@@ -20,6 +20,7 @@ Libs/HereBeDragons/HereBeDragons-Pins-2.0.lua
 Core/Codec.lua
 Core/CrewCode.lua
 Core/PlayTimes.lua
+Core/Professions.lua
 Core/Ledger.lua
 Core/Gossip.lua
 Core/Settle.lua

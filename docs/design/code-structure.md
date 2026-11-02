@@ -11,7 +11,7 @@ Almost all behaviour lives in one deep, pure-Lua module, **Core**, behind a smal
 | Module | Pure? | Owns |
 |---|---|---|
 | **Core** (`Core/`) | yes | Everything BFF knows and decides: Member records, sync, Feed, panel rows, saved-data layout. Details below. |
-| **Snapshot** (`Game/Snapshot.lua`) | no | Reads level, XP, zone, class, gold and GUID, counts deaths (kept per Character in `BFF_CharacterDB`), and calls `core:updateOwn(character)`. `Snapshot.locate()` reads where the Character stands, for Core's `locate`. |
+| **Snapshot** (`Game/Snapshot.lua`) | no | Reads level, XP, zone, class, gold, professions (through `Professions.read`) and GUID, counts deaths (kept per Character in `BFF_CharacterDB`), and calls `core:updateOwn(character)`. `Snapshot.locate()` reads where the Character stands, for Core's `locate`. |
 | **Bags** (`Game/Bags.lua`) | no | Offers a bag item as a Spare: the item on the cursor (the Spares tab's drop slot) or the first bag item matching a link (`/bff spares add`). Passes its item GUID and binding to `core:postSpare`, which refuses an item that can't be traded. Also tells Core where a posted item is now (`findItem`), for `core:bagsUpdated` on `BAG_UPDATE_DELAYED`. |
 | **Channel link** (`Game/ChannelLink.lua`) | no | The production link adapter: joins and hides the Crew channel (including filtering its system notices out of chat), AceComm with ChatThrottleLib, decides when the link is up or down, reports Members leaving the channel, and has an echo mode. See `docs/research/channel-spike.md`. |
 | **UI** (`UI/Skin.lua`, `UI/Panel.lua`, `UI/Minimap.lua`, `UI/MapPins.lua`, `UI/Away.lua`, `UI/ToastQueue.lua`, `UI/Toasts.lua`, `UI/Settings.lua`) | no | Renders Core's rows and summaries and sends user commands to Core. Shows no state it worked out itself. Skin is the shared flat look (colours, fonts, window, buttons, Feed icons) for the panel, the popup, toasts and map pins. ToastQueue is pure and tested offline (`docs/design/toasts.md`). |
@@ -59,7 +59,7 @@ Outputs:
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
 - Settings: Core holds one ordered list of the local settings (`docs/design/settings-and-release.md`). `setting(key)` reads one and `setSetting(key, value)` sets it; `settings()` is the Settings page's ready-to-render read, a section per `{ title, settings }`, each setting `{ key, kind, label, value }`. The named methods (`isPaused()`/`setPaused()`, `isMinimapShown()`/`setMinimapShown()`, `isChatLinesOn()`/`setChatLines()`, `isAwayPopupOn()`/`setAwayPopup()`, `isToastsOn()`/`setToasts()`, `toastSound()`/`setToastSound()` and `toastPosition()`/`setToastPosition()`) are one-line wrappers over these. `minimapIcon()` is the saved table LibDBIcon keeps the button's position and the minimap setting's hidden flag in.
 - Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil) and `displayName()`.
-- Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), `goals()` (the Goals tab's row per Crew goal track, `docs/design/goals.md`), `playTimes(memberId?)` (the When tab's grid for the Crew or one Member, `docs/design/play-times.md`), `mapPins()` (a world map pin per other Member the Roster shows, at their shown Character's last-seen spot), `spares()` (the Spares tab's rows, From the Crew and Yours), `spareItems()` (the item GUIDs of the open Spares the Character being played posted), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
+- Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), `goals()` (the Goals tab's row per Crew goal track, `docs/design/goals.md`), `playTimes(memberId?)` (the When tab's grid for the Crew or one Member, `docs/design/play-times.md`), `mapPins()` (a world map pin per other Member the Roster shows, at their shown Character's last-seen spot), `spares()` (the Spares tab's rows, From the Crew and Yours), `professions(order?)` (the Professions tab's grid, a row per Character by Member and a column per profession, `docs/design/professions.md`), `spareItems()` (the item GUIDs of the open Spares the Character being played posted), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
 - `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` (or `reaction`, `spare`) or `awaySummary`.
 - `react(key)` reacts to someone else's Feed entry, with a key from `feed()` or the summary.
 
@@ -75,6 +75,7 @@ These are internal seams: separate files for locality, tested only through Core'
 - **Settle** (`Core/Settle.lua`): when sync has gone quiet after the link came up (10 s with no new DATA, at most 30 s). Feed uses it for While you were away, Goals for its silent baseline.
 - **Goals** (`Core/Goals.lua`): the built-in Crew goal tracks and their rungs, progress worked out from Ledger's records, the reached rungs, the silent baseline and the Goals tab's rows. See `docs/design/goals.md`.
 - **PlayTimes** (`Core/PlayTimes.lua`): counts the own Member's seconds played per UTC hour of the week for the last 4 weeks, makes the summary their record shares, ages summaries by the viewer's clock and shifts them into local time. See `docs/design/play-times.md`.
+- **Professions** (`Core/Professions.lua`): the pure parts of Professions: reading them from the game through the API handed in (secret values and errors keep the last list), how a list is stored in a record and checked, ranks, and the Professions tab's grid from Roster's rows. See `docs/design/professions.md`.
 - **Roster** (`Core/Roster.lua`): builds panel rows from Ledger. Covers Main resolution, "on alt", online (heard within 12 min, and not seen leaving the channel since), Last seen, "can play with you" (±3 levels), the 30-day hide and sorting.
 - **CrewCode** (`Core/CrewCode.lua`): generates, normalises and checks Crew codes, and derives the channel name and password from them.
 - **Codec** (`Core/Codec.lua`): a plain-text protocol version header, then the LibSerialize + LibDeflate body (`1|<payload>`). A newer version is detected before anything is decoded.
@@ -99,7 +100,7 @@ Every file starts with `local _, ns = ...` and attaches itself to `ns`, the addo
 
 - **Runner:** busted under LuaJIT, linted with luacheck.
 - **The interface is the test surface.** Tests create Cores and check `rows()`, the While you were away summary, Feed entries, and the recorded listener events and sent messages. They never look inside `db`, Ledger or Gossip.
-- **Pure, stateless helper files may be tested directly**, table-style, as `codec_spec` does for Codec and `spare_rules_spec` for SpareRules. Anything with state or lifecycle is tested through Core.
+- **Pure, stateless helper files may be tested directly**, table-style, as `codec_spec` does for Codec, `spare_rules_spec` for SpareRules and `professions_spec` for reading professions. Anything with state or lifecycle is tested through Core.
 - **Fake network** (`Dev/FakeNet.lua`):
   - One shared virtual clock and scheduler, so every run plays out the same way.
   - Each simulated client is a real Core with a fake link and its own `db`.
@@ -140,7 +141,7 @@ Not embedded: AceDB (Core owns plain SavedVariables), AceConsole and AceEvent (a
 BFF.toc
 BFF.lua
 Bindings.xml                         -- key binding to open the panel
-Core/  Core.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  SpareRules.lua  Spares.lua  Feed.lua  Roster.lua  Goals.lua  PlayTimes.lua  CrewCode.lua  Codec.lua
+Core/  Core.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  SpareRules.lua  Spares.lua  Feed.lua  Roster.lua  Goals.lua  PlayTimes.lua  Professions.lua  CrewCode.lua  Codec.lua
 Game/  Snapshot.lua  Bags.lua  ChannelLink.lua
 UI/    Skin.lua  Panel.lua  Minimap.lua  MapPins.lua  Away.lua  ToastQueue.lua  Toasts.lua  Settings.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases
