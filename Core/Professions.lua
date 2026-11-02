@@ -226,49 +226,39 @@ function Professions.describe(stored)
 end
 
 -- The Professions tab from the Roster's rows (own first, then in the
--- Roster's order). See Core:professions().
-function Professions.tab(rows)
+-- Roster's order), sorted by the profession with skill line sortBy if
+-- given. See Core:professions().
+function Professions.tab(rows, sortBy)
   local professions, bySkillLine = {}, {}
   for i, p in ipairs(Professions.ALL) do
     professions[i] = { skillLine = p.skillLine, name = p.name, icon = p.icon, secondary = p.secondary == true,
-      holders = {} }
+      had = false }
     bySkillLine[p.skillLine] = professions[i]
   end
-  local unshared, shown = {}, 0
-  local function add(row, character)
-    shown = shown + 1
-    if not character.professions then
-      unshared[#unshared + 1] = { memberId = row.memberId, own = row.own == true, displayName = row.displayName,
-        name = character.name, classFilename = character.classFilename }
-      return
+  -- Each Member's Characters, the Main first, and any profession outside
+  -- the twelve as a column too.
+  local members = {}
+  for index, row in ipairs(rows) do
+    local characters = {}
+    for _, character in ipairs({ row, unpack(row.alts) }) do
+      table.insert(characters, character.main and 1 or #characters + 1, character)
     end
-    for _, p in ipairs(character.professions) do
-      local profession = bySkillLine[p.skillLine]
-      if not profession then
-        -- One outside the twelve: listed too, after its kind.
-        profession = { skillLine = p.skillLine, secondary = p.secondary, holders = {} }
-        bySkillLine[p.skillLine] = profession
-        professions[#professions + 1] = profession
+    local member = { memberId = row.memberId, own = row.own == true, displayName = row.displayName,
+      known = false, characters = characters, index = index }
+    for _, character in ipairs(characters) do
+      if character.professions then member.known = true end
+      for _, p in ipairs(character.professions or {}) do
+        local profession = bySkillLine[p.skillLine]
+        if not profession then
+          profession = { skillLine = p.skillLine, secondary = p.secondary == true }
+          bySkillLine[p.skillLine] = profession
+          professions[#professions + 1] = profession
+        end
+        -- Someone has it: as their client words it.
+        profession.name, profession.icon, profession.had = p.name, p.icon or profession.icon, true
       end
-      -- As the holder's client words it.
-      profession.name, profession.icon = p.name, p.icon or profession.icon
-      local holders = profession.holders
-      holders[#holders + 1] = {
-        memberId = row.memberId, own = row.own == true, displayName = row.displayName,
-        name = character.name, classFilename = character.classFilename, alt = not character.main,
-        skill = p.skill, max = p.max, rank = p.rank, full = p.full, capped = p.capped, shown = shown,
-      }
     end
-  end
-  for _, row in ipairs(rows) do
-    local characters = { row }
-    for _, alt in ipairs(row.alts) do characters[#characters + 1] = alt end
-    for _, character in ipairs(characters) do
-      if character.main then add(row, character) end
-    end
-    for _, character in ipairs(characters) do
-      if not character.main then add(row, character) end
-    end
+    members[#members + 1] = member
   end
 
   -- The twelve keep their order; any other goes after its kind, by name.
@@ -279,14 +269,49 @@ function Professions.tab(rows)
     if a.position or b.position then return a.position ~= nil end
     return listedBefore(a, b)
   end)
-  for _, profession in ipairs(professions) do
-    profession.position = nil
-    -- Best first; as the Roster shows them otherwise.
-    table.sort(profession.holders, function(a, b)
-      if a.skill ~= b.skill then return a.skill > b.skill end
-      return a.shown < b.shown
-    end)
-    for _, holder in ipairs(profession.holders) do holder.shown = nil end
+  for _, profession in ipairs(professions) do profession.position = nil end
+
+  -- A cell per profession: the Member's Characters who have it, best first,
+  -- the best's skill on the cell itself; false for none.
+  for _, member in ipairs(members) do
+    member.cells = {}
+    for i, profession in ipairs(professions) do
+      local characters = {}
+      for order, character in ipairs(member.characters) do
+        for _, p in ipairs(character.professions or {}) do
+          if p.skillLine == profession.skillLine then
+            characters[#characters + 1] = { name = character.name, classFilename = character.classFilename,
+              alt = not character.main, skill = p.skill, max = p.max, rank = p.rank, full = p.full, capped = p.capped,
+              order = order }
+          end
+        end
+      end
+      table.sort(characters, function(a, b)
+        if a.skill ~= b.skill then return a.skill > b.skill end
+        return a.order < b.order
+      end)
+      for _, c in ipairs(characters) do c.order = nil end
+      local best = characters[1]
+      member.cells[i] = best and { skill = best.skill, max = best.max, rank = best.rank, full = best.full,
+        capped = best.capped, characters = characters } or false
+    end
+    member.characters = nil
   end
-  return { professions = professions, unshared = unshared }
+
+  -- Sorted by a profession: yours stays first, then the best skill in it,
+  -- then the Roster's order.
+  local column
+  for i, profession in ipairs(professions) do
+    if profession.skillLine == sortBy then column = i end
+  end
+  if column then
+    local function skill(member) return member.cells[column] and member.cells[column].skill or -1 end
+    table.sort(members, function(a, b)
+      if a.own ~= b.own then return a.own end
+      if skill(a) ~= skill(b) then return skill(a) > skill(b) end
+      return a.index < b.index
+    end)
+  end
+  for _, member in ipairs(members) do member.index = nil end
+  return { professions = professions, members = members }
 end

@@ -205,16 +205,18 @@ function Core:rows(order)
 end
 
 -- The Professions tab: professions, a { skillLine, name, icon, secondary,
--- holders } for each of the twelve (main ones by name, then cooking, fishing
--- and first aid) and any other a Character shown has, after its kind. The
--- holders are the Characters the Roster shows (as rows(order)) who have it,
--- best skill first, then in the Roster's order (yours first, a Member's Main
--- before its Alts): memberId, own, displayName, name, classFilename, alt,
--- skill, max, rank, full and capped. None for a profession nobody has. And
--- unshared: { memberId, own, displayName, name, classFilename } for each
--- Character whose client never shared professions, in the same order.
-function Core:professions(order)
-  return ns.Professions.tab(ns.Roster.rows(self.ledger, self.now(), order))
+-- had (some Character shown has it) } for each of the twelve (main ones by
+-- name, then cooking, fishing and first aid) and any other a Character shown
+-- has, after its kind; and members, a row per Member the Roster shows (as
+-- rows(order): yours first), or sorted by the profession with skill line
+-- sortBy (yours still first, then best skill in it). A member has memberId,
+-- own, displayName, known (false if none of their Characters' clients ever
+-- shared professions) and cells: per profession, false for none, or the
+-- best skill among their Characters (skill, max, rank, full, capped) and
+-- characters, each Character who has it (name, classFilename, alt, skill,
+-- max, rank, full, capped), best first.
+function Core:professions(order, sortBy)
+  return ns.Professions.tab(ns.Roster.rows(self.ledger, self.now(), order), sortBy)
 end
 
 -- The world map's pins: one per other Member the panel shows whose shown
