@@ -465,8 +465,9 @@ local function drawSection(count)
   section.line:SetPoint("RIGHT", count > 0 and section.spares or section.sort, "LEFT", -8, 0)
 end
 
--- The sidebar: Roster, Feed, Goals, When and Spares on top, Settings at
--- the bottom, as plain labels. The selected one's chip marks it.
+-- The sidebar: Roster, Feed, Goals, When and Spares on top, Settings and
+-- the addon's version at the bottom, as plain labels. The selected one's
+-- chip marks it.
 local function navButton(label, onClick)
   local button = CreateFrame("Button", nil, frame.sidebar)
   button:SetHeight(NAV_HEIGHT)
@@ -517,8 +518,11 @@ local function createNav()
   nav.settings = navButton("Settings", function()
     if ns.Settings.open() then frame:Hide() end
   end)
-  nav.settings:SetPoint("BOTTOMLEFT", 0, 8)
-  nav.settings:SetPoint("BOTTOMRIGHT", 0, 8)
+  nav.settings:SetPoint("BOTTOMLEFT", 0, 22)
+  nav.settings:SetPoint("BOTTOMRIGHT", 0, 22)
+  nav.version = Skin.label(frame.sidebar, "tiny", DIM)
+  nav.version:SetPoint("BOTTOMLEFT", NAV_CHIP_X + 10, 10)
+  nav.version:SetText(ns.VERSION)
 end
 
 -- unseen counts the Feed's unseen entries, and sparesUnseen the

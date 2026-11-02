@@ -1,7 +1,13 @@
 -- App: wiring only. Creates Core, routes WoW events to it and ticks it once a
 -- second. See docs/design/code-structure.md.
 
-local _, ns = ...
+local addonName, ns = ...
+
+-- The .toc's Version, which the packager fills in from the release tag
+-- ("v0.2.1"). A checkout that wasn't packaged still has the token.
+local version = C_AddOns.GetAddOnMetadata(addonName, "Version")
+if not version or version:find("@", 1, true) then version = "dev" end
+ns.VERSION = version
 
 local function say(text)
   print("|cff33ff99BFF|r: " .. text)
