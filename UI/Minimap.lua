@@ -22,7 +22,7 @@ local shown
 -- "N of M online · K can play with you now" and, with the popup off, "N new
 -- in Feed", or how to get started.
 local function showTooltip(tooltip)
-  tooltip:AddLine("BFF")
+  tooltip:AddDoubleLine("BFF", ns.VERSION, nil, nil, nil, 0.6, 0.6, 0.6)
   if not core:crew() then
     tooltip:AddLine("Not in a Crew. Click to start or join one.", 1, 1, 1)
   else

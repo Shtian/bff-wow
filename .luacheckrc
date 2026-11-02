@@ -21,6 +21,7 @@ stds.wow = {
   read_globals = {
     "Ambiguate",
     "BACKPACK_CONTAINER",
+    "C_AddOns",
     "C_ChatInfo",
     "C_Container",
     "C_Cursor",
