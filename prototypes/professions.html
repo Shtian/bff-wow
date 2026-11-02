@@ -1,0 +1,259 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Question: where should Professions go in the BFF panel?
+  Four structurally different placements, switchable via ?variant=A|B|C|D, the bar at the bottom, or ← / →.
+    A  Roster: profession icons on each row, skill in the Character tooltip (no new tab)
+    B  Professions tab, by Member: a grid, one row per Character, a column per profession
+    C  Professions tab, by profession: who in the Crew has each one, gaps shown
+    D  News only: Feed entries at rank milestones and a Crew goal for coverage
+  All data is fake. Skill caps assume a 300 max (Apprentice 75, Journeyman 150, Expert 225, Artisan 300), to be checked on Forever.
+  Run: open the file in a browser.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE · BFF professions</title>
+<style>
+  :root {
+    --gold:#ffd14a; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99; --online:#70e370; --off:#54525e;
+    --window:#0e0d14f7; --header:#1a1821; --sidebar:#00000040; --raised:#1b1a23; --line:#ffffff12; --border:#ffffff1a;
+    --hover:#ffffff0d; --track:#ffffff14; --bar:#ffffff4d;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:28px 16px 90px; font:13px/1.35 "Arial Narrow", "Roboto Condensed", Arial, sans-serif; color:var(--text);
+    background: radial-gradient(ellipse at 40% 30%, #1d2a44 0%, #0d1220 55%, #07090f 100%); min-height:100vh; }
+  .stage { display:flex; gap:14px; align-items:flex-start; justify-content:center; flex-wrap:wrap; }
+  .note { max-width:820px; margin:0 auto 14px; color:var(--muted); font-size:13px; }
+  .note b { color:var(--gold); font-weight:normal; }
+
+  .panel { width:660px; height:470px; background:var(--window); border:1px solid var(--border); display:flex; flex-direction:column; box-shadow:0 10px 40px #000c; }
+  .head { height:34px; background:var(--header); display:flex; align-items:center; padding:0 12px 0 16px; border-bottom:1px solid var(--line); }
+  .head .t { font-family:"Friz Quadrata TT", Georgia, serif; color:var(--gold); font-size:14px; letter-spacing:.02em; flex:1; }
+  .head .on { color:var(--muted); font-size:12px; margin-right:14px; } .head .on::before { content:"●"; color:var(--online); margin-right:5px; font-size:9px; }
+  .head .x { color:var(--muted); }
+  .body { flex:1; display:flex; min-height:0; }
+  .side { width:150px; background:var(--sidebar); border-right:1px solid var(--line); padding:8px; display:flex; flex-direction:column; gap:2px; }
+  .side div { padding:6px 10px; color:var(--muted); font-size:14px; }
+  .side .sel { background:#ffffff14; color:var(--text); }
+  .side .new { color:var(--gold); }
+  .side .new::after { content:" new"; font-size:10px; color:var(--dim); }
+  .side .grow { flex:1; }
+  .main { flex:1; padding:8px 12px; overflow:auto; position:relative; }
+  .foot { height:34px; border-top:1px solid var(--line); display:flex; align-items:center; padding:0 14px; color:var(--muted); font-size:12px; gap:8px; }
+  .foot .code { border:1px solid var(--border); padding:2px 14px; color:var(--text); }
+  .foot .sp { flex:1; }
+  .cap { color:var(--dim); font-family:Georgia, serif; font-size:10px; letter-spacing:.12em; text-transform:uppercase; margin:6px 0 4px; }
+
+  .c-MAGE{color:#3FC7EB}.c-WARRIOR{color:#C69B6D}.c-ROGUE{color:#FFF468}.c-DRUID{color:#FF7C0A}.c-PRIEST{color:#fff}.c-HUNTER{color:#AAD372}.c-WARLOCK{color:#8788EE}
+  .lv { background:#ffffff14; padding:0 4px; font-size:12px; color:var(--text); }
+  .muted { color:var(--muted); } .dimt { color:var(--dim); }
+  .gold { color:var(--gold); }
+
+  /* profession glyph: stands in for the game's profession icon */
+  .pi { display:inline-grid; place-items:center; width:16px; height:16px; font-size:9px; font-weight:bold; color:#0e0d14; border:1px solid #000; vertical-align:middle; flex:none; }
+  .pi.big { width:22px; height:22px; font-size:11px; }
+  .pi.sec { opacity:.75; }
+  .bar { height:4px; background:var(--track); position:relative; }
+  .bar i { position:absolute; left:0; top:0; bottom:0; background:var(--bar); }
+  .bar i.max { background:var(--gold); }
+
+  /* A: roster rows with icons, plus tooltip */
+  .A .row { display:grid; grid-template-columns:32px 1fr auto; gap:8px; padding:5px 6px; align-items:center; border-bottom:1px solid var(--line); }
+  .A .row.hov { background:var(--hover); }
+  .A .av { width:26px; height:26px; display:grid; place-items:center; font-weight:bold; color:#000; border:1px solid #000; font-size:12px; }
+  .A .l1 { display:flex; gap:6px; align-items:center; }
+  .A .l1 .n { font-size:15px; }
+  .A .l2 { color:var(--muted); font-size:12px; }
+  .A .icons { display:inline-flex; gap:3px; margin-left:4px; }
+  .A .right { text-align:right; font-size:12px; color:var(--muted); }
+  .A .alt { display:flex; gap:6px; align-items:center; padding:3px 6px 3px 46px; font-size:13px; }
+  .tip { width:230px; background:#0b0a10f2; border:1px solid #ffffff30; padding:8px 10px; font-size:12.5px; box-shadow:0 6px 20px #000a; }
+  .tip .t1 { font-size:14px; }
+  .tip .ln { color:#fff; } .tip .m { color:var(--muted); }
+  .tip .prof { display:grid; grid-template-columns:18px 1fr auto; gap:6px; align-items:center; margin-top:3px; }
+  .tip .prof .bar { grid-column:2/4; margin-top:-1px; }
+  .tip hr { border:0; border-top:1px solid #ffffff1a; margin:6px 0; }
+
+  /* B: grid by member */
+  .B table { border-collapse:collapse; width:100%; font-size:12.5px; }
+  .B th { color:var(--dim); font-weight:normal; padding:4px 1px 6px; border-bottom:1px solid var(--line); text-align:center; }
+  .B th:first-child { text-align:left; }
+  .B td { padding:4px 1px; border-bottom:1px solid var(--line); text-align:center; vertical-align:middle; }
+  .B td:first-child { text-align:left; white-space:nowrap; }
+  .B tr.member td { border-top:1px solid #ffffff22; }
+  .B tr.altr td:first-child { padding-left:14px; font-size:12px; }
+  .B .cell { display:inline-block; min-width:27px; }
+  .B .cell .v { font-size:11.5px; } .B .cell .bar { margin-top:2px; height:3px; }
+  .B .cell.none { color:#ffffff22; }
+  .B .who { display:block; color:var(--dim); font-size:10.5px; }
+  .B th.secstart, .B td.secstart { border-left:1px solid #ffffff1f; }
+  .B .sel th.hl, .B td.hl { background:#ffd14a0c; }
+  .B .legend { color:var(--dim); font-size:11px; margin-top:8px; }
+
+  /* C: by profession */
+  .C .prof { display:grid; grid-template-columns:26px 1fr; gap:8px; padding:6px 4px; border-bottom:1px solid var(--line); }
+  .C .pn { font-size:14px; display:flex; gap:8px; align-items:baseline; }
+  .C .pn .count { color:var(--dim); font-size:11px; }
+  .C .people { display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:3px; }
+  .C .p { display:grid; grid-template-columns:auto 34px; gap:0 6px; align-items:center; font-size:12.5px; }
+  .C .p .bar { grid-column:1/3; height:3px; margin-top:1px; }
+  .C .p .r { text-align:right; color:var(--muted); }
+  .C .gap { color:var(--dim); font-style:italic; font-size:12.5px; margin-top:3px; }
+  .C .prof.missing .pn { color:var(--dim); }
+  .C .prof.missing .pi { filter:grayscale(1); opacity:.4; }
+  .C .filters { display:flex; gap:6px; margin-bottom:4px; }
+  .C .filters span { border:1px solid var(--border); padding:1px 8px; font-size:12px; color:var(--muted); }
+  .C .filters span.on { color:var(--text); border-color:#ffffff40; }
+
+  /* D: feed + goals */
+  .D .entry { display:grid; grid-template-columns:24px 1fr auto; gap:8px; padding:7px 4px; border-bottom:1px solid var(--line); align-items:start; }
+  .D .entry .when { color:var(--dim); font-size:11px; }
+  .D .entry .txt { font-size:14px; }
+  .D .entry .sub { color:var(--muted); font-size:12px; }
+  .D .entry.hlg .txt { color:var(--gold); }
+  .D .cheer { display:inline-block; border:1px solid var(--border); padding:0 6px; font-size:11px; color:var(--muted); margin-top:3px; }
+  .D .old { opacity:.55; }
+  .D .goal { border:1px solid var(--border); background:var(--raised); padding:8px 10px; margin-top:6px; }
+  .D .goal .g1 { display:flex; justify-content:space-between; }
+  .D .goal .bar { margin-top:6px; height:5px; }
+  .D .goal .slots { display:flex; gap:4px; margin-top:6px; }
+
+  /* switcher (not part of the design) */
+  .switcher { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); display:flex; align-items:center; gap:4px;
+    background:#fff; color:#111; border-radius:999px; padding:4px; box-shadow:0 6px 24px #000a; font:13px system-ui, sans-serif; z-index:9; }
+  .switcher button { border:0; background:#eee; border-radius:999px; width:30px; height:30px; cursor:pointer; font-size:15px; }
+  .switcher button:hover { background:#ddd; }
+  .switcher .label { padding:0 12px; min-width:310px; text-align:center; }
+  .switcher .label b { margin-right:6px; }
+</style>
+</head>
+<body>
+<div class="note" id="note"></div>
+<div class="stage" id="stage"></div>
+<div class="switcher"><button id="prev" title="Previous (←)">‹</button><span class="label" id="label"></span><button id="next" title="Next (→)">›</button></div>
+
+<script>
+// ---------- fake data ----------
+const PROF = {
+  Alchemy:{g:"Al",c:"#7fd36b"}, Blacksmithing:{g:"Bs",c:"#b5b0a8"}, Enchanting:{g:"En",c:"#b48cff"},
+  Engineering:{g:"Eg",c:"#e0a050"}, Herbalism:{g:"He",c:"#5fbf5f"}, Leatherworking:{g:"Lw",c:"#b07a4a"},
+  Mining:{g:"Mi",c:"#c9a46a"}, Skinning:{g:"Sk",c:"#d6b48a"}, Tailoring:{g:"Ta",c:"#e07aa8"},
+  Cooking:{g:"Co",c:"#ff9a5a",sec:1}, Fishing:{g:"Fi",c:"#5ab0ff",sec:1}, "First Aid":{g:"FA",c:"#ff6b6b",sec:1},
+};
+const PRIMARY = Object.keys(PROF).filter(p=>!PROF[p].sec), SECONDARY = Object.keys(PROF).filter(p=>PROF[p].sec);
+const CREW = [
+  { member:"You", own:true, online:true, chars:[
+    { name:"Gahzuria", cls:"MAGE", level:70, zone:"Northern Barrens", main:true, profs:{Tailoring:[262,300],Enchanting:[248,300],Cooking:[140,150],"First Aid":[300,300]} } ] },
+  { member:"Simbad", online:true, chars:[
+    { name:"Simbadsson", cls:"WARRIOR", level:70, zone:"Wetlands", main:true, playing:true, profs:{Mining:[300,300],Blacksmithing:[287,300],Fishing:[211,225]} },
+    { name:"Simbadra", cls:"ROGUE", level:82, zone:"Redridge Mountains", seen:"7m ago", profs:{Skinning:[120,150],Leatherworking:[98,150]} } ] },
+  { member:"Simone", online:true, chars:[
+    { name:"Simone", cls:"MAGE", level:75, zone:"Westfall", main:true, playing:true, profs:{Herbalism:[300,300],Alchemy:[300,300],Cooking:[300,300],Fishing:[150,150]} },
+    { name:"Simmy", cls:"PRIEST", level:34, zone:"Duskwood", seen:"2d ago", profs:{Tailoring:[140,150],"First Aid":[150,150]} } ] },
+  { member:"Simba", online:false, seen:"7m ago", chars:[
+    { name:"Simba", cls:"DRUID", level:90, zone:"Teldrassil", main:true, profs:{Herbalism:[188,225],Skinning:[75,75]} } ] },
+];
+const CLS = {MAGE:"#3FC7EB",WARRIOR:"#C69B6D",ROGUE:"#FFF468",DRUID:"#FF7C0A",PRIEST:"#fff"};
+const RANK = r => r>=300?"Artisan":r>=225?"Expert":r>=150?"Journeyman":r>=75?"Apprentice":"Novice";
+
+const pi = (p,big) => `<span class="pi${big?" big":""}${PROF[p].sec?" sec":""}" style="background:${PROF[p].c}" title="${p}">${PROF[p].g}</span>`;
+const bar = ([r,m]) => `<div class="bar"><i class="${r>=300?"max":""}" style="width:${Math.round(100*r/300)}%"></i></div>`;
+const nm = c => `<span class="c-${c.cls}">${c.name}</span>`;
+const sorted = profs => Object.keys(profs).sort((a,b)=>(PROF[a].sec||0)-(PROF[b].sec||0));
+
+function shell(navSel, content, opts={}) {
+  const nav = ["Roster","Feed","Goals","When","Spares"].concat(opts.newTab?["Professions"]:[]);
+  return `<div class="panel ${cur}"><div class="head"><span class="t">Best Friends in Forever</span><span class="on">3 of 4 online</span><span class="x">✕</span></div>
+  <div class="body"><div class="side">${nav.map(n=>`<div class="${n===navSel?"sel":""} ${n==="Professions"&&opts.newTab?"new":""}">${n}</div>`).join("")}<div class="grow"></div><div>Settings</div></div>
+  <div class="main">${content}</div></div>
+  <div class="foot">Crew code <span class="code">RJZX-2X4S</span><span class="sp"></span>Hidden: 1 (unseen 30d)</div></div>`;
+}
+
+// ---------- A: roster icons + tooltip ----------
+function variantA() {
+  let rows = "";
+  CREW.forEach((m,mi) => {
+    const shown = m.chars.find(c=>c.playing) || m.chars[0];
+    const icons = `<span class="icons">${sorted(shown.profs).filter(p=>!PROF[p].sec).map(p=>pi(p)).join("")}</span>`;
+    if (mi===1) rows += `<div class="cap">Crew</div>`;
+    rows += `<div class="row ${mi===2?"hov":""}"><div class="av" style="background:${CLS[shown.cls]}">${shown.name[0]}</div>
+      <div><div class="l1"><span class="n c-${shown.cls}">${shown.name}</span><span class="lv">${shown.level}</span><span class="muted">${m.own?"you":m.member}</span>${icons}</div>
+      <div class="l2">${shown.zone}</div></div>
+      <div class="right">${m.online?'<span style="color:var(--online)">online</span>':m.seen}${m.chars.length>1?`<br>+ ${m.chars.length-1} more`:""}</div></div>`;
+  });
+  const c = CREW[2].chars[0];
+  const tip = `<div class="tip"><div class="t1 c-${c.cls}">${c.name}</div><div class="ln">Level ${c.level} Mage (Main)</div><div class="ln">Simone's Character</div>
+    <div class="m">${c.zone}</div><div class="m">Deaths: 4</div><div class="m">Gold: 1,284</div><hr>
+    ${sorted(c.profs).map(p=>`<div class="prof">${pi(p)}<span>${p} <span class="m">${RANK(c.profs[p][0])}</span></span><span class="${c.profs[p][0]>=300?"gold":"m"}">${c.profs[p][0]}/${c.profs[p][1]}</span>${bar(c.profs[p])}</div>`).join("")}
+    <hr><div style="color:var(--online)">Online now</div></div>`;
+  return { note:"<b>A · Roster icons + tooltip.</b> No new tab. Main professions as small icons after the level on each row; the Character tooltip (shown open for Simone) lists every profession with rank and skill. Cheap, but you only see the Character on the row, not alts, and no Crew-wide view.",
+    html: shell("Roster", rows) + `<div class="A" style="margin-top:170px">${tip}</div>` };
+}
+
+// ---------- B: grid by member ----------
+function variantB() {
+  const cols = PRIMARY.concat(SECONDARY);
+  let h = `<table><tr><th></th>${cols.map(p=>`<th class="${p===SECONDARY[0]?"secstart":""}" title="${p}">${pi(p)}</th>`).join("")}</tr>`;
+  CREW.forEach(m => m.chars.forEach((c,i) => {
+    h += `<tr class="${i?"altr":"member"}"><td>${nm(c)}${i?"":`<span class="who">${m.own?"you":m.member}</span>`}</td>${cols.map(p=>{
+      const s = c.profs[p]; return `<td class="${p===SECONDARY[0]?"secstart":""}">${s?`<span class="cell" title="${p} ${s[0]}/${s[1]}"><span class="v ${s[0]>=300?"gold":""}">${s[0]}</span>${bar(s)}</span>`:`<span class="cell none">·</span>`}</td>`;}).join("")}</tr>`;
+  }));
+  h += `</table><div class="legend">Hover a column for the profession, a cell for skill/cap. Alts indented under their Member. Gold = maxed.</div>`;
+  return { note:"<b>B · Professions tab, by Member.</b> A grid: one row per Character (alts under their Member), a column per profession, skill in each cell. The densest overview; reads like a spreadsheet and gets tight with 12 columns (secondary ones after the divider).",
+    html: shell("Professions", h, {newTab:1}) };
+}
+
+// ---------- C: by profession ----------
+function variantC() {
+  const all = [];
+  CREW.forEach(m=>m.chars.forEach((c,i)=>all.push({m,c,alt:i>0})));
+  const block = p => {
+    const who = all.filter(x=>x.c.profs[p]).sort((a,b)=>b.c.profs[p][0]-a.c.profs[p][0]);
+    return `<div class="prof ${who.length?"":"missing"}">${pi(p,1)}<div><div class="pn">${p}<span class="count">${who.length?`best ${who[0].c.profs[p][0]} · ${RANK(who[0].c.profs[p][0])}`:""}</span></div>
+      ${who.length?`<div class="people">${who.map(x=>`<div class="p"><span>${x.m.own?"You":x.m.member}${x.alt?` <span class="dimt">(${x.c.name})</span>`:""}</span><span class="r ${x.c.profs[p][0]>=300?"gold":""}">${x.c.profs[p][0]}</span>${bar(x.c.profs[p])}</div>`).join("")}</div>`
+        :`<div class="gap">Nobody in the Crew yet</div>`}</div></div>`;
+  };
+  const h = `<div class="filters"><span class="on">All</span><span>Main professions</span><span>Secondary</span></div>
+    <div class="cap">Main professions</div>${PRIMARY.map(block).join("")}<div class="cap">Secondary</div>${SECONDARY.map(block).join("")}`;
+  return { note:"<b>C · Professions tab, by profession.</b> One block per profession, listing who has it (Member name, Alt in brackets), best first; gaps say \"Nobody in the Crew yet\". Answers \"who can make me this?\" and shows what the Crew is missing, but splits a person across blocks.",
+    html: shell("Professions", h, {newTab:1}) };
+}
+
+// ---------- D: feed + goal ----------
+function variantD() {
+  const e = (icon, txt, sub, when, cls="") => `<div class="entry ${cls}">${icon}<div><div class="txt">${txt}</div>${sub?`<div class="sub">${sub}</div>`:""}<span class="cheer">Cheer</span></div><span class="when">${when}</span></div>`;
+  const covered = PRIMARY.filter(p=>CREW.some(m=>m.chars.some(c=>c.profs[p])));
+  const h = `<div class="cap">Feed</div>
+    ${e(pi("Alchemy",1),"Simone is now an Artisan Alchemist","Alchemy 300/300","12m","hlg")}
+    ${e(pi("Blacksmithing",1),"Simbad is now an Expert Blacksmith","Blacksmithing 225 → 287","2h")}
+    ${e(pi("Tailoring",1),"Simone's Alt Simmy picked up Tailoring","","yesterday")}
+    <div class="old">${e(pi("Mining",1),"Simbad maxed Mining","","3d")}</div>
+    <div class="cap" style="margin-top:10px">Goals</div>
+    <div class="goal"><div class="g1"><span>Every main profession in the Crew</span><span class="muted">${covered.length} of ${PRIMARY.length}</span></div>
+      <div class="bar"><i style="width:${100*covered.length/PRIMARY.length}%"></i></div>
+      <div class="slots">${PRIMARY.map(p=>covered.includes(p)?pi(p):`<span class="pi" style="background:#333;color:#777">${PROF[p].g}</span>`).join("")}</div></div>
+    <div class="goal"><div class="g1"><span>Artisans in the Crew</span><span class="muted">4 of next 5</span></div><div class="bar"><i style="width:80%"></i></div></div>`;
+  return { note:"<b>D · News only.</b> No table at all: profession progress shows up as Feed entries at each rank (Apprentice → Journeyman → Expert → Artisan) with a Cheer, and as Crew goals that name nobody. Shown here in one view for comparison; in the real panel these live in the existing Feed and Goals tabs. Pairs with A, B or C.",
+    html: shell("Feed", h) };
+}
+
+// ---------- switcher ----------
+const VARIANTS = { A:["Roster icons + tooltip",variantA], B:["Tab: grid by Member",variantB], C:["Tab: by profession",variantC], D:["Feed + Crew goals",variantD] };
+const KEYS = Object.keys(VARIANTS);
+let cur = (new URLSearchParams(location.search).get("variant")||"A").toUpperCase(); if (!VARIANTS[cur]) cur = "A";
+function render() {
+  const v = VARIANTS[cur][1]();
+  document.getElementById("stage").innerHTML = v.html;
+  document.getElementById("note").innerHTML = v.note;
+  document.getElementById("label").innerHTML = `<b>${cur}</b>${VARIANTS[cur][0]} · ${KEYS.indexOf(cur)+1}/${KEYS.length}`;
+  try { const u = new URL(location.href); u.searchParams.set("variant", cur); history.replaceState(null,"",u); } catch(e) {}
+}
+const step = d => { cur = KEYS[(KEYS.indexOf(cur)+d+KEYS.length)%KEYS.length]; render(); };
+document.getElementById("prev").onclick = () => step(-1);
+document.getElementById("next").onclick = () => step(1);
+addEventListener("keydown", e => { if (e.target.closest("input,textarea,[contenteditable]")) return;
+  if (e.key==="ArrowLeft") step(-1); if (e.key==="ArrowRight") step(1); });
+render();
+</script>
+</body>
+</html>
