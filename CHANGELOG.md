@@ -1,6 +1,12 @@
 # Changelog
 
 
+
+## 0.2.1
+<sub>2026-11-02</sub>
+
+- *(patch)* Fixed CurseForge failing to process the release file: the zip no longer includes LibDeflate's documentation.
+
 ## 0.2.0
 <sub>2026-11-01</sub>
 
