@@ -38,7 +38,7 @@ _Avoid_: Primary
 Any of a Member's Characters other than their Main.
 
 **Profession**:
-A trade skill a Character has learned, with its skill and max skill, as that Character's own client reports it: a main profession (two at most, such as Alchemy) or a secondary one (cooking, fishing, first aid). Its rank (Apprentice, Journeyman, Expert, Artisan) comes from the max skill.
+A trade skill a Character has learned, with its skill and max skill, as that Character's own client reports it: a main profession (two at most, such as Alchemy) or a secondary one (cooking, fishing, first aid). Its rank (Apprentice, Journeyman, Expert, Artisan) comes from the max skill. A profession **milestone** is a base skill of 75, 150, 225 or 300 (maxed), each Feed news; it has nothing to do with Crew goals.
 _Avoid_: Trade, skill (when meaning the profession), craft
 
 **Remove (a Member)**:

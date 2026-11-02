@@ -92,7 +92,8 @@ local PROFESSION_DIVIDER = 7
 local PROFESSION_ROW = 32
 local PROFESSION_ALT = 22
 local PROFESSION_ALT_INDENT = 10
-local PROFESSIONS_NONE = "Nobody's professions are shared yet. They show up once a Member logs in with this version of BFF."
+local PROFESSIONS_UNSHARED = "Nobody's professions are shared yet. They show up once a Member logs in with this version of BFF."
+local PROFESSIONS_NONE = "Nobody in the Crew has learned a profession yet."
 
 local GOLD = Skin.GOLD
 local MUTED = Skin.MUTED
@@ -1356,7 +1357,6 @@ local function createProfessionsView()
   professionsView.none:SetWidth(CONTENT_WIDTH - 2 * INSET)
   professionsView.none:SetWordWrap(true)
   professionsView.none:SetJustifyH("LEFT")
-  professionsView.none:SetText(PROFESSIONS_NONE)
 end
 
 -- Where each column's centre is, from the left, and how wide a column is.
@@ -1451,6 +1451,10 @@ local function drawProfessions()
   local view = core:professions(order)
   local centres, width, dividerX = professionColumns(view.columns)
   local empty = #view.columns == 0
+  -- Shared lists that are all empty are "none"; no shared list is "unknown".
+  local shared = false
+  for _, gridRow in ipairs(view.rows) do shared = shared or gridRow.known end
+  professionsView.none:SetText(shared and PROFESSIONS_NONE or PROFESSIONS_UNSHARED)
   professionsView.none:SetShown(empty)
   professionsView.head:SetShown(not empty)
   professionsView.list:SetShown(not empty)
