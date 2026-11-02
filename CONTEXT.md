@@ -55,8 +55,12 @@ _Avoid_: Digest, recap
 A Member's one-click acknowledgement of another Member's Feed entry. Each kind of entry has exactly one: a **Cheer** for dings, max level and new Characters, **Respects** for deaths, and a **Welcome** for joining the Crew. A Reaction is permanent, and it is news to the entry's owner.
 _Avoid_: Like, emote, kudos
 
+**Live event**:
+A new Feed entry from another Member, a Reaction to one of your entries, or a Spare notice, announced as it happens by a chat line, a Toast or both.
+_Avoid_: Notification, alert, live news
+
 **Toast**:
-A small on-screen notice for a live Feed entry or a Reaction to one of your entries, with an optional sound. Shows the same things as the chat line.
+A small on-screen notice for a Live event, with an optional sound. Shows the same things as the chat line.
 _Avoid_: Popup, alert, notification (when meaning a toast)
 
 **Play times**:
