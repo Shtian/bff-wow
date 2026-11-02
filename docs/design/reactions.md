@@ -15,6 +15,9 @@ One per entry kind, so there's never a picker:
 | ding | **Cheer** | "Bob cheered your ding to 30" |
 | max level | **Cheer** | "Bob cheered you reaching max level" |
 | new Character | **Cheer** | "Bob cheered your new Character Jaina" |
+| new profession | **Cheer** | "Bob cheered you picking up Tailoring" |
+| profession skill | **Cheer** | "Bob cheered your 225 Alchemy" |
+| profession maxed | **Cheer** | "Bob cheered you maxing Alchemy" |
 | death | **Respects** | "Bob paid respects (Jaina died)" |
 | joined the Crew | **Welcome** | "Bob welcomed you" |
 | left the Crew | none | |

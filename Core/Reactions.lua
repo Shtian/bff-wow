@@ -22,15 +22,24 @@ local FOR_KIND = {
   newCharacter = "cheer",
   death = "respects",
   joined = "welcome",
+  newProfession = "cheer",
+  professionSkill = "cheer",
+  professionMaxed = "cheer",
 }
 
 -- Kinds as stored in a record, kept short since records go over the wire.
-local CODES = { ding = "d", maxLevel = "m", newCharacter = "c", death = "x", joined = "j" }
+local CODES = {
+  ding = "d", maxLevel = "m", newCharacter = "c", death = "x", joined = "j",
+  newProfession = "p", professionSkill = "s", professionMaxed = "a",
+}
 local KINDS = {}
 for kind, code in pairs(CODES) do KINDS[code] = kind end
 
--- Kinds whose key has a number: the level, death total or joinedAt reached.
-local NUMBERED = { ding = true, death = true, joined = true }
+-- Kinds whose key has a number: the level, death total, joinedAt or
+-- profession skill reached.
+local NUMBERED = { ding = true, death = true, joined = true, professionSkill = true }
+-- Kinds whose key also names the profession, by skill line ID.
+local PROFESSION = { newProfession = true, professionSkill = true, professionMaxed = true }
 
 -- The Reaction an entry kind has ("cheer", "respects" or "welcome"), or nil.
 function Reactions.forKind(kind)
@@ -38,7 +47,7 @@ function Reactions.forKind(kind)
 end
 
 -- The key a Reaction to this entry is made with: { memberId, guid, kind,
--- n }, keyed to the top of a collapsed entry's range. Nil for an entry
+-- n, skillLine (profession kinds only) }, keyed to the top of a collapsed entry's range. Nil for an entry
 -- that can't be reacted to, or one saved before it had what it needs.
 function Reactions.keyOf(entry)
   local kind = entry.kind
@@ -50,16 +59,22 @@ function Reactions.keyOf(entry)
     n = entry.to
   elseif kind == "joined" then
     n = entry.joinedAt
+  elseif kind == "professionSkill" then
+    n = entry.milestone
   end
   if NUMBERED[kind] and type(n) ~= "number" then return nil end
   if kind ~= "joined" and type(entry.guid) ~= "string" then return nil end
-  return { memberId = entry.memberId, guid = entry.guid, kind = kind, n = n }
+  local skillLine = PROFESSION[kind] and entry.skillLine or nil
+  if PROFESSION[kind] and type(skillLine) ~= "number" then return nil end
+  return { memberId = entry.memberId, guid = entry.guid, kind = kind, n = n, skillLine = skillLine }
 end
 
--- Whether a key falls on this entry: a collapsed ding or death matches
--- every level or death total in its range.
+-- Whether a key falls on this entry: a collapsed ding, death or
+-- profession milestone matches every level, death total or milestone in
+-- its range.
 function Reactions.matches(entry, key)
-  if entry.memberId ~= key.memberId or entry.kind ~= key.kind or entry.guid ~= key.guid then
+  if entry.memberId ~= key.memberId or entry.kind ~= key.kind or entry.guid ~= key.guid
+    or entry.skillLine ~= key.skillLine then
     return false
   end
   local n = key.n
@@ -69,6 +84,8 @@ function Reactions.matches(entry, key)
     return entry.to ~= nil and entry.count ~= nil and n > entry.to - entry.count and n <= entry.to
   elseif key.kind == "joined" then
     return entry.joinedAt == n
+  elseif key.kind == "professionSkill" then
+    return entry.from ~= nil and entry.milestone ~= nil and n > entry.from and n <= entry.milestone
   end
   return true
 end
@@ -88,17 +105,24 @@ function Reactions.validKey(key)
   elseif key.n ~= nil then
     return nil
   end
-  return { memberId = key.memberId, guid = key.guid, kind = key.kind, n = key.n }
+  if PROFESSION[key.kind] then
+    if type(key.skillLine) ~= "number" then return nil end
+  elseif key.skillLine ~= nil then
+    return nil
+  end
+  return { memberId = key.memberId, guid = key.guid, kind = key.kind, n = key.n, skillLine = key.skillLine }
 end
 
 -- The same key as a string, to tell Reactions apart.
 function Reactions.id(key)
-  return ("%s|%s|%s|%s"):format(key.memberId, key.kind, key.guid or "", key.n or "")
+  local id = ("%s|%s|%s|%s"):format(key.memberId, key.kind, key.guid or "", key.n or "")
+  if key.skillLine then id = id .. "|" .. key.skillLine end
+  return id
 end
 
 -- A key and when it was made, as stored in a record.
 function Reactions.item(key, time)
-  return { m = key.memberId, g = key.guid, k = CODES[key.kind], n = key.n, t = time }
+  return { m = key.memberId, g = key.guid, k = CODES[key.kind], n = key.n, p = key.skillLine, t = time }
 end
 
 -- The well-formed Reactions in a record, as { key, time }. A malformed
@@ -109,7 +133,7 @@ function Reactions.inRecord(record)
   for _, item in ipairs(record.reactions) do
     if type(item) == "table" and type(item.t) == "number" then
       local key = Reactions.validKey({
-        memberId = item.m, guid = item.g, kind = KINDS[item.k], n = item.n,
+        memberId = item.m, guid = item.g, kind = KINDS[item.k], n = item.n, skillLine = item.p,
       })
       if key then list[#list + 1] = { key = key, time = item.t } end
     end
@@ -164,6 +188,15 @@ function Reactions.phrase(entry, character, alt)
     return "cheered your new Character " .. name
   elseif kind == "death" then
     return ("paid respects (%s died)"):format(name)
+  elseif kind == "newProfession" then
+    return alt and ("cheered your Alt %s picking up %s"):format(name, entry.profession)
+      or ("cheered you picking up %s"):format(entry.profession)
+  elseif kind == "professionSkill" then
+    return alt and ("cheered your Alt %s's %d %s"):format(name, entry.milestone, entry.profession)
+      or ("cheered your %d %s"):format(entry.milestone, entry.profession)
+  elseif kind == "professionMaxed" then
+    return alt and ("cheered your Alt %s maxing %s"):format(name, entry.profession)
+      or ("cheered you maxing %s"):format(entry.profession)
   end
   return "welcomed you"
 end

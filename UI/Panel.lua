@@ -724,7 +724,7 @@ local function drawFeedEntry(line, entry)
   if entry.canReact then
     line.react:SetReaction(entry.reaction, entry.reacted)
   end
-  line.node:SetKind(entry.kind)
+  line.node:SetKind(entry.kind, entry.icon)
   line.text:SetText(entry.text)
   Skin.color(line.text, HIGHLIGHT[entry.kind] and GOLD or entry.own and MUTED or TEXT)
   line.time:SetText(date("%H:%M", entry.time))

@@ -60,7 +60,7 @@ The summary of Feed entries, and Reactions to their own entries, that a Member m
 _Avoid_: Digest, recap
 
 **Reaction**:
-A Member's one-click acknowledgement of another Member's Feed entry. Each kind of entry has exactly one: a **Cheer** for dings, max level and new Characters, **Respects** for deaths, and a **Welcome** for joining the Crew. A Reaction is permanent, and it is news to the entry's owner.
+A Member's one-click acknowledgement of another Member's Feed entry. Each kind of entry has exactly one: a **Cheer** for dings, max level, new Characters and profession news, **Respects** for deaths, and a **Welcome** for joining the Crew. A Reaction is permanent, and it is news to the entry's owner.
 _Avoid_: Like, emote, kudos
 
 **Live event**:

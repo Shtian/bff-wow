@@ -35,7 +35,7 @@ Skin.HEADER_HEIGHT = 30
 
 -- Feed entries shown in gold: the news. Leaving keeps its grey edge and
 -- plain text.
-Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, goal = true }
+Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, goal = true, professionMaxed = true }
 -- A muted grey for a picture's edge when its kind has no colour, and for
 -- the overflow toast's icon.
 Skin.FEED_ICON_COLOR = { 0.82, 0.8, 0.86 }
@@ -69,9 +69,15 @@ Skin.FEED_PICTURES = {
   gave = "Interface\\Icons\\INV_Misc_Bag_08",
   claimed = "Interface\\Icons\\INV_Misc_Bag_08",
   given = "Interface\\Icons\\INV_Letter_15",
+  -- Profession entries draw the profession's own icon; this is for one
+  -- whose icon wasn't shared.
+  newProfession = "Interface\\Icons\\INV_Misc_Book_11",
+  professionSkill = "Interface\\Icons\\INV_Misc_Book_11",
+  professionMaxed = "Interface\\Icons\\INV_Misc_Book_11",
 }
 local SPARE = { 0.78, 0.6, 1 }
 local CREW = { 0.4, 0.75, 1 }
+local PROFESSION = { 0.9, 0.72, 0.42 }
 Skin.FEED_EDGES = {
   ding = Skin.ONLINE,
   maxLevel = Skin.GOLD,
@@ -83,6 +89,9 @@ Skin.FEED_EDGES = {
   gave = SPARE,
   claimed = SPARE,
   given = SPARE,
+  newProfession = PROFESSION,
+  professionSkill = PROFESSION,
+  professionMaxed = Skin.GOLD,
 }
 local EDGE_ALPHA = 0.55
 -- A given Reaction's edge: a quiet frame, not gold, so the Feed's gold stays
@@ -91,8 +100,8 @@ local GIVEN_EDGE = { 1, 1, 1, 0.3 }
 
 -- A square picture `size` wide: an opaque back (so a line behind it is
 -- covered), the edge, and the icon inset 1px with its own bevel cropped.
--- :SetKind(kind) draws a Feed kind; :SetPicture(texture, edgeColor) any
--- icon.
+-- :SetKind(kind, icon) draws a Feed kind, with the entry's own icon if it
+-- has one (a profession's); :SetPicture(texture, edgeColor) any icon.
 function Skin.feedPicture(parent, size)
   local frame = CreateFrame("Frame", nil, parent)
   frame:SetSize(size, size)
@@ -110,8 +119,8 @@ function Skin.feedPicture(parent, size)
     self.edge:SetColorTexture(color[1], color[2], color[3], EDGE_ALPHA)
     self.picture:SetTexture(texture)
   end
-  function frame:SetKind(kind)
-    self:SetPicture(Skin.FEED_PICTURES[kind] or Skin.FEED_PICTURES.ding, Skin.FEED_EDGES[kind])
+  function frame:SetKind(kind, icon)
+    self:SetPicture(icon or Skin.FEED_PICTURES[kind] or Skin.FEED_PICTURES.ding, Skin.FEED_EDGES[kind])
   end
   return frame
 end

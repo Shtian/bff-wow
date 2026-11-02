@@ -118,6 +118,23 @@ local function characterEntries(self, record, was, character, own, list)
     entry.count, entry.to = deaths, character.deaths
     list[#list + 1] = entry
   end
+
+  for _, news in ipairs(ns.Professions.news(was.professions, character.professions)) do
+    local who = subject(self, record, character, own)
+    local text
+    if news.kind == "newProfession" then
+      text = ("%s picked up %s"):format(who, news.name)
+    elseif news.kind == "professionMaxed" then
+      text = ("%s maxed %s"):format(who, news.name)
+    else
+      text = ("%s reached %d %s"):format(who, news.milestone, news.name)
+    end
+    local entry = newEntry(news.kind, record, own, text, character)
+    -- The skill line and milestone key Reactions (docs/adr/0002).
+    entry.skillLine, entry.profession, entry.icon = news.skillLine, news.name, news.icon
+    entry.from, entry.milestone = news.from, news.milestone
+    list[#list + 1] = entry
+  end
 end
 
 -- Attaches a Reaction by the Member id `by` to an entry: { by, n, time,
@@ -486,6 +503,9 @@ local function cheerRank(entry)
   return nil
 end
 
+-- Profession entries show as lines of their own, not on the scoreboard.
+local PROFESSION_KINDS = { newProfession = true, professionSkill = true, professionMaxed = true }
+
 -- One Character's row in a Member's block: { name, main, from, level,
 -- deaths, new, maxLevel, cheer, respects }. The level range runs from the
 -- lowest "before" to the highest "after" (max level counts towards it), a
@@ -603,16 +623,23 @@ end
 
 -- While you were away: the unseen entries from other Members, one block
 -- per Member, most recent activity first, the Crew goals reached, newest
--- first ({ text, time }), the unseen Reactions to your own, and
+-- first ({ text, time }), profession news, newest first ({ kind, text,
+-- time, icon, cheer }), the unseen Reactions to your own, and
 -- spares: the Spare notices given (Spares:takeNews), then the
 -- Gives, newest first ({ kind = "gave", text, time }), as { members,
--- goals, spares, count, noticed }. Marks them seen. Nil when there
+-- goals, spares, professions, count, noticed }. Marks them seen. Nil when there
 -- are none.
 function Feed:takeSummary(spares)
   spares = spares or {}
-  local byMember, ids, goals, gives, count = {}, {}, {}, {}, 0
+  local byMember, ids, goals, gives, professions, count = {}, {}, {}, {}, {}, 0
   for _, entry in ipairs(self.db.feed) do
-    if not entry.seen and entry.kind == "goal" then
+    if not entry.seen and PROFESSION_KINDS[entry.kind] then
+      entry.seen = true
+      count = count + 1
+      table.insert(professions, 1, {
+        kind = entry.kind, text = entry.text, time = entry.time, icon = entry.icon, cheer = button(self, entry),
+      })
+    elseif not entry.seen and entry.kind == "goal" then
       entry.seen = true
       count = count + 1
       table.insert(goals, 1, { text = entry.text, time = entry.time })
@@ -642,7 +669,9 @@ function Feed:takeSummary(spares)
     if a.time ~= b.time then return a.time > b.time end
     return a.memberId < b.memberId
   end)
-  return { members = members, goals = goals, spares = spares, count = count, noticed = noticed }
+  return {
+    members = members, goals = goals, spares = spares, professions = professions, count = count, noticed = noticed,
+  }
 end
 
 -- An entry as handed out: a fresh table UI may keep. Seen is false while
@@ -665,6 +694,10 @@ function Feed:describe(entry)
     from = entry.from,
     level = entry.level,
     count = entry.count,
+    skillLine = entry.skillLine,
+    profession = entry.profession,
+    milestone = entry.milestone,
+    icon = entry.icon,
     own = entry.own == true,
     seen = entry.seen == true and #unseenReactions(self, entry) == 0,
     reaction = Reactions.forKind(entry.kind),
