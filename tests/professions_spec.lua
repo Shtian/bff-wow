@@ -97,6 +97,13 @@ describe("Professions", function()
       assert.is_nil(Professions.read(api, nil))
     end)
 
+    it("keeps the last good list when a value after a missing icon reads secret", function()
+      local last = { profession(MINING, "Mining", 10, 75) }
+      local api = game({ 1 }, { [1] = { "Mining", nil, 50, 75, MINING } },
+        function(value) return value == 50 end)
+      assert.equal(last, Professions.read(api, last))
+    end)
+
     it("keeps the last good list when a value couldn't be stored", function()
       local last = { profession(MINING, "Mining", 10, 75) }
       local api = game({ 1 }, { [1] = { "Mining", 136248, 0, 0, MINING } })

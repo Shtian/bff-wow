@@ -321,7 +321,6 @@ local function claimYours(client, you)
   return false
 end
 
-
 -- Steps the Character's first profession short of 300 up to its next
 -- milestone, or picks up Tailoring if it has none to raise. A Character
 -- whose client never shared professions (Simba's) is left alone.
