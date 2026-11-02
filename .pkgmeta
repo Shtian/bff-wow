@@ -38,6 +38,11 @@ externals:
     tag: 2.18-release
 
 ignore:
+  # LibDeflate ships its docs, including README.md.html next to readme.md.html.
+  # Two names that differ only by case broke CurseForge's file processing
+  # ("General error processing file").
+  - Libs/LibDeflate/docs
+  - Libs/LibDeflate/examples
   - tests
   - Dev
   - scripts
