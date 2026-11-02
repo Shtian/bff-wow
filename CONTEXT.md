@@ -37,6 +37,10 @@ _Avoid_: Primary
 **Alt**:
 Any of a Member's Characters other than their Main.
 
+**Profession**:
+A trade skill a Character has learned, with its skill and max skill, as that Character's own client reports it: a main profession (two at most, such as Alchemy) or a secondary one (cooking, fishing, first aid). Its rank (Apprentice, Journeyman, Expert, Artisan) comes from the max skill.
+_Avoid_: Trade, skill (when meaning the profession), craft
+
 **Remove (a Member)**:
 To hide a Member from your own view of the Crew. It never affects what other Members see; nobody removes a Member for the whole Crew.
 _Avoid_: Kick, ban

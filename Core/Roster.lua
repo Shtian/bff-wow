@@ -75,6 +75,8 @@ local function describeCharacter(character, main, yourLevel, now)
     zone = character.zone,
     deaths = character.deaths,
     money = character.money,
+    -- A malformed list costs only the professions, not the record.
+    professions = ns.Professions.describe(character.professions),
     mapId = character.mapId,
     x = character.x,
     y = character.y,

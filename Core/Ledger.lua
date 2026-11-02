@@ -15,10 +15,34 @@ local ID_LENGTH = 8
 local ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
 
 -- The fields Snapshot reports for a Character.
-local CHARACTER_FIELDS = { "name", "classFilename", "level", "xp", "maxXp", "zone", "deaths", "money" }
+local CHARACTER_FIELDS = {
+  "name", "classFilename", "level", "xp", "maxXp", "zone", "deaths", "money", "professions",
+}
 -- Where a Character was last seen, from locate(): written only by
 -- Ledger:locate, and kept when Snapshot reports the Character.
 local LOCATION_FIELDS = { "mapId", "x", "y", "instance" }
+
+-- Reported fields the record keeps in another form: store(reported)
+-- gives it (nil keeps what the record has), same(a, b) compares two.
+-- Professions keep short field names, and the last list when none could
+-- be read.
+local STORED_AS = {
+  professions = { store = ns.Professions.store, same = ns.Professions.same, keep = true },
+}
+
+local function stored(character, field, saved)
+  local as = STORED_AS[field]
+  if not as then return character[field] end
+  local value = as.store(character[field])
+  if value == nil and as.keep and saved then return saved[field] end
+  return value
+end
+
+local function same(field, a, b)
+  local as = STORED_AS[field]
+  if as then return as.same(a, b) end
+  return a == b
+end
 
 local function newMemberId(random)
   local chars = {}
@@ -99,17 +123,17 @@ function Ledger:updateOwn(character)
   local record = ownRecord(self)
   local saved = record.characters[character.guid]
   local changed = saved == nil or self.playingGuid ~= character.guid
-  if saved then
-    for _, field in ipairs(CHARACTER_FIELDS) do
-      if saved[field] ~= character[field] then changed = true end
-    end
+  local fields = {}
+  for _, field in ipairs(CHARACTER_FIELDS) do
+    fields[field] = stored(character, field, saved)
+    if saved and not same(field, saved[field], fields[field]) then changed = true end
   end
   self.playingGuid = character.guid
   if not changed then return false end
 
   local before = saved
   saved = { guid = character.guid }
-  for _, field in ipairs(CHARACTER_FIELDS) do saved[field] = character[field] end
+  for _, field in ipairs(CHARACTER_FIELDS) do saved[field] = fields[field] end
   for _, field in ipairs(LOCATION_FIELDS) do saved[field] = before and before[field] end
   saved.lastPlayed = self.now()
   record.characters[character.guid] = saved
@@ -328,6 +352,8 @@ local RECORD_SHAPE = {
   joinedAt = isOptional(isNumber),
   playTimes = isOptional(ns.PlayTimes.valid),
 }
+-- A Character's professions aren't checked here: a malformed list costs
+-- only them, so Professions.describe ignores it when rows are built.
 local CHARACTER_SHAPE = {
   guid = isText,
   name = isText,
