@@ -17,7 +17,7 @@ Each Character's own client shares its professions and skill in its record, like
 - A per-Character field `professions` in the record: a list of up to 5 `{ id, n, i, k, m, s }` (skill line ID, name, icon, skill, max skill, `s = true` for a secondary). Short names, since it rides every DATA. An empty list means the Character has none; no field means its client never shared them.
 - **"Later" urgency**, like gold and XP: a professions-only change waits for the next send or the 5-minute heartbeat. Reading the same list again isn't a change.
 - **Shape check:** a malformed list (not a list, more than 5 entries, or any entry with a missing or wrong field) is ignored for that Character, which then shows as unknown. The record itself isn't checked for it, so the rest is kept, and the list is relayed unchanged, as older clients relay a field they don't know.
-- No Feed entry. Feed entries and Crew goals for professions are follow-up tasks under #97.
+- A professions-only change that crosses a milestone, or picks up a profession, makes a Feed entry and goes out right away instead (#99, see Feed entries below).
 
 ## Reads
 
@@ -30,10 +30,22 @@ Each Character's own client shares its professions and skill in its record, like
 
 **Tooltip:** under the Gold line, one line per profession: icon, name and rank, then "skill/max", gold at 300/300. No lines when unknown.
 
+## Feed entries
+
+From [#99](https://github.com/Shtian/bff-wow/issues/99), following `docs/design/feed.md`: `Professions.news(before, after)` compares a Character's stored lists, and Feed makes, for every profession, main and secondary, on Mains and Alts alike:
+
+- **new profession**, "Simone picked up Tailoring", for a profession the Character didn't have.
+- **profession skill**, "Simone reached 225 Alchemy", when the base skill reaches 75, 150 or 225. Skipped versions collapse to the highest milestone crossed, with `from` the skill before.
+- **profession maxed**, "Simone maxed Alchemy", in gold, at 300 (it replaces the milestone).
+
+Alts are named the usual way ("Simone's Alt Simmy picked up Tailoring"). An unknown or malformed list on either side makes nothing, so the first share and a new Character are silent; so are drops and unlearning. Own entries are marked seen. Each takes a **Cheer**, keyed by owner, Character, kind, skill line and, for a milestone, the milestone reached (ADR 0002); a collapsed milestone entry matches every milestone in its range. The owner sees "Bob cheered your 225 Alchemy", "cheered you picking up Tailoring", "cheered you maxing Alchemy".
+
+Entries carry the profession's `icon` (file ID), which the Feed tab and toasts draw instead of the kind's picture, edged in amber (gold when maxed). While you were away lists them under **Professions**, a line each with the icon and a Cheer, rather than on the scoreboard.
+
 ## Dev
 
-`/bff sim` gives the simulated Members some professions; Simba's client "never shared" any.
+`/bff sim` gives the simulated Members some professions; Simba's client "never shared" any. The console's **Skill** button steps a Member's first profession short of 300 to its next milestone, or picks up Tailoring. `/bffdev toast` includes the three profession kinds.
 
 ## Not in this
 
-Recipes (only readable while the profession window is open, and big), Feed entries and Crew goals for professions (#99, #100), specialisations, and the skill bonus from gear and racials.
+Recipes (only readable while the profession window is open, and big), Crew goals for professions (#100), specialisations, and the skill bonus from gear and racials.

@@ -321,8 +321,37 @@ local function claimYours(client, you)
   return false
 end
 
+
+-- Steps the Character's first profession short of 300 up to its next
+-- milestone, or picks up Tailoring if it has none to raise. A Character
+-- whose client never shared professions (Simba's) is left alone.
+local function skillUp(client)
+  local known = client.character.professions
+  if not known then return end
+  local list = {}
+  for i, p in ipairs(known) do
+    list[i] = { skillLine = p.skillLine, name = p.name, icon = p.icon, skill = p.skill, max = p.max,
+      secondary = p.secondary }
+  end
+  for _, p in ipairs(list) do
+    for _, milestone in ipairs(ns.Professions.MILESTONES) do
+      if p.skill < milestone then
+        p.skill, p.max = milestone, math.max(p.max, milestone)
+        client:play({ professions = list })
+        return
+      end
+    end
+  end
+  local tailoring = PROFESSIONS.tailoring
+  if #list < 2 then
+    list[#list + 1] = { skillLine = tailoring[1], name = tailoring[2], icon = tailoring[3], skill = 1, max = 75 }
+    client:play({ professions = list })
+  end
+end
+
 -- What each console button does to a simulated Member's client.
 local ACTIONS = {
+  skill = skillUp,
   ding = function(client) client:play({ level = client.character.level + 1, xp = 0 }) end,
   xp = function(client)
     local c = client.character
@@ -514,7 +543,7 @@ ns.Console = Console
 
 local Skin = ns.Skin
 
-local WIDTH = 760
+local WIDTH = 814
 local HEIGHT = 480
 local INSET = 12
 local ROW_HEIGHT = 28
@@ -530,7 +559,7 @@ local DIM = "8c8a99"
 -- The console buttons on each simulated Member's row, left to right.
 local BUTTONS = {
   { "ding", "Ding" }, { "xp", "XP" }, { "die", "Die" }, { "zone", "Zone" },
-  { "alt", "Alt" }, { "max", "Max" }, { "react", "React" }, { "offer", "Offer" },
+  { "alt", "Alt" }, { "max", "Max" }, { "skill", "Skill" }, { "react", "React" }, { "offer", "Offer" },
   { "claim", "Claim" }, { "online", "Log out" },
 }
 
@@ -814,6 +843,9 @@ local SAMPLE_TOASTS = {
   { kind = "claimed", text = "Simone claimed [Cruel Barb] for Simonette", opens = "spares" },
   { kind = "given", text = "Simbad sent you [Staff of Westfall]. Check Simonette's mailbox.", opens = "spares" },
   { kind = "gave", text = "Simbad gave Simone [Staff of Westfall]" },
+  { kind = "newProfession", text = "Simone's Alt Simmy picked up Tailoring", icon = 136249 },
+  { kind = "professionSkill", text = "Simbad reached 225 Blacksmithing", icon = 136241 },
+  { kind = "professionMaxed", text = "Simone maxed Alchemy", icon = 136240 },
 }
 
 -- /bffdev toggles the console; /bffdev toast [n] shows n sample toasts

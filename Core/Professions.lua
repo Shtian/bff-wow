@@ -124,6 +124,45 @@ function Professions.same(a, b)
   return true
 end
 
+-- The skills that are Feed news, lowest first: each rank's cap, the last
+-- (Professions.CAP) being maxed.
+Professions.MILESTONES = {}
+for i = #RANKS, 1, -1 do Professions.MILESTONES[#Professions.MILESTONES + 1] = RANKS[i][1] end
+local MILESTONES = Professions.MILESTONES
+
+-- What's news between a Character's stored list as it was and as it is:
+-- a list of { kind, skillLine, name, icon, from, milestone }, in after's
+-- order. kind is "newProfession" for one it didn't have, "professionMaxed"
+-- for reaching 300, or "professionSkill" for reaching 75, 150 or 225 (the
+-- highest crossed, with from the skill before). Base skill only. Empty
+-- when either list is unknown or malformed (a first share is a silent
+-- baseline), and for drops and unlearning.
+function Professions.news(before, after)
+  local list = {}
+  if not valid(before) or not valid(after) then return list end
+  local had = {}
+  for _, entry in ipairs(before) do had[entry.id] = entry end
+  for _, entry in ipairs(after) do
+    local was = had[entry.id]
+    local item = { skillLine = entry.id, name = entry.n, icon = entry.i }
+    if not was then
+      item.kind = "newProfession"
+      list[#list + 1] = item
+    else
+      local reached
+      for _, milestone in ipairs(MILESTONES) do
+        if was.k < milestone and entry.k >= milestone then reached = milestone end
+      end
+      if reached then
+        item.kind = reached == Professions.CAP and "professionMaxed" or "professionSkill"
+        item.from, item.milestone = was.k, reached
+        list[#list + 1] = item
+      end
+    end
+  end
+  return list
+end
+
 local function secondaryOrder(p)
   return SECONDARY_ORDER[p.skillLine] or OTHER_SECONDARY
 end

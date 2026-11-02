@@ -213,7 +213,7 @@ describe("Professions", function()
       assert.same({ "Alchemy 287/300", "Herbalism 300/300", "Cooking 140/150" }, summary(a.core:rows()[1].professions))
     end)
 
-    it("add no Feed entry", function()
+    it("add no Feed entry when first shared", function()
       local net, clients = crew({ "Ann", "Bob" })
       local a, b = clients[1], clients[2]
       a:play({ level = 11 })

@@ -19,6 +19,9 @@ Feed entries are worked out by comparing the copy of a record you held with the 
 | **joined the Crew** | A Member appears whose `joinedAt` is after yours, or a known Member's left flag goes from set to cleared | "Bob joined the Crew" |
 | **left the Crew** | A known Member's left flag goes from cleared to set (#10) | "Bob left the Crew" |
 | **goal** | The Crew reached a rung of a Crew goal; Crew-wide, naming no Member (`docs/design/goals.md`) | "The Crew reached 300 Crew levels!" |
+| **new profession** | A Character has a profession it didn't have before (`docs/design/professions.md`) | "Ana picked up Tailoring" |
+| **profession skill** | A profession's base skill reached 75, 150 or 225 | "Ana reached 225 Alchemy" |
+| **profession maxed** | A profession's base skill reached 300, the cap on Forever | "Ana maxed Alchemy" |
 
 Zone changes and Main changes make no entries: zones change too often and the panel already shows them, and a new Main is shown by the panel too.
 
@@ -28,7 +31,8 @@ Ledger hands Feed a before/after pair whenever a received copy wins (and when yo
 
 - **Skipped versions collapse.** A client that missed some versions only sees before and after, so each kind becomes at most one entry per Character: level 22 » 24 is one "dinged 24" entry that remembers it started at 22, and deaths 3 » 5 is one "died 2 times" entry.
 - **Max level replaces the ding.** A jump that reaches max level makes only the max level entry.
-- **Odd jumps make nothing.** A death count that goes down (a crash lost that session's count, see #9) makes no entry, and a level above your own `maxLevel` (you're behind on a patch) makes no ding or max level entry.
+- **Professions collapse too.** A jump in skill makes one entry per Character and profession, for the highest milestone crossed (remembering the skill it started at); reaching 300 makes only the maxed entry. A new Character's professions make only the new Character entry, and the first time a Character's professions are shared at all is a silent baseline.
+- **Odd jumps make nothing.** A skill that drops, or a profession unlearned, makes no entry. A death count that goes down (a crash lost that session's count, see #9) makes no entry, and a level above your own `maxLevel` (you're behind on a patch) makes no ding or max level entry.
 - **Time** is the after record's version, which is the owner's `GetServerTime()` at the write. It's close to when the event happened, and every client orders entries the same way. For collapsed jumps the time is approximate.
 
 ### First sight of a Member
@@ -81,6 +85,7 @@ A small frame in the panel's style (#7), laid out as a scoreboard:
 - Members ordered by most recent activity, and a row per Character with unseen events: the Main's first, then the rest by latest activity. The Member's name and class icon sit on their first row, with the Character's name under it when it differs ("Alt Jaina").
 - Columns for the **level** now, **levels gained** and **deaths**. Under the level, a bar from 0 to max level shows the jump: grey for where they started, green for what they gained, and a star beside the level when it reached max level. A new Character shows its level and "new" in green instead of levels gained. The level range goes from the lowest "before" to the highest "after" across that Character's unseen entries.
 - Joined shows in gold beside the Member's name and left in grey; a Member with nothing else gets just that row.
+- Profession news (picked up, milestones, maxed) isn't on the scoreboard: it has a **Professions** section above it, a line each with the profession's icon and a Cheer (`docs/design/professions.md`).
 - **Open Feed** and **Dismiss** buttons.
 
 The summary is marked as seen once Core has fired it.

@@ -1,7 +1,9 @@
 -- Away: the While you were away popup from the Feed decision (#14), in the
 -- Skin's flat look. Your Crew noticed comes first: a line per entry of
 -- yours others reacted to, then Crew goals reached, in gold, then
--- Spares: Claims on yours, what was sent to you and Gives. Then Core's
+-- Spares: Claims on yours, what was sent to you and Gives, then
+-- Professions: a line per profession picked up, milestone or maxed, with
+-- the profession's icon and a Cheer. Then Core's
 -- summary as a scoreboard, Members by
 -- most recent activity: a row per Character with its level now, a bar for
 -- the jump (gold when it reached max level), levels gained, deaths, and
@@ -54,6 +56,7 @@ local rows = {}
 local lines = {}
 local goalLines = {}
 local spareLines = {}
+local professionLines = {}
 
 local hex = Skin.hex
 
@@ -84,6 +87,8 @@ local function create()
   frame.goals:SetText("CREW GOALS")
   frame.spares = Skin.label(frame, "label", Skin.DIM)
   frame.spares:SetText("SPARES")
+  frame.professions = Skin.label(frame, "label", Skin.DIM)
+  frame.professions:SetText("PROFESSIONS")
   frame.intro = Skin.label(frame, "small", Skin.MUTED)
 
   frame.headings = {}
@@ -310,14 +315,54 @@ local function drawSpares(notices, y)
   return drawSection(frame.spares, texts, spareLines, y)
 end
 
+-- A Professions line: the profession's icon and the text, gold when
+-- maxed, and a Cheer at the right.
+local function professionLine(index)
+  local item = professionLines[index]
+  if item then return item end
+  item = CreateFrame("Frame", nil, frame)
+  item:SetHeight(NOTICED_LINE)
+  item.text = Skin.label(item, "text")
+  item.text:SetWordWrap(false)
+  item.text:SetPoint("LEFT", 0, 0)
+  item.text:SetPoint("RIGHT", -(REACT + 8), 0)
+  item.cheer = Skin.reactionButton(item, REACT, react)
+  item.cheer:SetPoint("RIGHT", 0, 0)
+  professionLines[index] = item
+  return item
+end
+
+local function drawProfessions(news, y)
+  frame.professions:SetShown(#news > 0)
+  for i = #news + 1, #professionLines do professionLines[i]:Hide() end
+  if #news == 0 then return y end
+  y = y - SECTION_TOP
+  frame.professions:SetPoint("TOPLEFT", INSET, y)
+  y = y - NOTICED_TITLE
+  for i, item in ipairs(news) do
+    local entry = professionLine(i)
+    entry:ClearAllPoints()
+    entry:SetPoint("TOPLEFT", INSET, y)
+    entry:SetPoint("TOPRIGHT", -INSET, y)
+    local text = Skin.FEED_HIGHLIGHT[item.kind] and hex(Skin.GOLD) .. item.text .. "|r" or item.text
+    local icon = item.icon or Skin.FEED_PICTURES[item.kind]
+    entry.text:SetText(Skin.iconGlyph(icon, 14) .. "  " .. text)
+    drawButton(entry.cheer, "cheer", item.cheer)
+    entry:Show()
+    y = y - NOTICED_LINE
+  end
+  return y - NOTICED_GAP
+end
+
 -- Shows the summary from Core's awaySummary: { members, goals,
--- spares, count, noticed }. With no Member news, only Your Crew
--- noticed, Crew goals and Spares show.
+-- spares, professions, count, noticed }. With no Member news, only Your
+-- Crew noticed, Crew goals, Spares and Professions show.
 function Away.show(summary)
   if not frame then create() end
   local y = drawNoticed(summary.noticed or {}, -Skin.HEADER_HEIGHT)
   y = drawGoals(summary.goals or {}, y)
   y = drawSpares(summary.spares or {}, y)
+  y = drawProfessions(summary.professions or {}, y)
 
   local scoreboard = #summary.members > 0
   frame.intro:SetShown(scoreboard)

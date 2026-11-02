@@ -175,8 +175,9 @@ function Core:updateOwn(character)
   sharePlayTimes(self, changed)
   if changed then
     -- Your own events go into the Feed only while in a Crew.
-    if self.db.crew then self.log:ownChanged(before, character.guid) end
-    self.gossip:ownChanged(ns.Gossip.urgency(before, character))
+    local entries = self.db.crew and self.log:ownChanged(before, character.guid) or {}
+    -- Feed news goes out now, even a professions-only change.
+    self.gossip:ownChanged(#entries > 0 and "now" or ns.Gossip.urgency(before, character))
     checkGoals(self)
     self.listener("changed")
   end
@@ -319,10 +320,12 @@ end
 -- The Feed tab: { days = { { daysAgo, time, entries } }, unseen }, newest
 -- first, where unseen counts others' entries and Reactions to your own not
 -- yet shown. An entry has kind ("ding", "death", "newCharacter",
--- "maxLevel", "joined", "left" or "goal": a Crew goal reached, with no
+-- "maxLevel", "joined", "left", "newProfession", "professionSkill",
+-- "professionMaxed" or "goal": a Crew goal reached, with no
 -- memberId), time, memberId, guid (for Character
--- events), text, from (the level before a ding or max level), level, count
--- (deaths), own and seen (false while it has unseen Reactions). And for
+-- events), text, from (the level before a ding or max level, or the skill
+-- before a profession milestone), level, count (deaths), skillLine,
+-- profession (its name), milestone and icon (for profession kinds), own and seen (false while it has unseen Reactions). And for
 -- Reactions: reaction ("cheer", "respects" or "welcome", nil for left),
 -- key (for react()), reactors ({ memberId, name, you }, in the order they
 -- reacted), reacted (you have) and canReact (not yours, and it has a key).
