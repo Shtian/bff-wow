@@ -60,10 +60,8 @@ Tests run under LuaJIT, like WoW's Lua 5.1:
 brew install luajit luarocks
 luarocks --lua-version 5.1 --lua-dir "$(brew --prefix luajit)" --local install busted
 luarocks --lua-version 5.1 --lua-dir "$(brew --prefix luajit)" --local install luacheck
-export PATH="$HOME/.luarocks/bin:$PATH"
 
-luacheck .
-busted
+scripts/check.sh    # luacheck, then busted; CI runs the same
 ```
 
 Design notes: [`docs/design/architecture.html`](docs/design/architecture.html).

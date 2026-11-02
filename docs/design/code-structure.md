@@ -115,7 +115,7 @@ Every file starts with `local _, ns = ...` and attaches itself to `ns`, the addo
   - Ten Members with three Characters each: the DIGEST fits one message.
 - **WoW stand-ins** (`tests/wow_stubs.lua`): only for Snapshot and the channel link. UI frames aren't tested offline.
 - **In game:** `/bff sim` reuses FakeNet to attach a few simulated Members to your real Core, so the panel and Feed can be tested without a friend online. Their records are kept and relayed like real ones, so it only runs in a Crew where no one else is known yet. `/bff sim ding` makes one ding, `/bff sim stop` logs them out. The `.toc` lists `Dev/` inside `#@do-not-package@`, so releases don't load it. Echo mode on the channel link loops your own messages back to you.
-- **GitHub Actions** (`test.yml`) on every push and PR: `leafo/gh-actions-lua` (LuaJIT) and `leafo/gh-actions-luarocks`, `luarocks install busted luacheck`, fetch libraries, `luacheck .`, `busted`.
+- **GitHub Actions** (`test.yml`) on every push and PR: `leafo/gh-actions-lua` (LuaJIT) and `leafo/gh-actions-luarocks`, `luarocks install busted luacheck`, fetch libraries, then `scripts/check.sh` (`luacheck`, then `busted`), the same command you run locally.
 
 ## Libraries
 
