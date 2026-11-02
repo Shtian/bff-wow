@@ -321,8 +321,6 @@ local function claimYours(client, you)
   return false
 end
 
--- The skills that are Feed news, to step a profession to the next.
-local MILESTONES = { 75, 150, 225, 300 }
 
 -- Steps the Character's first profession short of 300 up to its next
 -- milestone, or picks up Tailoring if it has none to raise. A Character
@@ -336,7 +334,7 @@ local function skillUp(client)
       secondary = p.secondary }
   end
   for _, p in ipairs(list) do
-    for _, milestone in ipairs(MILESTONES) do
+    for _, milestone in ipairs(ns.Professions.MILESTONES) do
       if p.skill < milestone then
         p.skill, p.max = milestone, math.max(p.max, milestone)
         client:play({ professions = list })

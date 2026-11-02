@@ -124,8 +124,11 @@ function Professions.same(a, b)
   return true
 end
 
--- The skills that are Feed news: the ranks' caps, the last being maxed.
-local MILESTONES = { 75, 150, 225, Professions.CAP }
+-- The skills that are Feed news, lowest first: each rank's cap, the last
+-- (Professions.CAP) being maxed.
+Professions.MILESTONES = {}
+for i = #RANKS, 1, -1 do Professions.MILESTONES[#Professions.MILESTONES + 1] = RANKS[i][1] end
+local MILESTONES = Professions.MILESTONES
 
 -- What's news between a Character's stored list as it was and as it is:
 -- a list of { kind, skillLine, name, icon, from, milestone }, in after's

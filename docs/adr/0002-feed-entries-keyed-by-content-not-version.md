@@ -6,4 +6,5 @@ A Reaction (#50) lives in the reacting Member's own record and has to point at a
 
 - A collapsed entry ("dinged 24 (from 22)") covers a range and matches any key inside it: levels 23–24, death totals 4–5, or profession milestones 150–225 for "reached 225 Alchemy" from 140. A Reaction made on it is keyed to the top of the range. The owner never collapses their own entries, so every Reaction finds exactly one entry on their side.
 - Death entries store the total they reached, not only how many deaths were added.
+- Unlearning a profession and picking it up again (or falling back below a milestone and reaching it again) repeats a profession key, so an old Cheer can attach to the newer entry. Accepted for the same reason as repeated death totals below.
 - A crash that loses a session's deaths can repeat a death total, so an old Reaction can attach to a newer death within the 30 days Reactions are kept. Accepted as rare and harmless.

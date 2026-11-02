@@ -38,6 +38,9 @@ The entry's time can't be used, because the version it comes from differs betwee
 | death | owner Member id + Character GUID + death total reached |
 | new Character | owner Member id + Character GUID |
 | joined | owner Member id + `joinedAt` |
+| new profession | owner Member id + Character GUID + skill line ID |
+| profession skill | owner Member id + Character GUID + skill line ID + milestone reached (75, 150 or 225) |
+| profession maxed | owner Member id + Character GUID + skill line ID |
 
 A collapsed entry matches every key in its range: "dinged 24 (from 22)" shows Reactions keyed to 23 or 24, and "died 2 times" going from 3 to 5 shows those keyed to 4 or 5. A Reaction made on a collapsed entry, or on a While you were away row, is keyed to the top of the range. The owner's own entries never collapse, so each Reaction lands on exactly one of them.
 
@@ -47,7 +50,7 @@ Death entries gain the death total they reached (`to`) next to `count`.
 
 ### In the reacting Member's record
 
-The record gains an optional `reactions` list. Each item holds the key (owner id, GUID, kind, number) and the server time it was made, with short field names to keep DATA small.
+The record gains an optional `reactions` list. Each item holds the key (owner id, GUID, kind, number, and the skill line ID for profession kinds) and the server time it was made, with short field names to keep DATA small.
 
 - Kept for **30 days**, and at most the **50 most recent**. Pruned when the record is next written, so pruning alone never sends a DATA.
 - Clients that don't know the field keep and relay it unchanged, since `wellFormed` only checks the fields it knows.
