@@ -120,7 +120,24 @@
     ]
   },
   {
-    "id": "07-crew",
+    "id": "07-professions",
+    "layout": "left",
+    "title": "Who crafts what",
+    "caption": "Every friend’s professions and skill in one grid, so you know who to ask for a craft.",
+    "shots": [
+      {
+        "file": "professions.png",
+        "crop": [
+          660,
+          20,
+          760,
+          465
+        ]
+      }
+    ]
+  },
+  {
+    "id": "08-crew",
     "layout": "steps",
     "title": "Start a crew",
     "caption": "No server, no account, and no shared guild needed.",
