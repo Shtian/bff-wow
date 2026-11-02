@@ -2,6 +2,20 @@
 
 
 
+
+## 0.3.0
+<sub>2026-11-02</sub>
+
+- *(minor)*
+  Each Character's professions and skill are now shared with your Crew. A new Professions tab (`/bff professions`) shows a grid of all twelve professions, a row per Member with their best skill in each, sortable by profession, and the Character tooltip lists each profession with its rank and skill. Characters not played since the Crew upgraded show no professions until they are.
+- *(minor)*
+  Profession progress is now Feed news with a Cheer: picking up a profession, reaching 75, 150 and 225 skill, and maxing it at 300, shown as a chat line, a toast and in While you were away.
+- *(minor)*
+  Added three Crew goals for professions on the Goals tab: Every profession in the Crew, Crew skill, and Everyone a Journeyman (each Member has a profession at the next rank). The Goals tab now scrolls.
+- *(patch)*
+  Refactored the settings into one list in Core, and Core now decides whether each live event becomes a chat line or a toast.
+- *(patch)* The version number now shows at the bottom of the panel's sidebar and in the minimap button's tooltip.
+
 ## 0.2.1
 <sub>2026-11-02</sub>
 
