@@ -15,6 +15,8 @@ local SLOTS = 5
 local SECONDARY_FROM = 3
 -- Forever caps professions at 300 (#97).
 Professions.CAP = 300
+-- The Feed entry kinds that are profession news (each names a skill line).
+Professions.KINDS = { newProfession = true, professionSkill = true, professionMaxed = true }
 local RANKS = { { 300, "Artisan" }, { 225, "Expert" }, { 150, "Journeyman" }, { 75, "Apprentice" } }
 -- The secondary columns' order, by skill line ID: cooking, fishing, first
 -- aid. Any other secondary goes after them, by name.
@@ -43,8 +45,10 @@ local function readAll(api)
     if index ~= nil then
       if isSecret(index) then return nil end
       local name, icon, skill, max, _, _, skillLine = api.getProfessionInfo(index)
-      for _, value in ipairs({ name, icon, skill, max, skillLine }) do
-        if isSecret(value) then return nil end
+      -- A plain loop: ipairs would stop at a nil icon before the rest.
+      local values = { name, icon, skill, max, skillLine }
+      for i = 1, 5 do
+        if isSecret(values[i]) then return nil end
       end
       -- Anything a record couldn't store keeps the last list instead.
       if type(name) ~= "string" or name == "" or not isCount(skill) or not isCount(max) or max == 0

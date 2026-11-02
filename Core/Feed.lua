@@ -503,9 +503,6 @@ local function cheerRank(entry)
   return nil
 end
 
--- Profession entries show as lines of their own, not on the scoreboard.
-local PROFESSION_KINDS = { newProfession = true, professionSkill = true, professionMaxed = true }
-
 -- One Character's row in a Member's block: { name, main, from, level,
 -- deaths, new, maxLevel, cheer, respects }. The level range runs from the
 -- lowest "before" to the highest "after" (max level counts towards it), a
@@ -633,7 +630,8 @@ function Feed:takeSummary(spares)
   spares = spares or {}
   local byMember, ids, goals, gives, professions, count = {}, {}, {}, {}, {}, 0
   for _, entry in ipairs(self.db.feed) do
-    if not entry.seen and PROFESSION_KINDS[entry.kind] then
+    -- Profession entries show as lines of their own, not on the scoreboard.
+    if not entry.seen and ns.Professions.KINDS[entry.kind] then
       entry.seen = true
       count = count + 1
       table.insert(professions, 1, {

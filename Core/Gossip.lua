@@ -118,8 +118,10 @@ function Gossip:sendNow(message)
 end
 
 -- The own record changed. urgency is "now" (ding, death, new Character,
--- display name, Main), "soon" (zone, debounced) or "later" (XP, gold,
--- professions, Play times: waits for the next send or the heartbeat).
+-- display name, Main, and any change that makes a Feed entry, such as a
+-- profession milestone), "soon" (zone, debounced) or "later" (XP, gold,
+-- other profession changes, Play times: waits for the next send or the
+-- heartbeat).
 -- Where you stand never calls this: it is written just before own DATA
 -- goes out (beforeOwnSend).
 function Gossip:ownChanged(urgency)

@@ -39,7 +39,7 @@ for kind, code in pairs(CODES) do KINDS[code] = kind end
 -- profession skill reached.
 local NUMBERED = { ding = true, death = true, joined = true, professionSkill = true }
 -- Kinds whose key also names the profession, by skill line ID.
-local PROFESSION = { newProfession = true, professionSkill = true, professionMaxed = true }
+local PROFESSION = ns.Professions.KINDS
 
 -- The Reaction an entry kind has ("cheer", "respects" or "welcome"), or nil.
 function Reactions.forKind(kind)
