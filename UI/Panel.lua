@@ -13,8 +13,9 @@
 -- from a menu. Spares lists other Members' open ones with Claim
 -- and Withdraw-claim buttons, dimmed when none of your Characters is high
 -- enough level, then your own with their winning Claim and Give and
--- Withdraw. Professions is a grid of each Character's skill per profession,
--- by Member. It never sees a Member record.
+-- Withdraw. Professions lists the twelve professions, grey when nobody has
+-- one, each with the Characters who have it and their skill, best first.
+-- It never sees a Member record.
 
 local _, ns = ...
 
@@ -87,16 +88,14 @@ local SPARES_NONE = "No Spares from the Crew right now."
 local SPARES_DROP = "Drop an item from your bags here to offer it to your Crew."
 local SPARES_HOW = "Offer an item: drop it on the slot above, or type /bff spares add and shift-click it into the chat box. Mail it to the winner, then Give it."
 local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
--- Professions: a row per Character, a column per profession.
-local PROFESSION_HEAD = 26
+-- Professions: a row per profession, its icon and name, then who has it.
 local PROFESSION_ICON = 16
-local PROFESSION_NAME = 92
-local PROFESSION_MAX_COLUMN = 30
-local PROFESSION_DIVIDER = 7
-local PROFESSION_ROW = 32
-local PROFESSION_ALT = 22
-local PROFESSION_ALT_INDENT = 10
-local PROFESSIONS_NONE = "Nobody's professions are shared yet. They show up once a Member logs in with this version of BFF."
+local PROFESSION_NAME = 96
+local PROFESSION_ROW = 24
+local PROFESSION_PAD = 5
+-- The gap before cooking, fishing and first aid.
+local PROFESSION_SECONDARY_GAP = 8
+local PROFESSIONS_UNSHARED = "Not shared yet: %s. Their professions show up once they log in with this version of BFF."
 
 local GOLD = Skin.GOLD
 local MUTED = Skin.MUTED
@@ -1377,193 +1376,127 @@ local function drawSpares()
   if view.unseen > 0 then core:sparesSeen() end
 end
 
--- Professions: the column icons on top, then a scrolling grid below.
-local function showProfessionTooltip(owner)
-  if not owner.text then return end
-  GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-  GameTooltip:AddLine(owner.text, 1, 1, 1)
-  GameTooltip:Show()
+-- Professions: a scrolling list, a row per profession.
+local function holderText(holder)
+  local name = Skin.hex({ classColor(holder.classFilename) }) .. holder.name .. "|r"
+  return ("%s %s%d|r"):format(name, Skin.hex(holder.full and GOLD or TEXT), holder.skill)
 end
 
-local function hoverable(parent)
-  local item = CreateFrame("Frame", nil, parent)
-  item:EnableMouse(true)
-  item:SetScript("OnEnter", showProfessionTooltip)
-  item:SetScript("OnLeave", hideTooltip)
-  return item
+-- A row's tooltip: the profession, then each holder with their Member, skill
+-- and rank.
+local function showProfessionTooltip(row)
+  local profession = row.profession
+  if not profession then return end
+  GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+  GameTooltip:AddLine(profession.name, 1, 1, 1)
+  if #profession.holders == 0 then
+    GameTooltip:AddLine("Nobody in the Crew has it yet.", MUTED[1], MUTED[2], MUTED[3])
+  end
+  for _, holder in ipairs(profession.holders) do
+    local who = holder.name
+    if holder.own then
+      who = who .. Skin.hex(DIM) .. " (you)|r"
+    elseif holder.displayName and holder.displayName ~= holder.name then
+      who = who .. Skin.hex(DIM) .. " (" .. holder.displayName .. ")|r"
+    end
+    local skill = ("%d/%d"):format(holder.skill, holder.max)
+    if holder.rank then skill = Skin.hex(DIM) .. holder.rank .. "|r " .. skill end
+    local r, g, b = classColor(holder.classFilename)
+    local color = holder.full and GOLD or TEXT
+    GameTooltip:AddDoubleLine(who, skill, r, g, b, color[1], color[2], color[3])
+  end
+  GameTooltip:Show()
 end
 
 local function createProfessionsView()
   professionsView = CreateFrame("Frame", nil, frame.content)
   professionsView:SetAllPoints()
-  professionsView.head = CreateFrame("Frame", nil, professionsView)
-  professionsView.head:SetPoint("TOPLEFT")
-  professionsView.head:SetPoint("TOPRIGHT")
-  professionsView.head:SetHeight(PROFESSION_HEAD)
-  Skin.edge(professionsView.head, "BOTTOM", Skin.LINE)
-  professionsView.icons = {}
-  professionsView.divider = professionsView:CreateTexture(nil, "ARTWORK")
-  professionsView.divider:SetColorTexture(1, 1, 1, 0.12)
-  professionsView.divider:SetWidth(1)
   professionsView.list = createScrollView()
   professionsView.list:SetParent(professionsView)
-  professionsView.list:SetPoint("TOPLEFT", 0, -PROFESSION_HEAD)
+  professionsView.list:SetPoint("TOPLEFT")
   professionsView.list:SetPoint("BOTTOMRIGHT", -6, 0)
   professionsView.rows = {}
-  professionsView.none = Skin.label(professionsView, "small", MUTED)
-  professionsView.none:SetPoint("TOPLEFT", INSET, -INSET)
-  professionsView.none:SetWidth(CONTENT_WIDTH - 2 * INSET)
-  professionsView.none:SetWordWrap(true)
-  professionsView.none:SetJustifyH("LEFT")
-  professionsView.none:SetText(PROFESSIONS_NONE)
-end
-
--- Where each column's centre is, from the left, and how wide a column is.
-local function professionColumns(columns)
-  local count = #columns
-  local divider = 0
-  for _, column in ipairs(columns) do
-    if column.secondary then divider = PROFESSION_DIVIDER end
-  end
-  local room = CONTENT_WIDTH - 6 - 2 * INSET - PROFESSION_NAME - divider
-  local width = math.min(PROFESSION_MAX_COLUMN, math.floor(room / math.max(count, 1)))
-  local centres, dividerX = {}, nil
-  local x = INSET + PROFESSION_NAME
-  for i, column in ipairs(columns) do
-    if column.secondary and not dividerX then
-      dividerX = i > 1 and x + divider / 2 or nil
-      x = x + (i > 1 and divider or 0)
-    end
-    centres[i] = x + width / 2
-    x = x + width
-  end
-  return centres, width, dividerX
-end
-
-local function professionIcon(index)
-  local icon = professionsView.icons[index]
-  if icon then return icon end
-  icon = hoverable(professionsView.head)
-  icon:SetSize(PROFESSION_ICON, PROFESSION_ICON)
-  icon.texture = icon:CreateTexture(nil, "ARTWORK")
-  icon.texture:SetAllPoints()
-  icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  professionsView.icons[index] = icon
-  return icon
-end
-
--- A cell: the skill and a thin bar under it, or a faint dot for none.
-local function professionCell(row, index)
-  local cell = row.cells[index]
-  if cell then return cell end
-  cell = hoverable(row)
-  cell.value = Skin.label(cell, "tiny")
-  cell.value:SetPoint("TOP", 0, 0)
-  cell.track = cell:CreateTexture(nil, "ARTWORK")
-  cell.track:SetPoint("TOPLEFT", cell, "TOPLEFT", 3, -13)
-  cell.track:SetPoint("TOPRIGHT", cell, "TOPRIGHT", -3, -13)
-  cell.track:SetHeight(2)
-  cell.track:SetColorTexture(Skin.TRACK[1], Skin.TRACK[2], Skin.TRACK[3], Skin.TRACK[4])
-  cell.bar = cell:CreateTexture(nil, "OVERLAY")
-  cell.bar:SetPoint("TOPLEFT", cell.track)
-  cell.bar:SetHeight(2)
-  cell.dot = Skin.label(cell, "small", { 1, 1, 1, 0.15 })
-  cell.dot:SetPoint("TOP", 0, -1)
-  cell.dot:SetText("·")
-  row.cells[index] = cell
-  return cell
-end
-
-local function drawProfessionCell(cell, profession, width)
-  cell:SetSize(width, 16)
-  cell.text = profession and ("%s %d/%d"):format(profession.name, profession.skill, profession.max) or nil
-  cell.dot:SetShown(not profession)
-  cell.value:SetShown(profession ~= nil)
-  cell.track:SetShown(profession ~= nil)
-  cell.bar:SetShown(profession ~= nil and profession.skill > 0)
-  if profession then
-    cell.value:SetText(profession.skill)
-    Skin.color(cell.value, profession.full and GOLD or TEXT)
-    cell.bar:SetWidth(math.max(1, (width - 6) * math.min(profession.skill / profession.max, 1)))
-    local color = profession.full and GOLD or Skin.BAR
-    cell.bar:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
-  end
-  cell:Show()
+  professionsView.unshared = Skin.label(professionsView.list.content, "small", MUTED)
+  professionsView.unshared:SetWidth(CONTENT_WIDTH - 6 - 2 * INSET)
+  professionsView.unshared:SetWordWrap(true)
+  professionsView.unshared:SetJustifyH("LEFT")
 end
 
 local function professionRow(index)
   local row = professionsView.rows[index]
   if row then return row end
   row = CreateFrame("Frame", nil, professionsView.list.content)
-  row.ownBackground = Skin.fill(row, { GOLD[1], GOLD[2], GOLD[3], 0.05 })
+  row:EnableMouse(true)
+  row:SetScript("OnEnter", showProfessionTooltip)
+  row:SetScript("OnLeave", hideTooltip)
   row.edge = Skin.edge(row, "TOP", Skin.LINE)
+  row.icon = row:CreateTexture(nil, "ARTWORK")
+  row.icon:SetSize(PROFESSION_ICON, PROFESSION_ICON)
+  row.icon:SetPoint("TOPLEFT", INSET, -(PROFESSION_ROW - PROFESSION_ICON) / 2)
+  row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   row.name = Skin.label(row, "text")
-  row.member = Skin.label(row, "tiny", DIM)
-  row.member:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -1)
-  row.cells = {}
+  row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+  row.name:SetWidth(PROFESSION_NAME - PROFESSION_ICON - 6)
+  row.name:SetWordWrap(false)
+  row.name:SetJustifyH("LEFT")
+  row.holders = Skin.label(row, "small")
+  row.holders:SetPoint("TOPLEFT", INSET + PROFESSION_NAME, -PROFESSION_PAD - 1)
+  row.holders:SetWidth(CONTENT_WIDTH - 6 - 2 * INSET - PROFESSION_NAME)
+  row.holders:SetWordWrap(true)
+  row.holders:SetJustifyH("LEFT")
   professionsView.rows[index] = row
   return row
+end
+
+local function drawProfessionRow(row, profession)
+  local had = #profession.holders > 0
+  row.profession = profession
+  row.icon:SetTexture(profession.icon or QUESTION_MARK)
+  row.icon:SetDesaturated(not had)
+  row.icon:SetAlpha(had and 1 or 0.35)
+  row.name:SetText(profession.name)
+  Skin.color(row.name, had and TEXT or DIM)
+  if had then
+    local holders = {}
+    for i, holder in ipairs(profession.holders) do holders[i] = holderText(holder) end
+    row.holders:SetText(table.concat(holders, Skin.hex(DIM) .. "  ·  |r"))
+  else
+    row.holders:SetText(Skin.hex(DIM) .. "—|r")
+  end
+  local height = math.max(PROFESSION_ROW, math.ceil(row.holders:GetStringHeight()) + 2 * PROFESSION_PAD + 2)
+  row:SetHeight(height)
+  return height
 end
 
 local function drawProfessions()
   if not professionsView then createProfessionsView() end
   local view = core:professions(order)
-  local centres, width, dividerX = professionColumns(view.columns)
-  local empty = #view.columns == 0
-  professionsView.none:SetShown(empty)
-  professionsView.head:SetShown(not empty)
-  professionsView.list:SetShown(not empty)
-
-  for i, column in ipairs(view.columns) do
-    local icon = professionIcon(i)
-    icon:ClearAllPoints()
-    icon:SetPoint("CENTER", professionsView.head, "LEFT", centres[i], 0)
-    icon.texture:SetTexture(column.icon or QUESTION_MARK)
-    icon.text = column.name
-    icon:SetAlpha(column.secondary and 0.8 or 1)
-    icon:Show()
-  end
-  hideAll(professionsView.icons, #view.columns + 1)
 
   local y = 0
-  for i, data in ipairs(view.rows) do
+  for i, profession in ipairs(view.professions) do
     local row = professionRow(i)
-    local height = data.alt and PROFESSION_ALT or PROFESSION_ROW
+    local first = profession.secondary and (i == 1 or not view.professions[i - 1].secondary)
+    if first and i > 1 then y = y - PROFESSION_SECONDARY_GAP end
     row:ClearAllPoints()
     row:SetPoint("TOPLEFT", professionsView.list.content, "TOPLEFT", 0, y)
     row:SetPoint("TOPRIGHT", professionsView.list.content, "TOPRIGHT", 0, y)
-    row:SetHeight(height)
-    row.ownBackground:SetShown(data.own)
-    row.edge:SetShown(data.first == true and i > 1)
-    row.name:ClearAllPoints()
-    row.name:SetPoint("TOPLEFT", INSET + (data.alt and PROFESSION_ALT_INDENT or 0), data.alt and -4 or -3)
-    row.name:SetWidth(PROFESSION_NAME - 4 - (data.alt and PROFESSION_ALT_INDENT or 0))
-    row.name:SetWordWrap(false)
-    row.name:SetJustifyH("LEFT")
-    row.name:SetText(data.name)
-    row.name:SetTextColor(classColor(data.classFilename))
-    row.member:SetText(data.alt and "" or data.own and "you" or data.displayName or "")
-    for c in ipairs(view.columns) do
-      local cell = professionCell(row, c)
-      if data.known then
-        cell:ClearAllPoints()
-        cell:SetPoint("TOP", row, "TOPLEFT", centres[c], data.alt and -4 or -5)
-        drawProfessionCell(cell, data.cells[c] or nil, width)
-      else
-        cell:Hide()
-      end
-    end
-    hideAll(row.cells, #view.columns + 1)
+    row.edge:SetShown(i > 1)
     row:Show()
-    y = y - height
+    y = y - drawProfessionRow(row, profession)
   end
-  hideAll(professionsView.rows, #view.rows + 1)
+  hideAll(professionsView.rows, #view.professions + 1)
 
-  professionsView.divider:ClearAllPoints()
-  professionsView.divider:SetShown(dividerX ~= nil and not empty)
-  if dividerX then
-    professionsView.divider:SetPoint("TOPLEFT", professionsView, "TOPLEFT", dividerX, -4)
-    professionsView.divider:SetPoint("BOTTOMLEFT", professionsView, "BOTTOMLEFT", dividerX, 4)
+  local unshared = professionsView.unshared
+  unshared:SetShown(#view.unshared > 0)
+  if #view.unshared > 0 then
+    local names = {}
+    for i, character in ipairs(view.unshared) do
+      names[i] = Skin.hex({ classColor(character.classFilename) }) .. character.name .. "|r"
+    end
+    unshared:SetText(PROFESSIONS_UNSHARED:format(table.concat(names, ", ")))
+    unshared:ClearAllPoints()
+    unshared:SetPoint("TOPLEFT", professionsView.list.content, "TOPLEFT", INSET, y - INSET)
+    y = y - INSET - math.ceil(unshared:GetStringHeight())
   end
 
   professionsView.list.content:SetHeight(-y + 6)

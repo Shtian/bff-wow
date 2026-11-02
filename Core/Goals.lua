@@ -28,26 +28,8 @@ local DEATHS_STEPS = { 25, 50, 100 }
 local SKILL_STEPS = { 500, 1000, 2500 }
 local RANK_STEP = 75
 
--- The twelve professions of Every profession in the Crew, by skill line,
--- in the Goals tab's order (as the Professions tab's columns): main ones by
--- name, then cooking, fishing and first aid. The name and icon are for a
--- profession nobody has; one somebody has shows as their client words it.
--- noun names whoever has it, for the Feed entry.
-local PROFESSIONS = {
-  { skillLine = 171, name = "Alchemy", noun = "an Alchemist", icon = "Interface\\Icons\\Trade_Alchemy" },
-  { skillLine = 164, name = "Blacksmithing", noun = "a Blacksmith", icon = "Interface\\Icons\\Trade_BlackSmithing" },
-  { skillLine = 333, name = "Enchanting", noun = "an Enchanter", icon = "Interface\\Icons\\Trade_Engraving" },
-  { skillLine = 202, name = "Engineering", noun = "an Engineer", icon = "Interface\\Icons\\Trade_Engineering" },
-  { skillLine = 182, name = "Herbalism", noun = "a Herbalist", icon = "Interface\\Icons\\Trade_Herbalism" },
-  { skillLine = 165, name = "Leatherworking", noun = "a Leatherworker",
-    icon = "Interface\\Icons\\Trade_LeatherWorking" },
-  { skillLine = 186, name = "Mining", noun = "a Miner", icon = "Interface\\Icons\\Trade_Mining" },
-  { skillLine = 393, name = "Skinning", noun = "a Skinner", icon = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01" },
-  { skillLine = 197, name = "Tailoring", noun = "a Tailor", icon = "Interface\\Icons\\Trade_Tailoring" },
-  { skillLine = 185, name = "Cooking", noun = "a Cook", icon = "Interface\\Icons\\INV_Misc_Food_15" },
-  { skillLine = 356, name = "Fishing", noun = "an Angler", icon = "Interface\\Icons\\Trade_Fishing" },
-  { skillLine = 129, name = "First Aid", noun = "a First Aider", icon = "Interface\\Icons\\Spell_Holy_SealOfSacrifice" },
-}
+-- The twelve, as Every profession in the Crew counts them.
+local PROFESSIONS = ns.Professions.ALL
 
 -- A ladder of steps repeated ten times bigger for ever: the first one
 -- above after.
