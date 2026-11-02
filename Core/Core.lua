@@ -122,16 +122,16 @@ local function announce(self, entries, reactions, notices)
   for _, entry in ipairs(entries) do
     if not entry.seen then
       self.log:markSeen(entry)
-      self.listener("feedEntry", self.log:describe(entry), outlets(self))
+      self.listener("feedEntry", self.log:describe(entry), to)
     end
   end
   for _, item in ipairs(reactions or {}) do
     self.log:markSeen(item.reaction)
-    self.listener("reaction", self.log:news(item), outlets(self))
+    self.listener("reaction", self.log:news(item), to)
   end
   for _, news in ipairs(notices or {}) do
     self.spareLife:markSeen(news)
-    self.listener("spare", self.spareLife:describe(news), outlets(self))
+    self.listener("spare", self.spareLife:describe(news), to)
   end
 end
 
@@ -536,7 +536,8 @@ local function nilAsDefault(field, default)
   }
 end
 
--- A screen position, saved as { x, y } or nil; read as a copy.
+-- A screen position, saved as { x, y } or nil; read as a copy, so two
+-- reads are the same when their x and y are.
 local function screenPosition(field)
   return {
     read = function(db)
@@ -545,6 +546,10 @@ local function screenPosition(field)
     end,
     write = function(db, value)
       db[field] = value and value.x and { x = value.x, y = value.y } or nil
+    end,
+    same = function(a, b)
+      if a == nil or b == nil then return a == b end
+      return a.x == b.x and a.y == b.y
     end,
   }
 end
@@ -607,13 +612,8 @@ local function settingFor(key)
   return setting
 end
 
-local function same(a, b)
-  if type(a) == "table" and type(b) == "table" then return a.x == b.x and a.y == b.y end
-  return a == b
-end
-
--- Core's own reactions to a setting changing.
-local REACTIONS = {
+-- What Core itself does when a setting changes, by key.
+local ON_CHANGE = {
   -- Pause sharing: send nothing, still receive, and appear offline.
   paused = function(self, paused) self.gossip:setPaused(paused) end,
 }
@@ -631,9 +631,9 @@ function Core:setSetting(key, value)
   local before = saved.read(self.db)
   saved.write(self.db, value)
   local after = saved.read(self.db)
-  if same(before, after) then return end
-  local react = REACTIONS[key]
-  if react then react(self, after) end
+  if (saved.same or rawequal)(before, after) then return end
+  local onChange = ON_CHANGE[key]
+  if onChange then onChange(self, after) end
   self.listener("settingChanged", key, after)
 end
 

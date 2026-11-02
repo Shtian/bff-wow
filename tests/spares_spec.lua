@@ -495,6 +495,31 @@ describe("Spares", function()
       assert.same({ "Ann sent you [Cruel Barb]. Check Bob's mailbox." }, texts)
     end)
 
+    for _, chat in ipairs({ true, false }) do
+      for _, toast in ipairs({ true, false }) do
+        it(("go to chat %s and toast %s as Core says"):format(tostring(chat), tostring(toast)), function()
+          local net, clients = crew({ "Ann", "Bob" })
+          local a, b = clients[1], clients[2]
+          a.core:setSetting("chatLines", chat)
+          a.core:setSetting("toasts", toast)
+          local id = post(net, a)
+          b.core:claimSpare(a.memberId, id)
+          net:run(5)
+          local fired = {}
+          for _, event in ipairs(a.events) do
+            if event[1] == "spare" then fired[#fired + 1] = event[3] end
+          end
+          if chat or toast then
+            assert.same({ { chat = chat, toast = toast } }, fired)
+            assert.equal(0, view(a).unseen)
+          else
+            assert.same({}, fired)
+            assert.equal(1, view(a).unseen)
+          end
+        end)
+      end
+    end
+
     it("stay unseen with chat lines and toasts off until the tab is opened", function()
       local net, clients = crew({ "Ann", "Bob" })
       local a, b = clients[1], clients[2]

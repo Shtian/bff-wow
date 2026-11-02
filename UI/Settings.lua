@@ -204,8 +204,8 @@ local function createLeave()
   return leave
 end
 
--- What a section has under its settings, by title.
-local extras = { Sharing = createLeave }
+-- What the page puts under a setting's control, by key.
+local extras = { paused = createLeave }
 
 -- A header and a control per setting for each section of Core's list, in
 -- order, as frame.elements for refresh to lay out.
@@ -218,12 +218,12 @@ local function createSections()
     for _, setting in ipairs(section.settings) do
       local make = setting.kind == "toggle" and createToggle or custom[setting.kind]
       local control = make(setting)
-      control.section = section.title
+      control.section, control.kind = section.title, setting.kind
       frame.controls[setting.key] = control
       frame.elements[#frame.elements + 1] = control.element
-    end
-    if extras[section.title] then
-      frame.elements[#frame.elements + 1] = extras[section.title]()
+      if extras[setting.key] then
+        frame.elements[#frame.elements + 1] = extras[setting.key]()
+      end
     end
   end
 end
@@ -247,15 +247,15 @@ local function layout(crew)
   end
 end
 
--- Draws one setting's control. With toasts off, the rest of the Toasts
--- section (sound, Move toasts) is greyed out.
+-- Draws one setting's control. With toasts off, the Toasts section's
+-- controls that aren't on/off (sound, Move toasts) are greyed out.
 local function drawSetting(key, value)
   local control = frame.controls[key]
   if not control then return end
   control.draw(value)
   if key == "toasts" then
-    for otherKey, other in pairs(frame.controls) do
-      if otherKey ~= key and other.section == control.section then other.setEnabled(value) end
+    for _, other in pairs(frame.controls) do
+      if other.kind ~= "toggle" and other.section == control.section then other.setEnabled(value) end
     end
   end
 end
