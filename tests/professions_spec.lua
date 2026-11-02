@@ -291,106 +291,126 @@ describe("Professions", function()
   describe("the Professions tab", function()
     local function names(view)
       local result = {}
-      for i, column in ipairs(view.columns) do result[i] = column.name end
+      for i, p in ipairs(view.professions) do result[i] = p.name end
       return result
     end
 
-    -- Each row as "name: cells", with "." for an empty cell and "?" for an
-    -- unknown row.
+    -- Each Member as "name: cells", "." for none, "?" when not shared.
     local function grid(view)
       local result = {}
-      for i, row in ipairs(view.rows) do
+      for i, member in ipairs(view.members) do
         local cells = {}
-        if not row.known then
+        if not member.known then
           cells[1] = "?"
         else
-          for j = 1, #view.columns do
-            cells[j] = row.cells[j] and tostring(row.cells[j].skill) or "."
-          end
+          for j, cell in ipairs(member.cells) do cells[j] = cell and tostring(cell.skill) or "." end
         end
-        result[i] = (row.alt and "  " or "") .. row.name .. ": " .. table.concat(cells, " ")
+        result[i] = (member.displayName or "?") .. ": " .. table.concat(cells, " ")
       end
       return result
     end
 
-    it("has a row per Character, by Member, own first, Main first, Alts under it", function()
+    local function column(view, name)
+      for i, p in ipairs(view.professions) do
+        if p.name == name then return i end
+      end
+    end
+
+    it("has all twelve and a row per Member, each cell their best Character", function()
       local net, clients = crew({ "Ann", "Bob", "Cleo" })
       local a, b = clients[1], clients[2]
       a:play({ professions = alchemist(), level = 11 })
       net:run(2)
-      b:play({ professions = { profession(MINING, "Mining", 75, 75), profession(FISHING, "Fishing", 1, 75, true) } })
+      b:play({ professions = { profession(MINING, "Mining", 75, 75), profession(COOKING, "Cooking", 150, 150, true) } })
       net:run(2)
-      -- Bob plays an Alt now, so the Roster shows it with his Main as an
-      -- Alt, but the Main comes first here.
+      -- Bob plays an Alt now, with better Cooking.
       b:play({ guid = "Player-0-BobAlt", name = "Bobalt", level = 3,
-        professions = { profession(TAILORING, "Tailoring", 20, 75) } })
+        professions = { profession(MINING, "Mining", 20, 75), profession(COOKING, "Cooking", 200, 225, true) } })
       b.core:setMain("Player-0-Bob")
       net:run(2)
-      assert.equal("Bobalt", a:rowFor(b).name)
 
       local view = a.core:professions()
-      assert.same({ "Alchemy", "Herbalism", "Mining", "Tailoring", "Cooking", "Fishing" }, names(view))
-      assert.same({ false, false, false, false, true, true }, (function()
-        local result = {}
-        for i, column in ipairs(view.columns) do result[i] = column.secondary end
-        return result
-      end)())
+      assert.same({ "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Herbalism", "Leatherworking",
+        "Mining", "Skinning", "Tailoring", "Cooking", "Fishing", "First Aid" }, names(view))
       assert.same({
-        "Ann: 287 300 . . 140 .",
-        "Bob: . . 75 . . 1",
-        "  Bobalt: . . . 20 . .",
+        "Ann: 287 . . . 300 . . . . 140 . .",
+        "Bob: . . . . . . 75 . . 200 . .",
         "Cleo: ?",
       }, grid(view))
 
-      local own, bob, bobalt, cleo = view.rows[1], view.rows[2], view.rows[3], view.rows[4]
+      local enchanting = view.professions[column(view, "Enchanting")]
+      assert.is_false(enchanting.had)
+      assert.equal("Interface\\Icons\\Trade_Engraving", enchanting.icon)
+      assert.is_false(enchanting.secondary)
+      assert.is_true(view.professions[column(view, "Fishing")].secondary)
+      local alchemy = view.professions[column(view, "Alchemy")]
+      assert.is_true(alchemy.had)
+      -- Someone has it: their client's icon.
+      assert.equal(1000 + ALCHEMY, alchemy.icon)
+
+      local own, bob = view.members[1], view.members[2]
       assert.is_true(own.own)
-      assert.is_true(own.first)
       assert.equal(a.memberId, own.memberId)
-      assert.is_true(bob.main)
-      assert.is_true(bob.first)
       assert.equal("Bob", bob.displayName)
-      assert.is_true(bobalt.alt)
-      assert.is_falsy(bobalt.first)
-      assert.is_false(cleo.known)
-      assert.equal("WARRIOR", bob.classFilename)
-      assert.same({ skillLine = MINING, name = "Mining", icon = 1000 + MINING, skill = 75, max = 75,
-        secondary = false, rank = "Apprentice", full = true, capped = false }, bob.cells[3])
-      assert.equal(1000 + ALCHEMY, view.columns[1].icon)
+      assert.is_false(bob.own)
+      local mining = bob.cells[column(view, "Mining")]
+      assert.same({ skill = 75, max = 75, rank = "Apprentice", full = true, capped = false, characters = {
+        { name = "Bob", classFilename = "WARRIOR", alt = false, skill = 75, max = 75, rank = "Apprentice",
+          full = true, capped = false },
+        { name = "Bobalt", classFilename = "WARRIOR", alt = true, skill = 20, max = 75, rank = "Apprentice",
+          full = false, capped = false },
+      } }, mining)
+      local cooking = bob.cells[column(view, "Cooking")]
+      assert.equal("Bobalt", cooking.characters[1].name)
+      assert.equal("Expert", cooking.rank)
+      assert.is_false(bob.cells[column(view, "Alchemy")])
+      assert.is_false(view.members[3].known)
     end)
 
-    it("orders the secondary columns cooking, fishing, first aid", function()
+    it("lists one outside the twelve after its kind", function()
       local net, clients = crew({ "Ann", "Bob" })
       local a, b = clients[1], clients[2]
-      a:play({ level = 11, professions = { profession(FIRST_AID, "First Aid", 1, 75, true) } })
       b:play({ level = 11, professions = {
-        profession(FISHING, "Fishing", 1, 75, true), profession(COOKING, "Cooking", 1, 75, true),
-        profession(MINING, "Mining", 1, 75),
+        profession(999, "Jewelcrafting", 10, 75), profession(998, "Archaeology", 5, 75, true),
       } })
       net:run(2)
-      assert.same({ "Mining", "Cooking", "Fishing", "First Aid" }, names(a.core:professions()))
+      local view = a.core:professions()
+      local list = names(view)
+      assert.equal("Jewelcrafting", list[10])
+      assert.equal("Cooking", list[11])
+      assert.equal("Archaeology", list[14])
+      assert.equal(10, view.members[2].cells[10].skill)
     end)
 
-    it("follows the Roster's order for the other Members", function()
-      local net, clients = crew({ "Ann", "Bob", "Cleo" })
-      local a, b, c = clients[1], clients[2], clients[3]
-      b:play({ level = 5 })
-      c:play({ level = 30 })
+    it("follows the Roster's order, or sorts by a profession with yours first", function()
+      local net, clients = crew({ "Ann", "Bob", "Cleo", "Dan" })
+      local a, b, c, d = clients[1], clients[2], clients[3], clients[4]
+      b:play({ level = 5, professions = { profession(MINING, "Mining", 10, 75) } })
+      c:play({ level = 30, professions = { profession(MINING, "Mining", 50, 75) } })
+      d:play({ level = 20, professions = { profession(ALCHEMY, "Alchemy", 1, 75) } })
       net:run(2)
-      local function members(order)
+      local function members(order, sortBy)
         local result = {}
-        for _, row in ipairs(a.core:professions(order).rows) do result[#result + 1] = row.name end
+        for _, member in ipairs(a.core:professions(order, sortBy).members) do
+          result[#result + 1] = member.displayName
+        end
         return result
       end
-      assert.same({ "Ann", "Cleo", "Bob" }, members("level"))
-      assert.same({ "Ann", "Bob", "Cleo" }, members("name"))
+      assert.same({ "Ann", "Cleo", "Dan", "Bob" }, members("level"))
+      assert.same({ "Ann", "Bob", "Cleo", "Dan" }, members("name"))
+      assert.same({ "Ann", "Cleo", "Bob", "Dan" }, members("name", MINING))
+      -- Ties keep the Roster's order.
+      assert.same({ "Ann", "Dan", "Bob", "Cleo" }, members("name", ALCHEMY))
     end)
 
-    it("is empty without Characters", function()
+    it("is the twelve, with no Members, without Characters", function()
       local core = load().Core.new({
         db = {}, now = function() return 1000 end, random = math.random,
         link = { send = function() end }, listener = function() end, maxLevel = 60,
       })
-      assert.same({ columns = {}, rows = {} }, core:professions())
+      local view = core:professions()
+      assert.equal(12, #view.professions)
+      assert.same({}, view.members)
     end)
   end)
 end)

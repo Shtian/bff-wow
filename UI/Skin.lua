@@ -30,6 +30,16 @@ Skin.TRACK = { 1, 1, 1, 0.08 }
 Skin.BAR = { 1, 1, 1, 0.3 }
 -- A secondary button's plate: the small buttons and the Skin buttons.
 Skin.SECONDARY = { 1, 1, 1, 0.06 }
+-- The Professions tab's tiles: neutral washes by rank (gold is news, not a
+-- scale here), a lighter plate at 300, and a faint one for none.
+Skin.RANK_SHADES = {
+  Apprentice = { 1, 1, 1, 0.11 },
+  Journeyman = { 1, 1, 1, 0.19 },
+  Expert = { 1, 1, 1, 0.29 },
+  Artisan = { 1, 1, 1, 0.41 },
+}
+Skin.TILE_CAPPED = { 1, 1, 1, 0.66 }
+Skin.TILE_NONE = { 1, 1, 1, 0.035 }
 
 Skin.HEADER_HEIGHT = 30
 

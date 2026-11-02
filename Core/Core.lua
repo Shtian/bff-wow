@@ -204,17 +204,19 @@ function Core:rows(order)
   return ns.Roster.rows(self.ledger, self.now(), order)
 end
 
--- The Professions tab: columns, a { skillLine, name, icon, secondary }
--- for each profession a Character shown has, main professions first (by
--- name), then cooking, fishing and first aid; and rows, one per Character
--- the Roster shows, grouped by Member in the Roster's order (as rows(order)),
--- the Main first and its Alts after. A row has memberId, own, displayName,
--- name, classFilename, level, main, alt, first (the Member's first row),
--- known (false if the Character's client never shared professions) and
--- cells: per column, the Character's profession as in rows(), or false.
--- Empty when unknown.
-function Core:professions(order)
-  return ns.Professions.grid(ns.Roster.rows(self.ledger, self.now(), order))
+-- The Professions tab: professions, a { skillLine, name, icon, secondary,
+-- had (some Character shown has it) } for each of the twelve (main ones by
+-- name, then cooking, fishing and first aid) and any other a Character shown
+-- has, after its kind; and members, a row per Member the Roster shows (as
+-- rows(order): yours first), or sorted by the profession with skill line
+-- sortBy (yours still first, then best skill in it). A member has memberId,
+-- own, displayName, known (false if none of their Characters' clients ever
+-- shared professions) and cells: per profession, false for none, or the
+-- best skill among their Characters (skill, max, rank, full, capped) and
+-- characters, each Character who has it (name, classFilename, alt, skill,
+-- max, rank, full, capped), best first.
+function Core:professions(order, sortBy)
+  return ns.Professions.tab(ns.Roster.rows(self.ledger, self.now(), order), sortBy)
 end
 
 -- The world map's pins: one per other Member the panel shows whose shown

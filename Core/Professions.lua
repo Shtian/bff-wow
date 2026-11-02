@@ -1,7 +1,7 @@
 -- Professions: the pure parts of a Character's Professions. Reading them
 -- from the game (handed the API, so offline tests can fake it), how a list
 -- is stored in a record (short field names) and checked off the wire, the
--- rank from the max skill, and the Professions tab's grid.
+-- rank from the max skill, and the Professions tab: who has each profession.
 -- See docs/design/professions.md.
 
 local _, ns = ...
@@ -18,6 +18,27 @@ Professions.CAP = 300
 -- The Feed entry kinds that are profession news (each names a skill line).
 Professions.KINDS = { newProfession = true, professionSkill = true, professionMaxed = true }
 local RANKS = { { 300, "Artisan" }, { 225, "Expert" }, { 150, "Journeyman" }, { 75, "Apprentice" } }
+-- The twelve professions, by skill line, in the tabs' order: main ones by
+-- name, then cooking, fishing and first aid. The name and icon are for a
+-- profession nobody has; one somebody has shows as their client words it.
+-- noun names whoever has it, for Every profession in the Crew's Feed entry.
+Professions.ALL = {
+  { skillLine = 171, name = "Alchemy", noun = "an Alchemist", icon = "Interface\\Icons\\Trade_Alchemy" },
+  { skillLine = 164, name = "Blacksmithing", noun = "a Blacksmith", icon = "Interface\\Icons\\Trade_BlackSmithing" },
+  { skillLine = 333, name = "Enchanting", noun = "an Enchanter", icon = "Interface\\Icons\\Trade_Engraving" },
+  { skillLine = 202, name = "Engineering", noun = "an Engineer", icon = "Interface\\Icons\\Trade_Engineering" },
+  { skillLine = 182, name = "Herbalism", noun = "a Herbalist", icon = "Interface\\Icons\\Trade_Herbalism" },
+  { skillLine = 165, name = "Leatherworking", noun = "a Leatherworker",
+    icon = "Interface\\Icons\\Trade_LeatherWorking" },
+  { skillLine = 186, name = "Mining", noun = "a Miner", icon = "Interface\\Icons\\Trade_Mining" },
+  { skillLine = 393, name = "Skinning", noun = "a Skinner", icon = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01" },
+  { skillLine = 197, name = "Tailoring", noun = "a Tailor", icon = "Interface\\Icons\\Trade_Tailoring" },
+  { skillLine = 185, name = "Cooking", noun = "a Cook", icon = "Interface\\Icons\\INV_Misc_Food_15", secondary = true },
+  { skillLine = 356, name = "Fishing", noun = "an Angler", icon = "Interface\\Icons\\Trade_Fishing", secondary = true },
+  { skillLine = 129, name = "First Aid", noun = "a First Aider", icon = "Interface\\Icons\\Spell_Holy_SealOfSacrifice",
+    secondary = true },
+}
+
 -- The secondary columns' order, by skill line ID: cooking, fishing, first
 -- aid. Any other secondary goes after them, by name.
 local SECONDARY_ORDER = { [185] = 1, [356] = 2, [129] = 3 }
@@ -209,55 +230,92 @@ function Professions.describe(stored)
 end
 
 -- The Professions tab from the Roster's rows (own first, then in the
--- Roster's order). See Core:professions().
-function Professions.grid(rows)
-  local columns, bySkillLine = {}, {}
-  local gridRows = {}
-  local function addCharacter(row, character, first)
-    local gridRow = {
-      memberId = row.memberId,
-      own = row.own == true,
-      displayName = row.displayName,
-      name = character.name,
-      classFilename = character.classFilename,
-      level = character.level,
-      main = character.main,
-      alt = not character.main,
-      first = first or nil,
-      known = character.professions ~= nil,
-      professions = character.professions,
-    }
-    for _, p in ipairs(character.professions or {}) do
-      if not bySkillLine[p.skillLine] then
-        local column = { skillLine = p.skillLine, name = p.name, icon = p.icon, secondary = p.secondary }
-        bySkillLine[p.skillLine] = column
-        columns[#columns + 1] = column
-      end
-    end
-    gridRows[#gridRows + 1] = gridRow
+-- Roster's order), sorted by the profession with skill line sortBy if
+-- given. See Core:professions().
+function Professions.tab(rows, sortBy)
+  local professions, bySkillLine = {}, {}
+  for i, p in ipairs(Professions.ALL) do
+    professions[i] = { skillLine = p.skillLine, name = p.name, icon = p.icon, secondary = p.secondary == true,
+      had = false }
+    bySkillLine[p.skillLine] = professions[i]
   end
-  for _, row in ipairs(rows) do
-    local characters = { row }
-    for _, alt in ipairs(row.alts) do characters[#characters + 1] = alt end
-    for i, character in ipairs(characters) do
-      if character.main then
-        table.remove(characters, i)
-        table.insert(characters, 1, character)
-        break
+  -- Each Member's Characters, the Main first, and any profession outside
+  -- the twelve as a column too.
+  local members = {}
+  for index, row in ipairs(rows) do
+    local characters = {}
+    for _, character in ipairs({ row, unpack(row.alts) }) do
+      table.insert(characters, character.main and 1 or #characters + 1, character)
+    end
+    local member = { memberId = row.memberId, own = row.own == true, displayName = row.displayName,
+      known = false, characters = characters, index = index }
+    for _, character in ipairs(characters) do
+      if character.professions then member.known = true end
+      for _, p in ipairs(character.professions or {}) do
+        local profession = bySkillLine[p.skillLine]
+        if not profession then
+          profession = { skillLine = p.skillLine, secondary = p.secondary == true }
+          bySkillLine[p.skillLine] = profession
+          professions[#professions + 1] = profession
+        end
+        -- Someone has it: as their client words it.
+        profession.name, profession.icon, profession.had = p.name, p.icon or profession.icon, true
       end
     end
-    for i, character in ipairs(characters) do addCharacter(row, character, i == 1) end
+    members[#members + 1] = member
   end
 
-  table.sort(columns, listedBefore)
-  for _, gridRow in ipairs(gridRows) do
-    gridRow.cells = {}
-    if gridRow.known then
-      local learned = {}
-      for _, p in ipairs(gridRow.professions) do learned[p.skillLine] = p end
-      for i, column in ipairs(columns) do gridRow.cells[i] = learned[column.skillLine] or false end
+  -- The twelve keep their order; any other goes after its kind, by name.
+  for i, profession in ipairs(professions) do profession.position = i <= #Professions.ALL and i or nil end
+  table.sort(professions, function(a, b)
+    if a.position and b.position then return a.position < b.position end
+    if a.secondary ~= b.secondary then return b.secondary end
+    if a.position or b.position then return a.position ~= nil end
+    return listedBefore(a, b)
+  end)
+  for _, profession in ipairs(professions) do profession.position = nil end
+
+  -- A cell per profession: the Member's Characters who have it, best first,
+  -- the best's skill on the cell itself; false for none.
+  for _, member in ipairs(members) do
+    member.cells = {}
+    for i, profession in ipairs(professions) do
+      local characters = {}
+      for order, character in ipairs(member.characters) do
+        for _, p in ipairs(character.professions or {}) do
+          if p.skillLine == profession.skillLine then
+            characters[#characters + 1] = { name = character.name, classFilename = character.classFilename,
+              alt = not character.main, skill = p.skill, max = p.max, rank = p.rank, full = p.full, capped = p.capped,
+              order = order }
+          end
+        end
+      end
+      table.sort(characters, function(a, b)
+        if a.skill ~= b.skill then return a.skill > b.skill end
+        return a.order < b.order
+      end)
+      for _, c in ipairs(characters) do c.order = nil end
+      local best = characters[1]
+      member.cells[i] = best and { skill = best.skill, max = best.max, rank = best.rank, full = best.full,
+        capped = best.capped, characters = characters } or false
     end
-    gridRow.professions = nil
+    member.characters = nil
   end
-  return { columns = columns, rows = gridRows }
+
+  -- Sorted by a profession: yours stays first, then the best skill in it,
+  -- then the Roster's order.
+  local column
+  for i, profession in ipairs(professions) do
+    if profession.skillLine == sortBy then column = i end
+  end
+  if column then
+    local function skill(member) return member.cells[column] and member.cells[column].skill or -1 end
+    table.sort(members, function(a, b)
+      if a.own ~= b.own then return a.own end
+      if skill(a) ~= skill(b) then return skill(a) > skill(b) end
+      return a.index < b.index
+    end)
+  end
+  for _, member in ipairs(members) do member.index = nil end
+  return { professions = professions, members = members }
 end
