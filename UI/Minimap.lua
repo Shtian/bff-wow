@@ -75,13 +75,21 @@ local function createBadge()
   badge:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 4)
 end
 
+local function showButton(on)
+  if on == shown then return end
+  shown = on
+  if shown then icons:Show(NAME) else icons:Hide(NAME) end
+end
+
+-- Shows or hides the button as the minimap setting changes.
+function Minimap.settingChanged(key, on)
+  if key == "minimap" and icons then showButton(on) end
+end
+
 -- Shows or hides the button and redraws the badge, from Core.
 function Minimap.refresh()
   if not icons then return end
-  if core:isMinimapShown() ~= shown then
-    shown = core:isMinimapShown()
-    if shown then icons:Show(NAME) else icons:Hide(NAME) end
-  end
+  showButton(core:isMinimapShown())
   if not badge then return end
   local online = core:crew() and core:summary().online or 0
   badge:SetText(online)

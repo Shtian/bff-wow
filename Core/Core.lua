@@ -103,25 +103,35 @@ local function updateLink(self)
   self.gossip:setLink(up)
 end
 
+-- Where Live events go: { chat, toast }, from the chat lines and toasts
+-- settings.
+local function outlets(self)
+  return { chat = self:isChatLinesOn(), toast = self:isToastsOn() }
+end
+
 -- New Feed entries from other Members, new Reactions to your own and
--- Spare notices each make a chat line, a toast or both once
--- settled, if either is on, and are seen once they have. Entries already
--- seen (a gave entry your notice covers) make none.
+-- Spare notices are Live events once settled: each goes to the outlets
+-- that are on (feedEntry, reaction and spare carry them), and is seen once
+-- it has. With both off nothing is announced or seen, so they wait for
+-- While you were away. Entries already seen (a gave entry your notice
+-- covers) make none.
 local function announce(self, entries, reactions, notices)
-  if not (self.log:isSettled() and (self:isChatLinesOn() or self:isToastsOn())) then return end
+  if not self.log:isSettled() then return end
+  local to = outlets(self)
+  if not (to.chat or to.toast) then return end
   for _, entry in ipairs(entries) do
     if not entry.seen then
       self.log:markSeen(entry)
-      self.listener("feedEntry", self.log:describe(entry))
+      self.listener("feedEntry", self.log:describe(entry), outlets(self))
     end
   end
   for _, item in ipairs(reactions or {}) do
     self.log:markSeen(item.reaction)
-    self.listener("reaction", self.log:news(item))
+    self.listener("reaction", self.log:news(item), outlets(self))
   end
   for _, news in ipairs(notices or {}) do
     self.spareLife:markSeen(news)
-    self.listener("spare", self.spareLife:describe(news))
+    self.listener("spare", self.spareLife:describe(news), outlets(self))
   end
 end
 
@@ -481,71 +491,219 @@ function Core:feedSeen()
   if self.log:markAllSeen() then self.listener("changed") end
 end
 
--- Chat message for live events: on by default.
-function Core:setChatLines(on)
-  local off = not on or nil
-  if off == self.db.chatLinesOff then return end
-  self.db.chatLinesOff = off
-  self.listener("changed")
+-- Settings: the local preferences, one list of them. Each has its key, the
+-- Settings page's section and label (finished text), its kind ("toggle"
+-- for on/off, "sound" or "position"), its default, and how it's saved in
+-- db, as earlier versions saved it so nothing needs migrating. Adding an
+-- on/off setting here puts it on the Settings page. Display name isn't one:
+-- it's part of your Member record. See docs/design/settings-and-release.md.
+
+-- The table a setting is saved in: db itself, or one inside it.
+local function savedIn(db, parent)
+  if not parent then return db end
+  db[parent] = db[parent] or {}
+  return db[parent]
 end
 
-function Core:isChatLinesOn()
-  return not self.db.chatLinesOff
+-- On/off, saved as field = true while off and nil while on.
+local function offFlag(field, parent)
+  return {
+    read = function(db) return not savedIn(db, parent)[field] end,
+    write = function(db, on) savedIn(db, parent)[field] = not on or nil end,
+  }
 end
+
+-- On/off, saved as field = true while on and nil while off.
+local function onFlag(field)
+  return {
+    read = function(db) return db[field] == true end,
+    write = function(db, on) db[field] = on and true or nil end,
+  }
+end
+
+-- A value saved as nil while it's the default.
+local function nilAsDefault(field, default)
+  return {
+    read = function(db)
+      local value = db[field]
+      if value == nil then return default end
+      return value
+    end,
+    write = function(db, value)
+      if value == default then value = nil end
+      db[field] = value
+    end,
+  }
+end
+
+-- A screen position, saved as { x, y } or nil; read as a copy.
+local function screenPosition(field)
+  return {
+    read = function(db)
+      local saved = db[field]
+      return saved and { x = saved.x, y = saved.y } or nil
+    end,
+    write = function(db, value)
+      db[field] = value and value.x and { x = value.x, y = value.y } or nil
+    end,
+  }
+end
+
+-- The toast sound's default: the name UI plays it by.
+Core.DEFAULT_TOAST_SOUND = "UI_BNET_TOAST"
+
+local SHARING = "Sharing"
+local NOTIFICATIONS = "Notifications and display"
+local TOASTS = "Toasts"
+
+local SETTINGS = {
+  {
+    key = "paused", section = SHARING, kind = "toggle",
+    label = "Appear offline: send nothing, so your Crew sees you as offline",
+    saved = onFlag("paused"),
+  },
+  {
+    key = "chatLines", section = NOTIFICATIONS, kind = "toggle",
+    label = "Chat message for live events",
+    saved = offFlag("chatLinesOff"),
+  },
+  {
+    key = "awayPopup", section = NOTIFICATIONS, kind = "toggle",
+    label = "Show While you were away on login",
+    saved = offFlag("awayPopupOff"),
+  },
+  -- LibDBIcon reads hide from the button's own table (minimapIcon()).
+  {
+    key = "minimap", section = NOTIFICATIONS, kind = "toggle",
+    label = "Show minimap button",
+    saved = offFlag("hide", "minimap"),
+  },
+  {
+    key = "toasts", section = TOASTS, kind = "toggle",
+    label = "Show toasts for live events",
+    saved = offFlag("toastsOff"),
+  },
+  -- The name UI plays it by, or "none".
+  {
+    key = "toastSound", section = TOASTS, kind = "sound",
+    label = "Sound",
+    saved = nilAsDefault("toastSound", Core.DEFAULT_TOAST_SOUND),
+  },
+  -- The centre of the first toast, as { x, y } from the screen's bottom
+  -- left; nil for the default.
+  {
+    key = "toastPosition", section = TOASTS, kind = "position",
+    label = "Move toasts",
+    saved = screenPosition("toastPosition"),
+  },
+}
+
+local SETTING = {}
+for _, setting in ipairs(SETTINGS) do SETTING[setting.key] = setting end
+
+local function settingFor(key)
+  local setting = SETTING[key]
+  if not setting then error(("Core: no setting %q"):format(tostring(key)), 3) end
+  return setting
+end
+
+local function same(a, b)
+  if type(a) == "table" and type(b) == "table" then return a.x == b.x and a.y == b.y end
+  return a == b
+end
+
+-- Core's own reactions to a setting changing.
+local REACTIONS = {
+  -- Pause sharing: send nothing, still receive, and appear offline.
+  paused = function(self, paused) self.gossip:setPaused(paused) end,
+}
+
+-- A setting's current value, by key.
+function Core:setting(key)
+  return settingFor(key).saved.read(self.db)
+end
+
+-- Sets a setting by key. A real change is saved and fires
+-- settingChanged(key, value); setting the value it already has fires
+-- nothing.
+function Core:setSetting(key, value)
+  local saved = settingFor(key).saved
+  local before = saved.read(self.db)
+  saved.write(self.db, value)
+  local after = saved.read(self.db)
+  if same(before, after) then return end
+  local react = REACTIONS[key]
+  if react then react(self, after) end
+  self.listener("settingChanged", key, after)
+end
+
+-- The Settings page, ready to render: sections in order, { title,
+-- settings }, each setting { key, kind, label, value }.
+function Core:settings()
+  local sections, byTitle = {}, {}
+  for _, setting in ipairs(SETTINGS) do
+    local section = byTitle[setting.section]
+    if not section then
+      section = { title = setting.section, settings = {} }
+      byTitle[setting.section] = section
+      sections[#sections + 1] = section
+    end
+    section.settings[#section.settings + 1] = {
+      key = setting.key,
+      kind = setting.kind,
+      label = setting.label,
+      value = self:setting(setting.key),
+    }
+  end
+  return sections
+end
+
+-- The named settings, over setting() and setSetting().
+
+-- Chat message for live events: on by default.
+function Core:setChatLines(on) self:setSetting("chatLines", on) end
+function Core:isChatLinesOn() return self:setting("chatLines") end
 
 -- Show While you were away on login: on by default.
-function Core:setAwayPopup(on)
-  local off = not on or nil
-  if off == self.db.awayPopupOff then return end
-  self.db.awayPopupOff = off
-  self.listener("changed")
-end
-
-function Core:isAwayPopupOn()
-  return not self.db.awayPopupOff
-end
+function Core:setAwayPopup(on) self:setSetting("awayPopup", on) end
+function Core:isAwayPopupOn() return self:setting("awayPopup") end
 
 -- Toasts for live events: on by default.
-function Core:setToasts(on)
-  local off = not on or nil
-  if off == self.db.toastsOff then return end
-  self.db.toastsOff = off
-  self.listener("changed")
-end
-
-function Core:isToastsOn()
-  return not self.db.toastsOff
-end
+function Core:setToasts(on) self:setSetting("toasts", on) end
+function Core:isToastsOn() return self:setting("toasts") end
 
 -- The toast sound: the name UI plays it by, or "none". Nil goes back to
 -- the default.
-Core.DEFAULT_TOAST_SOUND = "UI_BNET_TOAST"
-
-function Core:setToastSound(name)
-  if name == Core.DEFAULT_TOAST_SOUND then name = nil end
-  if name == self.db.toastSound then return end
-  self.db.toastSound = name
-  self.listener("changed")
-end
-
-function Core:toastSound()
-  return self.db.toastSound or Core.DEFAULT_TOAST_SOUND
-end
+function Core:setToastSound(name) self:setSetting("toastSound", name) end
+function Core:toastSound() return self:setting("toastSound") end
 
 -- Where toasts appear: the centre of the first toast, as x and y from the
 -- screen's bottom left. Nil x goes back to the default, where this returns
 -- nil.
 function Core:setToastPosition(x, y)
-  local saved = self.db.toastPosition
-  if x == (saved and saved.x) and y == (saved and saved.y) then return end
-  self.db.toastPosition = x and { x = x, y = y } or nil
-  self.listener("changed")
+  self:setSetting("toastPosition", x and { x = x, y = y } or nil)
 end
 
 function Core:toastPosition()
-  local position = self.db.toastPosition
+  local position = self:setting("toastPosition")
   if not position then return nil end
   return position.x, position.y
+end
+
+-- Pause sharing: send nothing, still receive, and appear offline. Kept
+-- across reloads and logouts.
+function Core:setPaused(paused) self:setSetting("paused", paused) end
+function Core:isPaused() return self:setting("paused") end
+
+-- Show minimap button: on by default.
+function Core:setMinimapShown(shown) self:setSetting("minimap", shown) end
+function Core:isMinimapShown() return self:setting("minimap") end
+
+-- The minimap button's saved table, handed to LibDBIcon, which keeps the
+-- button's position and the minimap setting's hide flag in it.
+-- Account-wide, like every setting.
+function Core:minimapIcon()
+  return savedIn(self.db, "minimap")
 end
 
 -- Your display name, or nil until one is set.
@@ -690,41 +848,6 @@ function Core:removed()
     return a.memberId < b.memberId
   end)
   return removed
-end
-
--- Pause sharing: send nothing, still receive, and appear offline. Kept
--- across reloads and logouts.
-function Core:setPaused(paused)
-  paused = paused and true or nil
-  if paused == self.db.paused then return end
-  self.db.paused = paused
-  self.gossip:setPaused(self:isPaused())
-  self.listener("changed")
-end
-
-function Core:isPaused()
-  return self.db.paused == true
-end
-
--- The minimap button's saved table, handed to LibDBIcon, which keeps the
--- button's position in it. Account-wide, like every setting.
-function Core:minimapIcon()
-  self.db.minimap = self.db.minimap or {}
-  return self.db.minimap
-end
-
--- Show minimap button: on by default. LibDBIcon reads hide from the same
--- table.
-function Core:setMinimapShown(shown)
-  local hide = not shown or nil
-  local icon = self:minimapIcon()
-  if hide == icon.hide then return end
-  icon.hide = hide
-  self.listener("changed")
-end
-
-function Core:isMinimapShown()
-  return not self:minimapIcon().hide
 end
 
 -- Hands the tombstone to the link, then forgets the Crew. Your own record

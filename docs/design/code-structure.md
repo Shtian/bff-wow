@@ -48,17 +48,19 @@ Outputs:
 
 - `link.send(string)`: best-effort (see the link port below).
 - Listener events:
-  - `changed`: re-read whatever you show (`rows()`, `feed()`, settings such as Pause sharing and Show minimap button). Also fires when a Member passes the 12-minute online timeout, even though no record changed.
-  - `feedEntry(entry)`: a live Feed event, fired only when the chat-line or toast setting is on. App prints `entry.text` and shows a toast, each if its setting is on.
-  - `reaction(news)`: a live Reaction to one of your entries, fired and shown the same way as `feedEntry`. Toasts for the same entry merge (see `docs/design/reactions.md`).
-  - `spare(news)`: a live Spare notice (a Claim now winning yours, or one Given to you), fired and shown the same way as `feedEntry` (see `docs/design/spares.md`).
+  - `changed`: re-read whatever you show (`rows()`, `feed()` and the rest). Also fires when a Member passes the 12-minute online timeout, even though no record changed. Settings don't fire it.
+  - `settingChanged(key, value)`: a setting really changed (setting a value it already has fires nothing). App passes it to Panel, Minimap, Toasts and Settings, and each ignores keys it doesn't use: Toasts clears its queue when `toasts` turns off, Minimap shows or hides the button on `minimap`, Panel redraws on `paused` (its footer status), and the Settings page updates that key's control.
+  - `feedEntry(entry, outlets)`: a Live event from the Feed. Core decides where it goes: `outlets` is `{ chat, toast }`, from the chat-line and toast settings, and App prints `entry.text` and shows a toast exactly as told, reading neither setting. With both off it isn't fired, and the entry stays unseen for While you were away.
+  - `reaction(news, outlets)`: a live Reaction to one of your entries, fired and shown the same way as `feedEntry`. Toasts for the same entry merge (see `docs/design/reactions.md`).
+  - `spare(news, outlets)`: a live Spare notice (a Claim now winning yours, or one Given to you), fired and shown the same way as `feedEntry` (see `docs/design/spares.md`).
   - `spareGone(gone)`: at the first bag check after a real login, a Spare whose item is gone was withdrawn (`action` "withdrawn": App says so in chat) or has a Claim (`action` "ask", with its `winner`: App asks whether to Give or withdraw it).
   - `awaySummary(summary)`: While you were away has settled after an initial login. Fired only when the popup setting is on and it isn't empty. App shows it once out of combat.
   - `notice(kind)`: one-off messages ("BFF is out of date", "you left the Crew").
   - `crewChanged`: the Crew was joined or left. App tells the channel link to join or leave the channel from `crew()`.
-- Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil), `displayName()`, `isPaused()`, `isMinimapShown()`, `isChatLinesOn()`, `isAwayPopupOn()`, `isToastsOn()`, `toastSound()` and `toastPosition()`, plus `minimapIcon()`, the saved table LibDBIcon keeps the button's position and hidden flag in.
+- Settings: Core holds one ordered list of the local settings (`docs/design/settings-and-release.md`). `setting(key)` reads one and `setSetting(key, value)` sets it; `settings()` is the Settings page's ready-to-render read, a section per `{ title, settings }`, each setting `{ key, kind, label, value }`. The named methods (`isPaused()`/`setPaused()`, `isMinimapShown()`/`setMinimapShown()`, `isChatLinesOn()`/`setChatLines()`, `isAwayPopupOn()`/`setAwayPopup()`, `isToastsOn()`/`setToasts()`, `toastSound()`/`setToastSound()` and `toastPosition()`/`setToastPosition()`) are one-line wrappers over these. `minimapIcon()` is the saved table LibDBIcon keeps the button's position and the minimap setting's hidden flag in.
+- Reads: `crew()` (code, channel name and password, a `leaving` flag while a leave is pending, or nil) and `displayName()`.
 - Ready-to-render reads for UI: `rows()`, `feed()` (the Feed tab's entries grouped by day, plus the unseen count), `goals()` (the Goals tab's row per Crew goal track, `docs/design/goals.md`), `playTimes(memberId?)` (the When tab's grid for the Crew or one Member, `docs/design/play-times.md`), `mapPins()` (a world map pin per other Member the Roster shows, at their shown Character's last-seen spot), `spares()` (the Spares tab's rows, From the Crew and Yours), `spareItems()` (the item GUIDs of the open Spares the Character being played posted), and `unseen()` (the unseen count alone, for the minimap tooltip). UI never sees a Member record.
-- `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` or `awaySummary`.
+- `feedSeen()` is the command for opening the Feed tab. Core marks entries seen itself when it fires `feedEntry` (or `reaction`, `spare`) or `awaySummary`.
 - `react(key)` reacts to someone else's Feed entry, with a key from `feed()` or the summary.
 
 ### Inside Core

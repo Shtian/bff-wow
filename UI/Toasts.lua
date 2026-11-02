@@ -210,19 +210,22 @@ local function fade(now)
   end
 end
 
--- Runs while anything is shown or waiting. Turning toasts off clears them.
+-- Runs while anything is shown or waiting.
 local function onUpdate()
   local now = GetTime()
-  if not core:isToastsOn() then
-    queue:clear()
-    Toasts.draw()
-  end
   hover(now)
   local changed, sound = queue:update(now, InCombatLockdown())
   if sound then Toasts.play(core:toastSound()) end
   if changed then Toasts.draw() end
   fade(now)
   if queue:isIdle() then driver:Hide() end
+end
+
+-- Turning toasts off clears what's shown and waiting.
+function Toasts.settingChanged(key, on)
+  if key ~= "toasts" or on or not queue then return end
+  queue:clear()
+  Toasts.draw()
 end
 
 -- Shows a live Feed entry (from Core's feedEntry), Reaction (from its

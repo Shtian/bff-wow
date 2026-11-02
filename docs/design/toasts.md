@@ -15,7 +15,7 @@ A **Toast** is a third way to show a live Feed entry, next to the chat line: a s
 
 ## Toast vs chat line
 
-Two independent settings, both on by default. Core fires `feedEntry` when **either** is on, and marks the entry seen as it fires. With both off, entries stay unseen for the next login's popup and the Feed tab. App prints the chat line if chat lines are on, and shows the toast if toasts are on.
+Two independent settings, both on by default. Core fires `feedEntry` when **either** is on, and marks the entry seen as it fires. With both off, entries stay unseen for the next login's popup and the Feed tab. Core says which in the event (`outlets = { chat, toast }`), and App prints the chat line and shows the toast exactly as told.
 
 ## How it looks and behaves
 
@@ -50,7 +50,7 @@ All three are account-wide in `BFF_DB`, like the rest of the settings.
 
 ## Code
 
-- **Core** owns the settings: `setToasts(on)` / `isToastsOn()`, `setToastSound(key)` / `toastSound()` (`"none"` for silence, nil resets to `Core.DEFAULT_TOAST_SOUND`), and `setToastPosition(x, y)` / `toastPosition()` (nil for the default). Each fires `changed`.
+- **Core** owns the settings: `setToasts(on)` / `isToastsOn()`, `setToastSound(key)` / `toastSound()` (`"none"` for silence, nil resets to `Core.DEFAULT_TOAST_SOUND`), and `setToastPosition(x, y)` / `toastPosition()` (nil for the default), wrappers over Core's settings list (`docs/design/settings-and-release.md`). Each fires `settingChanged`; Toasts clears its queue when `toasts` turns off.
 - **ToastQueue** (`UI/ToastQueue.lua`) is pure Lua: the cap, the overflow toast, the combat hold, hover and the sound throttle. `tests/toasts_spec.lua` tests it directly, alongside Core's settings and gating.
 - **Toasts** (`UI/Toasts.lua`) draws the queue, plays sounds and owns the move mode.
 - `/bffdev toast [n]` (dev checkout only) shows n sample toasts, one of each kind in turn, bypassing Core, to check placement and bursts in game.
