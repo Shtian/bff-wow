@@ -47,6 +47,10 @@ _Avoid_: Kick, ban
 The log of noteworthy things that happened to the Crew's Characters, such as dings, deaths and new Characters.
 _Avoid_: News, timeline, activity log
 
+**New (Feed entry)**:
+A Feed entry, or a Reaction to your own, that was unseen when you opened the Feed. It stays New until you leave the Feed, though opening the Feed is what makes it seen.
+_Avoid_: Fresh, unread
+
 **While you were away**:
 The summary of Feed entries, and Reactions to their own entries, that a Member missed since their last logout, shown on login.
 _Avoid_: Digest, recap
