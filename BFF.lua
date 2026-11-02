@@ -106,12 +106,19 @@ local function spareGone(gone)
   end
 end
 
-local function onCoreEvent(event, kind)
+local function onCoreEvent(event, arg, more)
   if event == "changed" then
     ns.Panel.refresh()
     ns.Minimap.refresh()
     ns.MapPins.refresh()
     ns.Settings.refresh()
+  elseif event == "settingChanged" then
+    -- arg is the key, more the new value; each module ignores keys it
+    -- doesn't use.
+    ns.Panel.settingChanged(arg, more)
+    ns.Minimap.settingChanged(arg, more)
+    ns.Toasts.settingChanged(arg, more)
+    ns.Settings.settingChanged(arg, more)
   elseif event == "crewChanged" then
     ns.ChannelLink.setCrew(ns.core:crew())
     ns.Panel.refresh()
@@ -119,14 +126,15 @@ local function onCoreEvent(event, kind)
     ns.MapPins.refresh()
     ns.Settings.refresh()
   elseif event == "notice" then
-    say(MESSAGES[kind])
+    say(MESSAGES[arg])
   elseif event == "feedEntry" or event == "reaction" or event == "spare" then
-    if ns.core:isChatLinesOn() then chatLine(kind) end
-    if ns.core:isToastsOn() then ns.Toasts.show(kind) end
+    -- Core says where each Live event goes: more is its outlets.
+    if more.chat then chatLine(arg) end
+    if more.toast then ns.Toasts.show(arg) end
   elseif event == "awaySummary" then
-    showAway(kind)
+    showAway(arg)
   elseif event == "spareGone" then
-    spareGone(kind)
+    spareGone(arg)
   end
 end
 

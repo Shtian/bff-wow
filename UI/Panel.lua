@@ -1580,6 +1580,12 @@ function Panel.refresh()
   end
 end
 
+-- Pause sharing shows in the Roster's footer, whose height the rows sit
+-- above, so the open tab redraws.
+function Panel.settingChanged(key)
+  if key == "paused" then Panel.refresh() end
+end
+
 function Panel.toggle()
   if not frame then create() end
   frame:SetShown(not frame:IsShown())

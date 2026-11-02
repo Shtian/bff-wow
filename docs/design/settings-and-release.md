@@ -37,7 +37,31 @@ No other options: the "can play with you" range (±3), the 30-day hide and a cha
 
 ### Storage
 
-Everything is **account-wide** in `BFF_DB`, including the minimap button position (LibDBIcon's table lives inside it). Core owns the layout and defaults (#9); UI reads and writes settings only through Core's commands.
+Everything is **account-wide** in `BFF_DB`, including the minimap button position (LibDBIcon's table lives inside it). Core owns the layout and defaults (#9); UI reads and writes settings only through Core.
+
+### One list in Core
+
+Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): its key, kind (`toggle` for on/off, `sound` or `position`), default, how it's saved, and the Settings page's section and label as finished text. The list drives:
+
+- **Storage**, in the shape earlier versions saved, so nothing is migrated:
+
+  | Key | Saved as |
+  |---|---|
+  | `paused` | `paused = true`, or nil |
+  | `chatLines` | `chatLinesOff = true`, or nil while on |
+  | `awayPopup` | `awayPopupOff = true`, or nil while on |
+  | `minimap` | `hide = true` inside the minimap table LibDBIcon reads, or nil while on |
+  | `toasts` | `toastsOff = true`, or nil while on |
+  | `toastSound` | the sound's name, or nil for the default |
+  | `toastPosition` | `{ x, y }`, or nil for the default |
+
+- **Core's interface:** `setting(key)`, `setSetting(key, value)` and `settings()` (the page's sections). The named methods (`isPaused()`, `setToasts(on)` and the rest) stay as hand-written one-line wrappers, so they're greppable.
+- **Events:** a real change fires `settingChanged(key, value)`, not `changed`; setting a value it already has fires nothing. Core's own reactions run first (Pause sharing pauses Gossip).
+- **The page:** a section header per section and a checkbox per on/off setting, built in a loop from `settings()`, so a new on/off setting needs only a list entry. The sound picker (with Play) and Move toasts are drawn by hand but read and write through `setting()` and `setSetting()`. Leave Crew sits under Appear offline.
+
+Display name isn't in the list: it's part of your Member record and spreads to the Crew.
+
+Core also decides where each Live event goes: `feedEntry`, `reaction` and `spare` carry `outlets = { chat, toast }` from the chat-line and toast settings, and App shows them as told. With both off nothing is announced or marked seen, so they wait for While you were away.
 
 ## Releases
 

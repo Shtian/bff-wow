@@ -1,16 +1,21 @@
 -- Settings: the one page in the game's Settings panel (AddOns → BFF) from
 -- the settings decision (#16): You (display name, read-only Crew code),
--- Sharing (Appear offline, Leave Crew), Notifications and display (chat
--- line, While you were away, minimap button), and Toasts from the toasts
--- decision (on or off, sound, Move toasts). A canvas page, since the
--- standard controls have no text box. Everything is read and written
--- through Core. See docs/design/settings-and-release.md and
--- docs/design/toasts.md.
+-- then a section per section of Core's settings list (Sharing, with Leave
+-- Crew under Appear offline; Notifications and display; Toasts from the
+-- toasts decision). Every on/off setting in the list gets a checkbox built
+-- from core:settings(); the sound picker and Move toasts are drawn by hand.
+-- A canvas page, since the standard controls have no text box. Everything
+-- is read and written through Core. See docs/design/settings-and-release.md
+-- and docs/design/toasts.md.
 
 local _, ns = ...
 
 local Page = {}
 ns.Settings = Page
+
+-- The settings panel calls this for Okay and Defaults; nothing waits for
+-- them.
+local function noop() end
 
 local INDENT = 16
 local SECTION_GAP = 22
@@ -95,45 +100,16 @@ local function createYou()
     end
   end)
   frame.nameLabel = nameLabel
-end
-
-local function createSharing()
-  frame.sharing = createLabel(frame, "Sharing", "GameFontNormalLarge")
-  frame.pause = createCheckbox("Appear offline: send nothing, so your Crew sees you as offline", function(checked)
-    core:setPaused(checked)
-  end)
-  frame.pause.inset = INDENT - 4
-  frame.pause:SetPoint("TOPLEFT", frame.sharing, "BOTTOMLEFT", frame.pause.inset, -8)
-  frame.leave = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-  frame.leave:SetSize(120, 22)
-  frame.leave:SetText("Leave Crew")
-  frame.leave.inset = INDENT
-  frame.leave:SetPoint("TOPLEFT", frame.pause, "BOTTOMLEFT", frame.leave.inset - frame.pause.inset, -8)
-  frame.leave:SetScript("OnClick", ns.confirmLeave)
-end
-
-local function createNotifications()
-  frame.notifications = createLabel(frame, "Notifications and display", "GameFontNormalLarge")
-  frame.chatLines = createCheckbox("Chat message for live events", function(checked)
-    core:setChatLines(checked)
-  end)
-  frame.chatLines:SetPoint("TOPLEFT", frame.notifications, "BOTTOMLEFT", INDENT - 4, -8)
-  frame.away = createCheckbox("Show While you were away on login", function(checked)
-    core:setAwayPopup(checked)
-  end)
-  frame.away:SetPoint("TOPLEFT", frame.chatLines, "BOTTOMLEFT", 0, -4)
-  frame.minimap = createCheckbox("Show minimap button", function(checked)
-    core:setMinimapShown(checked)
-  end)
-  frame.minimap:SetPoint("TOPLEFT", frame.away, "BOTTOMLEFT", 0, -4)
+  nameLabel.inset = INDENT
+  frame.codeLabel.inset = INDENT
 end
 
 -- The sound picker: a radio per sound the client has; choosing one plays
 -- it.
 local function buildSoundMenu(_, root)
   for _, sound in ipairs(ns.Toasts.sounds()) do
-    root:CreateRadio(sound.label, function() return core:toastSound() == sound.key end, function()
-      core:setToastSound(sound.key)
+    root:CreateRadio(sound.label, function() return core:setting("toastSound") == sound.key end, function()
+      core:setSetting("toastSound", sound.key)
       ns.Toasts.play(sound.key)
     end)
   end
@@ -158,39 +134,131 @@ local function createSoundPicker()
   local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
   button:SetScript("OnClick", function(owner) MenuUtil.CreateContextMenu(owner, buildSoundMenu) end)
   function button:draw()
-    self:SetText(ns.Toasts.soundLabel(core:toastSound()))
+    self:SetText(ns.Toasts.soundLabel(core:setting("toastSound")))
   end
   return button
 end
 
-local function createToasts()
-  frame.toastsHeader = createLabel(frame, "Toasts", "GameFontNormalLarge")
-  frame.toastsHeader:SetPoint("TOPLEFT", frame.minimap, "BOTTOMLEFT", -(INDENT - 4), -SECTION_GAP)
-  frame.toasts = createCheckbox("Show toasts for live events", function(checked)
-    core:setToasts(checked)
-  end)
-  frame.toasts:SetPoint("TOPLEFT", frame.toastsHeader, "BOTTOMLEFT", INDENT - 4, -8)
+-- The controls for settings that aren't on/off, by kind: each makes the
+-- control, with :draw(value) and the element the page lays out.
+local custom = {}
 
-  frame.soundLabel = createLabel(frame, "Sound")
-  frame.soundLabel:SetPoint("TOPLEFT", frame.toasts, "BOTTOMLEFT", 4, -14)
-  frame.sound = createSoundPicker()
-  frame.sound:SetSize(160, 22)
-  frame.sound:SetPoint("LEFT", frame.soundLabel, "LEFT", 116, 0)
-  frame.play = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-  frame.play:SetSize(60, 22)
-  frame.play:SetText("Play")
-  frame.play:SetPoint("LEFT", frame.sound, "RIGHT", 6, 0)
-  frame.play:SetScript("OnClick", function() ns.Toasts.play(core:toastSound()) end)
-
-  frame.move = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-  frame.move:SetSize(120, 22)
-  frame.move:SetText("Move toasts")
-  frame.move:SetPoint("TOPLEFT", frame.soundLabel, "BOTTOMLEFT", 0, -14)
-  frame.move:SetScript("OnClick", ns.Toasts.move)
+-- The sound, chosen from a dropdown, with Play beside it.
+function custom.sound(setting)
+  local label = createLabel(frame, setting.label)
+  label.inset, label.gap = INDENT, 14
+  local picker = createSoundPicker()
+  picker:SetSize(160, 22)
+  picker:SetPoint("LEFT", label, "LEFT", 116, 0)
+  local play = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  play:SetSize(60, 22)
+  play:SetText("Play")
+  play:SetPoint("LEFT", picker, "RIGHT", 6, 0)
+  play:SetScript("OnClick", function() ns.Toasts.play(core:setting(setting.key)) end)
+  return {
+    element = label,
+    draw = function() picker:draw() end,
+    setEnabled = function(on)
+      label:SetAlpha(on and 1 or 0.5)
+      picker:SetEnabled(on)
+      play:SetEnabled(on)
+    end,
+  }
 end
 
--- The settings panel calls these; nothing waits for Okay or Defaults.
-local function noop() end
+-- Move toasts: the position is set by dragging, so there's nothing to draw.
+function custom.position(setting)
+  local move = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  move:SetSize(120, 22)
+  move:SetText(setting.label)
+  move:SetScript("OnClick", ns.Toasts.move)
+  move.inset, move.gap = INDENT, 14
+  return {
+    element = move,
+    draw = noop,
+    setEnabled = function(on) move:SetEnabled(on) end,
+  }
+end
+
+-- An on/off setting: a checkbox.
+local function createToggle(setting)
+  local box = createCheckbox(setting.label, function(checked)
+    core:setSetting(setting.key, checked)
+  end)
+  box.inset, box.gap = INDENT - 4, 4
+  return {
+    element = box,
+    draw = function(on) box:SetChecked(on) end,
+    setEnabled = function(on) box:SetEnabled(on) end,
+  }
+end
+
+-- Leave Crew, under Appear offline.
+local function createLeave()
+  local leave = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  leave:SetSize(120, 22)
+  leave:SetText("Leave Crew")
+  leave:SetScript("OnClick", ns.confirmLeave)
+  leave.inset, leave.gap = INDENT, 8
+  frame.leave = leave
+  return leave
+end
+
+-- What the page puts under a setting's control, by key.
+local extras = { paused = createLeave }
+
+-- A header and a control per setting for each section of Core's list, in
+-- order, as frame.elements for refresh to lay out.
+local function createSections()
+  frame.controls = {}
+  for _, section in ipairs(core:settings()) do
+    local header = createLabel(frame, section.title, "GameFontNormalLarge")
+    header.inset, header.header = 0, true
+    frame.elements[#frame.elements + 1] = header
+    for _, setting in ipairs(section.settings) do
+      local make = setting.kind == "toggle" and createToggle or custom[setting.kind]
+      local control = make(setting)
+      control.section, control.kind = section.title, setting.kind
+      frame.controls[setting.key] = control
+      frame.elements[#frame.elements + 1] = control.element
+      if extras[setting.key] then
+        frame.elements[#frame.elements + 1] = extras[setting.key]()
+      end
+    end
+  end
+end
+
+-- Stacks the sections under the You section (under the Crew code while in
+-- a Crew, else the display name). Each element sits its own inset in from
+-- the section's left edge; hidden ones close up.
+local function layout(crew)
+  local above = crew and frame.codeLabel or frame.nameLabel
+  for _, element in ipairs(frame.elements) do
+    if element:IsShown() then
+      element:ClearAllPoints()
+      if element.header then
+        element:SetPoint("TOPLEFT", above, "BOTTOMLEFT", -above.inset, -SECTION_GAP)
+      else
+        element:SetPoint("TOPLEFT", above, "BOTTOMLEFT", element.inset - above.inset,
+          -(above.header and 8 or element.gap))
+      end
+      above = element
+    end
+  end
+end
+
+-- Draws one setting's control. With toasts off, the Toasts section's
+-- controls that aren't on/off (sound, Move toasts) are greyed out.
+local function drawSetting(key, value)
+  local control = frame.controls[key]
+  if not control then return end
+  control.draw(value)
+  if key == "toasts" then
+    for _, other in pairs(frame.controls) do
+      if other.kind ~= "toggle" and other.section == control.section then other.setEnabled(value) end
+    end
+  end
+end
 
 local function create()
   frame = CreateFrame("Frame")
@@ -198,9 +266,8 @@ local function create()
   frame.title = createLabel(frame, "BFF", "GameFontNormalHuge")
   frame.title:SetPoint("TOPLEFT", 16, -16)
   createYou()
-  createSharing()
-  createNotifications()
-  createToasts()
+  frame.elements = {}
+  createSections()
   frame:SetScript("OnShow", Page.refresh)
   -- A refused name is forgotten once the page closes.
   frame:SetScript("OnHide", function() frame.nameError:SetText("") end)
@@ -223,31 +290,20 @@ function Page.refresh()
     frame.code.crewCode = crew.code
     frame.code:SetText(crew.code)
   end
-
-  frame.sharing:ClearAllPoints()
-  frame.sharing:SetPoint("TOPLEFT", crew and frame.codeLabel or frame.nameLabel, "BOTTOMLEFT",
-    -INDENT, -SECTION_GAP)
-  frame.pause:SetChecked(core:isPaused())
-  frame.pause:SetEnabled(crew ~= nil)
   frame.leave:SetShown(crew ~= nil and not crew.leaving)
+  layout(crew)
 
-  -- Under Leave Crew, or else Appear offline, back at the section's left
-  -- edge (each sits a different inset in from it).
-  local under = frame.leave:IsShown() and frame.leave or frame.pause
-  frame.notifications:ClearAllPoints()
-  frame.notifications:SetPoint("TOPLEFT", under, "BOTTOMLEFT", -under.inset, -SECTION_GAP)
-  frame.chatLines:SetChecked(core:isChatLinesOn())
-  frame.away:SetChecked(core:isAwayPopupOn())
-  frame.minimap:SetChecked(core:isMinimapShown())
+  for _, section in ipairs(core:settings()) do
+    for _, setting in ipairs(section.settings) do drawSetting(setting.key, setting.value) end
+  end
+  -- Appear offline needs a Crew to appear offline to.
+  frame.controls.paused.setEnabled(crew ~= nil)
+end
 
-  -- The sound and Move toasts are greyed out while toasts are off.
-  local toasts = core:isToastsOn()
-  frame.toasts:SetChecked(toasts)
-  frame.sound:draw()
-  frame.soundLabel:SetAlpha(toasts and 1 or 0.5)
-  frame.sound:SetEnabled(toasts)
-  frame.play:SetEnabled(toasts)
-  frame.move:SetEnabled(toasts)
+-- Updates the control for a setting that changed, if the page is open.
+function Page.settingChanged(key, value)
+  if not frame or not frame:IsShown() then return end
+  drawSetting(key, value)
 end
 
 -- Opens the game's Settings panel on this page. Returns true, or false in
