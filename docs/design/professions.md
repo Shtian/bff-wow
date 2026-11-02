@@ -42,10 +42,14 @@ Alts are named the usual way ("Simone's Alt Simmy picked up Tailoring"). An unkn
 
 Entries carry the profession's `icon` (file ID), which the Feed tab and toasts draw instead of the kind's picture, edged in amber (gold when maxed). While you were away lists them under **Professions**, a line each with the icon and a Cheer, rather than on the scoreboard.
 
+## Crew goals
+
+Three Crew goal tracks are worked out from the professions in records ([#100](https://github.com/Shtian/bff-wow/issues/100)): Every profession in the Crew, Crew skill and Everyone a Journeyman. See `docs/design/goals.md`.
+
 ## Dev
 
 `/bff sim` gives the simulated Members some professions; Simba's client "never shared" any. The console's **Skill** button steps a Member's first profession short of 300 to its next milestone, or picks up Tailoring. `/bffdev toast` includes the three profession kinds.
 
 ## Not in this
 
-Recipes (only readable while the profession window is open, and big), Crew goals for professions (#100), specialisations, and the skill bonus from gear and racials.
+Recipes (only readable while the profession window is open, and big), specialisations, and the skill bonus from gear and racials.

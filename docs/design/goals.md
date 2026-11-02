@@ -1,10 +1,10 @@
 # Crew goals
 
-Answers [Crew goals: built-in goal tracks, a Goals tab and a Feed entry when reached](https://github.com/Shtian/bff-wow/issues/51). Builds on the Feed (`docs/design/feed.md`) and toasts (`docs/design/toasts.md`). Domain vocabulary from `CONTEXT.md` (**Crew goal**, **Crew levels**).
+Answers [Crew goals: built-in goal tracks, a Goals tab and a Feed entry when reached](https://github.com/Shtian/bff-wow/issues/51), with the profession tracks from [#100](https://github.com/Shtian/bff-wow/issues/100). Builds on the Feed (`docs/design/feed.md`) and toasts (`docs/design/toasts.md`). Domain vocabulary from `CONTEXT.md` (**Crew goal**, **Crew levels**).
 
 ## The idea in one line
 
-Each client works out three built-in goal tracks from the Member records it already holds, remembers which rungs it has seen reached, and adds one Crew-wide Feed entry when a new rung is reached. No record fields, no sync change.
+Each client works out six built-in goal tracks from the Member records it already holds, remembers which rungs it has seen reached, and adds one Crew-wide Feed entry when a new rung is reached. No record fields, no sync change.
 
 ## Tracks and rungs
 
@@ -13,6 +13,11 @@ Each client works out three built-in goal tracks from the Member records it alre
 | **Crew levels** | Each Member's highest Character level, summed. Alts don't add to it. | 50, 100, 150, … for ever |
 | **Everyone at level N** | Reached when every Member has a Character at N or above (the lowest of the Members' highest levels). | 10, 20, 30, … then max level itself, and the track is complete |
 | **Crew deaths** | Deaths over every Character of every Member, summed. | 25, 50, 100, 250, 500, 1000, 2500, … |
+| **Every profession in the Crew** | Which of the twelve professions (the nine main ones, cooking, fishing, first aid) at least one Character has, by skill line. | each profession, complete when all twelve are reached |
+| **Crew skill** | Base skill over every profession of every Character, summed. | 500, 1000, 2500, 5000, 10000, … for ever |
+| **Everyone a Journeyman** | Like Everyone at level N: the lowest, over Members, of each Member's best base skill in any profession on any Character. | 75 Apprentice, 150 Journeyman, 225 Expert, then 300 Artisan, and the track is complete |
+
+The profession tracks count Alts and every profession. A Character whose professions are unknown (its client never shared them) adds nothing, so a Member none of whose professions are known has a best of 0: Everyone a Journeyman waits for them rather than being reached by whoever shared first.
 
 **Who counts:** every Member your Roster could show: you, and everyone held who hasn't Left. Removed Members aren't held, so they don't count; Remove is local, so progress is per client. A Member with no Characters yet doesn't count. All-time, from the records as they are.
 
@@ -22,9 +27,9 @@ Each client works out three built-in goal tracks from the Member records it alre
 
 - Core checks the tracks whenever a record changes: your own Character, DATA from others, and Remove.
 - Reached rungs are kept in `db.goals` (account-wide) with when they were reached. A reached rung **stays reached** even if progress drops (a level-1 Member joins, someone is Removed); the track just moves on to the rung above the highest reached.
-- A newly reached rung makes **one Crew-wide Feed entry**, kind `goal`, with no Member: "The Crew reached 300 Crew levels!", "Everyone in the Crew has a Character at 20!" ("… at max level!" for the last rung), "The Crew has died 100 times together!". It's highlighted in gold like max level and joined, has no Reaction, and goes the usual ways: chat line, toast (same sound and settings), or While you were away when it arrives while settling or with both off.
-- Several rungs crossed at once (after being away) are each recorded, but make **one entry per track**, for the highest.
-- **Only progress is news.** A rung reached because *who counts* changed (a Member first seen after the baseline, one Leaving or coming back, or one you Remove) is recorded quietly, with no entry. Like the Feed's first sight of a Member, a new Member's levels aren't something the Crew did together, and a toast celebrating someone leaving would read wrong.
+- A newly reached rung makes **one Crew-wide Feed entry**, kind `goal`, with no Member: "The Crew reached 300 Crew levels!", "Everyone in the Crew has a Character at 20!" ("… at max level!" for the last rung), "The Crew has died 100 times together!", "The Crew has an Engineer now!" ("… has every profession!" for the twelfth), "The Crew has 2,500 profession skill together!", "Everyone in the Crew is a Journeyman at something!". It's highlighted in gold like max level and joined, has no Reaction, and goes the usual ways: chat line, toast (same sound and settings), or While you were away when it arrives while settling or with both off.
+- Several rungs crossed at once (after being away) are each recorded, but make **one entry per track**, for the highest. For Every profession, the entry names each profession newly had: "The Crew has an Engineer, a Cook and a First Aider now!".
+- **Only progress is news.** A rung reached because *who counts* changed (a Member first seen after the baseline, one Leaving or coming back, one you Remove, or a Character's professions first known: a first share or a new Character) is recorded quietly, with no entry. Like the Feed's first sight of a Member, a new Member's levels aren't something the Crew did together, and a toast celebrating someone leaving would read wrong.
 
 ### Silent baseline
 
@@ -36,12 +41,13 @@ The baseline is taken once, **when the first sync has settled** (the Feed's rule
 
 ## Goals tab
 
-A third tab in the panel's sidebar, under Roster and Feed, within the panel's fixed height. `/bff goals` opens it. One row per track, from `Core:goals()`:
+A third tab in the panel's sidebar, under Roster and Feed. Its rows scroll within the panel's fixed height. `/bff goals` opens it. One row per track, from `Core:goals()`:
 
-- The track's name: "Crew levels", "Everyone at level 30", "Crew deaths".
+- The track's name: "Crew levels", "Everyone at level 30", "Crew deaths", "Every profession in the Crew", "Crew skill", "Everyone a Journeyman" (the next rank).
 - Progress numbers and a bar towards the next rung: "212 / 250". Everyone at level N counts Members: "3 / 5 Members" have a Character at the next rung. That count, not the lowest level, so no Member's own level shows.
-- The last rung reached and when: "Reached 200 on 14 Oct", or "Not reached yet".
-- Everyone at level N, once max level is reached, shows "Complete" and a full gold bar.
+- The last rung reached and when: "Reached 200 on 14 Oct", "Reached Journeyman on 14 Oct", or "Not reached yet". Every profession shows the latest profession reached: "Reached Engineering on 14 Oct".
+- Every profession in the Crew has a strip of the twelve icons under its bar: the ones reached (or had now) lit, the rest grey, the name on hover. A profession stays lit once reached, even if nobody has it any more.
+- Everyone at level N, once max level is reached, Everyone a Journeyman at 300, and Every profession with all twelve show "Complete" and a full gold bar.
 
 ## In Core
 

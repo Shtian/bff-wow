@@ -178,7 +178,8 @@ function Core:updateOwn(character)
     local entries = self.db.crew and self.log:ownChanged(before, character.guid) or {}
     -- Feed news goes out now, even a professions-only change.
     self.gossip:ownChanged(#entries > 0 and "now" or ns.Gossip.urgency(before, character))
-    checkGoals(self)
+    -- Professions first known change who counts, as for others.
+    checkGoals(self, ns.Goals.professionsFirstKnown(before, self.ledger:own().characters[character.guid]))
     self.listener("changed")
   end
 end
@@ -308,11 +309,14 @@ function Core:tick()
 end
 
 -- The Goals tab: a row per Crew goal track (Crew levels, Everyone at level
--- N, Crew deaths): { track, title, rung (the next one, nil when complete),
+-- N, Crew deaths, Every profession in the Crew, Crew skill, Everyone a
+-- Journeyman): { track, title, rung (the next one, nil when complete),
 -- value and goal (the progress bar, value out of goal; nil when complete),
--- complete, last ({ rung, time }: the highest reached, or nil) }. For
--- Everyone at level N, value counts the Members with a Character at the
--- next rung, out of every Member. No Member is named.
+-- unit, complete, last ({ rung, time, label }: the highest reached, or nil)
+-- }. For Everyone at level N and Everyone a Journeyman, value counts the
+-- Members at the next rung, out of every Member. Every profession in the
+-- Crew also has professions: the twelve as { skillLine, name, icon, lit }.
+-- No Member is named.
 function Core:goals()
   return self.crewGoals:rows()
 end
@@ -931,8 +935,9 @@ local function dataReceived(self, records, from)
       self.crewGoals:dataMerged()
       local entries, reactions = self.log:recordChanged(before, record)
       announce(self, entries, reactions, self.spareLife:recordChanged(before, record))
-      -- A Member first seen, leaving or back counts or stops counting.
-      if before == nil or (before.left == true) ~= (record.left == true) then checkGoals(self, true) end
+      -- A Member first seen, leaving or back, or professions first shared,
+      -- change who counts.
+      if ns.Goals.countedChanged(before, record) then checkGoals(self, true) end
     end
     if type(record) == "table" and type(record.id) == "string" and type(record.version) == "number" then
       self.gossip:recordSeen(record.id, record.version)

@@ -839,6 +839,7 @@ local SAMPLE_TOASTS = {
   { kind = "joined", text = "Simbad joined the Crew" },
   { kind = "left", text = "Simba left the Crew" },
   { kind = "goal", text = "The Crew reached 300 Crew levels!" },
+  { kind = "goal", text = "The Crew has an Engineer now!" },
   { kind = "claimed", text = "Simone claimed [Cruel Barb] for Simonette", opens = "spares" },
   { kind = "given", text = "Simbad sent you [Staff of Westfall]. Check Simonette's mailbox.", opens = "spares" },
   { kind = "gave", text = "Simbad gave Simone [Staff of Westfall]" },

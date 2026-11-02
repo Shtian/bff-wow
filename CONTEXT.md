@@ -89,6 +89,10 @@ _Avoid_: Challenge, quest, achievement, milestone
 The sum, over the Crew's Members, of each Member's highest Character level. Alts don't add to it.
 _Avoid_: Total levels
 
+**Crew skill**:
+The base skill of every Profession of every Character in the Crew, Alts included, summed.
+_Avoid_: Total skill
+
 **Competition**:
 A contest that ranks Members against each other. Unlike a Crew goal, it names who is ahead.
 _Avoid_: Race, leaderboard (when meaning the contest)
