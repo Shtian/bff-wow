@@ -26,8 +26,5 @@ jobs:
       - name: Fetch libraries
         run: scripts/fetch-libs.sh
 
-      - name: Lint
-        run: luacheck .
-
-      - name: Test
-        run: busted
+      - name: Lint and test
+        run: scripts/check.sh
