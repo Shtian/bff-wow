@@ -61,6 +61,7 @@ stds.wow = {
     "HideUIPanel",
     "InCombatLockdown",
     "IsModifiedClick",
+    "IsShiftKeyDown",
     "IsMouseButtonDown",
     "IsInInstance",
     "ItemLocation",

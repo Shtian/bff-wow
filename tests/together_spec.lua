@@ -65,6 +65,27 @@ local function barFor(view, name)
   return nil
 end
 
+-- Every dungeon entry shown, in a lane or folded into a chip, by name.
+local function entries(view)
+  local shown = {}
+  for _, bar in ipairs(view.bars) do shown[bar.name] = bar end
+  for _, chip in ipairs(view.chips) do
+    for _, item in ipairs(chip.items) do shown[item.name] = item end
+  end
+  return shown
+end
+
+local function sorted(list)
+  local out = {}
+  for name in pairs(list) do out[#out + 1] = name end
+  table.sort(out)
+  return out
+end
+
+local function idOf(clients, i)
+  return clients[1]:rowFor(clients[i]).memberId
+end
+
 describe("Together", function()
   describe("the dungeon table", function()
     it("has the nine new Forever dungeons as Blizzard gives them", function()
@@ -394,6 +415,290 @@ describe("Together", function()
       -- Your own label is placed, nearest the axis.
       assert.equal(1, groupAt(view, 24).row)
       assert.equal("11 friends can play with you · 11 online now", text(view.answer[1]))
+    end)
+  end)
+  describe("selecting friends", function()
+    it("outlines the dungeons you and the Member fit, and fades the rest", function()
+      local _, clients = crew({ { "Gahz", 24 }, { "Simba", 25 }, { "Simbad", 30 } })
+      local view = clients[1].core:together(nil, { idOf(clients, 2) })
+      local shared = {}
+      for name, entry in pairs(entries(view)) do
+        assert.equal(not entry.shared, entry.faded, name)
+        if entry.shared then shared[name] = true end
+      end
+      assert.same({ "Blackfathom Deeps", "Excavation Site", "Shadowfang Keep", "The Deadmines", "The Stockade" },
+        sorted(shared))
+      assert.is_false(groupAt(view, 24).faded)
+      assert.is_false(groupAt(view, 25).faded)
+      assert.is_true(groupAt(view, 30).faded)
+      assert.same({ idOf(clients, 2) }, view.selected)
+      assert.equal("Clear", view.clear)
+    end)
+
+    it("says you can play and where, together", function()
+      local _, clients = crew({ { "Gahz", 24 }, { "Simba", 25 }, { "Simbad", 30 } })
+      local answer = clients[1].core:together(nil, { idOf(clients, 2) }).answer
+      assert.equal("You and Simba can play", text(answer[1]))
+      assert.same({ "can play" }, styled(answer[1], "highlight"))
+      assert.equal("Together: The Deadmines, Shadowfang Keep, Blackfathom Deeps, The Stockade, Excavation Site",
+        text(answer[2]))
+      assert.same({ "Together: " }, styled(answer[2], "muted"))
+    end)
+
+    it("leaves out can play when a selected Member is more than 3 levels away", function()
+      local _, clients = crew({ { "Gahz", 24 }, { "Simba", 25 }, { "Simbad", 30 } })
+      local answer = clients[1].core:together(nil, { idOf(clients, 2), idOf(clients, 3) }).answer
+      assert.equal("You, Simba and Simbad", text(answer[1]))
+      assert.same({}, styled(answer[1], "highlight"))
+      assert.equal("Together: Shadowfang Keep, Blackfathom Deeps, The Stockade", text(answer[2]))
+    end)
+
+    it("says how far away they are when no dungeon fits you both", function()
+      local _, clients = crew({ { "Gahz", 24 }, { "Simone", 41 } })
+      local view = clients[1].core:together(nil, { idOf(clients, 2) })
+      assert.equal("You and Simone", text(view.answer[1]))
+      assert.equal("No dungeon fits you both yet · Simone is 17 ahead", text(view.answer[2]))
+      for name, entry in pairs(entries(view)) do assert.is_true(entry.faded, name) end
+    end)
+
+    it("counts any of a selected Member's Characters, and says you all for several", function()
+      local net, clients = crew({ { "Gahz", 24 }, { "Simone", 41 }, { "Oskar", 60 } })
+      playAlt(net, clients[2], "Simonette", 25)
+      local view = clients[1].core:together(nil, { idOf(clients, 2) })
+      assert.equal("You and Simone can play", text(view.answer[1]))
+      assert.is_true(entries(view)["Shadowfang Keep"].shared)
+
+      local both = clients[1].core:together(nil, { idOf(clients, 2), idOf(clients, 3) })
+      assert.equal("No dungeon fits you all yet · Oskar is 36 ahead", text(both.answer[2]))
+    end)
+
+    it("ignores Members it doesn't know, and is off with nothing selected", function()
+      local _, clients = crew({ { "Gahz", 24 }, { "Simba", 25 } })
+      local view = clients[1].core:together(nil, { "nobody" })
+      assert.same({}, view.selected)
+      assert.is_nil(view.clear)
+      assert.equal("Simba can play with you", text(view.answer[1]))
+      for name, entry in pairs(entries(view)) do
+        assert.is_false(entry.faded, name)
+        assert.is_false(entry.shared, name)
+      end
+      assert.is_false(groupAt(view, 25).faded)
+    end)
+
+    it("gives each label the Members a click selects: everyone merged in it, never you", function()
+      local _, clients = crew({ { "Gahz", 24 }, { "Ann", 24 }, { "Simba", 25 }, { "Krogg", 25 } })
+      local view = clients[1].core:together()
+      local merged = groupAt(view, 25).memberIds
+      table.sort(merged)
+      local expected = { idOf(clients, 3), idOf(clients, 4) }
+      table.sort(expected)
+      assert.same(expected, merged)
+      assert.same({ idOf(clients, 2) }, groupAt(view, 24).memberIds)
+    end)
+
+    it("selects on click, adds on shift-click, and clears on the same click again", function()
+      local ns = load()
+      local select = ns.Core.selectTogether
+      assert.same({ "a" }, select({}, { "a" }))
+      assert.same({ "b" }, select({ "a" }, { "b" }))
+      assert.same({ "a", "b" }, select({ "a" }, { "b" }, true))
+      assert.same({ "a", "b" }, select({ "a" }, { "a", "b" }, true))
+      assert.same({}, select({ "a" }, { "a" }))
+      assert.same({}, select({ "a", "b" }, { "b", "a" }))
+      assert.same({ "a", "b" }, select({ "a", "b" }, { "a" }, true))
+      -- Your own dot selects nobody.
+      assert.same({ "a" }, select({ "a" }, {}))
+      assert.same({ "a" }, select({ "a" }, {}, true))
+    end)
+  end)
+
+  describe("the Show menu", function()
+    it("lists the five options with their defaults, the key and the help line", function()
+      local _, clients = crew({ { "Gahz", 24 } })
+      local show = clients[1].core:together().show
+      assert.equal("Show", show.label)
+      local sections = {}
+      for i, section in ipairs(show.sections) do
+        local options = {}
+        for j, option in ipairs(section.options) do
+          options[j] = ("%s=%s %s%s"):format(option.key, tostring(option.value), option.label,
+            option.sub and (" / " .. option.sub) or "")
+        end
+        sections[i] = { title = section.title, options = options }
+      end
+      assert.same({
+        { title = "FRIENDS", options = {
+          "togetherOffline=true Offline friends",
+          "togetherAlts=false Alts / Mains and played Characters always show",
+        } },
+        { title = "DUNGEONS", options = {
+          "togetherNear=false Only near your level (±10)",
+          "togetherAttunements=true Attunements",
+          "togetherRaids=false Raids",
+        } },
+      }, sections)
+      assert.equal("KEY", show.key.title)
+      local key = {}
+      for i, item in ipairs(show.key.items) do key[i] = item.kind .. " " .. item.text end
+      assert.same({ "fits Fits your level", "attunement Attunement", "forever New in WoW: Forever",
+        "fitters Friends who fit it" }, key)
+      assert.equal("Drag or scroll to move along the levels. Click a friend to see where you fit together.", show.help)
+    end)
+
+    it("keeps its choices across a reload", function()
+      local _, clients = crew({ { "Gahz", 24 } })
+      clients[1].core:setSetting("togetherRaids", true)
+      clients[1].core:setSetting("togetherOffline", false)
+      clients[1]:reload()
+      local view = clients[1].core:together()
+      assert.is_true(view.show.sections[2].options[3].value)
+      assert.is_false(view.show.sections[1].options[1].value)
+      assert.is_not_nil(entries(view)["Raids 5"])
+    end)
+
+    it("leaves its choices off the Settings page", function()
+      local _, clients = crew({ { "Gahz", 24 } })
+      for _, section in ipairs(clients[1].core:settings()) do
+        for _, setting in ipairs(section.settings) do
+          assert.is_nil(setting.key:match("^together"), setting.key)
+        end
+      end
+    end)
+  end)
+
+  describe("filters", function()
+    it("hide offline friends' Characters, and say how many", function()
+      local net, clients = crew({ { "Gahz", 24 }, { "Simba", 27 }, { "Simone", 41 }, { "Oskar", 50 } })
+      clients[3]:logout()
+      clients[4]:logout()
+      net:run(5)
+      clients[1].core:setSetting("togetherOffline", false)
+      local view = clients[1].core:together()
+      assert.is_not_nil(groupAt(view, 27))
+      assert.is_nil(groupAt(view, 41))
+      assert.is_nil(groupAt(view, 50))
+      assert.equal("2 offline hidden", view.hidden)
+    end)
+
+    it("show Alts when asked, yours too", function()
+      local net, clients = crew({ { "Gahz", 24 }, { "Simbad", 27 } })
+      playAlt(net, clients[2], "Simbalt", 22)
+      clients[2].character = character("Simbonus", 10)
+      clients[2]:play()
+      playAlt(net, clients[1], "Gahzalt", 30)
+      local hidden = clients[1].core:together()
+      assert.is_nil(groupAt(hidden, 22))
+      assert.is_nil(groupAt(hidden, 24))
+      -- Simbad plays Simbonus: only Simbalt is hidden. Your own aren't counted.
+      assert.equal("1 alt hidden", hidden.hidden)
+
+      clients[1].core:setSetting("togetherAlts", true)
+      local view = clients[1].core:together()
+      assert.is_not_nil(groupAt(view, 22))
+      assert.is_not_nil(groupAt(view, 10))
+      assert.equal("You", groupAt(view, 24).label)
+      assert.is_nil(view.hidden)
+    end)
+
+    it("word the hidden note for every combination", function()
+      local net, clients = crew({ { "Gahz", 24 }, { "Simbad", 27 }, { "Simone", 41 } })
+      playAlt(net, clients[2], "Simbalt", 22)
+      clients[2].character = character("Simbonus", 10)
+      clients[2]:play()
+      playAlt(net, clients[3], "Simonette", 19)
+      clients[3]:logout()
+      net:run(5)
+      local core = clients[1].core
+      local function note(offline, alts)
+        core:setSetting("togetherOffline", offline)
+        core:setSetting("togetherAlts", alts)
+        return core:together().hidden
+      end
+      -- Simbad plays Simbonus: Simbalt is hidden. Simone is offline with
+      -- an Alt.
+      assert.equal("2 alts hidden", note(true, false))
+      assert.equal("1 alt, 1 offline hidden", note(false, false))
+      assert.equal("1 offline hidden", note(false, true))
+      assert.is_nil(note(true, true))
+    end)
+
+    it("leave the answer line and who fits counting everyone", function()
+      local net, clients = crew({ { "Gahz", 24 }, { "Simba", 25 } })
+      clients[2]:logout()
+      net:run(5)
+      clients[1].core:setSetting("togetherOffline", false)
+      local view = clients[1].core:together()
+      assert.equal("Simba can play with you", text(view.answer[1]))
+      assert.equal(1, entries(view)["Shadowfang Keep"].count)
+    end)
+
+    it("hide attunements when off", function()
+      local _, clients = crew({ { "Gahz", 57 } })
+      assert.is_not_nil(entries(clients[1].core:together())["Onyxia attunement"])
+      clients[1].core:setSetting("togetherAttunements", false)
+      assert.is_nil(entries(clients[1].core:together())["Onyxia attunement"])
+    end)
+
+    it("show raids as one entry at 60, listing each raid", function()
+      local _, clients = crew({ { "Gahz", 60 }, { "Oskar", 60 } })
+      assert.is_nil(entries(clients[1].core:together())["Raids 5"])
+      clients[1].core:setSetting("togetherRaids", true)
+      local view = clients[1].core:together()
+      local raids = entries(view)["Raids 5"]
+      assert.equal("raids", raids.kind)
+      assert.equal(60, raids.from)
+      assert.is_true(raids.fits)
+      assert.equal(1, raids.count)
+      assert.is_nil(entries(view)["Molten Core"])
+      assert.equal("Raids at 60", raids.tooltip.title)
+      local listed = {}
+      for i, raid in ipairs(raids.tooltip.raids) do
+        listed[i] = ("%s · %s%s"):format(raid.name, raid.detail, raid.forever and " NEW" or "")
+      end
+      assert.same({
+        "Molten Core · 40-player · Blackrock Mountain",
+        "Onyxia's Lair · 40-player · Dustwallow Marsh",
+        "Zul'Gurub · 20-player · Stranglethorn Vale",
+        "The Barrow Deeps · 10-player · Mount Hyjal NEW",
+        "Hyjal Summit · 20-player · Mount Hyjal NEW",
+      }, listed)
+    end)
+
+    it("keep only dungeons near your level, and mark the stretches left empty", function()
+      local _, clients = crew({ { "Gahz", 40 } })
+      local core = clients[1].core
+      assert.is_nil(core:together().empty)
+      core:setSetting("togetherNear", true)
+      local view = core:together()
+      for name, entry in pairs(entries(view)) do
+        assert.truthy(entry.to >= 30 and entry.from <= 50, name)
+      end
+      assert.is_not_nil(entries(view)["Shadowfang Keep"])
+      assert.is_nil(entries(view)["Scholomance"])
+      assert.is_nil(entries(view)["Ragefire Chasm"])
+
+      assert.equal("No dungeons shown at these levels", view.empty.text)
+      assert.equal("Show all levels", view.empty.action)
+      assert.equal("togetherNear", view.empty.setting)
+      local xOf = function(level) return view.ticks[level].x end
+      local function inSpan(x)
+        for _, span in ipairs(view.empty.spans) do
+          if x >= span.left and x <= span.right then return true end
+        end
+        return false
+      end
+      assert.is_true(inSpan(xOf(5)))
+      assert.is_true(inSpan(xOf(15)))
+      assert.is_false(inSpan(xOf(40)))
+      -- No span overlaps anything in a lane.
+      local spans = {}
+      for _, bar in ipairs(view.bars) do spans[#spans + 1] = bar end
+      for _, chip in ipairs(view.chips) do spans[#spans + 1] = chip end
+      for _, span in ipairs(view.empty.spans) do
+        for _, item in ipairs(spans) do
+          assert.truthy(span.right <= item.x or span.left >= item.x + item.width)
+        end
+      end
     end)
   end)
 end)

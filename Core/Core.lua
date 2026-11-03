@@ -227,25 +227,50 @@ end
 -- level line, ready to lay out (docs/design/together.md), or nil before
 -- you play a Character. measure(text, font) gives a text's width in pixels
 -- in Skin's "small" or "tiny" font; without it widths are estimated.
+-- selected is the memberIds picked on the line (see selectTogether). The
+-- Show menu's choices are the together* settings.
 -- Positions are pixels from level 1's left edge, in Core.TOGETHER_LAYOUT's
 -- geometry: as (the Character you play: name, classFilename, level, alt),
--- hidden ("3 alts hidden", or nil), answer (two lines, each a list of
--- { text, style }, style "text", "muted" or "highlight"), width, you (your
--- level's x), band ({ left, right, text } for can play), ticks (per level:
--- level, x, big, number, you), groups (a group per level of the Characters
--- shown: level, x, label, alt, own, online, classFilename, count, more,
--- row (1 nearest the axis, nil when only the dot shows), labelX,
--- labelWidth, and characters: memberId, member ("You" for yours), name,
+-- hidden ("3 alts, 2 offline hidden", or nil), answer (two lines, each a
+-- list of { text, style }, style "text", "muted" or "highlight"),
+-- selected (the picked memberIds Core knows), clear ("Clear" while any
+-- are picked, else nil), show (the Show menu: label, sections of { title,
+-- options: key (the setting), label, sub, value }, key { title, items of
+-- { kind, text } } and help), empty (with only near your level on: text,
+-- action, setting (what the action turns off) and spans of { left, right } with nothing in a lane; else nil),
+-- width, you (your level's x), band ({ left, right, text } for can play),
+-- ticks (per level: level, x, big, number, you), groups (a group per level
+-- of the Characters shown: level, x, label, alt, own, online,
+-- classFilename, count, more, row (1 nearest the axis, nil when only the
+-- dot shows), labelX, labelWidth, memberIds (the other Members a click
+-- picks), faded, and characters: memberId, member ("You" for yours), name,
 -- classFilename, level, alt, online, own, canPlay and apart), bars (a
--- dungeon each: name, kind, forever (new in WoW: Forever), from, to, fits, count, dots (class of each
--- Member who fits, up to 4), moreDots, x, width, lane (1 nearest the axis)
--- and tooltip: title, detail, forever, you, fits, fitters (memberId, member,
--- name, classFilename, level, online, far), none and almost) and chips
--- ("+N here": x, width, lane, text, title, and items, the bars folded in,
--- each with its detail).
-function Core:together(measure)
-  return ns.Together.view(ns.Roster.rows(self.ledger, self.now()), measure)
+-- dungeon each, or the raids' one: name, short, kind ("dungeon",
+-- "attunement" or "raids"), forever (new in WoW: Forever), from, to,
+-- fits, count, dots (class of each Member who fits, up to 4), moreDots, x,
+-- width, lane (1 nearest the axis), shared, faded and tooltip: title,
+-- detail, forever, raids (name, detail, forever), you, fits, fitters
+-- (memberId, member, name, classFilename, level, online, far), none and
+-- almost) and chips ("+N here": x, width, lane, text, title, shared,
+-- faded, and items, the bars folded in, each with its detail).
+function Core:together(measure, selected)
+  return ns.Together.view(ns.Roster.rows(self.ledger, self.now()), measure, {
+    selected = selected,
+    filters = {
+      offline = self:setting("togetherOffline"),
+      alts = self:setting("togetherAlts"),
+      near = self:setting("togetherNear"),
+      attunements = self:setting("togetherAttunements"),
+      raids = self:setting("togetherRaids"),
+    },
+  })
 end
+
+-- Picking friends on the Together line: selected (memberIds picked so
+-- far), memberIds (a clicked label's or dot's, its group's memberIds) and
+-- add (shift held) give the new selection. Clicking what's picked clears
+-- it; your own dot (no memberIds) changes nothing.
+Core.selectTogether = ns.Together.select
 
 -- The world map's pins: one per other Member the panel shows whose shown
 -- Character (being played while online, else the Main) has a known spot,
@@ -605,8 +630,10 @@ end
 -- Settings page's section and label (finished text), its kind ("toggle"
 -- for on/off, "sound" or "position"), its default, and how it's saved in
 -- db, as earlier versions saved it so nothing needs migrating. Adding an
--- on/off setting here puts it on the Settings page. Display name isn't one:
--- it's part of your Member record. See docs/design/settings-and-release.md.
+-- on/off setting with a section here puts it on the Settings page; the
+-- Together tab's Show menu choices have none, and show only in that menu.
+-- Display name isn't one: it's part of your Member record. See
+-- docs/design/settings-and-release.md.
 
 -- The table a setting is saved in: db itself, or one inside it.
 local function savedIn(db, parent)
@@ -624,10 +651,10 @@ local function offFlag(field, parent)
 end
 
 -- On/off, saved as field = true while on and nil while off.
-local function onFlag(field)
+local function onFlag(field, parent)
   return {
-    read = function(db) return db[field] == true end,
-    write = function(db, on) db[field] = on and true or nil end,
+    read = function(db) return savedIn(db, parent)[field] == true end,
+    write = function(db, on) savedIn(db, parent)[field] = on and true or nil end,
   }
 end
 
@@ -711,6 +738,12 @@ local SETTINGS = {
     label = "Move toasts",
     saved = screenPosition("toastPosition"),
   },
+  -- The Together tab's Show menu (together().show), saved in db.together.
+  { key = "togetherOffline", kind = "toggle", saved = offFlag("offlineOff", "together") },
+  { key = "togetherAlts", kind = "toggle", saved = onFlag("alts", "together") },
+  { key = "togetherNear", kind = "toggle", saved = onFlag("near", "together") },
+  { key = "togetherAttunements", kind = "toggle", saved = offFlag("attunementsOff", "together") },
+  { key = "togetherRaids", kind = "toggle", saved = onFlag("raids", "together") },
 }
 
 local SETTING = {}
@@ -748,22 +781,25 @@ function Core:setSetting(key, value)
 end
 
 -- The Settings page, ready to render: sections in order, { title,
--- settings }, each setting { key, kind, label, value }.
+-- settings }, each setting { key, kind, label, value }. Settings with no
+-- section (the Together tab's Show menu) aren't on it.
 function Core:settings()
   local sections, byTitle = {}, {}
   for _, setting in ipairs(SETTINGS) do
-    local section = byTitle[setting.section]
-    if not section then
+    local section = setting.section and byTitle[setting.section]
+    if setting.section and not section then
       section = { title = setting.section, settings = {} }
       byTitle[setting.section] = section
       sections[#sections + 1] = section
     end
-    section.settings[#section.settings + 1] = {
-      key = setting.key,
-      kind = setting.kind,
-      label = setting.label,
-      value = self:setting(setting.key),
-    }
+    if section then
+      section.settings[#section.settings + 1] = {
+        key = setting.key,
+        kind = setting.kind,
+        label = setting.label,
+        value = self:setting(setting.key),
+      }
+    end
   end
   return sections
 end
