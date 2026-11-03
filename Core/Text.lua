@@ -59,3 +59,8 @@ function Text.shortDate(time, utcOffset)
   local _, day, month = localDate(time, utcOffset)
   return ("%d %s"):format(day, MONTHS[month]:sub(1, 3))
 end
+
+-- A count with thousands separators: 2,500.
+function Text.grouped(count)
+  return (tostring(count):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", ""))
+end

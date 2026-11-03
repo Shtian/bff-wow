@@ -27,6 +27,14 @@ local DEATHS_STEPS = { 25, 50, 100 }
 -- Crew skill: 500, 1000, 2500, and on the same way.
 local SKILL_STEPS = { 500, 1000, 2500 }
 local RANK_STEP = 75
+-- A rung reached this recently is still news: its trophy shows in gold.
+local FRESH = 3 * 24 * 60 * 60
+-- A track's rungs as trophies, tiered in WoW's item qualities by how many
+-- it has reached: the 1st and 2nd uncommon, 3rd and 4th rare, 5th and 6th
+-- epic, then legendary. Every profession's are all one tier.
+local QUALITIES = { "uncommon", "uncommon", "rare", "rare", "epic", "epic" }
+local TOP_QUALITY = "legendary"
+local PROFESSIONS_QUALITY = "rare"
 
 -- The twelve, as Every profession in the Crew counts them.
 local PROFESSIONS = ns.Professions.ALL
@@ -43,10 +51,7 @@ local function scaled(steps, after)
   end
 end
 
--- A count with thousands separators: 2,500.
-local function grouped(count)
-  return (tostring(count):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", ""))
-end
+local grouped = ns.Text.grouped
 
 -- "a Journeyman" for the rank a skill stands for.
 local function aRank(skill)
@@ -72,12 +77,13 @@ local function membersAt(values)
   end
 end
 
--- What makes each track: its next rung after a value (nil past the last),
+-- What makes each track: its name (in the trophy cabinet), its next rung after a value (nil past the last),
 -- the progress its rungs are measured against, its title on the Goals
 -- tab, the Feed entry's text for a rung, and what the progress bar counts
 -- when that isn't the measure itself.
 local TRACK = {
   crewLevels = {
+    name = "Crew levels",
     next = function(after)
       return (math.floor(after / CREW_LEVELS_STEP) + 1) * CREW_LEVELS_STEP
     end,
@@ -86,6 +92,7 @@ local TRACK = {
     text = function(rung) return ("The Crew reached %d Crew levels!"):format(rung) end,
   },
   everyone = {
+    name = "Everyone at a level",
     -- Every 10, and the last rung is max level itself.
     next = function(after, maxLevel)
       if after >= maxLevel then return nil end
@@ -102,6 +109,7 @@ local TRACK = {
     bar = membersAt("highest"),
   },
   deaths = {
+    name = "Crew deaths",
     next = function(after) return scaled(DEATHS_STEPS, after) end,
     value = function(progress) return progress.deaths end,
     title = function() return "Crew deaths" end,
@@ -109,15 +117,18 @@ local TRACK = {
   },
   -- Not a ladder: its rungs are the professions. record and row are below.
   professions = {
+    name = "Every profession in the Crew",
     title = function() return "Every profession in the Crew" end,
   },
   crewSkill = {
+    name = "Crew skill",
     next = function(after) return scaled(SKILL_STEPS, after) end,
     value = function(progress) return progress.skill end,
     title = function() return "Crew skill" end,
     text = function(rung) return ("The Crew has %s profession skill together!"):format(grouped(rung)) end,
   },
   everyoneRank = {
+    name = "Everyone at a rank",
     -- 75 Apprentice, 150 Journeyman, 225 Expert and 300 Artisan, the last.
     next = function(after)
       if after >= ns.Professions.CAP then return nil end
@@ -206,7 +217,8 @@ function Goals.countedChanged(before, record)
 end
 
 -- db is the whole saved table; Goals keeps `goals`: reached (per track,
--- rung to when it was reached) and baselined (the silent baseline is done).
+-- rung to when it was reached), baselined (the silent baseline is done)
+-- and seen (when the Goals tab was last opened).
 function Goals.new(db, ledger, now, maxLevel)
   local self = setmetatable({ db = db, ledger = ledger, now = now, maxLevel = maxLevel }, Goals)
   self:load()
@@ -214,6 +226,7 @@ function Goals.new(db, ledger, now, maxLevel)
 end
 
 function Goals:load()
+  self.visiting = false
   local saved = self.db.goals or {}
   saved.reached = saved.reached or {}
   for _, track in ipairs(Goals.TRACKS) do saved.reached[track] = saved.reached[track] or {} end
@@ -271,7 +284,9 @@ end
 -- the baseline), with the name and icon of whoever has it.
 local function professionsRow(self, _, progress)
   local saved = self.db.goals.reached.professions
-  local row = { track = "professions", title = TRACK.professions.title(), professions = {}, value = 0 }
+  local row = {
+    track = "professions", title = TRACK.professions.title(), professions = {}, value = 0, reached = count(saved),
+  }
   local lastTime
   for i, p in ipairs(PROFESSIONS) do
     local had = progress.covered[p.skillLine]
@@ -368,6 +383,7 @@ local function ladderRow(self, track, progress)
     track = track,
     title = spec.title(rung),
     rung = rung,
+    reached = count(self.db.goals.reached[track]),
     complete = rung == nil,
     last = top and {
       rung = top,
@@ -386,7 +402,7 @@ end
 -- The Goals tab: a row per track, in Goals.TRACKS order: { track, title,
 -- rung (the next one, nil when complete), value and goal (the progress bar:
 -- value out of goal), unit (what value counts, when not the measure
--- itself), complete, last ({ rung, time, label }, the highest reached, or
+-- itself), complete, reached (how many rungs it has reached), last ({ rung, time, label }, the highest reached, or
 -- nil; label is how the tab words it: "2,500", "Journeyman") }. Every
 -- profession's rung counts professions; its last is the latest reached,
 -- labelled with its name; and it has professions, the twelve as { skillLine,
@@ -398,4 +414,121 @@ function Goals:rows()
     rows[#rows + 1] = (TRACK[track].row or ladderRow)(self, track, progress)
   end
   return rows
+end
+
+-- A trophy's quality, from how many rungs its track had reached with it.
+local function quality(nth)
+  return QUALITIES[nth] or TOP_QUALITY
+end
+
+local function trophy(self, track, fields)
+  fields.track = track
+  fields.title = TRACK[track].name
+  fields.fresh = self.now() - fields.time < FRESH
+  return fields
+end
+
+-- A ladder's reached rungs as trophies, oldest first.
+local function ladderTrophies(self, track)
+  local spec = TRACK[track]
+  local saved = self.db.goals.reached[track]
+  local rungs = {}
+  for rung in pairs(saved) do rungs[#rungs + 1] = rung end
+  table.sort(rungs)
+  local list = {}
+  for nth, rung in ipairs(rungs) do
+    list[nth] = trophy(self, track, {
+      rung = rung,
+      time = saved[rung],
+      label = spec.label and spec.label(rung) or grouped(rung),
+      text = spec.text(rung, Goals.nextRung(track, rung, self.maxLevel) == nil),
+      quality = quality(nth),
+    })
+  end
+  return list
+end
+
+-- Every profession's reached professions as trophies, oldest first (in
+-- the twelve's order when reached together), with the profession's icon.
+local function professionTrophies(self, _, progress)
+  local saved = self.db.goals.reached.professions
+  local reached = {}
+  for i, p in ipairs(PROFESSIONS) do
+    if saved[p.skillLine] then reached[#reached + 1] = { p = p, order = i, time = saved[p.skillLine] } end
+  end
+  table.sort(reached, function(x, y)
+    if x.time ~= y.time then return x.time < y.time end
+    return x.order < y.order
+  end)
+  local list = {}
+  for nth, item in ipairs(reached) do
+    local had = progress.covered[item.p.skillLine]
+    list[nth] = trophy(self, "professions", {
+      rung = nth,
+      time = item.time,
+      label = had and had.name or item.p.name,
+      icon = had and had.icon or item.p.icon,
+      text = nth >= #PROFESSIONS and "The Crew has every profession!"
+        or ("The Crew has %s now!"):format(item.p.noun),
+      quality = PROFESSIONS_QUALITY,
+    })
+  end
+  return list
+end
+TRACK.professions.trophies = professionTrophies
+
+-- The Goals tab was opened: call it on every draw. It starts a visit if
+-- none is open, and remembers when the tab was opened before it, for
+-- trophies()' sinceSeen, through the visit.
+function Goals:open()
+  if self.visiting then return end
+  self.visiting = true
+  self.since = self.db.goals.seen
+  self.db.goals.seen = self.now()
+end
+
+-- The Goals tab was left (another tab, or the panel hidden).
+function Goals:leave()
+  self.visiting = false
+end
+
+-- The trophy cabinet: every rung reached, as trophies { track, title (the
+-- track's name), rung, label (how the tab words the rung: "2,500",
+-- "Journeyman", "Engineering"), text (its Feed entry's), time, quality
+-- ("uncommon", "rare", "epic" or "legendary"), fresh (reached in the last
+-- 3 days, so still news), icon (Every profession's: the profession's) }.
+-- Returns { settled (the baseline is taken; until then nothing is
+-- reached), count, shelf (every trophy, newest first), cabinet (a group {
+-- track, title, trophies (oldest first) } per track with any, in
+-- Goals.TRACKS order), latest (the newest trophy, or nil) and sinceSeen
+-- (how many others were reached since the Goals tab was last opened: 0
+-- if it never was) }.
+function Goals:trophies()
+  local result = { settled = self.db.goals.baselined == true, count = 0, shelf = {}, cabinet = {}, sinceSeen = 0 }
+  local progress = Goals.progress(counted(self))
+  local order = {}
+  for i, track in ipairs(Goals.TRACKS) do
+    order[track] = i
+    local list = (TRACK[track].trophies or ladderTrophies)(self, track, progress)
+    if #list > 0 then
+      result.cabinet[#result.cabinet + 1] = { track = track, title = TRACK[track].name, trophies = list }
+      for _, item in ipairs(list) do result.shelf[#result.shelf + 1] = item end
+    end
+  end
+  -- Newest first; rungs reached together by track, the highest first.
+  table.sort(result.shelf, function(x, y)
+    if x.time ~= y.time then return x.time > y.time end
+    if x.track ~= y.track then return order[x.track] < order[y.track] end
+    return x.rung > y.rung
+  end)
+  result.count = #result.shelf
+  result.latest = result.shelf[1]
+  local since = self.db.goals.seen
+  if self.visiting then since = self.since end
+  if since then
+    for i = 2, #result.shelf do
+      if result.shelf[i].time > since then result.sinceSeen = result.sinceSeen + 1 end
+    end
+  end
+  return result
 end
