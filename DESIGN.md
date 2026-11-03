@@ -24,6 +24,10 @@ colors:
   feed-spare: "#c799ff"
   feed-left: "#9999a8"
   on-gold: "#1a1400"
+  quality-uncommon: "#1eff00"
+  quality-rare: "#3a9bff"
+  quality-epic: "#b55cf5"
+  quality-legendary: "#ff8000"
 typography:
   window-title:
     fontFamily: "Friz Quadrata (FRIZQT__.TTF)"
@@ -46,6 +50,9 @@ typography:
   tiny:
     fontFamily: "Arial Narrow (ARIALN.TTF)"
     fontSize: "11px"
+  figure:
+    fontFamily: "Arial Narrow (ARIALN.TTF)"
+    fontSize: "18px"
   brand-display:
     fontFamily: "Cinzel, serif"
     fontSize: "104px"
@@ -99,7 +106,8 @@ spacing:
   nav-row: "30px"
   roster-row: "44px"
   feed-entry: "38px"
-  goal-row: "84px"
+  goal-tile: "74px"
+  medal: "40px"
   section-top: "12px"
 components:
   button-primary:
@@ -192,7 +200,7 @@ BFF has its own flat skin. It deliberately rejects Blizzard's parchment, stone f
 
 **Key Characteristics:**
 - Near-black windows (97% opaque) over the game, with 1px white hairlines at 7–10% for structure.
-- Ember Gold is the only accent in the game, and it means news. Gold and teal appear together only on brand surfaces and inside the icon.
+- Ember Gold is the only accent in the game, and it means news. The Goals tab's trophy colours are the one deliberate exception, and even there gold is news. Gold and teal appear together only on brand surfaces and inside the icon.
 - Friz Quadrata names things (titles, headings, labels) and Arial Narrow carries everything else in the game. Cinzel and Archivo Narrow stand in for them on the web.
 - Square corners in the game; rounding is faked with stepped pixels only where a chip needs it.
 - Full-colour game icons with a faded 1px edge in their kind's colour carry the meaning of each Feed entry.
@@ -216,15 +224,22 @@ A night palette: one warm accent glowing against cool, slightly violet near-blac
 - **Smoke Muted** (smoke-muted): secondary text, the Character line under a Member, headerRight labels, unselected navigation.
 - **Dusk Dim** (dusk-dim): tertiary text: section labels, deaths counts, tiny captions.
 - **Hairline** (hairline) and **Border** (border): dividers and 1px frame edges. White at low alpha, so they work on any plate.
-- **Bar Fill** (bar-fill) on **Bar Track** (bar-track): every progress bar (Roster XP, While you were away levels, open Crew goals). Neutral, so colour on a bar means something.
+- **Bar Fill** (bar-fill) on **Bar Track** (bar-track): every progress bar (Roster XP, While you were away levels). Neutral, so colour on a bar means something. Open Crew goals fill in their track's hue (Trophy Colours Rule).
 
 ### Semantic
 - **Online Green** (online-green): online dots and map-pin rings, ding edges, levels gained (the bar's jump, "+N" and "new"). **Offline Grey** (offline-grey) for offline.
 - Feed kind edges: **feed-death** for deaths, **feed-crew** for new Characters and joining, **feed-spare** for Spares, **feed-left** for leaving.
 - Class colours come from the game (`RAID_CLASS_COLORS`) for Character names and map-pin dots. Don't redefine them.
+- Item quality, for trophy tiers only: **quality-uncommon**, **quality-rare** (lifted from the game's #0070dd so it reads on Night Window), **quality-epic** and **quality-legendary**.
 
 ### Named Rules
-**The One Ember Rule.** In the game, gold is the only accent. If everything glows, nothing happened. A window shows gold on its title, on what is genuinely news, and on at most one primary action. Progress, status and your own name are not news: open bars are neutral, "You" is Ash, a given Reaction has no gold edge, leaving is said in grey, a toast's timer line is faint, and a disabled button is never faded gold. The heatmap is the one place gold is a scale.
+**The One Ember Rule.** In the game, gold is the only accent. If everything glows, nothing happened. A window shows gold on its title, on what is genuinely news, and on at most one primary action. Progress, status and your own name are not news: open bars are neutral, "You" is Ash, a given Reaction has no gold edge, leaving is said in grey, a toast's timer line is faint, and a disabled button is never faded gold. The heatmap is the one place gold is a scale. The Goals tab adds colour on purpose, but not gold: see the Trophy Colours Rule.
+
+**The Trophy Colours Rule.** The Goals tab is meant to feel rewarding, so it is the one place colour is the point. Two scales, both borrowed from what players already read, and gold still means news:
+- **Track hues** reuse the Feed kinds, so a goal looks like the news it makes: Online Green for Crew levels and Everyone at level N, feed-death for Crew deaths, feed-spare for the profession tracks (Every profession in the Crew, Crew skill, Everyone a Journeyman). Only on the track icon's 1px edge and its bar's fill (at 75%).
+- **Rung tiers** use WoW's item quality colours, by how many rungs the track has reached: the 1st and 2nd uncommon, 3rd and 4th rare, 5th and 6th epic, the 7th on legendary. Every profession's medals are all rare. Only as a medal's 1px edge and its 3px foot, and its value in the medal's tooltip.
+- **Gold stays news:** the latest-win plate, and the value under a medal reached in the last 3 days, unless it was reached quietly (the silent baseline, or who counts changing). A complete goal's bar and its "Complete" are still gold. Nothing else on the tab is.
+Hues and tiers are `Skin.TROPHY_HUES` and `Skin.TROPHY_QUALITIES`; don't use them anywhere else.
 
 **The Two Rings Rule.** Gold and teal appear together only where the icon does: brand surfaces, and the icon itself where the game shows it. The addon never uses teal as a UI colour.
 
@@ -242,7 +257,8 @@ A night palette: one warm accent glowing against cool, slightly violet near-blac
 - **Body** (Arial Narrow, 15px): Member names and primary row text.
 - **Text** (Arial Narrow, 14px): default UI text, buttons, inputs, sidebar tabs.
 - **Small** (Arial Narrow, 12px): Character lines, checkbox labels, header-right status, level badges, small buttons, intro and helper lines.
-- **Tiny** (Arial Narrow, 11px): badge text ("NEW", unseen counts, the minimap count) and chart captions (heatmap hours and legend). Nothing smaller ships.
+- **Tiny** (Arial Narrow, 11px): badge text ("NEW", unseen counts, the minimap count), chart captions (heatmap hours and legend) and a medal's date. Nothing smaller ships.
+- **Figure** (Arial Narrow, 18px): the big progress numbers on Goals tiles, and nothing else.
 The gallery has its own scale, sized for 1920×1080 images that are also seen as roughly 300px-wide thumbnails on CurseForge:
 - **Brand display** (Cinzel 600, 104px, 1.06, solid Ember Gold): the hero's title.
 - **Brand title** (Cinzel 600, 96px): every other slide's title, 2–4 words, so it still reads in a thumbnail. Solid Ember Gold with a soft offset shadow for the scenery behind; never a gradient. 84px on the banner.
@@ -256,7 +272,7 @@ The gallery has its own scale, sized for 1920×1080 images that are also seen as
 
 ## Layout
 
-The in-game windows are movable. The panel opens at 640×520 and resizes from a grip in its bottom right corner, down to 460×380 and up to 900×800, remembered account-wide; it has a 124px sidebar of 30px tabs and the content to its right. Its size never changes between tabs, rows stretch to its width, and long lists scroll inside it. Content is inset 12px (14px in the While you were away popup, which is 400 wide). Rows follow a steady rhythm: 44px Member rows with 20px alt rows under them, 38px Feed entries, 26px day and section headings, 84px Crew goal rows, Play times cells 11px wide by 18px tall, and 25px Professions rows of 18px tiles (a 2px bar under each). The Together tab's level line scrolls sideways at 24px a level, with 21px label rows above a 20px axis and 23px dungeon lanes (20px bars) below it, between a 32px toolbar on top and a 22px overview strip at the bottom; its type is a step larger than the rest of the panel. In While you were away, each section starts 12px below what's above it, its label takes 16px and each line 20px, so groups sit about 22px apart and lines within them about 6px. Tabs are top-aligned. An empty view is never a lone line in a corner: its content is composed and centred (see Empty state). Toasts are 300×40 and stack 6px apart, up or down from a movable anchor that starts 160px from the top of the screen.
+The in-game windows are movable. The panel opens at 640×520 and resizes from a grip in its bottom right corner, down to 460×380 and up to 900×800, remembered account-wide; it has a 124px sidebar of 30px tabs and the content to its right. Its size never changes between tabs, rows stretch to its width, and long lists scroll inside it. Content is inset 12px (14px in the While you were away popup, which is 400 wide). Rows follow a steady rhythm: 44px Member rows with 20px alt rows under them, 38px Feed entries, 26px day and section headings, Goals as a gold latest-win plate (at least 60px), medals 52px wide on the shelf and 60px in the cabinet (40px icons, 72px high) that wrap, and 74px Working on tiles in two columns (one below 400px of content), split by 1px hairlines, Play times cells 11px wide by 18px tall, and 25px Professions rows of 18px tiles (a 2px bar under each). The Together tab's level line scrolls sideways at 24px a level, with 21px label rows above a 20px axis and 23px dungeon lanes (20px bars) below it, between a 32px toolbar on top and a 22px overview strip at the bottom; its type is a step larger than the rest of the panel. In While you were away, each section starts 12px below what's above it, its label takes 16px and each line 20px, so groups sit about 22px apart and lines within them about 6px. Tabs are top-aligned. An empty view is never a lone line in a corner: its content is composed and centred (see Empty state). Toasts are 300×40 and stack 6px apart, up or down from a movable anchor that starts 160px from the top of the screen.
 
 Brand images are 1920×1080, plus a 1600×520 banner. Split layouts put a 640px text column on one side, an 80px gap and 110–120px outer margins, and the screenshot column (`minmax(0, 1fr)`, 880px high) on the other side; the side alternates from slide to slide. Frames are measured into their column, so a wide shot can't push the copy, and never enlarged past 1.4x, so game text stays sharp. A second shot (a toast) sits below the first on the side away from the copy, overlapping only its bottom 28px. Only the hero carries the name and icon, small, top left: CurseForge already shows them beside the gallery. The last slide is a numbered how-to for starting a crew.
 
@@ -305,7 +321,10 @@ Quiet and flat. Components are faint fills and hairlines, so the content and the
 A Label in capitals at the left, with a Hairline running from it to the right edge or to whatever sits at the right (a count, a small button). Used for every section and for the Feed's day labels, which keep an opaque Night Window back so the timeline's line stops behind them. No boxed chips for labels.
 
 ### Progress bar
-Bar Fill on Bar Track, square. 6px on Crew goals, 4px in While you were away, 2px for Roster XP. Colour replaces the fill only when it means something: green for levels gained, Ember Gold for a completed goal.
+Bar Fill on Bar Track, square. 4px on Crew goal tiles and in While you were away, 2px for Roster XP. Colour replaces the fill only when it means something: green for levels gained, a Crew goal's track hue (Trophy Colours Rule), Ember Gold for a completed goal.
+
+### Medal
+A trophy for a Crew goal rung reached, on the Goals tab: the track's icon (a profession's own for Every profession in the Crew), 40px on an opaque back, with a 1px edge and a 3px foot in its tier's quality colour, then its value (Small; Ember Gold while fresh) and date (Tiny, Dusk Dim) centred under it. Hover names the track, the value and the date. The shelf's See all tile is the same size: a secondary plate with "+N", "See all" and the total.
 
 ### Inputs / Fields
 - **Edit box:** 24px high, black at 35% with a 1px Border, 8px text inset.
@@ -324,7 +343,7 @@ A small square (18–20px) holding the Reaction's icon, desaturated at 55% alpha
 300×40, Night Window at 88%, a 24px Feed picture, Body text (Ember Gold for news), and an optional Reaction button. A 2px timer line shows the time left at 18% white on every toast. Toasts fade over 0.6s.
 
 ### Empty state
-Centred in its view, built from the house's own shapes rather than an illustration. The empty Feed is a 120px stretch of the timeline with one node (the ding picture, desaturated at half strength, grey edge), a Heading beside it and one Small Smoke Muted line under that. The panel before joining a Crew is a 320px block centred in the window: Display name across, then Start a Crew and Join a Crew in two 150px columns split by a vertical Hairline.
+Centred in its view, built from the house's own shapes rather than an illustration. The empty Feed is a 120px stretch of the timeline with one node (the ding picture, desaturated at half strength, grey edge), a Heading beside it and one Small Smoke Muted line under that. The Goals tab with nothing on its shelf (before the first sync has settled, or with nothing reached) shows a desaturated goal picture, 40px, with a Heading and a Small Smoke Muted line beside it, centred where the latest win and shelf would be; the Working on tiles stay below. The panel before joining a Crew is a 320px block centred in the window: Display name across, then Start a Crew and Join a Crew in two 150px columns split by a vertical Hairline.
 
 ### Tooltips
 The game's own GameTooltip, with BFF's colours inside (class colour for the Character, Smoke Muted details, Online Green for online, Ember Gold for "can play"). A Roster row's tooltip opens beside the panel, level with the row, on whichever side has room; small controls (Reactions, heatmap cells, map pins) anchor to their right.

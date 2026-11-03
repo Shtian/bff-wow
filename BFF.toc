@@ -41,6 +41,7 @@ Game/ChannelLink.lua
 UI/Skin.lua
 UI/Panel.lua
 UI/TogetherTab.lua
+UI/GoalsTab.lua
 UI/Minimap.lua
 UI/MapPins.lua
 UI/Away.lua

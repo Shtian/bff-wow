@@ -97,6 +97,10 @@ _Avoid_: Last online, last active
 A target the whole Crew reaches together, where every Member's progress counts and nobody is ranked or credited. Built in, as a ladder of ever-higher targets.
 _Avoid_: Challenge, quest, achievement, milestone
 
+**Trophy**:
+A Crew goal rung the Crew has reached, kept as a medal on the Goals tab with when it was reached. It's **fresh** for 3 days, while it's still news. The **trophy cabinet** is every trophy, by track.
+_Avoid_: Achievement, badge, award
+
 **Crew levels**:
 The sum, over the Crew's Members, of each Member's highest Character level. Alts don't add to it.
 _Avoid_: Total levels

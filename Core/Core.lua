@@ -27,14 +27,15 @@ Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
 Core.DUNGEONS = ns.Together.DUNGEONS
 Core.TOGETHER_LAYOUT = ns.Together.LAYOUT
 
+-- A count with thousands separators, for the UI's wording: 2,500.
+Core.grouped = ns.Text.grouped
+
 -- The tooltip's gold line for a Character's money (copper): whole gold,
 -- floored, with thousands separators ("Gold: 1,234"). Nil when the
 -- Character's client never shared it, so no line shows rather than "0".
 function Core.goldText(money)
   if type(money) ~= "number" then return nil end
-  local digits = tostring(math.floor(money / 10000))
-  local grouped = digits:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
-  return "Gold: " .. grouped
+  return "Gold: " .. ns.Text.grouped(math.floor(money / 10000))
 end
 
 -- deps: db, now(), random(), link (with send(string)), listener(event, ...),
@@ -367,13 +368,39 @@ end
 -- N, Crew deaths, Every profession in the Crew, Crew skill, Everyone a
 -- Journeyman): { track, title, rung (the next one, nil when complete),
 -- value and goal (the progress bar, value out of goal; nil when complete),
--- unit, complete, last ({ rung, time, label }: the highest reached, or nil)
--- }. For Everyone at level N and Everyone a Journeyman, value counts the
+-- unit, complete, reached (how many rungs it has reached), last ({ rung,
+-- time, date ("3 Nov"), label }: the highest reached, or nil) }. For Everyone at level N and Everyone a Journeyman, value counts the
 -- Members at the next rung, out of every Member. Every profession in the
 -- Crew also has professions: the twelve as { skillLine, name, icon, lit }.
 -- No Member is named.
 function Core:goals()
-  return self.crewGoals:rows()
+  local rows = self.crewGoals:rows()
+  for _, row in ipairs(rows) do
+    if row.last then row.last.date = ns.Text.shortDate(row.last.time, self.utcOffset) end
+  end
+  return rows
+end
+
+-- The Goals tab's trophies: every Crew goal rung reached, newest first on
+-- the shelf and by track in the cabinet, with the latest win and how many
+-- others were reached since the tab was last opened (see Goals:trophies).
+-- Each trophy also has date, its time as a short local date: "3 Nov".
+-- Call openGoals() first, so that count holds through a visit.
+function Core:trophies()
+  local trophies = self.crewGoals:trophies()
+  for _, trophy in ipairs(trophies.shelf) do trophy.date = ns.Text.shortDate(trophy.time, self.utcOffset) end
+  return trophies
+end
+
+-- The Goals tab is shown: call it on every draw, before trophies(). It
+-- starts a visit if none is open.
+function Core:openGoals()
+  self.crewGoals:open()
+end
+
+-- The Goals tab was left (another tab, or the panel hidden).
+function Core:leaveGoals()
+  self.crewGoals:leave()
 end
 
 -- The Feed tab: { days = { { daysAgo, time, title, entries } }, unseen },

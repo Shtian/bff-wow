@@ -85,11 +85,12 @@ Skin.FEED_PICTURES = {
 local SPARE = { 0.78, 0.6, 1 }
 local CREW = { 0.4, 0.75, 1 }
 local PROFESSION = { 0.9, 0.72, 0.42 }
+local DEATH = { 0.95, 0.4, 0.36 }
 Skin.FEED_EDGES = {
   ding = Skin.ONLINE,
   maxLevel = Skin.GOLD,
   goal = Skin.GOLD,
-  death = { 0.95, 0.4, 0.36 },
+  death = DEATH,
   newCharacter = CREW,
   joined = CREW,
   left = { 0.6, 0.6, 0.66 },
@@ -104,6 +105,37 @@ local EDGE_ALPHA = 0.55
 -- A given Reaction's edge: a quiet frame, not gold, so the Feed's gold stays
 -- on the news.
 local GIVEN_EDGE = { 1, 1, 1, 0.3 }
+
+-- Trophy colours (DESIGN.md, Trophy colours). Each Crew goal track's hue
+-- is the Feed kind its news looks like: green for levels, red for deaths,
+-- violet for professions. On the track icon's edge and its bar's fill.
+Skin.TROPHY_HUES = {
+  crewLevels = Skin.ONLINE,
+  everyone = Skin.ONLINE,
+  deaths = DEATH,
+  professions = SPARE,
+  crewSkill = SPARE,
+  everyoneRank = SPARE,
+}
+-- A trophy's tier, in WoW's item quality colours (Core says which): on a
+-- medal's edge and foot. Rare is lifted from the game's #0070dd so it
+-- reads on Night Window.
+Skin.TROPHY_QUALITIES = {
+  uncommon = { 0.12, 1, 0 },
+  rare = { 0.23, 0.61, 1 },
+  epic = { 0.71, 0.36, 0.96 },
+  legendary = { 1, 0.5, 0 },
+}
+-- Each track's icon, on its Working on tile, its medals (but Every
+-- profession's, which show the profession) and the cabinet.
+Skin.GOAL_ICONS = {
+  crewLevels = "Interface\\Icons\\Achievement_Level_20",
+  everyone = "Interface\\Icons\\Achievement_Level_30",
+  deaths = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01",
+  professions = "Interface\\Icons\\INV_Misc_Book_11",
+  crewSkill = "Interface\\Icons\\INV_Pick_02",
+  everyoneRank = "Interface\\Icons\\INV_Misc_Note_06",
+}
 
 -- A square picture `size` wide: an opaque back (so a line behind it is
 -- covered), the edge, and the icon inset 1px with its own bevel cropped.
@@ -199,7 +231,8 @@ end
 
 -- Friz names things: window titles, headings (goal names) and labels
 -- (section, day and column labels, written in capitals). Arial Narrow
--- carries everything else; tiny is for badges and chart captions.
+-- carries everything else; tiny is for badges and chart captions, and
+-- figure for the Goals tab's big progress numbers.
 Skin.fonts = {
   title = font("BFFFontTitle", FRIZ, 13),
   heading = font("BFFFontHeading", FRIZ, 12),
@@ -208,6 +241,7 @@ Skin.fonts = {
   text = font("BFFFontText", NARROW, 14),
   small = font("BFFFontSmall", NARROW, 12),
   tiny = font("BFFFontTiny", NARROW, 11),
+  figure = font("BFFFontFigure", NARROW, 18),
 }
 
 -- A class's colour as r, g, b; white for an unknown class.
