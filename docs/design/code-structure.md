@@ -14,7 +14,7 @@ Almost all behaviour lives in one deep, pure-Lua module, **Core**, behind a smal
 | **Snapshot** (`Game/Snapshot.lua`) | no | Reads level, XP, zone, class, gold, professions (through `Professions.read`) and GUID, counts deaths (kept per Character in `BFF_CharacterDB`), and calls `core:updateOwn(character)`. `Snapshot.locate()` reads where the Character stands, for Core's `locate`. |
 | **Bags** (`Game/Bags.lua`) | no | Offers a bag item as a Spare: the item on the cursor (the Spares tab's drop slot) or the first bag item matching a link (`/bff spares add`). Passes its item GUID and binding to `core:postSpare`, which refuses an item that can't be traded. Also tells Core where a posted item is now (`findItem`), for `core:bagsUpdated` on `BAG_UPDATE_DELAYED`. |
 | **Channel link** (`Game/ChannelLink.lua`) | no | The production link adapter: joins and hides the Crew channel (including filtering its system notices out of chat), AceComm with ChatThrottleLib, decides when the link is up or down, reports Members leaving the channel, and has an echo mode. See `docs/research/channel-spike.md`. |
-| **UI** (`UI/Skin.lua`, `UI/Panel.lua`, `UI/TogetherTab.lua`, `UI/Minimap.lua`, `UI/MapPins.lua`, `UI/Away.lua`, `UI/ToastQueue.lua`, `UI/Toasts.lua`, `UI/Settings.lua`) | no | Renders Core's rows and summaries and sends user commands to Core. Shows no state it worked out itself. Skin is the shared flat look (colours, fonts, window, buttons, Feed icons) for the panel, the popup, toasts and map pins. ToastQueue is pure and tested offline (`docs/design/toasts.md`). |
+| **UI** (`UI/Skin.lua`, `UI/Panel.lua`, `UI/TogetherTab.lua`, `UI/GoalsTab.lua`, `UI/Minimap.lua`, `UI/MapPins.lua`, `UI/Away.lua`, `UI/ToastQueue.lua`, `UI/Toasts.lua`, `UI/Settings.lua`) | no | Renders Core's rows and summaries and sends user commands to Core. Shows no state it worked out itself. Skin is the shared flat look (colours, fonts, window, buttons, Feed icons) for the panel, the popup, toasts and map pins. ToastQueue is pure and tested offline (`docs/design/toasts.md`). |
 | **App** (`BFF.lua`) | no | Wiring only: creates Core, routes WoW events, runs a 1 s `C_Timer` ticker that calls `core:tick()`, and handles slash commands. |
 
 The first draft's Zones module is dropped from v1, because only the overlap finder needed it. The overlap finder (the Together tab) works from levels and a dungeon table instead.
@@ -145,7 +145,7 @@ BFF.lua
 Bindings.xml                         -- key binding to open the panel
 Core/  Core.lua  Text.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  SpareRules.lua  Spares.lua  Feed.lua  Roster.lua  Together.lua  Goals.lua  PlayTimes.lua  Professions.lua  CrewCode.lua  Codec.lua
 Game/  Snapshot.lua  Bags.lua  ChannelLink.lua
-UI/    Skin.lua  Panel.lua  TogetherTab.lua  Minimap.lua  MapPins.lua  Away.lua  ToastQueue.lua  Toasts.lua  Settings.lua
+UI/    Skin.lua  Panel.lua  TogetherTab.lua  GoalsTab.lua  Minimap.lua  MapPins.lua  Away.lua  ToastQueue.lua  Toasts.lua  Settings.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases
 Libs/                                -- fetched, gitignored
 scripts/ fetch-libs.sh  package.sh   -- package.sh builds the release zip

@@ -41,19 +41,24 @@ The baseline is taken once, **when the first sync has settled** (the Feed's rule
 
 ## Goals tab
 
-A third tab in the panel's sidebar, under Roster and Feed. Its rows scroll within the panel's fixed height. `/bff goals` opens it. One row per track, from `Core:goals()`:
+A third tab in the panel's sidebar, under Roster and Feed, drawn by `UI/GoalsTab.lua`. It scrolls within the panel's fixed height. `/bff goals` opens it. A **trophy cabinet** ([#119](https://github.com/Shtian/bff-wow/issues/119)): every rung reached stays visible, as a medal. Top to bottom:
 
-- The track's name: "Crew levels", "Everyone at level 30", "Crew deaths", "Every profession in the Crew", "Crew skill", "Everyone a Journeyman" (the next rank).
-- Progress numbers and a bar towards the next rung: "212 / 250". Everyone at level N counts Members: "3 / 5 Members" have a Character at the next rung. That count, not the lowest level, so no Member's own level shows.
-- The last rung reached and when: "Reached 200 on 14 Oct", "Reached Journeyman on 14 Oct", or "Not reached yet". Every profession shows the latest profession reached: "Reached Engineering on 14 Oct".
-- Every profession in the Crew has a strip of the twelve icons under its bar: the ones reached (or had now) lit, the rest grey, the name on hover. A profession stays lit once reached, even if nobody has it any more.
-- Everyone at level N, once max level is reached, Everyone a Journeyman at 300, and Every profession with all twelve show "Complete" and a full gold bar.
+- **Latest win:** the newest trophy in an Ember Gold framed plate, worded like its Feed entry ("The Crew reached 150 Crew levels!"), its date, and how many other rungs were reached since you last opened the tab: "3 Nov · 2 more since you last looked". Nothing is counted the first time.
+- **Trophy shelf:** every reached rung as a medal, newest first: the track's icon (the profession's own for Every profession in the Crew), its value ("150", "Journeyman", "Engineering") and date. The newest 7 show, then a **See all** tile with how many more. Medals wrap to a second line in a narrow panel rather than scroll sideways. Hover shows the track, the value and the date.
+- **Working on:** a tile per track, in the order below: its icon, name, big progress numbers ("212 / 250", "3 / 5 Members" for the Everyone tracks: a count, so no Member's own level shows), a bar towards the next rung, and "2 reached · last 3 Nov" or "Not reached yet". Two columns, one below 400px of content (the panel's minimum, 460×380). Everyone at level N once max level is reached, Everyone a Journeyman at 300 and Every profession with all twelve show "Complete" and a full gold bar. Every profession's tile names the professions nobody has yet on hover.
+- **Trophy cabinet**, opened from See all in the same tab, with a Back button: "Goals reached N", then each track that has reached rungs, its medals oldest first, so a track reads as a progression. Leaving the tab closes it.
+
+Track names: "Crew levels", "Everyone at level 30" (the next rung; "Everyone at a level" in the cabinet), "Crew deaths", "Every profession in the Crew", "Crew skill", "Everyone a Journeyman" (the next rank; "Everyone at a rank" in the cabinet).
+
+**Empty state.** Before the silent baseline has settled, the tab shows "Counting up the Crew" where the latest win and shelf would be; with it settled and nothing reached, "No trophies yet". Working on shows either way.
+
+**Colour** (DESIGN.md, the Trophy Colours Rule): track hues reuse the Feed kinds (green for Crew levels and Everyone at level N, red for Crew deaths, violet for the profession tracks) on the track icon's edge and the bar. A medal's tier is WoW's item quality by how many rungs its track has reached: 1st–2nd uncommon, 3rd–4th rare, 5th–6th epic, 7th on legendary; Every profession's are all rare. Gold stays news: the latest-win plate, and the value of a rung reached in the last 3 days (**fresh**).
 
 ## In Core
 
 - **Goals** (`Core/Goals.lua`): the ladders, progress from a list of records, the saved reached rungs, the baseline and the tab's rows. Pure; tested through Core and directly for the ladders.
 - **Feed** turns reached rungs into `goal` entries (`Feed:goalsReached`), and While you were away lists them on their own as `summary.goals` (`{ text, time }`, newest first), shown under "Crew goals" in gold.
-- **Core:** `goals()` for the tab. `feedEntry` and `awaySummary` carry goal entries as they do others.
+- **Core:** `goals()` for the Working on tiles: a row per track, with `reached` (how many rungs it has) and `last.date` ("3 Nov"). `trophies()` for the rest: `{ settled, count, shelf (newest first), cabinet ({ track, title, trophies } per track with any, oldest first), latest, sinceSeen }`, a trophy being `{ track, title, rung, label, text (its Feed entry's), time, date, quality, fresh, icon }`. Core decides each trophy's quality and whether it's fresh; Skin maps them to colours. `openGoals()` on every draw of the tab and `leaveGoals()` when it's left make a **Goals visit**, like the Feed's: `sinceSeen` counts from the tab's previous opening through the visit. When the tab was last opened is kept in `db.goals.seen`, so a new Crew starts again. `feedEntry` and `awaySummary` carry goal entries as they do others.
 
 ## Dev
 
