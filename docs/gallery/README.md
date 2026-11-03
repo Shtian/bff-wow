@@ -26,3 +26,7 @@ Each entry in `slides.json` has:
 - `steps`: for `steps` only. Wrap a chat command in backticks to set it in gold.
 
 `width` and `height` default to 1920×1080. Keep product terms lowercase in captions ("crew", "characters"); the reader doesn't know them yet.
+
+## The listing's text
+
+The CurseForge description lives in [`docs/curseforge-description.md`](../curseforge-description.md). CurseForge doesn't read it from the repo: paste it into the project's description (Markdown) after changing it.
