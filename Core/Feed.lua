@@ -506,7 +506,6 @@ end
 -- Entries that are the news, highlighted wherever they show: the Feed
 -- tab, While you were away and toasts. Leaving isn't.
 local HIGHLIGHTED = { maxLevel = true, joined = true, goal = true, professionMaxed = true }
-Feed.HIGHLIGHTED = HIGHLIGHTED
 
 -- Entries listed with a Member in the summary (highlights), and of those,
 -- the ones that tag them by name (max level has its star instead).

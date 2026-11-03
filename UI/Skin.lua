@@ -43,9 +43,6 @@ Skin.TILE_NONE = { 1, 1, 1, 0.035 }
 
 Skin.HEADER_HEIGHT = 30
 
--- Feed entries shown in gold: the news. Leaving keeps its grey edge and
--- plain text.
-Skin.FEED_HIGHLIGHT = { maxLevel = true, joined = true, goal = true, professionMaxed = true }
 -- A muted grey for a picture's edge when its kind has no colour, and for
 -- the overflow toast's icon.
 Skin.FEED_ICON_COLOR = { 0.82, 0.8, 0.86 }

@@ -24,6 +24,11 @@ function Text.ago(seconds)
   return ("%dd"):format(math.floor(seconds / DAY + 0.5))
 end
 
+-- Last seen in words: "5m ago".
+function Text.since(seconds)
+  return Text.ago(seconds) .. " ago"
+end
+
 -- The local calendar date of a server time: weekday (1 for Sunday), day
 -- of the month, month (1–12). Days since 1970 to a civil date, as in
 -- Howard Hinnant's days_from_civil inverse.

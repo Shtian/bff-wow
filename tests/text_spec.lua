@@ -17,6 +17,7 @@ describe("Text", function()
     assert.equal("24h", Text.ago(DAY - 1))
     assert.equal("1d", Text.ago(DAY))
     assert.equal("3d", Text.ago(2.5 * DAY))
+    assert.equal("5m ago", Text.since(5 * 60))
   end)
 
   it("titles a Feed day: today, yesterday, else weekday and date", function()
