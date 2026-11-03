@@ -41,7 +41,7 @@ Everything is **account-wide** in `BFF_DB`, including the minimap button positio
 
 ### One list in Core
 
-Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): its key, kind (`toggle` for on/off, `sound` or `position`), default, how it's saved, and the Settings page's section and label as finished text. The list drives:
+Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): its key, kind (`toggle` for on/off, `sound`, `position` or `panelPlace`), default, how it's saved, and the Settings page's section and label as finished text. The list drives:
 
 - **Storage**, in the shape earlier versions saved, so nothing is migrated:
 
@@ -54,6 +54,7 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `toasts` | `toastsOff = true`, or nil while on |
   | `toastSound` | the sound's name, or nil for the default |
   | `toastPosition` | `{ x, y }`, or nil for the default |
+  | `panelPlace` | `{ width, height, left, top }` in whole UI units (top left corner from the screen's bottom left), size within 460×380 to 900×800; nil for the default size, centred |
   | `togetherOffline` | `offlineOff = true` inside `together`, or nil while on |
   | `togetherAlts` | `alts = true` inside `together`, or nil while off |
   | `togetherNear` | `near = true` inside `together`, or nil while off |
@@ -62,9 +63,11 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
 
 - **Core's interface:** `setting(key)`, `setSetting(key, value)` and `settings()` (the page's sections). The named methods (`isPaused()`, `setToasts(on)` and the rest) stay as hand-written one-line wrappers, so they're greppable.
 - **Events:** a real change fires `settingChanged(key, value)`, not `changed`; setting a value it already has fires nothing. Core's own reactions run first (Pause sharing pauses Gossip).
-- **The page:** a section header per section and a checkbox per on/off setting, built in a loop from `settings()`, so a new on/off setting needs only a list entry. Settings with no section, the Together tab's Show menu choices (`docs/design/together.md`), aren't on the page; that menu shows them. The sound picker (with Play) and Move toasts are drawn by hand but read and write through `setting()` and `setSetting()`. Leave Crew sits under Appear offline.
+- **The page:** a section header per section and a checkbox per on/off setting, built in a loop from `settings()`, so a new on/off setting needs only a list entry. Settings with no section, the Together tab's Show menu choices (`docs/design/together.md`), aren't on the page; that menu shows them. The sound picker (with Play), Move toasts and Reset BFF window are drawn by hand but read and write through `setting()` and `setSetting()`. Leave Crew sits under Appear offline.
 
 Display name isn't in the list: it's part of your Member record and spreads to the Crew.
+
+The panel's size and position (`panelPlace`, #109) is saved through Core, not the game's window-layout cache, which is applied before the panel is created. `setPanelPlace(width, height, left, top)` saves where a move or resize left it, `resetPanelPlace()` goes back to the default, and `panelPlace(screenWidth, screenHeight)` says where it opens on this screen: shrunk to fit and moved onto it, with nil `left` and `top` for centred. The grip in the panel's bottom right corner resizes it (double-click resets), and the Settings page has Reset BFF window under Notifications and display, greyed out while the panel is at its default.
 
 Core also decides where each Live event goes: `feedEntry`, `reaction` and `spare` carry `outlets = { chat, toast }` from the chat-line and toast settings, and App shows them as told. With both off nothing is announced or marked seen, so they wait for While you were away.
 

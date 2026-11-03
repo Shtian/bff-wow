@@ -94,6 +94,7 @@ local SETTINGS = {
   { key = "minimap", default = true, other = false },
   { key = "toastSound", default = "UI_BNET_TOAST", other = "none" },
   { key = "toastPosition", default = nil, other = { x = 400, y = 600 } },
+  { key = "panelPlace", default = nil, other = { width = 600, height = 500, left = 100, top = 900 } },
   { key = "paused", default = false, other = true },
   { key = "togetherOffline", default = true, other = false },
   { key = "togetherAlts", default = false, other = true },
@@ -109,7 +110,8 @@ describe("Settings list", function()
     for _, section in ipairs(core:settings()) do
       for _, setting in ipairs(section.settings) do keys[#keys + 1] = setting.key end
     end
-    assert.same({ "paused", "chatLines", "awayPopup", "minimap", "toasts", "toastSound", "toastPosition" }, keys)
+    assert.same({ "paused", "chatLines", "awayPopup", "minimap", "panelPlace", "toasts", "toastSound",
+      "toastPosition" }, keys)
   end)
 
   it("gives the Settings page sections with finished labels and current values", function()

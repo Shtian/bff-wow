@@ -67,7 +67,7 @@ Then a key (Fits your level, Attunement, New in WoW: Forever, Friends who fit it
 
 ## Showing
 
-`UI/TogetherTab.lua`, a sidebar tab after Professions; `/bff together` opens it. It keeps to the panel's fixed size:
+`UI/TogetherTab.lua`, a sidebar tab after Professions; `/bff together` opens it. It keeps to the panel's size, redrawn when a resize ends:
 
 - **Toolbar** (28px): "As Gahzuria 24" in class colour, an "alt" tag when you're on an Alt, and at the right the hidden note and a small "Show" button (no ▾: Arial Narrow may not have it). The button opens the Show menu under it: 212px, checkboxes as the Settings page's, each change redrawing the line straight away. Escape or a click outside closes it.
 - **Answer line** (46px): the first line in Body, the second in Small, Smoke Muted with the dungeon in Ash. A Clear button at its right while friends are picked.

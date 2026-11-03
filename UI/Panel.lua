@@ -16,7 +16,9 @@
 -- Withdraw. Professions is a grid of all twelve professions, a row per
 -- Member and a tile each with their best Character's skill, sortable by a
 -- profession. Together is a level line of friends and dungeons, drawn by
--- TogetherTab. It never sees a Member record.
+-- TogetherTab. A grip in the bottom right corner resizes the window, and
+-- Core keeps its size and position; views lay out to the current width
+-- and redraw when a resize ends. It never sees a Member record.
 
 local _, ns = ...
 
@@ -25,9 +27,10 @@ ns.Panel = Panel
 
 local Skin = ns.Skin
 
-local WIDTH = 460
+-- The window's size is the player's (Core's panelPlace()), between
+-- Core's limits; views read it as they draw.
 local SIDEBAR = 124
-local CONTENT_WIDTH = WIDTH - SIDEBAR - 1
+local GRIP = 16
 local HEADER = Skin.HEADER_HEIGHT
 local NAV_HEIGHT = 30
 local NAV_CHIP_X = 6
@@ -43,9 +46,6 @@ local INSET = 12
 -- Buttons inside rows and headings, and the pickers that open a menu.
 -- Window actions keep Skin.button's 24.
 local SMALL_BUTTON = 20
--- One height for every view, so switching tabs never resizes the window;
--- the Roster and the Feed scroll inside it.
-local HEIGHT = 380
 local FEED_ENTRY = 38
 local REACT = 20
 local FEED_DAY = 26
@@ -90,7 +90,9 @@ local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
 local PROFESSION_HEAD = 26
 local PROFESSION_ICON = 16
 local PROFESSION_NAME = 82
+local PROFESSION_NAME_MAX = 160
 local PROFESSION_TILE = 18
+local PROFESSION_TILE_MAX = 30
 local PROFESSION_GAP = 1
 -- The gap before cooking, fishing and first aid, with a hairline in it.
 local PROFESSION_DIVIDER = 6
@@ -129,6 +131,16 @@ local order = "online"
 local expanded = {}
 
 local classColor = Skin.classColor
+
+-- The content's width right of the sidebar, at the window's current size.
+local function contentWidth()
+  return frame:GetWidth() - SIDEBAR - 1
+end
+
+-- A scroll view's width: the content less the thumb's gutter.
+local function listWidth()
+  return contentWidth() - 6
+end
 
 local function className(classFilename)
   return LOCALIZED_CLASS_NAMES_MALE[classFilename] or classFilename or ""
@@ -593,8 +605,13 @@ local function createScrollView()
   view:EnableMouseWheel(true)
   view:SetScript("OnMouseWheel", scroll)
   view.content = CreateFrame("Frame", nil, view)
-  view.content:SetSize(CONTENT_WIDTH - 6, 1)
+  view.content:SetSize(listWidth(), 1)
   view:SetScrollChild(view.content)
+  -- Rows anchor to the content, so they stretch with the window, live.
+  view:SetScript("OnSizeChanged", function(self, width)
+    self.content:SetWidth(width)
+    updateThumb(self)
+  end)
   view.thumb = view:CreateTexture(nil, "OVERLAY")
   view.thumb:SetColorTexture(1, 1, 1, 0.18)
   view.thumb:SetWidth(3)
@@ -635,9 +652,9 @@ local function createFeedView()
   title:SetText(FEED_EMPTY_TITLE)
   local text = Skin.label(empty, "small", MUTED)
   text:SetPoint("TOPLEFT", node, "RIGHT", 10, -3)
-  text:SetWidth(CONTENT_WIDTH - 2 * INSET - NODE - 10)
   text:SetText(FEED_EMPTY)
   feedView.empty = empty
+  feedView.emptyText = text
 end
 
 -- A day's label, like the Roster's CREW: on the window's colour so the
@@ -746,6 +763,7 @@ local function drawFeed(feed)
   end
   hideAll(feedView.days, dayCount + 1)
   hideAll(feedView.entries, entryCount + 1)
+  feedView.emptyText:SetWidth(contentWidth() - 2 * INSET - NODE - 10)
   feedView.empty:SetShown(entryCount == 0)
   feedView.line:ClearAllPoints()
   feedView.line:SetPoint("TOPLEFT", LINE_X, -INSET - 8)
@@ -945,7 +963,6 @@ local function createWhenView()
 
   whenView.intro = Skin.label(whenView, "small", MUTED)
   whenView.intro:SetPoint("TOPLEFT", whenView.pick, "BOTTOMLEFT", 0, -8)
-  whenView.intro:SetWidth(CONTENT_WIDTH - 2 * INSET)
   whenView.intro:SetWordWrap(true)
   whenView.intro:SetJustifyH("LEFT")
 
@@ -992,7 +1009,6 @@ local function createWhenView()
 
   whenView.note = Skin.label(whenView, "small", MUTED)
   whenView.note:SetPoint("TOPLEFT", INSET, below - 24)
-  whenView.note:SetWidth(CONTENT_WIDTH - 2 * INSET)
   whenView.note:SetWordWrap(true)
   whenView.note:SetJustifyH("LEFT")
 end
@@ -1007,7 +1023,9 @@ local function drawWhen()
   whenView.data = view
   whenView.pick.label:SetText("Show: " .. view.title)
   whenView.pick:SetWidth(whenView.pick.label:GetStringWidth() + 16)
+  whenView.intro:SetWidth(contentWidth() - 2 * INSET)
   whenView.intro:SetText(view.intro)
+  whenView.note:SetWidth(contentWidth() - 2 * INSET)
   whenView.note:SetText(view.note or "")
   for _, cell in ipairs(whenView.cells) do
     shadeCell(cell, view.grid[cell.day][cell.hour], view.max)
@@ -1111,7 +1129,6 @@ local function spareNote(index)
   local note = sparesView.notes[index]
   if note then return note end
   note = Skin.label(sparesView.content, "small", MUTED)
-  note:SetWidth(CONTENT_WIDTH - 2 * INSET - 6)
   note:SetWordWrap(true)
   sparesView.notes[index] = note
   return note
@@ -1227,7 +1244,7 @@ local function placeSpareButtons(row, primary, secondary)
     end
   end
   local buttons = (primary and SPARE_BUTTON + 4 or 0) + (secondary and SPARE_BUTTON + 4 or 0)
-  return CONTENT_WIDTH - 6 - 2 * INSET - SPARE_ICON - 8 - buttons - 4
+  return listWidth() - 2 * INSET - SPARE_ICON - 8 - buttons - 4
 end
 
 -- The item's link, then its required level on a badge, then a line under
@@ -1276,6 +1293,7 @@ local function drawSpares()
     local item = spareNote(notes)
     item:ClearAllPoints()
     item:SetPoint("TOPLEFT", sparesView.content, "TOPLEFT", INSET, y - 2)
+    item:SetWidth(listWidth() - 2 * INSET)
     item:SetText(text)
     item:Show()
     y = y - item:GetStringHeight() - 12
@@ -1368,17 +1386,21 @@ local function createProfessionsView()
   professionsView.rows = {}
 end
 
--- Where each column starts, from the left, and how wide a tile is: twelve
--- fit at 18px; more shrink them.
+-- Where each column starts, from the left, how wide a tile is and how
+-- wide the name column is. Twelve tiles fit at 18px at the smallest
+-- window; more shrink them. A wider window grows the tiles, then the name
+-- column, each up to its most.
 local function professionColumns(professions)
   local divider = 0
   for _, p in ipairs(professions) do
     if p.secondary then divider = PROFESSION_DIVIDER end
   end
-  local room = CONTENT_WIDTH - 6 - INSET - PROFESSION_NAME - divider
-  local width = math.min(PROFESSION_TILE, math.floor(room / math.max(#professions, 1)) - PROFESSION_GAP)
+  local count = math.max(#professions, 1)
+  local room = listWidth() - INSET - divider
+  local width = math.min(PROFESSION_TILE_MAX, math.floor((room - PROFESSION_NAME) / count) - PROFESSION_GAP)
+  local name = math.max(PROFESSION_NAME, math.min(PROFESSION_NAME_MAX, room - count * (width + PROFESSION_GAP)))
   local xs, dividerX = {}, nil
-  local x = INSET + PROFESSION_NAME
+  local x = INSET + name
   for i, p in ipairs(professions) do
     if p.secondary and not dividerX then
       dividerX = x + PROFESSION_DIVIDER / 2 - 1
@@ -1387,7 +1409,7 @@ local function professionColumns(professions)
     xs[i] = x
     x = x + width + PROFESSION_GAP
   end
-  return xs, width, dividerX
+  return xs, width, dividerX, name
 end
 
 local function iconTooltip(icon)
@@ -1497,10 +1519,8 @@ local function professionRow(index)
   row.edge = Skin.edge(row, "TOP", Skin.LINE)
   row.name = Skin.label(row, "body")
   row.name:SetPoint("LEFT", INSET, 0)
-  row.name:SetWidth(PROFESSION_NAME - 4)
   row.name:SetWordWrap(false)
   row.unknown = Skin.label(row, "small", MUTED)
-  row.unknown:SetPoint("LEFT", INSET + PROFESSION_NAME, 0)
   row.unknown:SetText("Not shared yet")
   row.tiles = {}
   professionsView.rows[index] = row
@@ -1511,7 +1531,7 @@ function drawProfessions()
   if not professionsView then createProfessionsView() end
   local view = core:professions(order, professionSort)
   professionsView.data = view
-  local xs, width, dividerX = professionColumns(view.professions)
+  local xs, width, dividerX, nameWidth = professionColumns(view.professions)
 
   for i, p in ipairs(view.professions) do
     local icon = professionIcon(i)
@@ -1544,7 +1564,10 @@ function drawProfessions()
     row:SetPoint("TOPRIGHT", professionsView.list.content, "TOPRIGHT", 0, y)
     row.ownBackground:SetShown(member.own)
     row.edge:SetShown(i > 1)
+    row.name:SetWidth(nameWidth - 4)
     row.name:SetText(member.displayName or (member.own and "You") or "")
+    row.unknown:ClearAllPoints()
+    row.unknown:SetPoint("LEFT", INSET + nameWidth, 0)
     Skin.color(row.name, TEXT)
     row.unknown:SetShown(not member.known)
     for c, p in ipairs(view.professions) do
@@ -1576,12 +1599,85 @@ function drawProfessions()
   updateThumb(professionsView.list)
 end
 
+-- Puts the window where Core says it opens: the player's size and
+-- position, kept on this screen, or the default size, centred.
+local function applyPlace()
+  local saved = core:panelPlace(UIParent:GetWidth(), UIParent:GetHeight())
+  frame:SetSize(saved.width, saved.height)
+  frame:ClearAllPoints()
+  if saved.left then
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", saved.left, saved.top)
+  else
+    frame:SetPoint("CENTER")
+  end
+end
+
+-- Saves where a move or resize left the window. Core saves it account-wide
+-- (not the game's layout cache, which is applied before the panel exists),
+-- and its settingChanged redraws the views at the new size.
+local function savePlace()
+  frame.sizing, frame.moving = nil, nil
+  frame:StopMovingOrSizing()
+  frame:SetUserPlaced(false)
+  core:setPanelPlace(frame:GetWidth(), frame:GetHeight(), frame:GetLeft(), frame:GetTop())
+end
+
+-- The grip in the bottom right corner: drag to resize, double-click to go
+-- back to the default size, centred. Anchored parts stretch while
+-- dragging; the views redraw once, when it ends.
+local function createGrip()
+  frame:SetResizable(true)
+  local limits = ns.Core
+  -- Midnight's API; older clients had the min and max calls.
+  if frame.SetResizeBounds then
+    frame:SetResizeBounds(limits.PANEL_MIN_WIDTH, limits.PANEL_MIN_HEIGHT,
+      limits.PANEL_MAX_WIDTH, limits.PANEL_MAX_HEIGHT)
+  else
+    frame:SetMinResize(limits.PANEL_MIN_WIDTH, limits.PANEL_MIN_HEIGHT)
+    frame:SetMaxResize(limits.PANEL_MAX_WIDTH, limits.PANEL_MAX_HEIGHT)
+  end
+  local grip = CreateFrame("Button", nil, frame)
+  grip:SetSize(GRIP, GRIP)
+  grip:SetPoint("BOTTOMRIGHT", -1, 1)
+  grip:SetFrameLevel(frame:GetFrameLevel() + 10)
+  grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+  grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+  grip:SetScript("OnMouseDown", function(_, button)
+    if button == "LeftButton" then
+      frame.sizing = true
+      frame:StartSizing("BOTTOMRIGHT")
+    end
+  end)
+  grip:SetScript("OnMouseUp", function()
+    if frame.sizing then savePlace() end
+  end)
+  grip:SetScript("OnDoubleClick", function() core:resetPanelPlace() end)
+  grip:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Drag to resize")
+    GameTooltip:AddLine("Double-click: default size, centred", MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:Show()
+  end)
+  grip:SetScript("OnLeave", hideTooltip)
+  frame.grip = grip
+end
+
 local function create()
-  frame = Skin.window("BFFPanel", WIDTH, TITLE)
-  frame:SetPoint("CENTER")
-  frame:SetHeight(HEIGHT)
+  frame = Skin.window("BFFPanel", ns.Core.PANEL_MIN_WIDTH, TITLE)
+  applyPlace()
+  frame:SetScript("OnDragStart", function()
+    frame.moving = true
+    frame:StartMoving()
+  end)
+  frame:SetScript("OnDragStop", savePlace)
+  createGrip()
   frame:SetScript("OnShow", Panel.refresh)
-  frame:SetScript("OnHide", function() core:leaveFeed() end)
+  -- A move or resize the panel closed during still saves where it got to.
+  frame:SetScript("OnHide", function()
+    if frame.sizing or frame.moving then savePlace() end
+    core:leaveFeed()
+  end)
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
     sinceRedraw = sinceRedraw + elapsed
@@ -1720,8 +1816,6 @@ local function createFooter()
 
   footer.status = Skin.label(footer, "small", MUTED)
   footer.status:SetPoint("TOPLEFT", INSET, -10)
-  -- Set outright so the wrapped text has a height before layout.
-  footer.status:SetWidth(CONTENT_WIDTH - 2 * INSET)
   footer.status:SetWordWrap(true)
 
   local codeLabel = Skin.label(footer, "small", MUTED)
@@ -1763,6 +1857,9 @@ local function drawFooter(crew, summary)
   footer.code:SetText(crew.code)
   footer.code:HighlightText()
 
+  -- Set outright, to the window's width, so the wrapped text has a height
+  -- before layout.
+  footer.status:SetWidth(contentWidth() - 2 * INSET)
   footer.status:SetText(crew.status or "")
   local height = 46
   if crew.status then height = height + footer.status:GetStringHeight() + 6 end
@@ -1864,9 +1961,11 @@ function Panel.refresh()
 end
 
 -- Pause sharing shows in the Roster's footer, whose height the rows sit
--- above, so the open tab redraws.
+-- above, so the open tab redraws. A new panel place (a resize, a move or a
+-- reset) puts the window there and redraws the views at its size.
 function Panel.settingChanged(key)
-  if key == "paused" then Panel.refresh() end
+  if key == "panelPlace" and frame then applyPlace() end
+  if key == "paused" or key == "panelPlace" then Panel.refresh() end
 end
 
 function Panel.toggle()

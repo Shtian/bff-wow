@@ -691,6 +691,47 @@ local function screenPosition(field)
   }
 end
 
+-- The panel's size limits, in UI units; it opens at the smallest.
+Core.PANEL_MIN_WIDTH, Core.PANEL_MIN_HEIGHT = 460, 380
+Core.PANEL_MAX_WIDTH, Core.PANEL_MAX_HEIGHT = 900, 800
+
+local function round(value)
+  return math.floor(value + 0.5)
+end
+
+local function clamp(value, low, high)
+  return math.max(low, math.min(high, value))
+end
+
+-- The panel's size and position, saved as { width, height, left, top } in
+-- whole UI units (left and top from the screen's bottom left), or nil for
+-- the default size, centred. The size is kept within the panel's limits;
+-- staying on screen is panelPlace()'s, since the screen can change.
+local function panelPlace(field)
+  return {
+    read = function(db)
+      local saved = db[field]
+      return saved and { width = saved.width, height = saved.height, left = saved.left, top = saved.top } or nil
+    end,
+    write = function(db, value)
+      if not (value and value.width) then
+        db[field] = nil
+        return
+      end
+      db[field] = {
+        width = clamp(round(value.width), Core.PANEL_MIN_WIDTH, Core.PANEL_MAX_WIDTH),
+        height = clamp(round(value.height), Core.PANEL_MIN_HEIGHT, Core.PANEL_MAX_HEIGHT),
+        left = round(value.left),
+        top = round(value.top),
+      }
+    end,
+    same = function(a, b)
+      if a == nil or b == nil then return a == b end
+      return a.width == b.width and a.height == b.height and a.left == b.left and a.top == b.top
+    end,
+  }
+end
+
 -- The toast sound's default: the name UI plays it by.
 Core.DEFAULT_TOAST_SOUND = "UI_BNET_TOAST"
 
@@ -719,6 +760,12 @@ local SETTINGS = {
     key = "minimap", section = NOTIFICATIONS, kind = "toggle",
     label = "Show minimap button",
     saved = offFlag("hide", "minimap"),
+  },
+  -- The panel's size and position (panelPlace()); the page shows a reset.
+  {
+    key = "panelPlace", section = NOTIFICATIONS, kind = "panelPlace",
+    label = "Reset BFF window",
+    saved = panelPlace("panelPlace"),
   },
   {
     key = "toasts", section = TOASTS, kind = "toggle",
@@ -834,6 +881,34 @@ function Core:toastPosition()
   local position = self:setting("toastPosition")
   if not position then return nil end
   return position.x, position.y
+end
+
+-- The panel's size and position as the player left it, by its top left
+-- corner in UI units from the screen's bottom left. Account-wide, so it
+-- opens the same on every Character.
+function Core:setPanelPlace(width, height, left, top)
+  self:setSetting("panelPlace", { width = width, height = height, left = left, top = top })
+end
+
+-- Back to the default size, centred.
+function Core:resetPanelPlace()
+  self:setSetting("panelPlace", nil)
+end
+
+-- Where the panel opens on a screen this big (UI units): { width, height,
+-- left, top }, shrunk to fit the screen and moved onto it. Left and top
+-- are nil while it hasn't been moved or resized, for centred.
+function Core:panelPlace(screenWidth, screenHeight)
+  local saved = self:setting("panelPlace")
+  if not saved then return { width = Core.PANEL_MIN_WIDTH, height = Core.PANEL_MIN_HEIGHT } end
+  local width = math.min(saved.width, screenWidth)
+  local height = math.min(saved.height, screenHeight)
+  return {
+    width = width,
+    height = height,
+    left = clamp(saved.left, 0, screenWidth - width),
+    top = clamp(saved.top, height, screenHeight),
+  }
 end
 
 -- Pause sharing: send nothing, still receive, and appear offline. Kept
