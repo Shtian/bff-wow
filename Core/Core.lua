@@ -231,11 +231,9 @@ end
 -- Show menu's choices are the together* settings.
 -- Positions are pixels from level 1's left edge, in Core.TOGETHER_LAYOUT's
 -- geometry: as (the Character you play: name, classFilename, level, alt),
--- hidden ("3 alts, 2 offline hidden", or nil), answer (two lines, each a
--- list of { text, style }, style "text", "muted" or "highlight"),
--- selected (the picked memberIds Core knows), clear ("Clear" while any
+-- hidden ("3 alts, 2 offline hidden", or nil), selected (the picked memberIds Core knows), clear ("Clear" while any
 -- are picked, else nil), show (the Show menu: label, sections of { title,
--- options: key (the setting), label, sub, value }, key { title, items of
+-- options: key (the setting), label, value }, key { title, items of
 -- { kind, text } } and help), empty (with only near your level on: text,
 -- action, setting (what the action turns off) and spans of { left, right } with nothing in a lane; else nil),
 -- width, you (your level's x), band ({ left, right, text } for can play),
@@ -245,14 +243,14 @@ end
 -- dot shows), labelX, labelWidth, memberIds (the other Members a click
 -- picks), faded, and characters: memberId, member ("You" for yours), name,
 -- classFilename, level, alt, online, own, canPlay and apart), bars (a
--- dungeon each, or the raids' one: name, short, kind ("dungeon",
+-- dungeon each, or the raids' one: name, kind ("dungeon",
 -- "attunement" or "raids"), forever (new in WoW: Forever), from, to,
 -- fits, count, dots (class of each Member who fits, up to 4), moreDots, x,
--- width, lane (1 nearest the axis), shared, faded and tooltip: title,
+-- width, lane (1 nearest the axis; every bar has one), shared, faded and
+-- tooltip: title,
 -- detail, forever, raids (name, detail, forever), you, fits, fitters
 -- (memberId, member, name, classFilename, level, online, far), none and
--- almost) and chips ("+N here": x, width, lane, text, title, shared,
--- faded, and items, the bars folded in, each with its detail).
+-- almost), and lanes (how many lanes the bars take).
 function Core:together(measure, selected)
   return ns.Together.view(ns.Roster.rows(self.ledger, self.now()), measure, {
     selected = selected,
@@ -691,8 +689,9 @@ local function screenPosition(field)
   }
 end
 
--- The panel's size limits, in UI units; it opens at the smallest.
+-- The panel's size limits and the size it opens at, in UI units.
 Core.PANEL_MIN_WIDTH, Core.PANEL_MIN_HEIGHT = 460, 380
+Core.PANEL_WIDTH, Core.PANEL_HEIGHT = 640, 520
 Core.PANEL_MAX_WIDTH, Core.PANEL_MAX_HEIGHT = 900, 800
 
 local function round(value)
@@ -900,7 +899,9 @@ end
 -- are nil while it hasn't been moved or resized, for centred.
 function Core:panelPlace(screenWidth, screenHeight)
   local saved = self:setting("panelPlace")
-  if not saved then return { width = Core.PANEL_MIN_WIDTH, height = Core.PANEL_MIN_HEIGHT } end
+  if not saved then
+    return { width = math.min(Core.PANEL_WIDTH, screenWidth), height = math.min(Core.PANEL_HEIGHT, screenHeight) }
+  end
   local width = math.min(saved.width, screenWidth)
   local height = math.min(saved.height, screenHeight)
   return {

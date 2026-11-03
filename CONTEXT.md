@@ -76,7 +76,7 @@ The hours of the week a Member usually plays, from the last 4 weeks of their own
 _Avoid_: Schedule, availability, activity
 
 **Together (tab)**:
-The panel's view of who a Member can play with, and where: the Crew's Characters and the game's dungeons on one level line, with an answer line that says it in words.
+The panel's view of who a Member can play with, and where: the Crew's Characters and the game's dungeons on one level line.
 _Avoid_: Overlap finder (the feature's working name), level line (when meaning the tab)
 
 **Can play**:

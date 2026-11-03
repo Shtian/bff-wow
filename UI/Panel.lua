@@ -1666,7 +1666,7 @@ local function createGrip()
 end
 
 local function create()
-  frame = Skin.window("BFFPanel", ns.Core.PANEL_MIN_WIDTH, TITLE)
+  frame = Skin.window("BFFPanel", ns.Core.PANEL_WIDTH, TITLE)
   applyPlace()
   frame:SetScript("OnDragStart", function()
     frame.moving = true

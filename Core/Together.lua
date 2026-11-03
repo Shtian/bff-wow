@@ -68,7 +68,6 @@ for _, dungeon in ipairs(DUNGEONS) do
 end
 local RAIDS = {
   name = ("Raids %d"):format(#RAID_LIST),
-  short = "Raids",
   from = 60,
   to = 60,
   kind = "raids",
@@ -82,16 +81,16 @@ local RAIDS = {
 local NEAR = 10
 
 -- The line's geometry, in pixels: a level's width, the room left of level
--- 1 and right of the top level, the label rows above the axis and the
--- dungeon lanes below it, and the gaps kept between neighbours in a row or
--- a lane. UI reads the same table to lay the line out.
+-- 1 and right of the top level, the label rows above the axis, and the
+-- gaps kept between neighbours in a row or a lane. The dungeon lanes below
+-- the axis are as many as the dungeons need (together().lanes). UI reads
+-- the same table to lay the line out.
 local LAYOUT = {
   levels = 60,
   level = 24,
   left = 16,
   right = 90,
   rows = 4,
-  lanes = 5,
   rowGap = 6,
   laneGap = 3,
   -- A label's name is cut at this width.
@@ -99,6 +98,8 @@ local LAYOUT = {
   -- A bar shows at most this many Member dots, then "+N".
   dots = 4,
   dot = 8,
+  -- The online dot before an online friend's label, and its gap.
+  online = 10,
 }
 Together.LAYOUT = LAYOUT
 
@@ -116,16 +117,6 @@ end
 
 local function plural(count, one, many)
   return count == 1 and one or many
-end
-
--- "Ann", "Ann and Bob", "Ann, Bob and Cleo", "Ann, Bob and 2 more".
-local function listJoin(names, max)
-  max = max or 3
-  if #names <= 1 then return names[1] or "" end
-  if #names <= max then
-    return table.concat(names, ", ", 1, #names - 1) .. " and " .. names[#names]
-  end
-  return table.concat(names, ", ", 1, max - 1) .. " and " .. (#names - max + 1) .. " more"
 end
 
 -- The Roster's rule: within CAN_PLAY levels of the Character you play.
@@ -267,7 +258,8 @@ local function buildGroups(members, yourLevel, measure, filters, chosen)
       end
       if member.own or chosen[member.id] then group.faded = false end
     end
-    group.labelWidth = math.min(measure(group.label, "small"), LAYOUT.nameWidth) + 4
+    group.labelWidth = (group.online and not group.own and LAYOUT.online or 0)
+      + math.min(measure(group.label, "small"), LAYOUT.nameWidth) + 4
       + measure(tostring(level), "tiny")
       + (group.alt and measure("alt", "tiny") + 10 or 0)
       + (group.more > 0 and measure("+" .. group.more, "small") + 4 or 0) + 8
@@ -426,10 +418,11 @@ local function sharedBy(dungeon, yourLevel, chosen)
   return true
 end
 
--- Bars below the axis for the dungeons shown, placed in the lanes most
--- relevant first: ones you fit, then by how many Members fit. The rest
--- fold into "+N here" chips near their level. While friends are chosen,
--- the ones you all fit are shared and the rest faded.
+-- Bars below the axis for every dungeon shown, placed most relevant first
+-- in the first lane with room: ones you fit, then by how many Members fit.
+-- A bar that finds no room opens a new lane, so none is left out. While
+-- friends are chosen, the ones you all fit are shared and the rest faded.
+-- Returns the bars and how many lanes they take.
 local function buildBars(dungeons, others, yourLevel, measure, chosen)
   local bars = {}
   for _, dungeon in ipairs(dungeons) do
@@ -447,7 +440,6 @@ local function buildBars(dungeons, others, yourLevel, measure, chosen)
     local shared = sharedBy(dungeon, yourLevel, chosen)
     bars[#bars + 1] = {
       name = dungeon.name,
-      short = dungeon.short or dungeon.name,
       kind = dungeon.kind,
       forever = dungeon.forever,
       from = dungeon.from,
@@ -473,240 +465,32 @@ local function buildBars(dungeons, others, yourLevel, measure, chosen)
     return a.index < b.index
   end)
   local lanes = {}
-  for lane = 1, LAYOUT.lanes do lanes[lane] = {} end
-  local placed, over = {}, {}
   for _, bar in ipairs(order) do
-    for lane = 1, LAYOUT.lanes do
+    for lane = 1, #lanes + 1 do
+      lanes[lane] = lanes[lane] or {}
       if free(lanes[lane], bar.x, bar.x + bar.width, LAYOUT.laneGap) then
         table.insert(lanes[lane], { bar.x, bar.x + bar.width })
         bar.lane = lane
         break
       end
     end
-    if bar.lane then
-      placed[#placed + 1] = bar
-    else
-      over[#over + 1] = bar
-    end
   end
-  table.sort(placed, function(a, b) return a.index < b.index end)
-  table.sort(over, function(a, b) return a.index < b.index end)
-
-  -- Chips: the overflow, grouped by starting level (within CAN_PLAY of a
-  -- chip's first), each placed in the first room found at or right of
-  -- its level, lowest lane first. A chip with no room joins the one before
-  -- (or, before any is placed, the next).
-  local groups = {}
-  for _, bar in ipairs(over) do
-    local last = groups[#groups]
-    if last and bar.from - last.from <= CAN_PLAY then
-      table.insert(last.items, bar)
-    else
-      groups[#groups + 1] = { from = bar.from, items = { bar } }
-    end
-  end
-  local chips, waiting = {}, {}
-  local farthest = xOf(LAYOUT.levels) + LAYOUT.right
-  for i, group in ipairs(groups) do
-    for _, bar in ipairs(group.items) do waiting[#waiting + 1] = bar end
-    local width = measure(("+%d here"):format(#waiting), "small") + 12
-    -- Up to 6 levels right of the group; the last group, with no chip
-    -- placed yet, looks as far as the line goes, so nothing is lost.
-    local steps = (i == #groups and #chips == 0) and math.huge or 12
-    local x, lane
-    local step = 0
-    while not lane and step <= steps and xOf(group.from) + step * LAYOUT.level / 2 + width <= farthest do
-      local at = xOf(group.from) + step * LAYOUT.level / 2
-      for l = LAYOUT.lanes, 1, -1 do
-        if free(lanes[l], at, at + width, LAYOUT.laneGap) then
-          x, lane = at, l
-          break
-        end
-      end
-      step = step + 1
-    end
-    if lane then
-      table.insert(lanes[lane], { x, x + width })
-      chips[#chips + 1] = { x = x, width = width, lane = lane, items = waiting }
-      waiting = {}
-    elseif #chips > 0 then
-      for _, bar in ipairs(waiting) do table.insert(chips[#chips].items, bar) end
-      waiting = {}
-    end
-  end
-  for _, chip in ipairs(chips) do
-    chip.text = ("+%d here"):format(#chip.items)
-    chip.title = ("%d more here"):format(#chip.items)
-    chip.shared = false
-    for _, item in ipairs(chip.items) do
-      item.detail = rangeText(item) .. (item.count > 0 and (" · %d fit"):format(item.count) or "")
-      if item.shared then chip.shared = true end
-    end
-    chip.faded = #chosen > 0 and not chip.shared
-  end
-  return placed, chips
-end
-
-local function segment(text, style)
-  return { text = text, style = style or "text" }
-end
-
--- A Member's name, shortened to its first word when long.
-local function shortName(name)
-  if #name > 14 then return name:match("^%S+") or name end
-  return name
-end
-
--- The answer line while friends are chosen: whether you can all play, and
--- the dungeons shown that you all fit.
-local function chosenAnswer(chosen, yourLevel, bars, chips)
-  local names, far, allNear = { "You" }, {}, true
-  for _, member in ipairs(chosen) do
-    names[#names + 1] = shortName(member.name)
-    local character = closest(member, yourLevel)
-    if not canPlay(character.level, yourLevel) then
-      allNear = false
-      local gap = character.level - yourLevel
-      far[#far + 1] = ("%s is %d %s"):format(shortName(member.name), math.abs(gap), gap > 0 and "ahead" or "behind")
-    end
-  end
-  local first = { segment(listJoin(names, 4)) }
-  if allNear then
-    first[1].text = first[1].text .. " "
-    first[2] = segment("can play", "highlight")
-  end
-
-  local shared = {}
-  local function add(bar)
-    if bar.shared then shared[#shared + 1] = bar end
-  end
-  for _, bar in ipairs(bars) do add(bar) end
-  for _, chip in ipairs(chips) do
-    for _, item in ipairs(chip.items) do add(item) end
-  end
-  table.sort(shared, function(a, b) return a.index < b.index end)
-
-  local second
-  if #shared > 0 then
-    local list = {}
-    for i, bar in ipairs(shared) do list[i] = bar.short end
-    second = { segment("Together: ", "muted"), segment(table.concat(list, ", ")) }
-  else
-    second = { segment(("No dungeon fits you %s yet · %s"):format(#chosen == 1 and "both" or "all",
-      #far > 0 and table.concat(far, ", ") or "Quest together"), "muted") }
-  end
-  return { first, second }
-end
-
--- The answer line: who can play with you, and the best dungeon together.
-local function answer(others, yourLevel)
-  if #others == 0 then
-    return {
-      { segment("You're the only one in the Crew so far.", "muted") },
-      { segment("Share your Crew code from Settings to bring friends in.", "muted") },
-    }
-  end
-
-  local can, nearest = {}, nil
-  for _, member in ipairs(others) do
-    local character = closest(member, yourLevel)
-    local gap = math.abs(character.level - yourLevel)
-    if canPlay(character.level, yourLevel) then can[#can + 1] = character end
-    if not nearest or gap < math.abs(nearest.level - yourLevel)
-      or (gap == math.abs(nearest.level - yourLevel) and member.name < nearest.member.name) then
-      nearest = character
-    end
-  end
-
-  if #can == 0 then
-    local gap = nearest.level - yourLevel
-    local who = nearest.main and nearest.member.name
-      or ("%s's alt %s"):format(nearest.member.name, nearest.name)
-    return {
-      { segment(("Nobody is within %d levels of you."):format(CAN_PLAY), "muted") },
-      { segment(("Nearest: %s, %d %s."):format(who, math.abs(gap), gap > 0 and "ahead" or "behind"), "muted") },
-    }
-  end
-
-  table.sort(can, function(a, b)
-    if a.member.online ~= b.member.online then return a.member.online end
-    local gapA, gapB = math.abs(a.level - yourLevel), math.abs(b.level - yourLevel)
-    if gapA ~= gapB then return gapA < gapB end
-    return a.member.name < b.member.name
-  end)
-
-  local first
-  if #can > 3 then
-    local online = 0
-    for _, character in ipairs(can) do
-      if character.member.online then online = online + 1 end
-    end
-    first = {
-      segment(("%d friends "):format(#can)),
-      segment("can play", "highlight"),
-      segment(" with you"),
-      segment((" · %d online now"):format(online), "muted"),
-    }
-  else
-    local names = {}
-    for i, character in ipairs(can) do
-      names[i] = shortName(character.member.name) .. (character.main and "" or " (alt)")
-    end
-    first = { segment(listJoin(names) .. " "), segment("can play", "highlight"), segment(" with you") }
-  end
-
-  -- The dungeon you fit that the most of them fit (with a Character that
-  -- can play with you), online first.
-  local best = {}
-  for _, dungeon in ipairs(DUNGEONS) do
-    if dungeon.kind == "dungeon" and fits(yourLevel, dungeon) then
-      local with, online = {}, 0
-      for _, character in ipairs(can) do
-        local fitting = closest(character.member, yourLevel, function(c)
-          return fits(c.level, dungeon) and canPlay(c.level, yourLevel)
-        end)
-        if fitting then
-          with[#with + 1] = character.member
-          if character.member.online then online = online + 1 end
-        end
-      end
-      if #with > 0 then best[#best + 1] = { dungeon = dungeon, with = with, online = online } end
-    end
-  end
-  table.sort(best, function(a, b)
-    if #a.with ~= #b.with then return #a.with > #b.with end
-    if a.online ~= b.online then return a.online > b.online end
-    return a.dungeon.index < b.dungeon.index
-  end)
-
-  local second
-  if best[1] then
-    local names = {}
-    for i, member in ipairs(best[1].with) do names[i] = shortName(member.name) end
-    second = {
-      segment("Best together: ", "muted"),
-      segment(best[1].dungeon.name),
-      segment(" with " .. (#names > 2 and ("%d friends"):format(#names) or listJoin(names)), "muted"),
-    }
-    if best[2] then second[#second + 1] = segment(" · also " .. best[2].dungeon.name, "muted") end
-  else
-    second = { segment("No dungeon fits you together yet. Quest together.", "muted") }
-  end
-  return { first, second }
+  table.sort(bars, function(a, b) return a.index < b.index end)
+  return bars, #lanes
 end
 
 -- The Show menu: its options with their current values, the key and the
 -- help line.
 local function showMenu(filters)
-  local function option(key, field, label, sub)
-    return { key = key, label = label, sub = sub, value = filters[field] }
+  local function option(key, field, label)
+    return { key = key, label = label, value = filters[field] }
   end
   return {
     label = "Show",
     sections = {
       { title = "FRIENDS", options = {
         option("togetherOffline", "offline", "Offline friends"),
-        option("togetherAlts", "alts", "Alts", "Mains and played Characters always show"),
+        option("togetherAlts", "alts", "Alts"),
       } },
       { title = "DUNGEONS", options = {
         option("togetherNear", "near", ("Only near your level (±%d)"):format(NEAR)),
@@ -728,10 +512,9 @@ local function showMenu(filters)
 end
 
 -- The stretches of the line, from 0 to width, with nothing in a lane.
-local function emptySpans(bars, chips, width)
+local function emptySpans(bars, width)
   local taken = {}
   for _, bar in ipairs(bars) do taken[#taken + 1] = { bar.x, bar.x + bar.width } end
-  for _, chip in ipairs(chips) do taken[#taken + 1] = { chip.x, chip.x + chip.width } end
   table.sort(taken, function(a, b) return a[1] < b[1] end)
   local spans, from = {}, 0
   for _, span in ipairs(taken) do
@@ -825,7 +608,7 @@ function Together.view(rows, measure, options)
 
   local groups = buildGroups(members, yourLevel, measure, filters, chosen)
   placeLabels(groups, yourLevel)
-  local bars, chips = buildBars(shownDungeons(filters, yourLevel), others, yourLevel, measure, chosen)
+  local bars, lanes = buildBars(shownDungeons(filters, yourLevel), others, yourLevel, measure, chosen)
 
   local ticks = {}
   for level = 1, LAYOUT.levels do
@@ -843,7 +626,6 @@ function Together.view(rows, measure, options)
   return {
     as = { name = own.name, classFilename = own.classFilename, level = yourLevel, alt = own.onAlt == true },
     hidden = hiddenNote(others, filters),
-    answer = chosen.any and chosenAnswer(chosen, yourLevel, bars, chips) or answer(others, yourLevel),
     selected = selected,
     clear = chosen.any and "Clear" or nil,
     show = showMenu(filters),
@@ -851,7 +633,7 @@ function Together.view(rows, measure, options)
       text = "No dungeons shown at these levels",
       action = "Show all levels",
       setting = "togetherNear",
-      spans = emptySpans(bars, chips, width),
+      spans = emptySpans(bars, width),
     } or nil,
     width = width,
     you = xOf(yourLevel),
@@ -863,6 +645,6 @@ function Together.view(rows, measure, options)
     ticks = ticks,
     groups = groups,
     bars = bars,
-    chips = chips,
+    lanes = lanes,
   }
 end

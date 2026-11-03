@@ -1,7 +1,7 @@
 local load = require("tests.load")
 
 -- The Together tab, read through Core's together(): friends and dungeons
--- on one level line, and the answer line on top.
+-- on one level line.
 
 local function character(name, level, extra)
   local c = {
@@ -35,22 +35,6 @@ local function playAlt(net, client, name, level)
   net:run(10)
 end
 
--- A line's text, its segments joined.
-local function text(line)
-  local parts = {}
-  for i, segment in ipairs(line) do parts[i] = segment.text end
-  return table.concat(parts)
-end
-
--- The text of a line's segments with the given style.
-local function styled(line, style)
-  local parts = {}
-  for _, segment in ipairs(line) do
-    if segment.style == style then parts[#parts + 1] = segment.text end
-  end
-  return parts
-end
-
 local function groupAt(view, level)
   for _, group in ipairs(view.groups) do
     if group.level == level then return group end
@@ -65,13 +49,10 @@ local function barFor(view, name)
   return nil
 end
 
--- Every dungeon entry shown, in a lane or folded into a chip, by name.
+-- Every dungeon entry shown, by name.
 local function entries(view)
   local shown = {}
   for _, bar in ipairs(view.bars) do shown[bar.name] = bar end
-  for _, chip in ipairs(view.chips) do
-    for _, item in ipairs(chip.items) do shown[item.name] = item end
-  end
   return shown
 end
 
@@ -232,69 +213,11 @@ describe("Together", function()
     end)
   end)
 
-  describe("the answer line", function()
-    it("names who can play with you, counting each Member once", function()
-      local net, clients = crew({ { "Gahz", 24 }, { "Simba", 25 }, { "Simbad", 27 }, { "Simone", 41 } })
-      playAlt(net, clients[3], "Simbalt", 22)
-      local answer = clients[1].core:together().answer
-      assert.equal("Simba and Simbad (alt) can play with you", text(answer[1]))
-      assert.same({ "can play" }, styled(answer[1], "highlight"))
-    end)
-
-    it("counts more than three, with how many are online", function()
-      local net, clients = crew({ { "Gahz", 24 }, { "Ann", 23 }, { "Bob", 25 }, { "Cleo", 26 }, { "Dan", 22 } })
-      clients[5]:logout()
-      net:run(5)
-      local answer = clients[1].core:together().answer
-      assert.equal("4 friends can play with you · 3 online now", text(answer[1]))
-      assert.same({ "can play" }, styled(answer[1], "highlight"))
-    end)
-
-    it("names the best dungeon together, then another", function()
-      -- At 24, with friends at 25 and 22: both fit The Deadmines and
-      -- Shadowfang Keep, and the lower one comes first.
-      local _, clients = crew({ { "Gahz", 24 }, { "Simba", 25 }, { "Krogg", 22 } })
-      local answer = clients[1].core:together().answer
-      assert.equal("Best together: The Deadmines with Simba and Krogg · also Shadowfang Keep", text(answer[2]))
-      assert.same({ "The Deadmines" }, styled(answer[2], "text"))
-    end)
-
-    it("names the nearest Member when nobody can play", function()
-      local net, clients = crew({ { "Gahz", 24 }, { "Simone", 41 }, { "Oskar", 60 } })
-      playAlt(net, clients[2], "Simonette", 28)
-      local answer = clients[1].core:together().answer
-      assert.equal("Nobody is within 3 levels of you.", text(answer[1]))
-      assert.equal("Nearest: Simone's alt Simonette, 4 ahead.", text(answer[2]))
-      assert.same({}, styled(answer[1], "highlight"))
-    end)
-
-    it("names a Main as just the Member", function()
-      local _, clients = crew({ { "Gahz", 24 }, { "Oskar", 60 } })
-      assert.equal("Nearest: Oskar, 36 ahead.", text(clients[1].core:together().answer[2]))
-    end)
-
-    it("invites friends when you're alone in the Crew", function()
-      local _, clients = crew({ { "Gahz", 24 } })
-      local answer = clients[1].core:together().answer
-      assert.equal("You're the only one in the Crew so far.", text(answer[1]))
-      assert.equal("Share your Crew code from Settings to bring friends in.", text(answer[2]))
-    end)
-  end)
-
   describe("dungeons", function()
     it("say whether you fit, need levels or have outlevelled them", function()
       local _, clients = crew({ { "Gahz", 24 } })
       local view = clients[1].core:together()
-      local function you(name)
-        for _, bar in ipairs(view.bars) do
-          if bar.name == name then return bar.tooltip.you end
-        end
-        for _, chip in ipairs(view.chips) do
-          for _, item in ipairs(chip.items) do
-            if item.name == name then return item.tooltip.you end
-          end
-        end
-      end
+      local function you(name) return barFor(view, name).tooltip.you end
       assert.equal("You fit", you("Shadowfang Keep"))
       assert.equal("You need 34 more levels", you("Scholomance"))
       assert.equal("You've outlevelled it", you("Ragefire Chasm"))
@@ -327,55 +250,45 @@ describe("Together", function()
       local view = clients[1].core:together()
       assert.is_true(barFor(view, "Blackmaw Hold").forever)
       assert.equal("New in WoW: Forever", barFor(view, "Blackmaw Hold").tooltip.forever)
-      local shown = {}
-      for _, bar in ipairs(view.bars) do shown[bar.name] = bar end
-      for _, chip in ipairs(view.chips) do
-        for _, item in ipairs(chip.items) do shown[item.name] = item end
-      end
+      local shown = entries(view)
       assert.equal("attunement", shown["Onyxia attunement"].kind)
       assert.is_nil(shown["Molten Core"])
       assert.is_nil(shown["Hyjal Summit"])
     end)
 
-    it("place the ones you fit first, in at most 5 lanes, the rest in +N here chips", function()
+    it("give every dungeon shown a lane, as many as they need, the ones you fit first", function()
       local _, clients = crew({ { "Gahz", 58 } })
       local view = clients[1].core:together()
-      local placed = 0
-      for _, bar in ipairs(view.bars) do
-        assert.truthy(bar.lane >= 1 and bar.lane <= 5)
-        placed = placed + 1
-      end
-      local folded = 0
-      for _, chip in ipairs(view.chips) do
-        assert.truthy(chip.lane >= 1 and chip.lane <= 5)
-        assert.equal(("+%d here"):format(#chip.items), chip.text)
-        folded = folded + #chip.items
-      end
-      assert.truthy(folded > 0)
       local shown = 0
       for _, dungeon in ipairs(load().Core.DUNGEONS) do
         if dungeon.kind ~= "raid" then shown = shown + 1 end
       end
-      assert.equal(shown, placed + folded)
+      assert.equal(shown, #view.bars)
+      assert.truthy(view.lanes > 5)
+      local most = 0
+      for _, bar in ipairs(view.bars) do
+        assert.truthy(bar.lane >= 1 and bar.lane <= view.lanes, bar.name)
+        most = math.max(most, bar.lane)
+      end
+      assert.equal(view.lanes, most)
       -- Nothing in a lane overlaps.
-      local spans = {}
-      for _, bar in ipairs(view.bars) do spans[#spans + 1] = bar end
-      for _, chip in ipairs(view.chips) do spans[#spans + 1] = chip end
-      for i, a in ipairs(spans) do
-        for j = i + 1, #spans do
-          local b = spans[j]
+      for i, a in ipairs(view.bars) do
+        for j = i + 1, #view.bars do
+          local b = view.bars[j]
           if a.lane == b.lane then
-            assert.truthy(a.x + a.width <= b.x or b.x + b.width <= a.x, ("%s and %s overlap"):format(
-              a.name or a.text, b.name or b.text))
+            assert.truthy(a.x + a.width <= b.x or b.x + b.width <= a.x, ("%s and %s overlap"):format(a.name, b.name))
           end
         end
       end
-      -- The ones you fit are placed first, so the first five get a lane.
-      local fitting = 0
-      for _, bar in ipairs(view.bars) do
-        if bar.fits then fitting = fitting + 1 end
+      -- The ones you fit are placed first: where one you fit and one you
+      -- don't would overlap, yours is nearer the axis.
+      for _, a in ipairs(view.bars) do
+        for _, b in ipairs(view.bars) do
+          if a.fits and not b.fits and a.x < b.x + b.width and b.x < a.x + a.width then
+            assert.truthy(a.lane < b.lane, ("%s below %s"):format(a.name, b.name))
+          end
+        end
       end
-      assert.truthy(fitting >= 5)
     end)
   end)
 
@@ -409,12 +322,9 @@ describe("Together", function()
           end
         end
       end
-      -- The dungeons stay in their 5 lanes, the rest in chips.
-      for _, bar in ipairs(view.bars) do assert.truthy(bar.lane >= 1 and bar.lane <= 5) end
-      for _, chip in ipairs(view.chips) do assert.truthy(chip.lane >= 1 and chip.lane <= 5) end
+      for _, bar in ipairs(view.bars) do assert.truthy(bar.lane >= 1 and bar.lane <= view.lanes) end
       -- Your own label is placed, nearest the axis.
       assert.equal(1, groupAt(view, 24).row)
-      assert.equal("11 friends can play with you · 11 online now", text(view.answer[1]))
     end)
   end)
   describe("selecting friends", function()
@@ -435,41 +345,20 @@ describe("Together", function()
       assert.equal("Clear", view.clear)
     end)
 
-    it("says you can play and where, together", function()
-      local _, clients = crew({ { "Gahz", 24 }, { "Simba", 25 }, { "Simbad", 30 } })
-      local answer = clients[1].core:together(nil, { idOf(clients, 2) }).answer
-      assert.equal("You and Simba can play", text(answer[1]))
-      assert.same({ "can play" }, styled(answer[1], "highlight"))
-      assert.equal("Together: The Deadmines, Shadowfang Keep, Blackfathom Deeps, The Stockade, Excavation Site",
-        text(answer[2]))
-      assert.same({ "Together: " }, styled(answer[2], "muted"))
-    end)
-
-    it("leaves out can play when a selected Member is more than 3 levels away", function()
-      local _, clients = crew({ { "Gahz", 24 }, { "Simba", 25 }, { "Simbad", 30 } })
-      local answer = clients[1].core:together(nil, { idOf(clients, 2), idOf(clients, 3) }).answer
-      assert.equal("You, Simba and Simbad", text(answer[1]))
-      assert.same({}, styled(answer[1], "highlight"))
-      assert.equal("Together: Shadowfang Keep, Blackfathom Deeps, The Stockade", text(answer[2]))
-    end)
-
-    it("says how far away they are when no dungeon fits you both", function()
+    it("fades every dungeon when none fits you both", function()
       local _, clients = crew({ { "Gahz", 24 }, { "Simone", 41 } })
       local view = clients[1].core:together(nil, { idOf(clients, 2) })
-      assert.equal("You and Simone", text(view.answer[1]))
-      assert.equal("No dungeon fits you both yet · Simone is 17 ahead", text(view.answer[2]))
       for name, entry in pairs(entries(view)) do assert.is_true(entry.faded, name) end
     end)
 
-    it("counts any of a selected Member's Characters, and says you all for several", function()
+    it("counts any of a selected Member's Characters, and every selected Member", function()
       local net, clients = crew({ { "Gahz", 24 }, { "Simone", 41 }, { "Oskar", 60 } })
       playAlt(net, clients[2], "Simonette", 25)
       local view = clients[1].core:together(nil, { idOf(clients, 2) })
-      assert.equal("You and Simone can play", text(view.answer[1]))
       assert.is_true(entries(view)["Shadowfang Keep"].shared)
 
       local both = clients[1].core:together(nil, { idOf(clients, 2), idOf(clients, 3) })
-      assert.equal("No dungeon fits you all yet · Oskar is 36 ahead", text(both.answer[2]))
+      for name, entry in pairs(entries(both)) do assert.is_false(entry.shared, name) end
     end)
 
     it("ignores Members it doesn't know, and is off with nothing selected", function()
@@ -477,7 +366,6 @@ describe("Together", function()
       local view = clients[1].core:together(nil, { "nobody" })
       assert.same({}, view.selected)
       assert.is_nil(view.clear)
-      assert.equal("Simba can play with you", text(view.answer[1]))
       for name, entry in pairs(entries(view)) do
         assert.is_false(entry.faded, name)
         assert.is_false(entry.shared, name)
@@ -521,15 +409,14 @@ describe("Together", function()
       for i, section in ipairs(show.sections) do
         local options = {}
         for j, option in ipairs(section.options) do
-          options[j] = ("%s=%s %s%s"):format(option.key, tostring(option.value), option.label,
-            option.sub and (" / " .. option.sub) or "")
+          options[j] = ("%s=%s %s"):format(option.key, tostring(option.value), option.label)
         end
         sections[i] = { title = section.title, options = options }
       end
       assert.same({
         { title = "FRIENDS", options = {
           "togetherOffline=true Offline friends",
-          "togetherAlts=false Alts / Mains and played Characters always show",
+          "togetherAlts=false Alts",
         } },
         { title = "DUNGEONS", options = {
           "togetherNear=false Only near your level (±10)",
@@ -622,13 +509,12 @@ describe("Together", function()
       assert.is_nil(note(true, true))
     end)
 
-    it("leave the answer line and who fits counting everyone", function()
+    it("leave who fits counting everyone", function()
       local net, clients = crew({ { "Gahz", 24 }, { "Simba", 25 } })
       clients[2]:logout()
       net:run(5)
       clients[1].core:setSetting("togetherOffline", false)
       local view = clients[1].core:together()
-      assert.equal("Simba can play with you", text(view.answer[1]))
       assert.equal(1, entries(view)["Shadowfang Keep"].count)
     end)
 
@@ -691,11 +577,8 @@ describe("Together", function()
       assert.is_true(inSpan(xOf(15)))
       assert.is_false(inSpan(xOf(40)))
       -- No span overlaps anything in a lane.
-      local spans = {}
-      for _, bar in ipairs(view.bars) do spans[#spans + 1] = bar end
-      for _, chip in ipairs(view.chips) do spans[#spans + 1] = chip end
       for _, span in ipairs(view.empty.spans) do
-        for _, item in ipairs(spans) do
+        for _, item in ipairs(view.bars) do
           assert.truthy(span.right <= item.x or span.left >= item.x + item.width)
         end
       end
