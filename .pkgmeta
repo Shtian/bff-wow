@@ -52,6 +52,7 @@ ignore:
   - CONTEXT.md
   - PRODUCT.md
   - DESIGN.md
+  - skills-lock.json
   - package.json
   - package-lock.json
   - node_modules
