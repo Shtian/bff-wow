@@ -31,6 +31,7 @@ Core/Spares.lua
 Core/Feed.lua
 Core/Roster.lua
 Core/Together.lua
+Core/Clears.lua
 Core/Goals.lua
 Core/Core.lua
 

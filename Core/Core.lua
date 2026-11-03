@@ -26,6 +26,9 @@ Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
 -- The game's dungeons and the Together tab's line geometry (see together()).
 Core.DUNGEONS = ns.Together.DUNGEONS
 Core.TOGETHER_LAYOUT = ns.Together.LAYOUT
+-- The final bosses known: encounter ID to the name of the instance a kill
+-- clears (see encounterEnded()).
+Core.FINAL_BOSSES = ns.Clears.FINAL_BOSSES
 
 -- A count with thousands separators, for the UI's wording: 2,500.
 Core.grouped = ns.Text.grouped
@@ -44,9 +47,11 @@ end
 -- Character being played stands, read just before own DATA goes out; see
 -- Snapshot.locate), itemLink(itemString) (optional: the game's link for
 -- an item string, or nil while it isn't cached; texts say "an item" then)
--- and findItem(itemGuid) (optional: whether the item is in the bags or
+-- findItem(itemGuid) (optional: whether the item is in the bags or
 -- bank, nil if the game can't say, and whether it's equipped; see
--- Bags.findItem).
+-- Bags.findItem) and finalBosses (optional: encounter ID to instance name,
+-- default Core.FINAL_BOSSES; for tests and the dev sim, while Forever's
+-- IDs aren't known).
 function Core.new(deps)
   for name, kind in pairs(required) do
     if type(deps[name]) ~= kind then
@@ -67,6 +72,7 @@ function Core.new(deps)
     maxLevel = deps.maxLevel,
     ledger = ns.Ledger.new(deps.db, deps.now, deps.random, deps.initialLogin == true),
     utcOffset = type(deps.utcOffset) == "number" and deps.utcOffset or 0,
+    finalBosses = type(deps.finalBosses) == "table" and deps.finalBosses or ns.Clears.FINAL_BOSSES,
     linkUp = false,
   }, Core)
   local itemLink = type(deps.itemLink) == "function" and deps.itemLink or nil
@@ -186,6 +192,63 @@ function Core:updateOwn(character)
     checkGoals(self, ns.Goals.professionsFirstKnown(before, self.ledger:own().characters[character.guid]))
     self.listener("changed")
   end
+end
+
+-- The Member ids of a party as the game reads it ({ guid, name } per
+-- member, either nil when secret): you, and each held Member of the Crew
+-- (not Left) owning a Character with that GUID, or else that name.
+-- Strangers aren't named.
+local function partyMembers(self, party)
+  local you = self.ledger:memberId()
+  local found = { [you] = true }
+  local list = { you }
+  local function owner(guid, name)
+    for id, record in self.ledger:records() do
+      if not record.left then
+        for _, character in pairs(record.characters) do
+          if guid and character.guid == guid then return id end
+          if not guid and name and character.name:lower() == name:lower() then return id end
+        end
+      end
+    end
+  end
+  for _, unit in ipairs(party) do
+    if type(unit) == "table" then
+      local guid = type(unit.guid) == "string" and unit.guid or nil
+      local name = type(unit.name) == "string" and unit.name or nil
+      local id = owner(guid, name) or (guid and name and owner(nil, name))
+      if id and not found[id] then
+        found[id] = true
+        list[#list + 1] = id
+      end
+    end
+  end
+  table.sort(list)
+  return list
+end
+
+-- A boss died (ENCOUNTER_END): { encounterId, success, instanceType (from
+-- GetInstanceInfo: "party", "raid", ...), party ({ guid, name } per
+-- member, you included) }, with any secret value read as nil. A known final
+-- boss killed in a party or raid instance, in a Crew, is a clear: it goes
+-- into your record with the Crew's Members in the party, and out with the
+-- rest of it (not while the link is down: in lockdown). The Crew's first
+-- clear of an instance is a trophy and a Crew-wide Feed entry, like a
+-- goal's. Returns the instance's name, or nil and why not: "unreadable",
+-- "wipe", "notInstance", "unknown" (not a final boss known) or "noCrew".
+function Core:encounterEnded(encounter)
+  local name, reason = ns.Clears.cleared(encounter, self.finalBosses)
+  if not name then return nil, reason end
+  if not self.db.crew then return nil, "noCrew" end
+  local members = partyMembers(self, encounter.party)
+  local now = self.now()
+  local changed = self.ledger:changeOwn(function(record) return ns.Clears.add(record, name, now, members) end)
+  if changed then
+    self.gossip:ownChanged("now")
+    checkGoals(self)
+    self.listener("changed")
+  end
+  return name
 end
 
 -- The panel's rows, ready to render, sorted by order: "online" (default),
@@ -381,9 +444,11 @@ function Core:goals()
   return rows
 end
 
--- The Goals tab's trophies: every Crew goal rung reached, newest first on
--- the shelf and by track in the cabinet, with the latest win and how many
--- others were reached since the tab was last opened (see Goals:trophies).
+-- The Goals tab's trophies: every Crew goal rung reached and every
+-- instance the Crew has cleared, newest first on the shelf, the cabinet's
+-- dungeon and raid grids and goal rungs by track, with the latest win and
+-- how many others were reached since the tab was last opened (see
+-- Goals:trophies).
 -- Each trophy also has date, its time as a short local date: "3 Nov".
 -- Call openGoals() first, so that count holds through a visit.
 function Core:trophies()

@@ -1,8 +1,10 @@
 -- GoalsTab: the panel's Goals tab as a trophy cabinet, drawn from Core's
 -- trophies() and goals(). On top the latest win in a gold plate, then the
 -- trophy shelf (the newest medals and a See all tile), then Working on: a
--- tile per track with its progress. See all opens the full cabinet, every
--- track's medals oldest first, in the same tab; Back returns. Before the
+-- tile per track with its progress. Trophies are Crew goal rungs and
+-- dungeon and raid clears. See all opens the full cabinet in the same tab:
+-- a slot per dungeon and per raid, lit once cleared, then every track's
+-- medals oldest first; Back returns. Before the
 -- baseline has settled, or with nothing reached, a composed empty state
 -- takes the latest win's and the shelf's place. Track hues and medal tiers
 -- are Skin's trophy colours; Core decides which tier and what is fresh.
@@ -125,14 +127,35 @@ local function drawHeading(text, count, y)
   return y - HEADING
 end
 
+-- A trophy's icon: a profession's own, a goal track's, or a clear's.
+local function iconOf(trophy)
+  return trophy.icon or Skin.GOAL_ICONS[trophy.track] or Skin.CLEAR_ICONS[trophy.kind]
+end
+
+-- A goal rung: the track, the value and the date. A clear: the instance,
+-- the date and who was there. An empty slot: the instance, its levels.
 local function showMedalTooltip(medal)
-  local trophy = medal.trophy
-  if not trophy then return end
-  local quality = Skin.TROPHY_QUALITIES[trophy.quality] or TEXT
+  local trophy, slot = medal.trophy, medal.slot
+  if not (trophy or slot) then return end
   GameTooltip:SetOwner(medal, "ANCHOR_RIGHT")
-  GameTooltip:AddLine(trophy.title, TEXT[1], TEXT[2], TEXT[3])
-  GameTooltip:AddLine(trophy.label, quality[1], quality[2], quality[3])
-  GameTooltip:AddLine("Reached " .. trophy.date, MUTED[1], MUTED[2], MUTED[3])
+  if not trophy then
+    GameTooltip:AddLine(slot.name, TEXT[1], TEXT[2], TEXT[3])
+    GameTooltip:AddLine("Levels " .. slot.levels, MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:AddLine("Not cleared yet", DIM[1], DIM[2], DIM[3])
+    return GameTooltip:Show()
+  end
+  local quality = Skin.TROPHY_QUALITIES[trophy.quality] or TEXT
+  if trophy.track == "clears" then
+    GameTooltip:AddLine(trophy.instance, quality[1], quality[2], quality[3])
+    GameTooltip:AddLine("Cleared " .. trophy.date, MUTED[1], MUTED[2], MUTED[3])
+    if #trophy.party > 0 then
+      GameTooltip:AddLine(table.concat(trophy.party, ", "), TEXT[1], TEXT[2], TEXT[3], true)
+    end
+  else
+    GameTooltip:AddLine(trophy.title, TEXT[1], TEXT[2], TEXT[3])
+    GameTooltip:AddLine(trophy.label, quality[1], quality[2], quality[3])
+    GameTooltip:AddLine("Reached " .. trophy.date, MUTED[1], MUTED[2], MUTED[3])
+  end
   GameTooltip:Show()
 end
 
@@ -160,19 +183,43 @@ local function createMedal()
   return medal
 end
 
-local function drawMedal(trophy, width)
+local function newMedal(width)
   local medal = take(pool("medals", createMedal))
-  medal.trophy = trophy
   medal:SetWidth(width)
   medal.value:SetWidth(width)
   medal.date:SetWidth(width)
+  medal.picture.picture:SetDesaturated(false)
+  medal.picture.picture:SetAlpha(1)
+  medal.foot:Show()
+  return medal
+end
+
+local function drawMedal(trophy, width)
+  local medal = newMedal(width)
+  medal.trophy, medal.slot = trophy, nil
   local quality = Skin.TROPHY_QUALITIES[trophy.quality] or MUTED
-  medal.picture:SetPicture(trophy.icon or Skin.GOAL_ICONS[trophy.track])
+  medal.picture:SetPicture(iconOf(trophy))
   medal.picture.edge:SetColorTexture(quality[1], quality[2], quality[3], 1)
   medal.foot:SetColorTexture(quality[1], quality[2], quality[3], 1)
   medal.value:SetText(trophy.label)
   Skin.color(medal.value, trophy.fresh and GOLD or TEXT)
   medal.date:SetText(trophy.date)
+  return medal
+end
+
+-- A dungeon or raid slot in the cabinet: its clear's medal, or greyed
+-- with its name and level range until cleared.
+local function drawSlot(slot, width)
+  if slot.trophy then return drawMedal(slot.trophy, width) end
+  local medal = newMedal(width)
+  medal.trophy, medal.slot = nil, slot
+  medal.picture:SetPicture(Skin.CLEAR_ICONS[slot.kind], Skin.BORDER)
+  medal.picture.picture:SetDesaturated(true)
+  medal.picture.picture:SetAlpha(0.35)
+  medal.foot:Hide()
+  medal.value:SetText(slot.label)
+  Skin.color(medal.value, DIM)
+  medal.date:SetText(slot.levels)
   return medal
 end
 
@@ -232,7 +279,7 @@ local function drawPlate(trophies, y, width)
   plate:ClearAllPoints()
   plate:SetPoint("TOPLEFT", view.content, "TOPLEFT", INSET, y)
   plate:SetWidth(width)
-  plate.picture:SetPicture(latest.icon or Skin.GOAL_ICONS[latest.track], GOLD)
+  plate.picture:SetPicture(iconOf(latest), GOLD)
   local textWidth = width - PLATE_ICON - 3 * PLATE_PAD - 2
   plate.title:SetWidth(textWidth)
   plate.title:SetText(latest.text)
@@ -400,15 +447,16 @@ local function drawGoalsView(core, trophies, width)
     y = drawHeading("TROPHY SHELF", trophies.count, y)
     local shelf = {}
     for i = 1, math.min(SHELF, #trophies.shelf) do shelf[i] = drawMedal(trophies.shelf[i], SHELF_MEDAL) end
-    if #trophies.shelf > SHELF then
-      seeAll = seeAll or createSeeAll()
-      seeAll:ClearAllPoints()
-      seeAll:SetWidth(SHELF_MEDAL)
-      seeAll.more:SetText(("+%d"):format(#trophies.shelf - SHELF))
-      seeAll.total:SetText(("%d trophies"):format(trophies.count))
-      seeAll:Show()
-      shelf[#shelf + 1] = seeAll
-    end
+    -- Always there: the cabinet also holds the dungeons and raids not
+    -- cleared yet.
+    seeAll = seeAll or createSeeAll()
+    seeAll:ClearAllPoints()
+    seeAll:SetWidth(SHELF_MEDAL)
+    local more = #trophies.shelf - SHELF
+    seeAll.more:SetText(more > 0 and ("+%d"):format(more) or "…")
+    seeAll.total:SetText(("%d %s"):format(trophies.count, trophies.count == 1 and "trophy" or "trophies"))
+    seeAll:Show()
+    shelf[#shelf + 1] = seeAll
     y = flow(shelf, SHELF_MEDAL, SHELF_GAP, y, width) - 6
   end
   y = drawHeading("WORKING ON", nil, y)
@@ -446,7 +494,15 @@ local function drawCabinet(trophies, width)
   cabinetHead:SetPoint("TOPLEFT", view.content, "TOPLEFT", 0, 0)
   cabinetHead:SetPoint("RIGHT", view.content, "RIGHT")
   cabinetHead:Show()
-  local y = drawHeading("GOALS REACHED", trophies.count, -CABINET_HEAD - 4)
+  local y = -CABINET_HEAD - 4
+  for _, grid in ipairs({ { "DUNGEONS CLEARED", trophies.dungeons }, { "RAIDS CLEARED", trophies.raids } }) do
+    local slots = grid[2]
+    y = drawHeading(grid[1], ("%d / %d"):format(slots.cleared, slots.total), y)
+    local medals = {}
+    for i, slot in ipairs(slots.slots) do medals[i] = drawSlot(slot, CABINET_MEDAL) end
+    y = flow(medals, CABINET_MEDAL, CABINET_GAP, y, width) - TRACK_GAP
+  end
+  y = drawHeading("GOALS REACHED", trophies.goalsReached, y)
   for _, group in ipairs(trophies.cabinet) do
     local line = take(pool("trackLines", createTrackLine))
     line:SetPoint("TOPLEFT", view.content, "TOPLEFT", 0, y)

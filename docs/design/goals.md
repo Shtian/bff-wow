@@ -60,6 +60,8 @@ Track names: "Crew levels", "Everyone at level 30" (the next rung; "Everyone at 
 - **Feed** turns reached rungs into `goal` entries (`Feed:goalsReached`), and While you were away lists them on their own as `summary.goals` (`{ text, time }`, newest first), shown under "Crew goals" in gold.
 - **Core:** `goals()` for the Working on tiles: a row per track, with `reached` (how many rungs it has) and `last.date` ("3 Nov"). `trophies()` for the rest: `{ settled, count, shelf (newest first), cabinet ({ track, title, trophies } per track with any, oldest first), latest, sinceSeen }`, a trophy being `{ track, title, rung, label, text (its Feed entry's), time, date, quality, fresh, icon }`. Core decides each trophy's quality and whether it's fresh; Skin maps them to colours. `openGoals()` on every draw of the tab and `leaveGoals()` when it's left make a **Goals visit**, like the Feed's: `sinceSeen` counts from the tab's previous opening through the visit. When the tab was last opened is kept in `db.goals.seen`, so a new Crew starts again. `feedEntry` and `awaySummary` carry goal entries as they do others.
 
+Clears are trophies too: see `docs/design/trophies.md`.
+
 ## Dev
 
 The `/bffdev` console's **Goal** button makes the first simulated Member online die as often as the Crew needs to reach the next Crew deaths rung. `/bffdev toast` includes a sample goal toast.

@@ -10,7 +10,9 @@
 -- per client. Reached rungs are kept with when they were reached and stay
 -- reached if progress drops. Rungs passed when the first sync in a Crew
 -- has settled are a silent baseline. Nothing here names a Member.
--- See docs/design/goals.md.
+-- Also the Crew's dungeon and raid clears (from the records, by Clears),
+-- kept as trophies the same way: each instance's first clear, which does
+-- name its party. See docs/design/goals.md and docs/design/trophies.md.
 
 local _, ns = ...
 
@@ -35,6 +37,11 @@ local FRESH = 3 * 24 * 60 * 60
 local QUALITIES = { "uncommon", "uncommon", "rare", "rare", "epic", "epic" }
 local TOP_QUALITY = "legendary"
 local PROFESSIONS_QUALITY = "rare"
+-- A clear's trophy: a dungeon's is epic, a raid's legendary.
+local CLEAR_QUALITIES = { dungeon = "epic", raid = "legendary" }
+local CLEAR_TITLES = { dungeon = "Dungeons cleared", raid = "Raids cleared" }
+
+local Clears = ns.Clears
 
 -- The twelve, as Every profession in the Crew counts them.
 local PROFESSIONS = ns.Professions.ALL
@@ -218,8 +225,10 @@ end
 
 -- db is the whole saved table; Goals keeps `goals`: reached (per track,
 -- rung to when it was reached), quiet (per track, the rungs reached
--- without news: the baseline's, or by who counts changing), baselined (the
--- silent baseline is done) and seen (when the Goals tab was last opened).
+-- without news: the baseline's, or by who counts changing), clears (per
+-- instance name, the Crew's clear: { time (the first), members (a set of
+-- Member ids credited), quiet }), baselined (the silent baseline is done)
+-- and seen (when the Goals tab was last opened).
 function Goals.new(db, ledger, now, maxLevel)
   local self = setmetatable({ db = db, ledger = ledger, now = now, maxLevel = maxLevel }, Goals)
   self:load()
@@ -231,6 +240,7 @@ function Goals:load()
   local saved = self.db.goals or {}
   saved.reached = saved.reached or {}
   saved.quiet = saved.quiet or {}
+  saved.clears = saved.clears or {}
   for _, track in ipairs(Goals.TRACKS) do
     saved.reached[track] = saved.reached[track] or {}
     saved.quiet[track] = saved.quiet[track] or {}
@@ -341,15 +351,44 @@ local function recordLadder(self, track, progress, quiet)
   return { track = track, rung = newest, text = TRACK[track].text(newest, top) }
 end
 
--- Records every rung progress has passed. Returns the newest per track, as
--- { track, rung, text } (text: the Feed entry's), unless quiet.
+-- The Crew's clears in the records: a first clear of an instance is a new
+-- trophy, at the earliest clear's time; a later or earlier one only adds
+-- who's credited, or moves the time back. Returns the new trophies as {
+-- track "clears", rung (the instance's name), text }, in level order,
+-- unless quiet.
+local function recordClears(self, records, quiet)
+  local saved = self.db.goals.clears
+  local new = {}
+  for name, clear in pairs(Clears.collect(records)) do
+    local had = saved[name]
+    if had then
+      had.time = math.min(had.time, clear.time)
+      for id in pairs(clear.members) do had.members[id] = true end
+    else
+      saved[name] = { time = clear.time, members = clear.members, quiet = quiet or nil }
+      if not quiet then new[#new + 1] = Clears.instance(name) end
+    end
+  end
+  table.sort(new, function(x, y) return x.index < y.index end)
+  local entries = {}
+  for i, dungeon in ipairs(new) do
+    entries[i] = { track = "clears", rung = dungeon.name, text = Clears.text(dungeon.name) }
+  end
+  return entries
+end
+
+-- Records every rung progress has passed, and every clear. Returns the
+-- newest per track, then the new clears, as { track, rung, text } (text:
+-- the Feed entry's), unless quiet.
 local function record(self, quiet)
-  local progress = Goals.progress(counted(self))
+  local records = counted(self)
+  local progress = Goals.progress(records)
   local reached = {}
   for _, track in ipairs(Goals.TRACKS) do
     local entry = (TRACK[track].record or recordLadder)(self, track, progress, quiet)
     if entry and not quiet then reached[#reached + 1] = entry end
   end
+  for _, entry in ipairs(recordClears(self, records, quiet)) do reached[#reached + 1] = entry end
   return reached
 end
 
@@ -492,6 +531,65 @@ local function professionTrophies(self, _, progress)
 end
 TRACK.professions.trophies = professionTrophies
 
+-- Who a clear credits, by name: "You" first, then the others by name.
+-- A Member no longer held (Removed) isn't named.
+local function partyNames(self, members)
+  local you = self.ledger:memberId()
+  local names = {}
+  for id in pairs(members) do
+    local held = self.ledger:record(id)
+    if held and id ~= you then names[#names + 1] = ns.Roster.memberName(held, self.now()) end
+  end
+  table.sort(names, function(x, y) return x:lower() < y:lower() end)
+  if members[you] then table.insert(names, 1, "You") end
+  return names
+end
+
+-- The Crew's clears as trophies, by instance name.
+local function clearTrophies(self)
+  local list = {}
+  for name, saved in pairs(self.db.goals.clears) do
+    local dungeon = Clears.instance(name)
+    if dungeon then
+      local quiet = saved.quiet == true
+      list[name] = {
+        track = "clears",
+        kind = dungeon.kind,
+        instance = name,
+        title = CLEAR_TITLES[dungeon.kind],
+        rung = dungeon.index,
+        label = Clears.label(name),
+        text = Clears.text(name),
+        time = saved.time,
+        quality = CLEAR_QUALITIES[dungeon.kind],
+        quiet = quiet,
+        fresh = not quiet and self.now() - saved.time < FRESH,
+        party = partyNames(self, saved.members),
+      }
+    end
+  end
+  return list
+end
+
+-- A cabinet grid: a slot per instance of a kind, in level order.
+local function grid(kind, trophies)
+  local result = { cleared = 0, slots = {} }
+  for i, dungeon in ipairs(Clears.instances(kind)) do
+    local won = trophies[dungeon.name]
+    result.slots[i] = {
+      name = dungeon.name,
+      label = Clears.label(dungeon.name),
+      kind = kind,
+      levels = Clears.levels(dungeon),
+      cleared = won ~= nil,
+      trophy = won,
+    }
+    if won then result.cleared = result.cleared + 1 end
+  end
+  result.total = #result.slots
+  return result
+end
+
 -- The Goals tab was opened: call it on every draw. It starts a visit if
 -- none is open, and remembers when the tab was opened before it, for
 -- trophies()' sinceSeen, through the visit.
@@ -513,12 +611,20 @@ end
 -- ("uncommon", "rare", "epic" or "legendary"), quiet (reached without
 -- news: the baseline's, or by who counts changing), fresh (reached in the
 -- last 3 days and not quiet, so still news), icon (Every profession's: the profession's) }.
--- Returns { settled (the baseline is taken; until then nothing is
--- reached), count, shelf (every trophy, newest first), cabinet (a group {
--- track, title, trophies (oldest first) } per track with any, in
--- Goals.TRACKS order), latest (the newest trophy, or nil) and sinceSeen
--- (how many others were reached, not quietly, since the Goals tab was
--- last opened: 0 if it never was) }.
+-- A clear's trophy has track "clears", kind ("dungeon" or "raid"),
+-- instance (its name), title ("Dungeons cleared" or "Raids cleared"), rung
+-- (its place in the dungeon table), label ("Deadmines"), text, time (the
+-- Crew's first clear), quality (a dungeon's "epic", a raid's
+-- "legendary"), quiet, fresh, and party (who's credited, by name: "You"
+-- first). Returns { settled (the baseline is taken; until then nothing is
+-- reached), count, goalsReached (how many of them are goal rungs), shelf
+-- (every trophy, newest first), cabinet (a group { track, title, trophies
+-- (oldest first) } per goal track with any, in Goals.TRACKS order),
+-- dungeons and raids (the cabinet's grids: { cleared, total, slots }, a
+-- slot per instance in level order: { name, label, kind, levels ("17–26"),
+-- cleared, trophy (nil until cleared) }), latest (the newest trophy, or
+-- nil) and sinceSeen (how many others were reached, not quietly, since
+-- the Goals tab was last opened: 0 if it never was) }.
 function Goals:trophies()
   local result = { settled = self.db.goals.baselined == true, count = 0, shelf = {}, cabinet = {}, sinceSeen = 0 }
   local progress = Goals.progress(counted(self))
@@ -531,6 +637,12 @@ function Goals:trophies()
       for _, item in ipairs(list) do result.shelf[#result.shelf + 1] = item end
     end
   end
+  result.goalsReached = #result.shelf
+  order.clears = #Goals.TRACKS + 1
+  local clears = clearTrophies(self)
+  for _, item in pairs(clears) do result.shelf[#result.shelf + 1] = item end
+  result.dungeons = grid("dungeon", clears)
+  result.raids = grid("raid", clears)
   -- Newest first; rungs reached together by track, the highest first.
   table.sort(result.shelf, function(x, y)
     if x.time ~= y.time then return x.time > y.time end

@@ -196,6 +196,8 @@ eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 -- After a real login the bags read as empty until the first of these, so
 -- Core checks Spare items only on it.
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
+-- A boss died: Core decides whether it's a clear.
+eventFrame:RegisterEvent("ENCOUNTER_END")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_ENTERING_WORLD" and not ns.core then
     start((...))
@@ -203,6 +205,8 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     if ns.core then itemInfoReceived() end
   elseif event == "BAG_UPDATE_DELAYED" then
     if ns.core then ns.core:bagsUpdated() end
+  elseif event == "ENCOUNTER_END" then
+    if ns.core then ns.core:encounterEnded(ns.Snapshot.encounter(...)) end
   elseif event == "PLAYER_REGEN_ENABLED" then
     eventFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
     local summary = pendingAway

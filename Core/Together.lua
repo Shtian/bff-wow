@@ -12,7 +12,12 @@ ns.Together = Together
 -- "attunement" or "raid"; forever marks the ones new in WoW: Forever (from
 -- Blizzard's "Explore the New Dungeons of World of Warcraft: Forever", Oct
 -- 20 2026). Classic ranges are the usual recommended ones; the two new
--- raids' levels aren't published yet and are assumed to be 60.
+-- raids' levels aren't published yet and are assumed to be 60. finals are
+-- the DungeonEncounterIDs (ENCOUNTER_END's encounterID) of the boss whose
+-- kill clears it, as far as they're known (docs/research/boss-kills.md):
+-- the three classic raids' are classic's, still to be confirmed on Forever.
+-- Names are keys too: Members' records keep their clears by them (docs/adr/
+-- 0005), so renaming an instance orphans its clears.
 local DUNGEONS = {
   { name = "Ragefire Chasm", from = 13, to = 18, where = "Orgrimmar" },
   { name = "Hall of Thanes", from = 13, to = 18, where = "beneath Ironforge", forever = true },
@@ -47,9 +52,9 @@ local DUNGEONS = {
   { name = "Stratholme", from = 58, to = 60, where = "Eastern Plaguelands" },
   { name = "Upper Blackrock Spire", from = 58, to = 60, where = "Blackrock Mountain" },
   { name = "Shaper's Terrace", from = 58, to = 60, where = "Un'Goro Crater", forever = true },
-  { name = "Molten Core", from = 60, to = 60, where = "Blackrock Mountain", kind = "raid", size = 40 },
-  { name = "Onyxia's Lair", from = 60, to = 60, where = "Dustwallow Marsh", kind = "raid", size = 40 },
-  { name = "Zul'Gurub", from = 60, to = 60, where = "Stranglethorn Vale", kind = "raid", size = 20 },
+  { name = "Molten Core", from = 60, to = 60, where = "Blackrock Mountain", kind = "raid", size = 40, finals = { 672 } },
+  { name = "Onyxia's Lair", from = 60, to = 60, where = "Dustwallow Marsh", kind = "raid", size = 40, finals = { 1084 } },
+  { name = "Zul'Gurub", from = 60, to = 60, where = "Stranglethorn Vale", kind = "raid", size = 20, finals = { 793 } },
   { name = "The Barrow Deeps", from = 60, to = 60, where = "Mount Hyjal", kind = "raid", size = 10, forever = true },
   { name = "Hyjal Summit", from = 60, to = 60, where = "Mount Hyjal", kind = "raid", size = 20, forever = true },
 }

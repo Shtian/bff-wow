@@ -137,6 +137,13 @@ Skin.GOAL_ICONS = {
   everyoneRank = "Interface\\Icons\\INV_Misc_Note_06",
 }
 
+-- A clear's medal icon, by kind: a dungeon's and a raid's (DESIGN.md,
+-- Medal). Classic icons, so Forever has them.
+Skin.CLEAR_ICONS = {
+  dungeon = "Interface\\Icons\\INV_Misc_Head_Human_01",
+  raid = "Interface\\Icons\\INV_Misc_Head_Dragon_Black",
+}
+
 -- A square picture `size` wide: an opaque back (so a line behind it is
 -- covered), the edge, and the icon inset 1px with its own bevel cropped.
 -- :SetKind(kind, icon) draws a Feed kind, with the entry's own icon if it
