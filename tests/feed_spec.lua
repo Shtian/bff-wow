@@ -267,12 +267,81 @@ describe("The Feed", function()
     net:run(3)
 
     local changed = b:count("changed")
-    b.core:feedSeen()
+    b.core:openFeed()
     assert.equal(0, b.core:feed().unseen)
+    assert.equal(0, b.core:unseen())
     assert.is_true(entries(b)[1].seen)
     assert.equal(changed + 1, b:count("changed"))
-    b.core:feedSeen()
+    b.core:openFeed()
     assert.equal(changed + 1, b:count("changed"))
+  end)
+
+  describe("visit", function()
+    -- A net where Bob has chat lines and toasts off, so Ann's entries
+    -- stay unseen for him.
+    local function quiet()
+      local net, clients = crew({ "Ann", "Bob" })
+      local b = clients[2]
+      b.core:setChatLines(false)
+      b.core:setToasts(false)
+      return net, clients[1], b
+    end
+
+    -- The texts of the client's New entries.
+    local function new(client)
+      local result = {}
+      for _, entry in ipairs(entries(client)) do
+        if entry.new then result[#result + 1] = entry.text end
+      end
+      return result
+    end
+
+    it("keeps what was unseen on opening the Feed New until you leave it", function()
+      local net, a, b = quiet()
+      a:play({ level = 11 })
+      net:run(3)
+      assert.same({}, new(b))
+
+      b.core:openFeed()
+      assert.same({ "Ann dinged 11" }, new(b))
+      b.core:openFeed()
+      assert.same({ "Ann dinged 11" }, new(b))
+      b.core:leaveFeed()
+      assert.same({}, new(b))
+      b.core:openFeed()
+      assert.same({}, new(b))
+    end)
+
+    it("makes an entry New that arrives during the visit, unseen at the next redraw", function()
+      local net, a, b = quiet()
+      b.core:openFeed()
+      a:play({ level = 11 })
+      net:run(3)
+      b.core:openFeed()
+      assert.same({ "Ann dinged 11" }, new(b))
+    end)
+
+    it("doesn't make an entry New that a Live event already showed", function()
+      local net, a, b = quiet()
+      b.core:setChatLines(true)
+      b.core:openFeed()
+      a:play({ level = 11 })
+      net:run(3)
+      b.core:openFeed()
+      assert.same({}, new(b))
+    end)
+
+    it("makes your own entry New while a Reaction to it is unseen", function()
+      local net, a, b = quiet()
+      b:play({ level = 11 })
+      net:run(3)
+      local ding = entries(a)[1]
+      assert.is_true(a.core:react(ding.key))
+      net:run(3)
+
+      b.core:openFeed()
+      assert.same({ "You dinged 11" }, new(b))
+    end)
   end)
 
   it("drops a Removed Member's entries, and makes no joined entry on re-adding them", function()
@@ -316,7 +385,8 @@ describe("The Feed", function()
     assert.same({ "You died 2 times" }, texts(a))
   end)
 
-  it("groups entries by day, newest first", function()
+  it("groups entries by day, newest first, each titled", function()
+    -- The clock starts on Thursday 1 January 1970.
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     a:play({ level = 11 })
@@ -324,13 +394,32 @@ describe("The Feed", function()
     net:step(net:now() + DAY)
     a:play({ level = 12 })
     net:run(3)
+    net:step(net:now() + DAY)
+    a:play({ level = 13 })
+    net:run(3)
 
     local feed = b.core:feed()
-    assert.equal(2, #feed.days)
+    assert.equal(3, #feed.days)
     assert.equal(0, feed.days[1].daysAgo)
     assert.equal(1, feed.days[2].daysAgo)
-    assert.equal("Ann dinged 12", feed.days[1].entries[1].text)
-    assert.equal("Ann dinged 11", feed.days[2].entries[1].text)
+    assert.equal("Ann dinged 13", feed.days[1].entries[1].text)
+    assert.equal("Ann dinged 12", feed.days[2].entries[1].text)
+    assert.same({ "TODAY", "YESTERDAY", "THURSDAY 01 JANUARY" },
+      { feed.days[1].title, feed.days[2].title, feed.days[3].title })
+  end)
+
+  it("highlights the news: max level, joined, Crew goals and maxed professions", function()
+    local net, clients = crew({ "Ann", "Bob" }, { Ann = 58 })
+    local a, b = clients[1], clients[2]
+    a:play({ level = 59 })
+    net:run(3)
+    a:play({ level = 60 })
+    net:run(3)
+    local highlighted = {}
+    for _, entry in ipairs(entries(b)) do highlighted[entry.text] = entry.highlight end
+    assert.is_false(highlighted["Ann dinged 59"])
+    assert.is_true(highlighted["Ann reached max level!"])
+    assert.is_true(highlighted["You joined the Crew"])
   end)
 
   it("keeps entries for 30 days", function()

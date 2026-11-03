@@ -346,7 +346,7 @@ local function unseenReactions(self, entry)
 end
 
 -- Marks every entry and Reaction seen. Returns true if any wasn't.
-function Feed:markAllSeen()
+local function markAllSeen(self)
   local any = false
   for _, entry in ipairs(self.db.feed) do
     if not entry.seen then
@@ -359,6 +359,25 @@ function Feed:markAllSeen()
     end
   end
   return any
+end
+
+-- The Feed tab is open: a visit starts, if one isn't open already. Every
+-- entry unseen now, or with an unseen Reaction, is New until the visit
+-- ends, and is then marked seen. Called on every draw of the tab, so what
+-- arrives during the visit and is still unseen at the next draw is New
+-- too. Returns true if anything was unseen.
+function Feed:open()
+  local visit = self.visit or {}
+  self.visit = visit
+  for _, entry in ipairs(self.db.feed) do
+    if not entry.seen or #unseenReactions(self, entry) > 0 then visit[entry] = true end
+  end
+  return markAllSeen(self)
+end
+
+-- The Feed tab was left: the visit ends, and nothing is New.
+function Feed:leave()
+  self.visit = nil
 end
 
 -- How many entries and Reactions haven't been seen.
@@ -706,14 +725,17 @@ function Feed:takeSummary(spares)
 end
 
 -- An entry as handed out: a fresh table UI may keep. Seen is false while
--- it has unseen Reactions. reaction is the one that applies, key what
--- react() takes, reactors who reacted ({ memberId, name, you }), reacted
--- whether you have, and canReact whether you can at all.
+-- it has unseen Reactions, highlight says it's the news, and new that it
+-- is New in the open Feed visit. reaction is the one that applies, key
+-- what react() takes, reactors who reacted ({ memberId, name, you }, name
+-- being "You" for you), reacted whether you have, and canReact whether
+-- you can at all.
 function Feed:describe(entry)
   local me = self.ledger:memberId()
   local reactors = {}
   for i, id in ipairs(reactorIds(self, entry)) do
-    reactors[i] = { memberId = id, name = reactorName(self, id), you = id == me }
+    local you = id == me
+    reactors[i] = { memberId = id, name = you and "You" or reactorName(self, id), you = you }
   end
   local key = Reactions.keyOf(entry)
   return {
@@ -731,6 +753,8 @@ function Feed:describe(entry)
     icon = entry.icon,
     own = entry.own == true,
     seen = entry.seen == true and #unseenReactions(self, entry) == 0,
+    highlight = HIGHLIGHTED[entry.kind] == true,
+    new = self.visit ~= nil and self.visit[entry] == true,
     reaction = Reactions.forKind(entry.kind),
     key = key,
     reactors = reactors,
@@ -740,7 +764,8 @@ function Feed:describe(entry)
 end
 
 -- The log newest first, grouped by day (utcOffset shifts day boundaries
--- to local time): { days = { { daysAgo, time, entries } }, unseen }.
+-- to local time): { days = { { daysAgo, time, title, entries } }, unseen },
+-- title being "TODAY", "YESTERDAY" or "MONDAY 02 NOVEMBER".
 function Feed:view(utcOffset)
   local today = math.floor((self.now() + utcOffset) / DAY)
   local days = {}
@@ -755,6 +780,9 @@ function Feed:view(utcOffset)
     end
     group.entries[#group.entries + 1] = self:describe(entry)
   end
-  for _, group in ipairs(days) do group.day = nil end
+  for _, group in ipairs(days) do
+    group.day = nil
+    group.title = ns.Text.dayTitle(group.daysAgo, group.time, utcOffset)
+  end
   return { days = days, unseen = self:unseen() }
 end

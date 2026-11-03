@@ -52,7 +52,7 @@ The log of noteworthy things that happened to the Crew's Characters, such as din
 _Avoid_: News, timeline, activity log
 
 **New (Feed entry)**:
-A Feed entry, or a Reaction to your own, that was unseen when you opened the Feed. It stays New until you leave the Feed, though opening the Feed is what makes it seen.
+A Feed entry, or a Reaction to your own, that was unseen when you opened the Feed, or that arrived while it was open and was still unseen when it redrew. It stays New until you leave the Feed (the end of that **Feed visit**), though opening the Feed is what makes it seen. One a Live event already showed is never New.
 _Avoid_: Fresh, unread
 
 **While you were away**:

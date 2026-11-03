@@ -45,11 +45,13 @@ local function entry(client, text)
   error(("%s has no entry %q"):format(client.name, text))
 end
 
--- Who reacted to an entry, by name ("You" for yourself), in order.
+-- Who reacted to an entry, by name ("You" for yourself, marked you), in
+-- order.
 local function reactors(client, text)
   local names = {}
   for i, reactor in ipairs(entry(client, text).reactors) do
-    names[i] = reactor.you and "You" or reactor.name
+    assert.equal(reactor.name == "You", reactor.you)
+    names[i] = reactor.name
   end
   return names
 end
@@ -206,7 +208,7 @@ describe("Reactions", function()
     assert.same({}, events(a, "reaction"))
     assert.equal(1, a.core:unseen())
     assert.is_false(entry(a, "You dinged 11").seen)
-    a.core:feedSeen()
+    a.core:openFeed()
     assert.equal(0, a.core:unseen())
     assert.is_true(entry(a, "You dinged 11").seen)
   end)

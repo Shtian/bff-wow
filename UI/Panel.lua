@@ -107,7 +107,6 @@ local ONLINE = Skin.ONLINE
 local ERROR = { 1, 0.42, 0.42 }
 
 local SORTS = { { "online", "Online first" }, { "level", "Level" }, { "name", "Name" } }
-local HIGHLIGHT = Skin.FEED_HIGHLIGHT
 
 local core
 local frame
@@ -123,15 +122,13 @@ local professionsView
 local footer
 local rowFrames = {}
 local altFrames = {}
--- What the UI itself remembers: the tab, the sort, which Members show
--- Alts, and which Feed entries were unseen when the Feed was opened (they
--- keep their "new" tag until you leave the Feed).
+-- What the UI itself remembers: the tab, the sort and which Members show
+-- Alts. Which Feed entries are New is Core's (openFeed, leaveFeed).
 local tab = "roster"
 -- The When tab's Member, or nil for the Crew.
 local whenMember
 local order = "online"
 local expanded = {}
-local fresh = {}
 
 local classColor = Skin.classColor
 
@@ -701,23 +698,13 @@ local function createFeedEntry()
   return entry
 end
 
-local function dayTitle(day)
-  if day.daysAgo == 0 then return "TODAY" end
-  if day.daysAgo == 1 then return "YESTERDAY" end
-  return date("%A %d %B", day.time):upper()
-end
-
-local function entryKey(entry)
-  return ("%d:%s:%s:%s"):format(entry.time, entry.memberId or "", entry.kind, entry.guid or "")
-end
-
 -- Who reacted, after the time: the Reaction's icon and their names, You
 -- a step brighter than the others.
 local function reactorsText(entry)
   if #entry.reactors == 0 then return "" end
   local names = {}
   for i, reactor in ipairs(entry.reactors) do
-    names[i] = reactor.you and Skin.hex(TEXT) .. "You|r" or reactor.name
+    names[i] = reactor.you and Skin.hex(TEXT) .. reactor.name .. "|r" or reactor.name
   end
   return Skin.reactionGlyph(entry.reaction, 12) .. " " .. table.concat(names, ", ")
 end
@@ -731,24 +718,16 @@ local function drawFeedEntry(line, entry)
   end
   line.node:SetKind(entry.kind, entry.icon)
   line.text:SetText(entry.text)
-  Skin.color(line.text, HIGHLIGHT[entry.kind] and GOLD or entry.own and MUTED or TEXT)
+  Skin.color(line.text, entry.highlight and GOLD or entry.own and MUTED or TEXT)
   line.time:SetText(date("%H:%M", entry.time))
-  local isNew = fresh[entryKey(entry)]
   line.new:ClearAllPoints()
   line.new:SetPoint("LEFT", line.text, "LEFT", line.text:GetStringWidth() + 6, 0)
-  line.new:SetShown(isNew == true)
+  line.new:SetShown(entry.new)
 end
 
--- Draws the Feed and marks it seen; what was unseen keeps its tag while
--- the Feed stays open.
+-- Draws the Feed, which Panel.refresh has opened (core:openFeed).
 local function drawFeed(feed)
   if not feedView then createFeedView() end
-  for _, day in ipairs(feed.days) do
-    for _, entry in ipairs(day.entries) do
-      if not entry.seen then fresh[entryKey(entry)] = true end
-    end
-  end
-
   local y, dayCount, entryCount = -INSET, 0, 0
   for _, day in ipairs(feed.days) do
     dayCount = dayCount + 1
@@ -756,7 +735,7 @@ local function drawFeed(feed)
     chip:ClearAllPoints()
     chip:SetPoint("TOPLEFT", feedView.content, "TOPLEFT", INSET - 4, y)
     chip:SetPoint("RIGHT", feedView.content, "RIGHT", -INSET, 0)
-    chip.label:SetText(dayTitle(day))
+    chip.label:SetText(day.title)
     chip:Show()
     y = y - FEED_DAY
     for _, entry in ipairs(day.entries) do
@@ -780,7 +759,6 @@ local function drawFeed(feed)
   feedView.content:SetHeight(math.max(-y + INSET, 1))
   feedView:Show()
   updateThumb(feedView)
-  if feed.unseen > 0 then core:feedSeen() end
 end
 
 -- Goals: a row per track, scrolling within the panel's fixed height.
@@ -1650,7 +1628,7 @@ local function create()
   frame:SetPoint("CENTER")
   frame:SetHeight(HEIGHT)
   frame:SetScript("OnShow", Panel.refresh)
-  frame:SetScript("OnHide", function() fresh = {} end)
+  frame:SetScript("OnHide", function() core:leaveFeed() end)
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
     sinceRedraw = sinceRedraw + elapsed
@@ -1914,28 +1892,25 @@ function Panel.refresh()
     return
   end
   if setup then setup:Hide() end
+  -- Showing the Feed starts or continues a Feed visit, before anything is
+  -- read; any other tab ends it.
+  if tab == "feed" then core:openFeed() else core:leaveFeed() end
 
   local summary = core:summary()
   frame.headerRight:SetText(("%d of %d online"):format(summary.online, summary.members))
-  local feed = core:feed()
-  drawNav(feed.unseen, core:unseenSpares())
+  drawNav(core:unseen(), core:unseenSpares())
   hideViewsBut(tab)
   if tab == "feed" then
-    drawFeed(feed)
+    drawFeed(core:feed())
   elseif tab == "goals" then
-    fresh = {}
     drawGoals()
   elseif tab == "when" then
-    fresh = {}
     drawWhen()
   elseif tab == "spares" then
-    fresh = {}
     drawSpares()
   elseif tab == "professions" then
-    fresh = {}
     drawProfessions()
   else
-    fresh = {}
     drawRoster(crew, summary)
   end
 end

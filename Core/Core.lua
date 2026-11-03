@@ -323,18 +323,22 @@ function Core:goals()
   return self.crewGoals:rows()
 end
 
--- The Feed tab: { days = { { daysAgo, time, entries } }, unseen }, newest
--- first, where unseen counts others' entries and Reactions to your own not
--- yet shown. An entry has kind ("ding", "death", "newCharacter",
--- "maxLevel", "joined", "left", "newProfession", "professionSkill",
--- "professionMaxed" or "goal": a Crew goal reached, with no
--- memberId), time, memberId, guid (for Character
--- events), text, from (the level before a ding or max level, or the skill
--- before a profession milestone), level, count (deaths), skillLine,
--- profession (its name), milestone and icon (for profession kinds), own and seen (false while it has unseen Reactions). And for
--- Reactions: reaction ("cheer", "respects" or "welcome", nil for left),
--- key (for react()), reactors ({ memberId, name, you }, in the order they
--- reacted), reacted (you have) and canReact (not yours, and it has a key).
+-- The Feed tab: { days = { { daysAgo, time, title, entries } }, unseen },
+-- newest first, where unseen counts others' entries and Reactions to your
+-- own not yet shown, and a day's title is "TODAY", "YESTERDAY" or "MONDAY
+-- 02 NOVEMBER", in local time. An entry has kind ("ding", "death",
+-- "newCharacter", "maxLevel", "joined", "left", "newProfession",
+-- "professionSkill", "professionMaxed" or "goal": a Crew goal reached,
+-- with no memberId), time, memberId, guid (for Character events), text,
+-- from (the level before a ding or max level, or the skill before a
+-- profession milestone), level, count (deaths), skillLine, profession (its
+-- name), milestone and icon (for profession kinds), own, seen (false while
+-- it has unseen Reactions), highlight (the news: max level, joined, a Crew
+-- goal, a profession maxed) and new (New in the open Feed visit; see
+-- openFeed()). And for Reactions: reaction ("cheer", "respects" or
+-- "welcome", nil for left), key (for react()), reactors ({ memberId, name,
+-- you }, in the order they reacted, name "You" for you), reacted (you
+-- have) and canReact (not yours, and it has a key).
 function Core:feed()
   return self.log:view(self.utcOffset)
 end
@@ -512,9 +516,17 @@ function Core:sparesSeen()
   if self.spareLife:markAllSeen() then self.listener("changed") end
 end
 
--- The Feed tab was opened: every entry and Reaction is seen.
-function Core:feedSeen()
-  if self.log:markAllSeen() then self.listener("changed") end
+-- The Feed tab is shown: call it on every draw, before reading feed().
+-- It starts a Feed visit if none is open, and every entry and Reaction
+-- unseen now is New in feed() until leaveFeed(), and is seen.
+function Core:openFeed()
+  if self.log:open() then self.listener("changed") end
+end
+
+-- The Feed tab was left (another tab, or the panel hidden): the visit
+-- ends, and nothing is New.
+function Core:leaveFeed()
+  self.log:leave()
 end
 
 -- Settings: the local preferences, one list of them. Each has its key, the

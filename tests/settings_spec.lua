@@ -58,7 +58,7 @@ describe("Settings", function()
     net:run(3)
     assert.equal(2, b.core:unseen())
 
-    b.core:feedSeen()
+    b.core:openFeed()
     assert.equal(0, b.core:unseen())
   end)
 end)
@@ -262,7 +262,7 @@ describe("Settings list", function()
         -- A Reaction to Bob's own entry.
         b:play({ level = 11 })
         net:run(3)
-        b.core:feedSeen()
+        b.core:openFeed()
         mark = #b.events
         local key
         for _, day in ipairs(a.core:feed().days) do
