@@ -707,7 +707,7 @@ end
 -- whole UI units (left and top from the screen's bottom left), or nil for
 -- the default size, centred. The size is kept within the panel's limits;
 -- staying on screen is panelPlace()'s, since the screen can change.
-local function panelPlace(field)
+local function windowPlace(field)
   return {
     read = function(db)
       local saved = db[field]
@@ -765,7 +765,7 @@ local SETTINGS = {
   {
     key = "panelPlace", section = NOTIFICATIONS, kind = "panelPlace",
     label = "Reset BFF window",
-    saved = panelPlace("panelPlace"),
+    saved = windowPlace("panelPlace"),
   },
   {
     key = "toasts", section = TOASTS, kind = "toggle",

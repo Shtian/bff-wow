@@ -30,7 +30,9 @@ local Skin = ns.Skin
 -- The window's size is the player's (Core's panelPlace()), between
 -- Core's limits; views read it as they draw.
 local SIDEBAR = 124
-local GRIP = 16
+-- Small enough to stay clear of the Roster footer's Removed and the
+-- Together tab's overview strip.
+local GRIP = 12
 local HEADER = Skin.HEADER_HEIGHT
 local NAV_HEIGHT = 30
 local NAV_CHIP_X = 6
@@ -90,9 +92,8 @@ local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
 local PROFESSION_HEAD = 26
 local PROFESSION_ICON = 16
 local PROFESSION_NAME = 82
-local PROFESSION_NAME_MAX = 160
+local PROFESSION_NAME_MAX = 140
 local PROFESSION_TILE = 18
-local PROFESSION_TILE_MAX = 30
 local PROFESSION_GAP = 1
 -- The gap before cooking, fishing and first aid, with a hairline in it.
 local PROFESSION_DIVIDER = 6
@@ -1388,8 +1389,8 @@ end
 
 -- Where each column starts, from the left, how wide a tile is and how
 -- wide the name column is. Twelve tiles fit at 18px at the smallest
--- window; more shrink them. A wider window grows the tiles, then the name
--- column, each up to its most.
+-- window; more shrink them. A wider window grows the name column up to
+-- its most, then the tiles take the rest, so the grid always fills it.
 local function professionColumns(professions)
   local divider = 0
   for _, p in ipairs(professions) do
@@ -1397,8 +1398,9 @@ local function professionColumns(professions)
   end
   local count = math.max(#professions, 1)
   local room = listWidth() - INSET - divider
-  local width = math.min(PROFESSION_TILE_MAX, math.floor((room - PROFESSION_NAME) / count) - PROFESSION_GAP)
-  local name = math.max(PROFESSION_NAME, math.min(PROFESSION_NAME_MAX, room - count * (width + PROFESSION_GAP)))
+  local name = math.max(PROFESSION_NAME,
+    math.min(PROFESSION_NAME_MAX, room - count * (PROFESSION_TILE + PROFESSION_GAP)))
+  local width = math.floor((room - name) / count) - PROFESSION_GAP
   local xs, dividerX = {}, nil
   local x = INSET + name
   for i, p in ipairs(professions) do
