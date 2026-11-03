@@ -66,10 +66,15 @@ local FEED_EMPTY_LINE = 120
 local SETUP_WIDTH = 320
 local SETUP_COLUMN = 150
 local SETUP_COLUMNS_Y = -72
--- The When grid: a cell per hour, a row per day.
+-- The When grid: a cell per hour, a row per day. It grows to fill the view,
+-- so the cell and row sizes are its least; the legend's swatches stay at them.
 local WHEN_CELL = 11
 local WHEN_ROW = 18
 local WHEN_DAYS = 30
+-- The grid's top, under the picker and the intro's room.
+local WHEN_TOP = -INSET - SMALL_BUTTON - 8 - 36
+-- What the grid leaves below it: the legend, two lines of note and an inset.
+local WHEN_BELOW = 74
 local DAY_NAMES = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" }
 -- Spares: a row per item, under a section heading.
 local SPARE_ROW = 44
@@ -128,6 +133,10 @@ local classColor = Skin.classColor
 -- The content's width right of the sidebar, at the window's current size.
 local function contentWidth()
   return frame:GetWidth() - SIDEBAR - 1
+end
+
+local function contentHeight()
+  return frame:GetHeight() - HEADER - 1
 end
 
 -- A scroll view's width: the content less the thumb's gutter.
@@ -842,22 +851,21 @@ local function createWhenView()
   whenView.intro:SetWordWrap(true)
   whenView.intro:SetJustifyH("LEFT")
 
-  local top = -INSET - SMALL_BUTTON - 8 - 36
+  whenView.hours = {}
   for hour = 0, 21, 3 do
     local label = Skin.label(whenView, "tiny", DIM)
-    label:SetPoint("BOTTOMLEFT", whenView, "TOPLEFT", INSET + WHEN_DAYS + hour * WHEN_CELL, top + 2)
     label:SetText(("%02d"):format(hour))
+    label.hour = hour
+    whenView.hours[#whenView.hours + 1] = label
   end
+  whenView.days = {}
   whenView.cells = {}
   for day = 1, 7 do
-    local y = top - (day - 1) * WHEN_ROW
     local label = Skin.label(whenView, "small", MUTED)
-    label:SetPoint("TOPLEFT", INSET, y - 1)
     label:SetText(DAY_NAMES[day])
+    whenView.days[day] = label
     for hour = 1, 24 do
       local cell = CreateFrame("Frame", nil, whenView)
-      cell:SetSize(WHEN_CELL - 1, WHEN_ROW - 2)
-      cell:SetPoint("TOPLEFT", INSET + WHEN_DAYS + (hour - 1) * WHEN_CELL, y)
       cell.texture = cell:CreateTexture(nil, "ARTWORK")
       cell.texture:SetAllPoints()
       cell.day, cell.hour = day, hour
@@ -868,9 +876,7 @@ local function createWhenView()
     end
   end
 
-  local below = top - 7 * WHEN_ROW - 10
   whenView.legendLow = Skin.label(whenView, "tiny", DIM)
-  whenView.legendLow:SetPoint("TOPLEFT", INSET + WHEN_DAYS, below)
   whenView.legend = {}
   local anchor = whenView.legendLow
   for i = 1, 4 do
@@ -884,9 +890,28 @@ local function createWhenView()
   whenView.legendHigh:SetPoint("LEFT", anchor, "RIGHT", 6, 0)
 
   whenView.note = Skin.label(whenView, "small", MUTED)
-  whenView.note:SetPoint("TOPLEFT", INSET, below - 24)
   whenView.note:SetWordWrap(true)
   whenView.note:SetJustifyH("LEFT")
+end
+
+-- Sizes the grid to fill the view at the window's current size, in whole
+-- pixels, and hangs the legend and note below it.
+local function placeWhenGrid()
+  local cellWidth = math.max(WHEN_CELL, math.floor((contentWidth() - 2 * INSET - WHEN_DAYS) / 24))
+  local rowHeight = math.max(WHEN_ROW, math.floor((contentHeight() + WHEN_TOP - WHEN_BELOW) / 7))
+  for _, label in ipairs(whenView.hours) do
+    label:SetPoint("BOTTOMLEFT", whenView, "TOPLEFT", INSET + WHEN_DAYS + label.hour * cellWidth, WHEN_TOP + 2)
+  end
+  for day, label in ipairs(whenView.days) do
+    label:SetPoint("LEFT", whenView, "TOPLEFT", INSET, WHEN_TOP - (day - 1) * rowHeight + 1 - math.floor(rowHeight / 2))
+  end
+  for _, cell in ipairs(whenView.cells) do
+    cell:SetSize(cellWidth - 1, rowHeight - 2)
+    cell:SetPoint("TOPLEFT", INSET + WHEN_DAYS + (cell.hour - 1) * cellWidth, WHEN_TOP - (cell.day - 1) * rowHeight)
+  end
+  local below = WHEN_TOP - 7 * rowHeight - 10
+  whenView.legendLow:SetPoint("TOPLEFT", INSET + WHEN_DAYS, below)
+  whenView.note:SetPoint("TOPLEFT", INSET, below - 24)
 end
 
 local function drawWhen()
@@ -903,6 +928,7 @@ local function drawWhen()
   whenView.intro:SetText(view.intro)
   whenView.note:SetWidth(contentWidth() - 2 * INSET)
   whenView.note:SetText(view.note or "")
+  placeWhenGrid()
   for _, cell in ipairs(whenView.cells) do
     shadeCell(cell, view.grid[cell.day][cell.hour], view.max)
   end
