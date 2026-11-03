@@ -177,7 +177,7 @@
   <section>
     <h2><span class="n">02</span> Module layers</h2>
     <div class="stack">
-      <div class="layer l1"><div class="name">UI</div><div class="desc">Panel · login summary popup · overlap finder. Only reads from the Store and re-renders when it changes.</div></div>
+      <div class="layer l1"><div class="name">UI</div><div class="desc">Panel (Roster, Feed, Goals, When, Spares, Professions, Together) · login summary popup · toasts. Only reads from the Store and re-renders when it changes.</div></div>
       <div class="layer l2"><div class="name">Feed</div><div class="desc">Compares old and new data to produce ding, zone, death and alt events, plus the "while you were away" summary.</div></div>
       <div class="layer l3"><div class="name">Store</div><div class="desc">Owns the saved data. <code>upsertChar()</code>, <code>merge()</code>, change callbacks. The only module that writes to the database.</div></div>
       <div class="layer split">
@@ -370,7 +370,7 @@
       <div class="step key"><div class="num">2</div><div><h3>Transport (channel) + PING <span class="flag">← tests the biggest risk</span></h3><p>Two clients can see each other online.</p></div></div>
       <div class="step"><div class="num">3</div><div><h3>HELLO / WANT / DATA</h3><p>Test passing data along with three people, or two accounts and a reload.</p></div></div>
       <div class="step"><div class="num">4</div><div><h3>Feed + login summary</h3><p>Dings, deaths, zones, and "while you were away".</p></div></div>
-      <div class="step"><div class="num">5</div><div><h3>Overlap finder → competitions</h3><p>More views of the same synced data.</p></div></div>
+      <div class="step"><div class="num">5</div><div><h3>Together tab → competitions</h3><p>More views of the same synced data.</p></div></div>
     </div>
   </section>
 

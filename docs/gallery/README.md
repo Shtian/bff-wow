@@ -2,7 +2,7 @@
 
 The CurseForge gallery and the README banner, all in one look: the game's own scenery behind, the addon's dark window and gold, the icon's teal as a thin accent, Cinzel titles and Archivo Narrow text. The rules are in the brand register of `DESIGN.md`.
 
-1. Put in-game screenshots in `shots/`, named as in `slides.json`: `away.jpg`, `toast.jpg`, `roster.jpg`, `feed.jpg`, `goals.jpg`, `spares.jpg`, `when.jpg` and `professions.png`. WoW saves JPGs; any format a browser reads works if `slides.json` names it.
+1. Put in-game screenshots in `shots/`, named as in `slides.json`: `away.jpg`, `toast.jpg`, `roster.jpg`, `feed.jpg`, `goals.jpg`, `spares.jpg`, `when.jpg`, `professions.png` and `together.jpg`. WoW saves JPGs; any format a browser reads works if `slides.json` names it.
 2. `npm run gallery` writes `out/<id>.png`: 1920×1080 for the gallery, 1600×520 for the README banner. `npm run gallery -- 02` renders only the slides whose id starts with `02`.
 
 A missing screenshot stops the render. To preview the layout before you have them all, run `npm run gallery -- --draft`: missing shots become dashed placeholders, and those slides get a red DRAFT stamp so they can't be uploaded by mistake.

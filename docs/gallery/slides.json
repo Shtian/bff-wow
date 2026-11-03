@@ -137,7 +137,24 @@
     ]
   },
   {
-    "id": "08-crew",
+    "id": "08-together",
+    "layout": "right",
+    "title": "Who's near you",
+    "caption": "See who's near your level and which dungeons fit you together.",
+    "shots": [
+      {
+        "file": "together.jpg",
+        "crop": [
+          680,
+          0,
+          616,
+          470
+        ]
+      }
+    ]
+  },
+  {
+    "id": "09-crew",
     "layout": "steps",
     "title": "Start a crew",
     "caption": "No server, no account, and no shared guild needed.",
