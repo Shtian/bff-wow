@@ -231,11 +231,9 @@ end
 -- Show menu's choices are the together* settings.
 -- Positions are pixels from level 1's left edge, in Core.TOGETHER_LAYOUT's
 -- geometry: as (the Character you play: name, classFilename, level, alt),
--- hidden ("3 alts, 2 offline hidden", or nil), answer (two lines, each a
--- list of { text, style }, style "text", "muted" or "highlight"),
--- selected (the picked memberIds Core knows), clear ("Clear" while any
+-- hidden ("3 alts, 2 offline hidden", or nil), selected (the picked memberIds Core knows), clear ("Clear" while any
 -- are picked, else nil), show (the Show menu: label, sections of { title,
--- options: key (the setting), label, sub, value }, key { title, items of
+-- options: key (the setting), label, value }, key { title, items of
 -- { kind, text } } and help), empty (with only near your level on: text,
 -- action, setting (what the action turns off) and spans of { left, right } with nothing in a lane; else nil),
 -- width, you (your level's x), band ({ left, right, text } for can play),
@@ -245,14 +243,14 @@ end
 -- dot shows), labelX, labelWidth, memberIds (the other Members a click
 -- picks), faded, and characters: memberId, member ("You" for yours), name,
 -- classFilename, level, alt, online, own, canPlay and apart), bars (a
--- dungeon each, or the raids' one: name, short, kind ("dungeon",
+-- dungeon each, or the raids' one: name, kind ("dungeon",
 -- "attunement" or "raids"), forever (new in WoW: Forever), from, to,
 -- fits, count, dots (class of each Member who fits, up to 4), moreDots, x,
--- width, lane (1 nearest the axis), shared, faded and tooltip: title,
+-- width, lane (1 nearest the axis; every bar has one), shared, faded and
+-- tooltip: title,
 -- detail, forever, raids (name, detail, forever), you, fits, fitters
 -- (memberId, member, name, classFilename, level, online, far), none and
--- almost) and chips ("+N here": x, width, lane, text, title, shared,
--- faded, and items, the bars folded in, each with its detail).
+-- almost), and lanes (how many lanes the bars take).
 function Core:together(measure, selected)
   return ns.Together.view(ns.Roster.rows(self.ledger, self.now()), measure, {
     selected = selected,
@@ -691,6 +689,48 @@ local function screenPosition(field)
   }
 end
 
+-- The panel's size limits and the size it opens at, in UI units.
+Core.PANEL_MIN_WIDTH, Core.PANEL_MIN_HEIGHT = 460, 380
+Core.PANEL_WIDTH, Core.PANEL_HEIGHT = 640, 520
+Core.PANEL_MAX_WIDTH, Core.PANEL_MAX_HEIGHT = 900, 800
+
+local function round(value)
+  return math.floor(value + 0.5)
+end
+
+local function clamp(value, low, high)
+  return math.max(low, math.min(high, value))
+end
+
+-- The panel's size and position, saved as { width, height, left, top } in
+-- whole UI units (left and top from the screen's bottom left), or nil for
+-- the default size, centred. The size is kept within the panel's limits;
+-- staying on screen is panelPlace()'s, since the screen can change.
+local function windowPlace(field)
+  return {
+    read = function(db)
+      local saved = db[field]
+      return saved and { width = saved.width, height = saved.height, left = saved.left, top = saved.top } or nil
+    end,
+    write = function(db, value)
+      if not (value and value.width) then
+        db[field] = nil
+        return
+      end
+      db[field] = {
+        width = clamp(round(value.width), Core.PANEL_MIN_WIDTH, Core.PANEL_MAX_WIDTH),
+        height = clamp(round(value.height), Core.PANEL_MIN_HEIGHT, Core.PANEL_MAX_HEIGHT),
+        left = round(value.left),
+        top = round(value.top),
+      }
+    end,
+    same = function(a, b)
+      if a == nil or b == nil then return a == b end
+      return a.width == b.width and a.height == b.height and a.left == b.left and a.top == b.top
+    end,
+  }
+end
+
 -- The toast sound's default: the name UI plays it by.
 Core.DEFAULT_TOAST_SOUND = "UI_BNET_TOAST"
 
@@ -719,6 +759,12 @@ local SETTINGS = {
     key = "minimap", section = NOTIFICATIONS, kind = "toggle",
     label = "Show minimap button",
     saved = offFlag("hide", "minimap"),
+  },
+  -- The panel's size and position (panelPlace()); the page shows a reset.
+  {
+    key = "panelPlace", section = NOTIFICATIONS, kind = "panelPlace",
+    label = "Reset BFF window",
+    saved = windowPlace("panelPlace"),
   },
   {
     key = "toasts", section = TOASTS, kind = "toggle",
@@ -834,6 +880,36 @@ function Core:toastPosition()
   local position = self:setting("toastPosition")
   if not position then return nil end
   return position.x, position.y
+end
+
+-- The panel's size and position as the player left it, by its top left
+-- corner in UI units from the screen's bottom left. Account-wide, so it
+-- opens the same on every Character.
+function Core:setPanelPlace(width, height, left, top)
+  self:setSetting("panelPlace", { width = width, height = height, left = left, top = top })
+end
+
+-- Back to the default size, centred.
+function Core:resetPanelPlace()
+  self:setSetting("panelPlace", nil)
+end
+
+-- Where the panel opens on a screen this big (UI units): { width, height,
+-- left, top }, shrunk to fit the screen and moved onto it. Left and top
+-- are nil while it hasn't been moved or resized, for centred.
+function Core:panelPlace(screenWidth, screenHeight)
+  local saved = self:setting("panelPlace")
+  if not saved then
+    return { width = math.min(Core.PANEL_WIDTH, screenWidth), height = math.min(Core.PANEL_HEIGHT, screenHeight) }
+  end
+  local width = math.min(saved.width, screenWidth)
+  local height = math.min(saved.height, screenHeight)
+  return {
+    width = width,
+    height = height,
+    left = clamp(saved.left, 0, screenWidth - width),
+    top = clamp(saved.top, height, screenHeight),
+  }
 end
 
 -- Pause sharing: send nothing, still receive, and appear offline. Kept

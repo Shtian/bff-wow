@@ -3,7 +3,8 @@
 -- then a section per section of Core's settings list (Sharing, with Leave
 -- Crew under Appear offline; Notifications and display; Toasts from the
 -- toasts decision). Every on/off setting in the list gets a checkbox built
--- from core:settings(); the sound picker and Move toasts are drawn by hand.
+-- from core:settings(); the sound picker, Move toasts and Reset BFF window
+-- are drawn by hand.
 -- A canvas page, since the standard controls have no text box. Everything
 -- is read and written through Core. See docs/design/settings-and-release.md
 -- and docs/design/toasts.md.
@@ -177,6 +178,21 @@ function custom.position(setting)
     element = move,
     draw = noop,
     setEnabled = function(on) move:SetEnabled(on) end,
+  }
+end
+
+-- Reset BFF window: back to the default size, centred. Greyed out while
+-- the panel already opens there.
+function custom.panelPlace(setting)
+  local reset = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  reset:SetSize(140, 22)
+  reset:SetText(setting.label)
+  reset:SetScript("OnClick", function() core:resetPanelPlace() end)
+  reset.inset, reset.gap = INDENT, 10
+  return {
+    element = reset,
+    draw = function(place) reset:SetEnabled(place ~= nil) end,
+    setEnabled = function(on) reset:SetEnabled(on) end,
   }
 end
 
