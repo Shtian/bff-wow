@@ -71,6 +71,6 @@ Then a key (Fits your level, Attunement, New in WoW: Forever, Friends who fit it
 - **Dungeons** below the axis: bars at 5% white (12% when you fit, with a 2px Bar Fill underline), NEW on a neutral plate, a dashed edge for the attunement, a diamond before "Raids 5", and a 6px class-coloured dot per Member who fits. A bar's name slides along so it stays readable while the bar is partly scrolled off the left.
 - **Overview strip** (22px): a tick per group, a gold mark for you and a frame for the visible window. Clicking or dragging it jumps there. "‹ You" or "You ›" shows whenever you've scrolled yourself out of view.
 
-## Not decided here
+## Telling people
 
-- README, CurseForge description and gallery image: #113.
+The README lists the tab ("Dungeons together": "near" would read as the world map pins) with its gallery slide, `08-together` (`docs/gallery/slides.json`, from `shots/together.jpg`), and `/bff together` among the commands (#113).

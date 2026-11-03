@@ -19,6 +19,10 @@ A World of Warcraft: Forever addon for friends who don't always play at the same
 <td><img src="docs/gallery/out/05-spares.png" alt="Pass on spare gear"><br><b>Pass on spare gear.</b> Offer an item to your friends. Whoever claims it first gets it by in-game mail.</td>
 <td><img src="docs/gallery/out/06-when.png" alt="When everyone plays"><br><b>When everyone plays.</b> A heatmap of the hours each friend usually plays, in your own time zone.</td>
 </tr>
+<tr>
+<td><img src="docs/gallery/out/07-professions.png" alt="Who crafts what"><br><b>Who crafts what.</b> Every friend's professions and skill in one grid, so you know who to ask for a craft.</td>
+<td><img src="docs/gallery/out/08-together.png" alt="Dungeons together"><br><b>Dungeons together.</b> See which friends are close to your level, and the dungeons you can run together.</td>
+</tr>
 </table>
 
 ## Start a crew
@@ -32,7 +36,7 @@ A World of Warcraft: Forever addon for friends who don't always play at the same
 | Command | What it does |
 |---|---|
 | `/bff` | Open or close the panel (also a key binding and the minimap button) |
-| `/bff feed`, `/bff goals`, `/bff when`, `/bff spares`, `/bff professions` | Open the panel on that tab |
+| `/bff feed`, `/bff goals`, `/bff when`, `/bff spares`, `/bff professions`, `/bff together` | Open the panel on that tab |
 | `/bff spares add <item>` | Offer an item from your bags: shift-click it in after `add` |
 | `/bff start`, `/bff join <code>`, `/bff leave` | Start, join or leave a crew |
 | `/bff code` | Show your crew code |
