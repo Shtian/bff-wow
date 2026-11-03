@@ -447,9 +447,28 @@ end
 -- time, expires, winner, claims, given ({ memberId, name, character }
 -- once Given), canGive, canWithdraw, state }. unseen counts notices not
 -- yet shown, claims and open your open Claims and Spares, out of
--- maxClaims and maxOpen.
+-- maxClaims and maxOpen. Each row also comes worded: info (the line under
+-- the item: who posted it or how long is left, and the Claim state),
+-- primary and secondary (the buttons shown: { label, enabled } for Claim
+-- or Give, { label } for Withdraw; nil when not shown), highlight (a
+-- winning Claim of yours, a Claim on yours, or your item gone) and dimmed
+-- (none of your Characters is high enough level, or yours was Given).
+-- claimFor lists your Characters a Claim can be for, Main first: { guid,
+-- label ("Jaina (30)") }.
 function Core:spares()
-  return self.spareLife:view()
+  local view = self.spareLife:view()
+  local claimFor = {}
+  local own = ns.Roster.rows(self.ledger, self.now())[1]
+  if own and own.own then
+    local characters = { own }
+    for _, alt in ipairs(own.alts) do characters[#characters + 1] = alt end
+    for _, character in ipairs(characters) do
+      local entry = { guid = character.guid, label = ("%s (%d)"):format(character.name, character.level) }
+      if character.main then table.insert(claimFor, 1, entry) else claimFor[#claimFor + 1] = entry end
+    end
+  end
+  view.claimFor = claimFor
+  return view
 end
 
 -- An own write that others should get now.

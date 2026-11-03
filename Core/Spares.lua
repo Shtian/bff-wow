@@ -238,22 +238,29 @@ local function crewRow(self, record, spare, highest)
     if mine then state = state .. " (you claimed it for " .. characterName(self.ledger:own(), mine.guid) .. ")" end
   end
   local item = Rules.fullItemString(spare.item)
+  local ownerName = memberName(self, record)
+  local usable = highest >= spare.level
   return {
     ownerId = owner,
-    owner = memberName(self, record),
+    owner = ownerName,
     id = id,
     item = item,
     link = self.itemLink(item),
     level = spare.level,
     time = spare.time,
     expires = spare.time + Rules.KEEP_FOR - self.now(),
-    usable = highest >= spare.level,
+    usable = usable,
     winner = winner and who(self, winner.memberId, winner.guid),
     claims = count,
     claimed = mine ~= nil,
     claimCharacter = mine and characterName(self.ledger:own(), mine.guid),
     canClaim = mine == nil,
     state = state,
+    info = ("%s · %s"):format(ownerName, state),
+    primary = mine == nil and { label = "Claim", enabled = true } or nil,
+    secondary = mine ~= nil and { label = "Withdraw" } or nil,
+    highlight = winner ~= nil and winner.memberId == me,
+    dimmed = not usable,
   }
 end
 
@@ -274,20 +281,35 @@ local function yourRow(self, spare)
     state = "No claims yet"
   end
   local item = Rules.fullItemString(spare.item)
+  local expires = spare.time + Rules.KEEP_FOR - self.now()
+  local gone = (not given and self.goneItems[id]) or nil
+  local info
+  if gone then
+    info = "This item has left your bags · " .. state
+  elseif given then
+    info = state
+  else
+    info = ("%s · %s"):format(expires > 0 and ns.Text.ago(expires) .. " left" or "ending", state)
+  end
   return {
     id = id,
     item = item,
     link = self.itemLink(item),
     level = spare.level,
     time = spare.time,
-    expires = spare.time + Rules.KEEP_FOR - self.now(),
+    expires = expires,
     winner = winner and who(self, winner.memberId, winner.guid),
     claims = count,
     given = given,
     canGive = winner ~= nil,
     canWithdraw = given == nil,
-    gone = (not given and self.goneItems[id]) or nil,
+    gone = gone,
     state = state,
+    info = info,
+    primary = not given and { label = "Give", enabled = winner ~= nil } or nil,
+    secondary = not given and { label = "Withdraw" } or nil,
+    highlight = winner ~= nil or gone == true,
+    dimmed = given ~= nil,
   }
 end
 

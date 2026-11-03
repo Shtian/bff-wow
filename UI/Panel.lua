@@ -1137,15 +1137,12 @@ end
 
 -- Right-click Claim: pick which of your Characters it's for.
 local function showClaimMenu(owner, data)
-  local own = core:rows()[1]
-  if not own then return end
+  local claimFor = sparesView.claimFor
+  if not claimFor or #claimFor == 0 then return end
   MenuUtil.CreateContextMenu(owner, function(_, root)
     root:CreateTitle("Claim it for")
-    local characters = { own }
-    for _, alt in ipairs(own.alts) do characters[#characters + 1] = alt end
-    for _, character in ipairs(characters) do
-      local label = ("%s (%d)"):format(character.name, character.level)
-      root:CreateButton(label, function() claim(data, character.guid) end)
+    for _, character in ipairs(claimFor) do
+      root:CreateButton(character.label, function() claim(data, character.guid) end)
     end
   end)
 end
@@ -1251,35 +1248,24 @@ local function drawSpareText(row, data, width)
   row.info:SetWidth(width)
 end
 
+-- Draws a row as Core words it. A Given Spare of yours dims less than
+-- one of the Crew's you can't use.
 local function drawSpareRow(row, data, yours)
   row.data, row.yours = data, yours
   row.icon:SetTexture(getItemIcon and getItemIcon(data.item) or QUESTION_MARK)
-  local left = data.expires > 0 and ago(data.expires) .. " left" or "ending"
-  if yours then
-    if data.gone then
-      row.info:SetText(("This item has left your bags · %s"):format(data.state))
-    else
-      row.info:SetText(data.given and data.state or ("%s · %s"):format(left, data.state))
-    end
-    Skin.color(row.info, (data.winner or data.gone) and GOLD or MUTED)
-    drawSpareText(row, data, placeSpareButtons(row, not data.given and "Give" or nil,
-      data.canWithdraw and "Withdraw" or nil))
-    row.primary:SetEnabled(data.canGive)
-    row:SetAlpha(data.given and 0.6 or 1)
-  else
-    row.info:SetText(("%s · %s"):format(data.owner, data.state))
-    Skin.color(row.info, data.winner and data.winner.you and GOLD or MUTED)
-    drawSpareText(row, data, placeSpareButtons(row, data.canClaim and "Claim" or nil,
-      data.claimed and "Withdraw" or nil))
-    row.primary:SetEnabled(true)
-    row:SetAlpha(data.usable and 1 or 0.45)
-  end
+  row.info:SetText(data.info)
+  Skin.color(row.info, data.highlight and GOLD or MUTED)
+  drawSpareText(row, data, placeSpareButtons(row, data.primary and data.primary.label,
+    data.secondary and data.secondary.label))
+  if data.primary then row.primary:SetEnabled(data.primary.enabled) end
+  row:SetAlpha(data.dimmed and (yours and 0.6 or 0.45) or 1)
   row:Show()
 end
 
 local function drawSpares()
   if not sparesView then createSparesView() end
   local view = core:spares()
+  sparesView.claimFor = view.claimFor
   local y, headings, rows, notes = -4, 0, 0, 0
   local function heading(text, count)
     headings = headings + 1
