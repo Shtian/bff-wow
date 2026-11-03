@@ -71,7 +71,7 @@ describe("Together", function()
       local ns = load()
       local forever = {}
       for _, dungeon in ipairs(ns.Core.DUNGEONS) do
-        if dungeon.new and dungeon.kind == "dungeon" then
+        if dungeon.forever and dungeon.kind == "dungeon" then
           forever[dungeon.name] = ("%d-%d %s"):format(dungeon.from, dungeon.to, dungeon.where)
         end
       end
@@ -112,7 +112,7 @@ describe("Together", function()
         assert.is_string(dungeon.where)
         assert.truthy(dungeon.from >= 1 and dungeon.from <= dungeon.to and dungeon.to <= 60, dungeon.name)
         assert.truthy(dungeon.kind == "dungeon" or dungeon.kind == "attunement" or dungeon.kind == "raid")
-        assert.is_boolean(dungeon.new)
+        assert.is_boolean(dungeon.forever)
       end
     end)
   end)
@@ -304,8 +304,8 @@ describe("Together", function()
     it("mark new Forever dungeons and the attunement, and hide raids", function()
       local _, clients = crew({ { "Gahz", 57 } })
       local view = clients[1].core:together()
-      assert.is_true(barFor(view, "Blackmaw Hold").new)
-      assert.equal("New in WoW: Forever", barFor(view, "Blackmaw Hold").tooltip.new)
+      assert.is_true(barFor(view, "Blackmaw Hold").forever)
+      assert.equal("New in WoW: Forever", barFor(view, "Blackmaw Hold").tooltip.forever)
       local shown = {}
       for _, bar in ipairs(view.bars) do shown[bar.name] = bar end
       for _, chip in ipairs(view.chips) do
@@ -388,6 +388,9 @@ describe("Together", function()
           end
         end
       end
+      -- The dungeons stay in their 5 lanes, the rest in chips.
+      for _, bar in ipairs(view.bars) do assert.truthy(bar.lane >= 1 and bar.lane <= 5) end
+      for _, chip in ipairs(view.chips) do assert.truthy(chip.lane >= 1 and chip.lane <= 5) end
       -- Your own label is placed, nearest the axis.
       assert.equal(1, groupAt(view, 24).row)
       assert.equal("11 friends can play with you · 11 online now", text(view.answer[1]))

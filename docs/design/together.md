@@ -17,7 +17,7 @@ A **Together** tab answers "who can I play with, and where?": the Crew's Charact
 
 ## Dungeon table
 
-`Core.DUNGEONS`, in `Core/Together.lua`: a name, `from` and `to` levels, `kind` (`dungeon`, `attunement` or `raid`), `new` (new in WoW: Forever), `where`, and a raid's `size`.
+`Core.DUNGEONS`, in `Core/Together.lua`: a name, `from` and `to` levels, `kind` (`dungeon`, `attunement` or `raid`), `forever` (new in WoW: Forever; not the Feed's **New**), `where`, and a raid's `size`.
 
 - The classic dungeons with their usual recommended ranges. These are rough and should be checked against Forever's own dungeon finder once it's live.
 - The nine new Forever dungeons, from Blizzard's [Explore the New Dungeons of World of Warcraft: Forever](http://worldofwarcraft.blizzard.com/en-us/news/24301455) (Oct 20 2026): Hall of Thanes 13–18, Ruins of Lordaeron 15–20, Excavation Site 24–29, City of Dalaran 28–33 (needs an attunement), The Drowned City 35–40, Krol'dok Stronghold 40–45, Alcaz Prison 48–53, Blackmaw Hold 55–60, Shaper's Terrace 58–60.
@@ -32,7 +32,7 @@ A **Together** tab answers "who can I play with, and where?": the Crew's Charact
 - **Groups:** the Characters shown, one group per level. Its Characters are ordered you first, then whoever is online, then Mains, and the first leads the label ("You", or the Member's name, with `alt` when it isn't their Main) with "+N" for the rest.
 - **Label rows:** labels are placed you first, then groups with someone online, then nearest your level, each in the first of the 4 rows (row 1 nearest the axis) where it keeps 6px from its neighbours. A label that finds no room has `row` nil: only its dot shows, with a count when merged.
 - **Bars:** one per dungeon shown, from its first level, as wide as its range or its content (name, NEW plate, up to 4 Member dots and "+N"), whichever is wider. Each other Member who fits it is listed once, through their Character closest to your level, online first. They're placed most relevant first (ones you fit, then by how many Members fit, then by level) in the first of the 5 lanes with room, 3px apart.
-- **Chips:** bars with no room are grouped by level (within 3 levels of a group's first) into "+N here" chips, each placed in the first room at or right of its level, lowest lane first. A chip that finds no room joins the one before.
+- **Chips:** bars with no room are grouped by level (within 3 levels of a group's first) into "+N here" chips, each placed in the first room at or right of its level, lowest lane first. A chip that finds no room joins the one before; before any chip is placed, the last group looks as far right as the line goes, so no dungeon is lost.
 - **Answer line:** two lines, each a list of `{ text, style }`, style `text`, `muted` or `highlight` (gold, only ever "can play"):
   - Some can play: "Simba and Simbad (alt) **can play** with you" (up to 3 names, online first, then nearest; long names cut to their first word). More than 3: "10 friends **can play** with you · 7 online now".
   - Then "Best together: **Shadowfang Keep** with Simba and Simbad · also Blackfathom Deeps": the dungeon you fit that the most can-play Members fit with a Character within 3 levels of you, then the most of them online, then the lowest.

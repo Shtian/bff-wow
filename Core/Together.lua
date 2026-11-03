@@ -9,53 +9,53 @@ local Together = {}
 ns.Together = Together
 
 -- The game's dungeons, by the level they start at. kind is "dungeon",
--- "attunement" or "raid"; new marks the ones new in WoW: Forever (from
+-- "attunement" or "raid"; forever marks the ones new in WoW: Forever (from
 -- Blizzard's "Explore the New Dungeons of World of Warcraft: Forever", Oct
 -- 20 2026). Classic ranges are the usual recommended ones; the two new
 -- raids' levels aren't published yet and are assumed to be 60.
 local DUNGEONS = {
   { name = "Ragefire Chasm", from = 13, to = 18, where = "Orgrimmar" },
-  { name = "Hall of Thanes", from = 13, to = 18, where = "beneath Ironforge", new = true },
-  { name = "Ruins of Lordaeron", from = 15, to = 20, where = "Tirisfal Glades", new = true },
+  { name = "Hall of Thanes", from = 13, to = 18, where = "beneath Ironforge", forever = true },
+  { name = "Ruins of Lordaeron", from = 15, to = 20, where = "Tirisfal Glades", forever = true },
   { name = "Wailing Caverns", from = 17, to = 24, where = "The Barrens" },
   { name = "The Deadmines", from = 17, to = 26, where = "Westfall" },
   { name = "Shadowfang Keep", from = 22, to = 30, where = "Silverpine Forest" },
   { name = "Blackfathom Deeps", from = 24, to = 32, where = "Ashenvale" },
   { name = "The Stockade", from = 24, to = 32, where = "Stormwind City" },
-  { name = "Excavation Site", from = 24, to = 29, where = "Wetlands", new = true },
+  { name = "Excavation Site", from = 24, to = 29, where = "Wetlands", forever = true },
   { name = "SM Graveyard", from = 28, to = 38, where = "Scarlet Monastery, Tirisfal Glades" },
-  { name = "City of Dalaran", from = 28, to = 33, where = "Alterac Mountains (needs an attunement)", new = true },
+  { name = "City of Dalaran", from = 28, to = 33, where = "Alterac Mountains (needs an attunement)", forever = true },
   { name = "Gnomeregan", from = 29, to = 38, where = "Dun Morogh" },
   { name = "SM Library", from = 29, to = 39, where = "Scarlet Monastery, Tirisfal Glades" },
   { name = "Razorfen Kraul", from = 30, to = 40, where = "The Barrens" },
   { name = "SM Armory", from = 32, to = 42, where = "Scarlet Monastery, Tirisfal Glades" },
   { name = "SM Cathedral", from = 35, to = 45, where = "Scarlet Monastery, Tirisfal Glades" },
-  { name = "The Drowned City", from = 35, to = 40, where = "off Stranglethorn", new = true },
+  { name = "The Drowned City", from = 35, to = 40, where = "off Stranglethorn", forever = true },
   { name = "Razorfen Downs", from = 40, to = 50, where = "The Barrens" },
-  { name = "Krol'dok Stronghold", from = 40, to = 45, where = "Riverglades", new = true },
+  { name = "Krol'dok Stronghold", from = 40, to = 45, where = "Riverglades", forever = true },
   { name = "Uldaman", from = 42, to = 52, where = "Badlands" },
   { name = "Zul'Farrak", from = 44, to = 54, where = "Tanaris" },
   { name = "Maraudon", from = 46, to = 55, where = "Desolace" },
-  { name = "Alcaz Prison", from = 48, to = 53, where = "Dustwallow Marsh", new = true },
+  { name = "Alcaz Prison", from = 48, to = 53, where = "Dustwallow Marsh", forever = true },
   { name = "Sunken Temple", from = 50, to = 60, where = "Swamp of Sorrows" },
   { name = "Blackrock Depths", from = 52, to = 60, where = "Blackrock Mountain" },
   { name = "Lower Blackrock Spire", from = 55, to = 60, where = "Blackrock Mountain" },
-  { name = "Blackmaw Hold", from = 55, to = 60, where = "Azshara", new = true },
+  { name = "Blackmaw Hold", from = 55, to = 60, where = "Azshara", forever = true },
   { name = "Onyxia attunement", from = 55, to = 60, where = "a quest chain for Onyxia's Lair", kind = "attunement" },
   { name = "Dire Maul", from = 56, to = 60, where = "Feralas" },
   { name = "Scholomance", from = 58, to = 60, where = "Western Plaguelands" },
   { name = "Stratholme", from = 58, to = 60, where = "Eastern Plaguelands" },
   { name = "Upper Blackrock Spire", from = 58, to = 60, where = "Blackrock Mountain" },
-  { name = "Shaper's Terrace", from = 58, to = 60, where = "Un'Goro Crater", new = true },
+  { name = "Shaper's Terrace", from = 58, to = 60, where = "Un'Goro Crater", forever = true },
   { name = "Molten Core", from = 60, to = 60, where = "Blackrock Mountain", kind = "raid", size = 40 },
   { name = "Onyxia's Lair", from = 60, to = 60, where = "Dustwallow Marsh", kind = "raid", size = 40 },
   { name = "Zul'Gurub", from = 60, to = 60, where = "Stranglethorn Vale", kind = "raid", size = 20 },
-  { name = "The Barrow Deeps", from = 60, to = 60, where = "Mount Hyjal", kind = "raid", size = 10, new = true },
-  { name = "Hyjal Summit", from = 60, to = 60, where = "Mount Hyjal", kind = "raid", size = 20, new = true },
+  { name = "The Barrow Deeps", from = 60, to = 60, where = "Mount Hyjal", kind = "raid", size = 10, forever = true },
+  { name = "Hyjal Summit", from = 60, to = 60, where = "Mount Hyjal", kind = "raid", size = 20, forever = true },
 }
 for i, dungeon in ipairs(DUNGEONS) do
   dungeon.kind = dungeon.kind or "dungeon"
-  dungeon.new = dungeon.new == true
+  dungeon.forever = dungeon.forever == true
   dungeon.index = i
 end
 Together.DUNGEONS = DUNGEONS
@@ -65,7 +65,7 @@ Together.DUNGEONS = DUNGEONS
 -- dungeon lanes below it, and the gaps kept between neighbours in a row or
 -- a lane. UI reads the same table to lay the line out.
 local LAYOUT = {
-  top = 60,
+  levels = 60,
   level = 24,
   left = 16,
   right = 90,
@@ -74,7 +74,7 @@ local LAYOUT = {
   rowGap = 6,
   laneGap = 3,
   -- A label's name is cut at this width.
-  name = 96,
+  nameWidth = 96,
   -- A bar shows at most this many Member dots, then "+N".
   dots = 4,
   dot = 8,
@@ -107,10 +107,15 @@ local function listJoin(names, max)
   return table.concat(names, ", ", 1, max - 1) .. " and " .. (#names - max + 1) .. " more"
 end
 
+-- The Roster's rule: within CAN_PLAY levels of the Character you play.
+local function canPlay(level, yourLevel)
+  return math.abs(level - yourLevel) <= CAN_PLAY
+end
+
 -- "can play", "4 ahead" or "10 behind", from you.
 local function apart(level, yourLevel)
   local gap = level - yourLevel
-  if math.abs(gap) <= CAN_PLAY then return "can play" end
+  if canPlay(level, yourLevel) then return "can play" end
   return ("%d %s"):format(math.abs(gap), gap > 0 and "ahead" or "behind")
 end
 
@@ -186,7 +191,7 @@ local function describeCharacter(character, yourLevel)
     alt = not character.main,
     online = character.played,
     own = own,
-    canPlay = not own and math.abs(character.level - yourLevel) <= CAN_PLAY,
+    canPlay = not own and canPlay(character.level, yourLevel),
     apart = not own and apart(character.level, yourLevel) or nil,
   }
 end
@@ -228,7 +233,7 @@ local function buildGroups(members, yourLevel, measure)
       group.characters[i] = describeCharacter(character, yourLevel)
       if character.played then group.online = true end
     end
-    group.labelWidth = math.min(measure(group.label, "small"), LAYOUT.name) + 4
+    group.labelWidth = math.min(measure(group.label, "small"), LAYOUT.nameWidth) + 4
       + measure(tostring(level), "tiny")
       + (group.alt and measure("alt", "tiny") + 10 or 0)
       + (group.more > 0 and measure("+" .. group.more, "small") + 4 or 0) + 8
@@ -320,7 +325,7 @@ local function describeDungeon(dungeon, others, yourLevel)
   local tooltip = {
     title = dungeon.name,
     detail = ("%s · %s · %s"):format(KINDS[dungeon.kind], rangeText(dungeon), dungeon.where),
-    new = dungeon.new and "New in WoW: Forever" or nil,
+    forever = dungeon.forever and "New in WoW: Forever" or nil,
     you = you,
     fits = youFit,
     fitters = {},
@@ -360,13 +365,13 @@ local function buildBars(others, yourLevel, measure)
       for i = 1, math.min(#fitters, LAYOUT.dots) do dots[i] = fitters[i].classFilename end
       local moreDots = math.max(#fitters - LAYOUT.dots, 0)
       local content = measure(dungeon.name, "small") + 10
-        + (dungeon.new and measure("NEW", "tiny") + 10 or 0)
+        + (dungeon.forever and measure("NEW", "tiny") + 10 or 0)
         + (#dots > 0 and #dots * LAYOUT.dot + 6 or 0)
         + (moreDots > 0 and measure("+" .. moreDots, "tiny") + 4 or 0)
       bars[#bars + 1] = {
         name = dungeon.name,
         kind = dungeon.kind,
-        new = dungeon.new,
+        forever = dungeon.forever,
         from = dungeon.from,
         to = dungeon.to,
         index = dungeon.index,
@@ -410,7 +415,8 @@ local function buildBars(others, yourLevel, measure)
 
   -- Chips: the overflow, grouped by starting level (within CAN_PLAY of a
   -- chip's first), each placed in the first room found at or right of
-  -- its level, lowest lane first. A chip with no room joins the one before.
+  -- its level, lowest lane first. A chip with no room joins the one before
+  -- (or, before any is placed, the next).
   local groups = {}
   for _, bar in ipairs(over) do
     local last = groups[#groups]
@@ -421,12 +427,16 @@ local function buildBars(others, yourLevel, measure)
     end
   end
   local chips, waiting = {}, {}
-  for _, group in ipairs(groups) do
+  local farthest = xOf(LAYOUT.levels) + LAYOUT.right
+  for i, group in ipairs(groups) do
     for _, bar in ipairs(group.items) do waiting[#waiting + 1] = bar end
     local width = measure(("+%d here"):format(#waiting), "small") + 12
+    -- Up to 6 levels right of the group; the last group, with no chip
+    -- placed yet, looks as far as the line goes, so nothing is lost.
+    local steps = (i == #groups and #chips == 0) and math.huge or 12
     local x, lane
     local step = 0
-    while not lane and step <= 12 do
+    while not lane and step <= steps and xOf(group.from) + step * LAYOUT.level / 2 + width <= farthest do
       local at = xOf(group.from) + step * LAYOUT.level / 2
       for l = LAYOUT.lanes, 1, -1 do
         if free(lanes[l], at, at + width, LAYOUT.laneGap) then
@@ -478,7 +488,7 @@ local function answer(others, yourLevel)
   for _, member in ipairs(others) do
     local character = closest(member, yourLevel)
     local gap = math.abs(character.level - yourLevel)
-    if gap <= CAN_PLAY then can[#can + 1] = character end
+    if canPlay(character.level, yourLevel) then can[#can + 1] = character end
     if not nearest or gap < math.abs(nearest.level - yourLevel)
       or (gap == math.abs(nearest.level - yourLevel) and member.name < nearest.member.name) then
       nearest = character
@@ -530,7 +540,7 @@ local function answer(others, yourLevel)
       local with, online = {}, 0
       for _, character in ipairs(can) do
         local fitting = closest(character.member, yourLevel, function(c)
-          return fits(c.level, dungeon) and math.abs(c.level - yourLevel) <= CAN_PLAY
+          return fits(c.level, dungeon) and canPlay(c.level, yourLevel)
         end)
         if fitting then
           with[#with + 1] = character.member
@@ -589,7 +599,7 @@ function Together.view(rows, measure)
   local bars, chips = buildBars(others, yourLevel, measure)
 
   local ticks = {}
-  for level = 1, LAYOUT.top do
+  for level = 1, LAYOUT.levels do
     local big = level == 1 or level % 5 == 0
     ticks[level] = {
       level = level,
@@ -604,7 +614,7 @@ function Together.view(rows, measure)
     as = { name = own.name, classFilename = own.classFilename, level = yourLevel, alt = own.onAlt == true },
     hidden = hidden > 0 and ("%d %s hidden"):format(hidden, plural(hidden, "alt", "alts")) or nil,
     answer = answer(others, yourLevel),
-    width = xOf(LAYOUT.top) + LAYOUT.right,
+    width = xOf(LAYOUT.levels) + LAYOUT.right,
     you = xOf(yourLevel),
     band = {
       left = xOf(yourLevel - CAN_PLAY) - LAYOUT.level / 2,

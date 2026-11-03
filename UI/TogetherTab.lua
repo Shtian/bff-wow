@@ -44,17 +44,13 @@ local barFrames, chipFrames = {}, {}
 local labelFrames, dotFrames, stemTextures = {}, {}, {}
 local tickTextures, numberLabels, overviewTicks = {}, {}, {}
 
-local function hex(color)
-  return Skin.hex(color)
-end
-
 local function classHex(classFilename)
   local r, g, b = Skin.classColor(classFilename)
   return Skin.hex({ r, g, b })
 end
 
 local function colored(text, color)
-  return hex(color) .. text .. "|r"
+  return Skin.hex(color) .. text .. "|r"
 end
 
 local function hideFrom(list, from)
@@ -134,7 +130,7 @@ local function dungeonTooltip(owner)
   local tooltip = owner.bar.tooltip
   GameTooltip:AddLine(tooltip.title, 1, 1, 1)
   line(tooltip.detail, DIM)
-  if tooltip.new then line(tooltip.new, MUTED) end
+  if tooltip.forever then line(tooltip.forever, MUTED) end
   line(tooltip.you, tooltip.fits and TEXT or DIM)
   for _, fitter in ipairs(tooltip.fitters) do
     local parts = {
@@ -246,7 +242,7 @@ local function createView(parent)
   view.stripYou:SetSize(2, 14)
   view.stripWindow = CreateFrame("Frame", nil, view.strip)
   view.stripWindow:SetHeight(16)
-  Skin.border(view.stripWindow, { 1, 1, 1, 0.45 })
+  Skin.border(view.stripWindow, Skin.BAR)
   local function jump()
     local scale = view.strip:GetEffectiveScale()
     local x = GetCursorPosition() / scale - view.strip:GetLeft()
@@ -301,7 +297,7 @@ local function createView(parent)
 
   -- The axis.
   view.axis = view.track:CreateTexture(nil, "BACKGROUND", nil, 1)
-  view.axis:SetColorTexture(0, 0, 0, 0.25)
+  view.axis:SetColorTexture(unpack(Skin.SIDEBAR))
   view.axisTop = view.track:CreateTexture(nil, "BORDER")
   view.axisTop:SetColorTexture(Skin.BORDER[1], Skin.BORDER[2], Skin.BORDER[3], Skin.BORDER[4])
   view.axisTop:SetHeight(1)
@@ -397,7 +393,7 @@ local function createDotFrame()
   frame.dot:SetPoint("CENTER")
   frame.dot:SetColorTexture(1, 1, 1, 1)
   Skin.round(frame, frame.dot)
-  frame.count = Skin.badge(frame, "tiny", TEXT, { 0.165, 0.157, 0.2, 1 })
+  frame.count = Skin.badge(frame, "tiny", TEXT, Skin.RAISED)
   frame.count:SetPoint("BOTTOMLEFT", frame, "CENTER", 4, 3)
   return frame
 end
@@ -405,7 +401,7 @@ end
 local function createLabelFrame()
   local frame = hoverable(view.track, groupTooltip)
   frame:SetHeight(LABEL_HEIGHT)
-  frame.hover = Skin.fill(frame, { 1, 1, 1, 0.07 }, "HIGHLIGHT")
+  frame.hover = Skin.fill(frame, Skin.LINE, "HIGHLIGHT")
   frame.name = Skin.label(frame, "small", TEXT)
   frame.name:SetPoint("LEFT", 3, 0)
   frame.name:SetWordWrap(false)
@@ -439,7 +435,7 @@ local function drawGroups(data)
       local y = rowY(group.row)
       at(label, group.labelX, y, group.labelWidth)
       label.name:SetText(group.label)
-      label.name:SetWidth(math.min(label.name:GetUnboundedStringWidth(), layout().name))
+      label.name:SetWidth(math.min(label.name:GetUnboundedStringWidth(), layout().nameWidth))
       local anchor = label.name
       label.alt:SetShown(group.alt)
       if group.alt then
@@ -506,7 +502,7 @@ end
 local function createBarFrame()
   local frame = hoverable(view.track, dungeonTooltip)
   frame:SetHeight(BAR)
-  frame.background = Skin.fill(frame, { 1, 1, 1, 0.05 })
+  frame.background = Skin.fill(frame, Skin.HOVER)
   frame.underline = Skin.fill(frame, Skin.BAR, "BORDER")
   frame.underline:ClearAllPoints()
   frame.underline:SetPoint("BOTTOMLEFT")
@@ -518,8 +514,8 @@ local function createBarFrame()
   frame.inner:SetHeight(BAR)
   frame.name = Skin.label(frame.inner, "small")
   frame.name:SetPoint("LEFT", 0, 0)
-  frame.new = Skin.badge(frame.inner, "tiny", MUTED, { 1, 1, 1, 0.1 })
-  frame.new:SetText("NEW")
+  frame.forever = Skin.badge(frame.inner, "tiny", MUTED)
+  frame.forever:SetText("NEW")
   frame.dots = {}
   frame.more = Skin.label(frame.inner, "tiny", MUTED)
   return frame
@@ -540,12 +536,12 @@ local function drawBar(frame, bar)
   frame.name:SetText(bar.name)
   Skin.color(frame.name, bar.fits and TEXT or DIM)
   local anchor, width = frame.name, frame.name:GetStringWidth()
-  frame.new:SetShown(bar.new)
-  if bar.new then
-    frame.new:ClearAllPoints()
-    frame.new:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
-    anchor = frame.new
-    width = width + 4 + frame.new:GetWidth()
+  frame.forever:SetShown(bar.forever)
+  if bar.forever then
+    frame.forever:ClearAllPoints()
+    frame.forever:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
+    anchor = frame.forever
+    width = width + 4 + frame.forever:GetWidth()
   end
   for i, classFilename in ipairs(bar.dots) do
     local dot = frame.dots[i]
@@ -673,6 +669,11 @@ function TogetherTab.draw(parent, theCore)
   view.data = data
   if not data then
     view.scroller:Hide()
+    view.as:SetText("")
+    view.asAlt:Hide()
+    view.hidden:SetText("")
+    view.first:SetText("")
+    view.second:SetText("")
     return
   end
   view.scroller:Show()

@@ -237,9 +237,9 @@ end
 -- row (1 nearest the axis, nil when only the dot shows), labelX,
 -- labelWidth, and characters: memberId, member ("You" for yours), name,
 -- classFilename, level, alt, online, own, canPlay and apart), bars (a
--- dungeon each: name, kind, new, from, to, fits, count, dots (class of each
+-- dungeon each: name, kind, forever (new in WoW: Forever), from, to, fits, count, dots (class of each
 -- Member who fits, up to 4), moreDots, x, width, lane (1 nearest the axis)
--- and tooltip: title, detail, new, you, fits, fitters (memberId, member,
+-- and tooltip: title, detail, forever, you, fits, fitters (memberId, member,
 -- name, classFilename, level, online, far), none and almost) and chips
 -- ("+N here": x, width, lane, text, title, and items, the bars folded in,
 -- each with its detail).
