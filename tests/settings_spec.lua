@@ -95,6 +95,11 @@ local SETTINGS = {
   { key = "toastSound", default = "UI_BNET_TOAST", other = "none" },
   { key = "toastPosition", default = nil, other = { x = 400, y = 600 } },
   { key = "paused", default = false, other = true },
+  { key = "togetherOffline", default = true, other = false },
+  { key = "togetherAlts", default = false, other = true },
+  { key = "togetherNear", default = false, other = true },
+  { key = "togetherAttunements", default = true, other = false },
+  { key = "togetherRaids", default = false, other = true },
 }
 
 describe("Settings list", function()

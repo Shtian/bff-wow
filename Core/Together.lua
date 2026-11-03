@@ -60,6 +60,27 @@ for i, dungeon in ipairs(DUNGEONS) do
 end
 Together.DUNGEONS = DUNGEONS
 
+-- The raids, shown together as one "Raids 5" entry at 60 when the Show
+-- menu's Raids is on.
+local RAID_LIST = {}
+for _, dungeon in ipairs(DUNGEONS) do
+  if dungeon.kind == "raid" then RAID_LIST[#RAID_LIST + 1] = dungeon end
+end
+local RAIDS = {
+  name = ("Raids %d"):format(#RAID_LIST),
+  short = "Raids",
+  from = 60,
+  to = 60,
+  kind = "raids",
+  forever = false,
+  index = #DUNGEONS + 1,
+  raids = RAID_LIST,
+}
+
+-- "Only near your level": dungeons whose range comes within this many
+-- levels of you.
+local NEAR = 10
+
 -- The line's geometry, in pixels: a level's width, the room left of level
 -- 1 and right of the top level, the label rows above the axis and the
 -- dungeon lanes below it, and the gaps kept between neighbours in a row or
@@ -159,11 +180,15 @@ local function closest(member, level, test)
   return best
 end
 
--- Whether a Character shows on the line: yours only while played; others'
--- Main and the Character they're playing. Alts are hidden.
-local function visible(character)
-  if character.member.own then return character.shown end
-  return character.main or character.played
+-- Whether a Character shows on the line, under the Show menu's filters:
+-- yours while played; others' Main and the Character they're playing.
+-- Alts show only with filters.alts, offline Members' Characters only with
+-- filters.offline.
+local function visible(character, filters)
+  local member = character.member
+  if member.own then return character.shown or filters.alts end
+  if not filters.offline and not member.online then return false end
+  return character.main or character.played or filters.alts
 end
 
 local function fits(level, dungeon)
@@ -196,11 +221,11 @@ local function describeCharacter(character, yourLevel)
   }
 end
 
-local function buildGroups(members, yourLevel, measure)
+local function buildGroups(members, yourLevel, measure, filters, chosen)
   local byLevel, levels = {}, {}
   for _, member in ipairs(members) do
     for _, character in ipairs(member.characters) do
-      if visible(character) then
+      if visible(character, filters) then
         local level = character.level
         if not byLevel[level] then
           byLevel[level] = {}
@@ -228,10 +253,19 @@ local function buildGroups(members, yourLevel, measure)
       more = #pins - 1,
       online = false,
       characters = {},
+      memberIds = {},
+      faded = chosen.any,
     }
+    local seen = {}
     for i, character in ipairs(pins) do
       group.characters[i] = describeCharacter(character, yourLevel)
       if character.played then group.online = true end
+      local member = character.member
+      if not member.own and not seen[member.id] then
+        seen[member.id] = true
+        group.memberIds[#group.memberIds + 1] = member.id
+      end
+      if member.own or chosen[member.id] then group.faded = false end
     end
     group.labelWidth = math.min(measure(group.label, "small"), LAYOUT.nameWidth) + 4
       + measure(tostring(level), "tiny")
@@ -324,7 +358,7 @@ local function describeDungeon(dungeon, others, yourLevel)
 
   local tooltip = {
     title = dungeon.name,
-    detail = ("%s · %s · %s"):format(KINDS[dungeon.kind], rangeText(dungeon), dungeon.where),
+    detail = dungeon.where and ("%s · %s · %s"):format(KINDS[dungeon.kind], rangeText(dungeon), dungeon.where),
     forever = dungeon.forever and "New in WoW: Forever" or nil,
     you = you,
     fits = youFit,
@@ -343,6 +377,17 @@ local function describeDungeon(dungeon, others, yourLevel)
       far = gap > CAN_PLAY and ("fits, but %d levels from you"):format(gap) or nil,
     }
   end
+  if dungeon.raids then
+    tooltip.title = "Raids at 60"
+    tooltip.raids = {}
+    for i, raid in ipairs(dungeon.raids) do
+      tooltip.raids[i] = {
+        name = raid.name,
+        detail = ("%d-player · %s"):format(raid.size, raid.where),
+        forever = raid.forever,
+      }
+    end
+  end
   if #almost > 0 then
     local parts = {}
     for i, character in ipairs(almost) do
@@ -353,37 +398,71 @@ local function describeDungeon(dungeon, others, yourLevel)
   return fitters, tooltip
 end
 
--- Bars below the axis for the dungeons shown (raids are hidden), placed in
--- the lanes most relevant first: ones you fit, then by how many Members
--- fit. The rest fold into "+N here" chips near their level.
-local function buildBars(others, yourLevel, measure)
-  local bars = {}
+-- The dungeons the Show menu's filters leave on the line: every dungeon,
+-- the attunement while Attunements is on, one entry for the raids while
+-- Raids is on; with Only near your level, those within NEAR levels of you.
+local function shownDungeons(filters, yourLevel)
+  local list = {}
   for _, dungeon in ipairs(DUNGEONS) do
-    if dungeon.kind ~= "raid" then
-      local fitters, tooltip = describeDungeon(dungeon, others, yourLevel)
-      local dots = {}
-      for i = 1, math.min(#fitters, LAYOUT.dots) do dots[i] = fitters[i].classFilename end
-      local moreDots = math.max(#fitters - LAYOUT.dots, 0)
-      local content = measure(dungeon.name, "small") + 10
-        + (dungeon.forever and measure("NEW", "tiny") + 10 or 0)
-        + (#dots > 0 and #dots * LAYOUT.dot + 6 or 0)
-        + (moreDots > 0 and measure("+" .. moreDots, "tiny") + 4 or 0)
-      bars[#bars + 1] = {
-        name = dungeon.name,
-        kind = dungeon.kind,
-        forever = dungeon.forever,
-        from = dungeon.from,
-        to = dungeon.to,
-        index = dungeon.index,
-        fits = tooltip.fits,
-        count = #fitters,
-        dots = dots,
-        moreDots = moreDots,
-        x = xOf(dungeon.from),
-        width = math.max((dungeon.to - dungeon.from) * LAYOUT.level, content),
-        tooltip = tooltip,
-      }
+    if dungeon.kind == "dungeon" or (dungeon.kind == "attunement" and filters.attunements) then
+      list[#list + 1] = dungeon
     end
+  end
+  if filters.raids then list[#list + 1] = RAIDS end
+  if not filters.near then return list end
+  local near = {}
+  for _, dungeon in ipairs(list) do
+    if dungeon.to >= yourLevel - NEAR and dungeon.from <= yourLevel + NEAR then near[#near + 1] = dungeon end
+  end
+  return near
+end
+
+-- Whether you and every chosen Member (any of their Characters) fit it.
+local function sharedBy(dungeon, yourLevel, chosen)
+  if #chosen == 0 or not fits(yourLevel, dungeon) then return false end
+  for _, member in ipairs(chosen) do
+    if not closest(member, yourLevel, function(c) return fits(c.level, dungeon) end) then return false end
+  end
+  return true
+end
+
+-- Bars below the axis for the dungeons shown, placed in the lanes most
+-- relevant first: ones you fit, then by how many Members fit. The rest
+-- fold into "+N here" chips near their level. While friends are chosen,
+-- the ones you all fit are shared and the rest faded.
+local function buildBars(dungeons, others, yourLevel, measure, chosen)
+  local bars = {}
+  for _, dungeon in ipairs(dungeons) do
+    local fitters, tooltip = describeDungeon(dungeon, others, yourLevel)
+    local dots = {}
+    for i = 1, math.min(#fitters, LAYOUT.dots) do dots[i] = fitters[i].classFilename end
+    local moreDots = math.max(#fitters - LAYOUT.dots, 0)
+    -- The raids' entry starts a little left of 60, for its diamond.
+    local raids = dungeon.kind == "raids"
+    local content = measure(dungeon.name, "small") + 10
+      + (dungeon.forever and measure("NEW", "tiny") + 10 or 0)
+      + (#dots > 0 and #dots * LAYOUT.dot + 6 or 0)
+      + (moreDots > 0 and measure("+" .. moreDots, "tiny") + 4 or 0)
+      + (raids and 12 or 0)
+    local shared = sharedBy(dungeon, yourLevel, chosen)
+    bars[#bars + 1] = {
+      name = dungeon.name,
+      short = dungeon.short or dungeon.name,
+      kind = dungeon.kind,
+      forever = dungeon.forever,
+      from = dungeon.from,
+      to = dungeon.to,
+      index = dungeon.index,
+      fits = tooltip.fits,
+      count = #fitters,
+      dots = dots,
+      moreDots = moreDots,
+      x = xOf(dungeon.from) - (raids and 6 or 0),
+      width = math.max((dungeon.to - dungeon.from) * LAYOUT.level, content),
+      tooltip = tooltip,
+      shared = shared,
+      faded = #chosen > 0 and not shared,
+    }
   end
 
   local order = {}
@@ -458,9 +537,12 @@ local function buildBars(others, yourLevel, measure)
   for _, chip in ipairs(chips) do
     chip.text = ("+%d here"):format(#chip.items)
     chip.title = ("%d more here"):format(#chip.items)
+    chip.shared = false
     for _, item in ipairs(chip.items) do
       item.detail = rangeText(item) .. (item.count > 0 and (" · %d fit"):format(item.count) or "")
+      if item.shared then chip.shared = true end
     end
+    chip.faded = #chosen > 0 and not chip.shared
   end
   return placed, chips
 end
@@ -473,6 +555,47 @@ end
 local function shortName(name)
   if #name > 14 then return name:match("^%S+") or name end
   return name
+end
+
+-- The answer line while friends are chosen: whether you can all play, and
+-- the dungeons shown that you all fit.
+local function chosenAnswer(chosen, yourLevel, bars, chips)
+  local names, far, allNear = { "You" }, {}, true
+  for _, member in ipairs(chosen) do
+    names[#names + 1] = shortName(member.name)
+    local character = closest(member, yourLevel)
+    if not canPlay(character.level, yourLevel) then
+      allNear = false
+      local gap = character.level - yourLevel
+      far[#far + 1] = ("%s is %d %s"):format(shortName(member.name), math.abs(gap), gap > 0 and "ahead" or "behind")
+    end
+  end
+  local first = { segment(listJoin(names, 4)) }
+  if allNear then
+    first[1].text = first[1].text .. " "
+    first[2] = segment("can play", "highlight")
+  end
+
+  local shared = {}
+  local function add(bar)
+    if bar.shared then shared[#shared + 1] = bar end
+  end
+  for _, bar in ipairs(bars) do add(bar) end
+  for _, chip in ipairs(chips) do
+    for _, item in ipairs(chip.items) do add(item) end
+  end
+  table.sort(shared, function(a, b) return a.index < b.index end)
+
+  local second
+  if #shared > 0 then
+    local list = {}
+    for i, bar in ipairs(shared) do list[i] = bar.short end
+    second = { segment("Together: ", "muted"), segment(table.concat(list, ", ")) }
+  else
+    second = { segment(("No dungeon fits you %s yet · %s"):format(#chosen == 1 and "both" or "all",
+      #far > 0 and table.concat(far, ", ") or "Quest together"), "muted") }
+  end
+  return { first, second }
 end
 
 -- The answer line: who can play with you, and the best dungeon together.
@@ -572,31 +695,140 @@ local function answer(others, yourLevel)
   return { first, second }
 end
 
--- The Together tab from Roster's rows (yours first), or nil before you
--- play a Character. measure(text, font) is how wide a text is in pixels
--- in the font named ("small" or "tiny", as Skin's); without one, widths
--- are estimated.
-function Together.view(rows, measure)
-  local own = rows[1]
-  if not own or not own.own then return nil end
-  measure = measure or estimate
-  local yourLevel = own.level
+-- The Show menu: its options with their current values, the key and the
+-- help line.
+local function showMenu(filters)
+  local function option(key, field, label, sub)
+    return { key = key, label = label, sub = sub, value = filters[field] }
+  end
+  return {
+    label = "Show",
+    sections = {
+      { title = "FRIENDS", options = {
+        option("togetherOffline", "offline", "Offline friends"),
+        option("togetherAlts", "alts", "Alts", "Mains and played Characters always show"),
+      } },
+      { title = "DUNGEONS", options = {
+        option("togetherNear", "near", ("Only near your level (±%d)"):format(NEAR)),
+        option("togetherAttunements", "attunements", "Attunements"),
+        option("togetherRaids", "raids", "Raids"),
+      } },
+    },
+    key = {
+      title = "KEY",
+      items = {
+        { kind = "fits", text = "Fits your level" },
+        { kind = "attunement", text = "Attunement" },
+        { kind = "forever", text = "New in WoW: Forever" },
+        { kind = "fitters", text = "Friends who fit it" },
+      },
+    },
+    help = "Drag or scroll to move along the levels. Click a friend to see where you fit together.",
+  }
+end
 
-  local members = membersOf(rows)
-  local others = {}
-  local hidden = 0
-  for _, member in ipairs(members) do
-    if not member.own then
-      others[#others + 1] = member
+-- The stretches of the line, from 0 to width, with nothing in a lane.
+local function emptySpans(bars, chips, width)
+  local taken = {}
+  for _, bar in ipairs(bars) do taken[#taken + 1] = { bar.x, bar.x + bar.width } end
+  for _, chip in ipairs(chips) do taken[#taken + 1] = { chip.x, chip.x + chip.width } end
+  table.sort(taken, function(a, b) return a[1] < b[1] end)
+  local spans, from = {}, 0
+  for _, span in ipairs(taken) do
+    if span[1] > from then spans[#spans + 1] = { left = from, right = span[1] } end
+    from = math.max(from, span[2])
+  end
+  if from < width then spans[#spans + 1] = { left = from, right = width } end
+  return spans
+end
+
+-- "3 alts, 2 offline hidden", or nil when nothing is. Offline Members
+-- hidden by the filter count once each; Alts count among the rest.
+local function hiddenNote(others, filters)
+  local alts, offline = 0, 0
+  for _, member in ipairs(others) do
+    if not filters.offline and not member.online then
+      offline = offline + 1
+    else
       for _, character in ipairs(member.characters) do
-        if not visible(character) then hidden = hidden + 1 end
+        if not visible(character, filters) then alts = alts + 1 end
       end
     end
   end
+  local parts = {}
+  if alts > 0 then parts[#parts + 1] = ("%d %s"):format(alts, plural(alts, "alt", "alts")) end
+  if offline > 0 then parts[#parts + 1] = ("%d offline"):format(offline) end
+  if #parts == 0 then return nil end
+  return table.concat(parts, ", ") .. " hidden"
+end
 
-  local groups = buildGroups(members, yourLevel, measure)
+local DEFAULT_FILTERS = { offline = true, alts = false, near = false, attunements = true, raids = false }
+
+-- Picking friends on the line: clicking a label or dot picks the Members
+-- in it (memberIds), shift-clicking (add) adds them, and clicking what's
+-- already picked clears it. No Members (your own dot) changes nothing.
+-- Returns the new list of memberIds.
+function Together.select(selected, memberIds, add)
+  local result = {}
+  for i, id in ipairs(selected) do result[i] = id end
+  if #memberIds == 0 then return result end
+  local picked = {}
+  for _, id in ipairs(selected) do picked[id] = true end
+  local same = #selected == #memberIds
+  for _, id in ipairs(memberIds) do
+    if not picked[id] then same = false end
+  end
+  if same then return {} end
+  if not add then
+    result = {}
+    picked = {}
+  end
+  for _, id in ipairs(memberIds) do
+    if not picked[id] then
+      picked[id] = true
+      result[#result + 1] = id
+    end
+  end
+  return result
+end
+
+-- The Together tab from Roster's rows (yours first), or nil before you
+-- play a Character. measure(text, font) is how wide a text is in pixels
+-- in the font named ("small" or "tiny", as Skin's); without one, widths
+-- are estimated. options: filters (the Show menu's offline, alts, near,
+-- attunements and raids) and selected (memberIds picked on the line).
+function Together.view(rows, measure, options)
+  local own = rows[1]
+  if not own or not own.own then return nil end
+  measure = measure or estimate
+  options = options or {}
+  local filters = options.filters or DEFAULT_FILTERS
+  local yourLevel = own.level
+
+  local members = membersOf(rows)
+  local others, byId = {}, {}
+  for _, member in ipairs(members) do
+    if not member.own then
+      others[#others + 1] = member
+      byId[member.id] = member
+    end
+  end
+
+  -- The chosen Members, as a list and by id; any is set while there are some.
+  local chosen, selected = {}, {}
+  for _, id in ipairs(options.selected or {}) do
+    local member = byId[id]
+    if member and not chosen[id] then
+      chosen[id] = true
+      chosen[#chosen + 1] = member
+      selected[#selected + 1] = id
+    end
+  end
+  chosen.any = #chosen > 0
+
+  local groups = buildGroups(members, yourLevel, measure, filters, chosen)
   placeLabels(groups, yourLevel)
-  local bars, chips = buildBars(others, yourLevel, measure)
+  local bars, chips = buildBars(shownDungeons(filters, yourLevel), others, yourLevel, measure, chosen)
 
   local ticks = {}
   for level = 1, LAYOUT.levels do
@@ -610,11 +842,20 @@ function Together.view(rows, measure)
     }
   end
 
+  local width = xOf(LAYOUT.levels) + LAYOUT.right
   return {
     as = { name = own.name, classFilename = own.classFilename, level = yourLevel, alt = own.onAlt == true },
-    hidden = hidden > 0 and ("%d %s hidden"):format(hidden, plural(hidden, "alt", "alts")) or nil,
-    answer = answer(others, yourLevel),
-    width = xOf(LAYOUT.levels) + LAYOUT.right,
+    hidden = hiddenNote(others, filters),
+    answer = chosen.any and chosenAnswer(chosen, yourLevel, bars, chips) or answer(others, yourLevel),
+    selected = selected,
+    clear = chosen.any and "Clear" or nil,
+    show = showMenu(filters),
+    empty = filters.near and {
+      text = "No dungeons shown at these levels",
+      action = "Show all levels",
+      spans = emptySpans(bars, chips, width),
+    } or nil,
+    width = width,
     you = xOf(yourLevel),
     band = {
       left = xOf(yourLevel - CAN_PLAY) - LAYOUT.level / 2,

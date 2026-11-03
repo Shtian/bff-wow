@@ -54,10 +54,15 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `toasts` | `toastsOff = true`, or nil while on |
   | `toastSound` | the sound's name, or nil for the default |
   | `toastPosition` | `{ x, y }`, or nil for the default |
+  | `togetherOffline` | `offlineOff = true` inside `together`, or nil while on |
+  | `togetherAlts` | `alts = true` inside `together`, or nil while off |
+  | `togetherNear` | `near = true` inside `together`, or nil while off |
+  | `togetherAttunements` | `attunementsOff = true` inside `together`, or nil while on |
+  | `togetherRaids` | `raids = true` inside `together`, or nil while off |
 
 - **Core's interface:** `setting(key)`, `setSetting(key, value)` and `settings()` (the page's sections). The named methods (`isPaused()`, `setToasts(on)` and the rest) stay as hand-written one-line wrappers, so they're greppable.
 - **Events:** a real change fires `settingChanged(key, value)`, not `changed`; setting a value it already has fires nothing. Core's own reactions run first (Pause sharing pauses Gossip).
-- **The page:** a section header per section and a checkbox per on/off setting, built in a loop from `settings()`, so a new on/off setting needs only a list entry. The sound picker (with Play) and Move toasts are drawn by hand but read and write through `setting()` and `setSetting()`. Leave Crew sits under Appear offline.
+- **The page:** a section header per section and a checkbox per on/off setting, built in a loop from `settings()`, so a new on/off setting needs only a list entry. Settings with no section, the Together tab's Show menu choices (`docs/design/together.md`), aren't on the page; that menu shows them. The sound picker (with Play) and Move toasts are drawn by hand but read and write through `setting()` and `setSetting()`. Leave Crew sits under Appear offline.
 
 Display name isn't in the list: it's part of your Member record and spreads to the Crew.
 

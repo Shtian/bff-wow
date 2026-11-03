@@ -2,8 +2,9 @@
 -- A toolbar ("As Gahzuria 24", what's hidden), the answer line, then a
 -- 1–60 level line that scrolls sideways: friends' dots and labels above the
 -- axis, dungeon bars in lanes below it, and an overview strip under it to
--- jump along. Core places and words everything; this only draws it.
--- See docs/design/together.md.
+-- jump along. Clicking friends picks them to see the dungeons you share,
+-- and the Show menu filters the line. Core places and words everything;
+-- this only draws it and keeps what's picked. See docs/design/together.md.
 
 local _, ns = ...
 
@@ -36,9 +37,19 @@ local RING = 2
 local KEYLINE = 1
 local WHEEL_STEP = 48
 local DASH = 3
+-- A press that moves the cursor less than this is a click, not a drag.
+local CLICK_SLOP = 4
+-- What a selection fades: unpicked friends and dungeons not shared.
+local FADED = 0.3
+local SHARED = { 1, 1, 1, 0.6 }
+local MENU_WIDTH = 212
+local MENU_PAD = 10
 
 local view
 local core
+-- The Members picked on the line, as memberIds; Core drops any it doesn't
+-- know.
+local selected = {}
 -- Bars and chips by frame, for the sticky names while scrolling.
 local barFrames, chipFrames = {}, {}
 local labelFrames, dotFrames, stemTextures = {}, {}, {}
@@ -129,8 +140,12 @@ end
 local function dungeonTooltip(owner)
   local tooltip = owner.bar.tooltip
   GameTooltip:AddLine(tooltip.title, 1, 1, 1)
-  line(tooltip.detail, DIM)
+  if tooltip.detail then line(tooltip.detail, DIM) end
   if tooltip.forever then line(tooltip.forever, MUTED) end
+  for _, raid in ipairs(tooltip.raids or {}) do
+    line(colored(raid.name, TEXT) .. " " .. colored(raid.detail, DIM)
+      .. (raid.forever and " " .. colored("NEW", MUTED) or ""))
+  end
   line(tooltip.you, tooltip.fits and TEXT or DIM)
   for _, fitter in ipairs(tooltip.fitters) do
     local parts = {
@@ -153,8 +168,25 @@ local function chipTooltip(owner)
   end
 end
 
+local function redraw()
+  if view then TogetherTab.draw(view:GetParent(), core) end
+end
+
+local function pick(memberIds, add)
+  selected = ns.Core.selectTogether(selected, memberIds, add)
+  redraw()
+end
+
+local function clearSelection()
+  if #selected == 0 then return end
+  selected = {}
+  redraw()
+end
+
 -- Dragging the line moves along the levels; anything on it passes its
--- mouse-down on, so a drag can start on a bar or a label.
+-- mouse-down on, so a drag can start on a bar or a label. A press that
+-- doesn't move is a click: on a friend it picks them, on the line's empty
+-- space it clears what's picked.
 local function scrollTo(x)
   local scroller = view.scroller
   local range = math.max(0, view.track:GetWidth() - scroller:GetWidth())
@@ -162,8 +194,13 @@ local function scrollTo(x)
   TogetherTab.scrolled()
 end
 
+local function cursorX()
+  return GetCursorPosition() / view.scroller:GetEffectiveScale()
+end
+
 local function startDrag()
-  view.dragFrom = GetCursorPosition() / view.scroller:GetEffectiveScale()
+  view.dragFrom = cursorX()
+  view.pressFrom = view.dragFrom
   view.dragScroll = view.scroller:GetHorizontalScroll()
 end
 
@@ -171,9 +208,17 @@ local function stopDrag()
   view.dragFrom = nil
 end
 
+local function endPress(frame, button)
+  local pressFrom = view.pressFrom
+  view.pressFrom = nil
+  stopDrag()
+  if button ~= "LeftButton" or not pressFrom or not frame.onClick then return end
+  if math.abs(cursorX() - pressFrom) < CLICK_SLOP then frame.onClick(frame) end
+end
+
 local function passDrag(frame)
   frame:SetScript("OnMouseDown", startDrag)
-  frame:SetScript("OnMouseUp", stopDrag)
+  frame:SetScript("OnMouseUp", endPress)
 end
 
 local function centreOnYou()
@@ -191,6 +236,214 @@ local function hoverable(parent, tooltip)
   return frame
 end
 
+-- A dashed 1px edge round a frame, for the attunement.
+local function dashes(frame, width, height)
+  frame.dashes = frame.dashes or {}
+  local count = 0
+  local function dash(x, y, w, h)
+    count = count + 1
+    local texture = frame.dashes[count]
+    if not texture then
+      texture = frame:CreateTexture(nil, "BORDER")
+      frame.dashes[count] = texture
+    end
+    texture:SetColorTexture(1, 1, 1, frame.bar and frame.bar.fits and 0.5 or 0.25)
+    texture:ClearAllPoints()
+    texture:SetPoint("TOPLEFT", x, -y)
+    texture:SetSize(w, h)
+    texture:Show()
+  end
+  for x = 0, width - 1, 2 * DASH do
+    local w = math.min(DASH, width - x)
+    dash(x, 0, w, 1)
+    dash(x, height - 1, w, 1)
+  end
+  for y = 0, height - 1, 2 * DASH do
+    local h = math.min(DASH, height - y)
+    dash(0, y, 1, h)
+    dash(width - 1, y, 1, h)
+  end
+  hideFrom(frame.dashes, count + 1)
+end
+
+-- Hovering a friend lights up their Members' other labels on the line.
+local function lightKin(group)
+  local ids = {}
+  for _, id in ipairs(group and group.memberIds or {}) do ids[id] = true end
+  for _, label in ipairs(labelFrames) do
+    local kin = false
+    if group and label:IsShown() and label.group ~= group then
+      for _, id in ipairs(label.group.memberIds) do
+        if ids[id] then kin = true end
+      end
+    end
+    label.kin:SetShown(kin)
+  end
+end
+
+-- A friend's dot or label: a tooltip, lights up their other labels, and
+-- picks them on click (shift adds).
+local function friendFrame()
+  local frame = hoverable(view.track, groupTooltip)
+  frame:SetScript("OnEnter", function(self)
+    showTooltip(self)
+    lightKin(self.group)
+  end)
+  frame:SetScript("OnLeave", function()
+    hideTooltip()
+    lightKin(nil)
+  end)
+  frame.onClick = function(self) pick(self.group.memberIds, IsShiftKeyDown()) end
+  return frame
+end
+
+-- The Show menu: Core's options as checkboxes, the key and the help line.
+-- Built once from the first together().show; draws its values each time.
+local function keySwatch(parent, kind)
+  local swatch = CreateFrame("Frame", nil, parent)
+  swatch:SetSize(22, 9)
+  if kind == "fits" then
+    Skin.fill(swatch, { 1, 1, 1, 0.12 })
+    local underline = Skin.fill(swatch, Skin.BAR, "BORDER")
+    underline:ClearAllPoints()
+    underline:SetPoint("BOTTOMLEFT")
+    underline:SetPoint("BOTTOMRIGHT")
+    underline:SetHeight(2)
+  elseif kind == "attunement" then
+    swatch.dashed = true
+  elseif kind == "forever" then
+    swatch.badge = Skin.badge(swatch, "tiny", MUTED)
+    swatch.badge:SetPoint("LEFT")
+    swatch.badge:SetText("NEW")
+  elseif kind == "fitters" then
+    for i, classFilename in ipairs({ "DRUID", "ROGUE" }) do
+      local dot = swatch:CreateTexture(nil, "ARTWORK")
+      dot:SetSize(6, 6)
+      dot:SetColorTexture(1, 1, 1, 1)
+      dot:SetVertexColor(Skin.classColor(classFilename))
+      dot:SetPoint("LEFT", (i - 1) * 8, 0)
+      Skin.round(swatch, dot)
+    end
+  end
+  return swatch
+end
+
+local function createMenu(show)
+  local menu = CreateFrame("Frame", nil, view)
+  menu:SetWidth(MENU_WIDTH)
+  menu:SetPoint("TOPRIGHT", view.showButton, "BOTTOMRIGHT", 0, -2)
+  menu:SetFrameLevel(view:GetFrameLevel() + 30)
+  menu:EnableMouse(true)
+  Skin.fill(menu, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1 })
+  Skin.border(menu, { 1, 1, 1, 0.18 })
+  menu.checks = {}
+  local y = 6
+  local function heading(text)
+    local label = Skin.label(menu, "label", MUTED)
+    label:SetPoint("TOPLEFT", MENU_PAD, -(y + 6))
+    label:SetText(text)
+    local rule = Skin.fill(menu, Skin.LINE, "BORDER")
+    rule:ClearAllPoints()
+    rule:SetHeight(1)
+    rule:SetPoint("LEFT", label, "RIGHT", 6, 0)
+    rule:SetPoint("RIGHT", menu, "RIGHT", -MENU_PAD, 0)
+    y = y + 22
+  end
+  for _, section in ipairs(show.sections) do
+    heading(section.title)
+    for _, option in ipairs(section.options) do
+      local key = option.key
+      local check = Skin.checkbox(menu, option.label, function(self)
+        core:setSetting(key, self:GetChecked() and true or false)
+        redraw()
+      end)
+      check:SetPoint("TOPLEFT", MENU_PAD, -(y + 3))
+      menu.checks[key] = check
+      y = y + 22
+      if option.sub then
+        local sub = Skin.label(menu, "tiny", DIM)
+        sub:SetPoint("TOPLEFT", check.label, "BOTTOMLEFT", 0, -1)
+        sub:SetText(option.sub)
+        y = y + 12
+      end
+    end
+  end
+  heading(show.key.title)
+  for _, item in ipairs(show.key.items) do
+    local swatch = keySwatch(menu, item.kind)
+    swatch:SetPoint("TOPLEFT", MENU_PAD, -(y + 4))
+    if swatch.dashed then dashes(swatch, 22, 9) end
+    local label = Skin.label(menu, "small", MUTED)
+    label:SetPoint("LEFT", swatch, "RIGHT", 7, 0)
+    label:SetText(item.text)
+    y = y + 17
+  end
+  local help = Skin.label(menu, "small", DIM)
+  help:SetPoint("TOPLEFT", MENU_PAD, -(y + 6))
+  help:SetWidth(MENU_WIDTH - 2 * MENU_PAD)
+  help:SetText(show.help)
+  menu:SetHeight(y + 6 + help:GetStringHeight() + 10)
+
+  -- A click anywhere outside it, but on the Show button, closes it.
+  menu:SetScript("OnShow", function(self) self:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
+  menu:SetScript("OnHide", function(self)
+    self:UnregisterEvent("GLOBAL_MOUSE_DOWN")
+    TogetherTab.keys()
+  end)
+  menu:SetScript("OnEvent", function(self)
+    if not self:IsMouseOver() and not view.showButton:IsMouseOver() then self:Hide() end
+  end)
+  menu:Hide()
+  return menu
+end
+
+local function drawMenu(show)
+  if not view.menu then view.menu = createMenu(show) end
+  for _, section in ipairs(show.sections) do
+    for _, option in ipairs(section.options) do view.menu.checks[option.key]:SetChecked(option.value) end
+  end
+end
+
+local function toggleMenu()
+  if not view.menu then return end
+  view.menu:SetShown(not view.menu:IsShown())
+  TogetherTab.keys()
+end
+
+-- Escape closes the menu, else clears what's picked. The tab only takes
+-- the keyboard while there's one of those to undo, and never in combat,
+-- where it can't let other keys through.
+local function createKeys()
+  local keys = CreateFrame("Frame", nil, view)
+  keys:SetScript("OnKeyDown", function(self, key)
+    if InCombatLockdown() then return end
+    if key ~= "ESCAPE" then
+      self:SetPropagateKeyboardInput(true)
+      return
+    end
+    self:SetPropagateKeyboardInput(false)
+    if view.menu and view.menu:IsShown() then
+      view.menu:Hide()
+    else
+      clearSelection()
+    end
+    TogetherTab.keys()
+  end)
+  keys:RegisterEvent("PLAYER_REGEN_DISABLED")
+  keys:SetScript("OnEvent", function(self)
+    self:SetPropagateKeyboardInput(true)
+    self:EnableKeyboard(false)
+  end)
+  return keys
+end
+
+function TogetherTab.keys()
+  if not view or InCombatLockdown() then return end
+  local active = view:IsVisible() and ((view.menu and view.menu:IsShown()) or #selected > 0)
+  view.keys:SetPropagateKeyboardInput(true)
+  view.keys:EnableKeyboard(active and true or false)
+end
+
 local function createView(parent)
   view = CreateFrame("Frame", nil, parent)
   view:SetAllPoints()
@@ -206,8 +459,12 @@ local function createView(parent)
   view.asAlt = Skin.badge(view.toolbar, "tiny", MUTED)
   view.asAlt:SetPoint("LEFT", view.as, "RIGHT", 4, 0)
   view.asAlt:SetText("alt")
+  view.showButton = Skin.button(view.toolbar, "Show", toggleMenu)
+  view.showButton:SetHeight(20)
+  view.showButton.label:SetFontObject(Skin.fonts.small)
+  view.showButton:SetPoint("RIGHT", -8, 0)
   view.hidden = Skin.label(view.toolbar, "small", DIM)
-  view.hidden:SetPoint("RIGHT", -INSET, 0)
+  view.hidden:SetPoint("RIGHT", view.showButton, "LEFT", -8, 0)
   view.hidden:SetJustifyH("RIGHT")
 
   -- The answer line.
@@ -216,9 +473,12 @@ local function createView(parent)
   view.answer:SetPoint("TOPRIGHT", 0, -TOOLBAR)
   view.answer:SetHeight(ANSWER)
   Skin.edge(view.answer, "BOTTOM", Skin.LINE)
+  view.clear = Skin.button(view.answer, "Clear", clearSelection)
+  view.clear:SetHeight(20)
+  view.clear.label:SetFontObject(Skin.fonts.small)
+  view.clear:SetPoint("TOPRIGHT", -8, -6)
   view.first = Skin.label(view.answer, "body", TEXT)
   view.first:SetPoint("TOPLEFT", INSET, -6)
-  view.first:SetPoint("RIGHT", -INSET, 0)
   view.first:SetWordWrap(false)
   view.second = Skin.label(view.answer, "small", MUTED)
   view.second:SetPoint("TOPLEFT", view.first, "BOTTOMLEFT", 0, -4)
@@ -274,6 +534,7 @@ local function createView(parent)
     scrollTo(self:GetHorizontalScroll() - delta * WHEEL_STEP)
   end)
   passDrag(view.scroller)
+  view.scroller.onClick = clearSelection
   view.scroller:SetScript("OnUpdate", function(self)
     if not view.dragFrom then return end
     if not IsMouseButtonDown("LeftButton") then
@@ -316,6 +577,32 @@ local function createView(parent)
   view.backRight.label:SetFontObject(Skin.fonts.small)
   view.backRight:SetPoint("TOPRIGHT", view.scroller, "TOPRIGHT", -6, -4)
   view.backRight:SetFrameLevel(view.scroller:GetFrameLevel() + 10)
+
+  -- With only near your level on: what's said over a stretch of the line
+  -- with no dungeons, and the link that turns the filter off.
+  view.empty = CreateFrame("Frame", nil, view)
+  view.empty:SetSize(1, 16)
+  view.empty:SetFrameLevel(view.scroller:GetFrameLevel() + 10)
+  view.emptyText = Skin.label(view.empty, "small", DIM)
+  view.emptyText:SetPoint("LEFT")
+  view.emptyAction = CreateFrame("Button", nil, view.empty)
+  view.emptyAction:SetHeight(16)
+  view.emptyAction:SetPoint("LEFT", view.emptyText, "RIGHT", 0, 0)
+  view.emptyAction.label = Skin.label(view.emptyAction, "small", MUTED)
+  view.emptyAction.label:SetPoint("LEFT")
+  view.emptyAction:SetScript("OnEnter", function(self) Skin.color(self.label, TEXT) end)
+  view.emptyAction:SetScript("OnLeave", function(self) Skin.color(self.label, MUTED) end)
+  view.emptyAction:SetScript("OnClick", function()
+    core:setSetting("togetherNear", false)
+    redraw()
+  end)
+  view.empty:Hide()
+
+  view.keys = createKeys()
+  view:SetScript("OnHide", function()
+    if view.menu then view.menu:Hide() end
+    TogetherTab.keys()
+  end)
 end
 
 local function at(region, x, y, width, height)
@@ -370,7 +657,7 @@ local function drawAxis(data)
 end
 
 local function createDotFrame()
-  local frame = hoverable(view.track, groupTooltip)
+  local frame = friendFrame()
   local size = DOT + 2 * (RING + KEYLINE)
   frame:SetSize(size + 4, size + 4)
   frame.outline = frame:CreateTexture(nil, "ARTWORK", nil, 0)
@@ -399,9 +686,11 @@ local function createDotFrame()
 end
 
 local function createLabelFrame()
-  local frame = hoverable(view.track, groupTooltip)
+  local frame = friendFrame()
   frame:SetHeight(LABEL_HEIGHT)
   frame.hover = Skin.fill(frame, Skin.LINE, "HIGHLIGHT")
+  frame.kin = Skin.fill(frame, Skin.LINE)
+  frame.kin:Hide()
   frame.name = Skin.label(frame, "small", TEXT)
   frame.name:SetPoint("LEFT", 3, 0)
   frame.name:SetWordWrap(false)
@@ -426,6 +715,7 @@ local function drawGroups(data)
     dot.outline:SetShown(group.own)
     dot.count:SetShown(group.row == nil and group.count > 1)
     dot.count:SetText(group.count)
+    dot:SetAlpha(group.faded and FADED or 1)
     dot:Show()
 
     local label = labelFrames[i] or createLabelFrame()
@@ -449,6 +739,8 @@ local function drawGroups(data)
       label.more:ClearAllPoints()
       label.more:SetPoint("LEFT", label.level, "RIGHT", 3, 0)
       label.more:SetText(group.more > 0 and "+" .. group.more or "")
+      label.kin:Hide()
+      label:SetAlpha(group.faded and FADED or 1)
       label:Show()
 
       stems = stems + 1
@@ -459,6 +751,7 @@ local function drawGroups(data)
         stemTextures[stems] = stem
       end
       at(stem, group.x, y + LABEL_HEIGHT - 2, 1, rail - y - LABEL_HEIGHT - 3)
+      stem:SetAlpha(group.faded and FADED or 1)
       stem:Show()
     else
       label:Hide()
@@ -467,36 +760,6 @@ local function drawGroups(data)
   hideFrom(dotFrames, #data.groups + 1)
   hideFrom(labelFrames, #data.groups + 1)
   hideFrom(stemTextures, stems + 1)
-end
-
--- A dashed 1px edge round a frame, for the attunement.
-local function dashes(frame, width, height)
-  frame.dashes = frame.dashes or {}
-  local count = 0
-  local function dash(x, y, w, h)
-    count = count + 1
-    local texture = frame.dashes[count]
-    if not texture then
-      texture = frame:CreateTexture(nil, "BORDER")
-      frame.dashes[count] = texture
-    end
-    texture:SetColorTexture(1, 1, 1, frame.bar and frame.bar.fits and 0.5 or 0.25)
-    texture:ClearAllPoints()
-    texture:SetPoint("TOPLEFT", x, -y)
-    texture:SetSize(w, h)
-    texture:Show()
-  end
-  for x = 0, width - 1, 2 * DASH do
-    local w = math.min(DASH, width - x)
-    dash(x, 0, w, 1)
-    dash(x, height - 1, w, 1)
-  end
-  for y = 0, height - 1, 2 * DASH do
-    local h = math.min(DASH, height - y)
-    dash(0, y, 1, h)
-    dash(width - 1, y, 1, h)
-  end
-  hideFrom(frame.dashes, count + 1)
 end
 
 local function createBarFrame()
@@ -509,11 +772,18 @@ local function createBarFrame()
   frame.underline:SetPoint("BOTTOMRIGHT")
   frame.underline:SetHeight(2)
   frame.hover = Skin.fill(frame, Skin.HOVER, "HIGHLIGHT")
+  -- The 1px light outline of a dungeon you share with who's picked.
+  frame.outline = Skin.border(frame, SHARED)
   -- What stays readable when the bar is partly scrolled off the left.
   frame.inner = CreateFrame("Frame", nil, frame)
   frame.inner:SetHeight(BAR)
+  -- The raids' diamond.
+  frame.diamond = frame.inner:CreateTexture(nil, "ARTWORK")
+  frame.diamond:SetSize(7, 7)
+  frame.diamond:SetPoint("LEFT", 2, 0)
+  frame.diamond:SetColorTexture(Skin.BAR[1], Skin.BAR[2], Skin.BAR[3], 1)
+  frame.diamond:SetRotation(math.rad(45))
   frame.name = Skin.label(frame.inner, "small")
-  frame.name:SetPoint("LEFT", 0, 0)
   frame.forever = Skin.badge(frame.inner, "tiny", MUTED)
   frame.forever:SetText("NEW")
   frame.dots = {}
@@ -533,9 +803,15 @@ local function drawBar(frame, bar)
   elseif frame.dashes then
     hideFrom(frame.dashes, 1)
   end
+  for _, edge in ipairs(frame.outline) do edge:SetShown(bar.shared) end
+  frame:SetAlpha(bar.faded and FADED or 1)
+  local raids = bar.kind == "raids"
+  frame.diamond:SetShown(raids)
+  frame.name:ClearAllPoints()
+  frame.name:SetPoint("LEFT", raids and 12 or 0, 0)
   frame.name:SetText(bar.name)
-  Skin.color(frame.name, bar.fits and TEXT or DIM)
-  local anchor, width = frame.name, frame.name:GetStringWidth()
+  Skin.color(frame.name, (bar.fits or bar.shared) and TEXT or DIM)
+  local anchor, width = frame.name, (raids and 12 or 0) + frame.name:GetStringWidth()
   frame.forever:SetShown(bar.forever)
   if bar.forever then
     frame.forever:ClearAllPoints()
@@ -595,6 +871,7 @@ local function drawDungeons(data)
     frame.chip = chip
     at(frame, chip.x, laneY(chip.lane), chip.width, BAR)
     frame.text:SetText(chip.text)
+    frame:SetAlpha(chip.faded and FADED or 1)
     frame:Show()
   end
   hideFrom(chipFrames, #data.chips + 1)
@@ -647,6 +924,12 @@ function TogetherTab.scrolled()
   for _, button in ipairs({ view.backLeft, view.backRight }) do
     button:SetWidth(button.label:GetStringWidth() + 16)
   end
+  -- The hint shows while the whole window is in one empty stretch.
+  local empty = false
+  for _, span in ipairs(data.empty and data.empty.spans or {}) do
+    if left >= span.left and left + width <= span.right then empty = true end
+  end
+  view.empty:SetShown(empty)
 end
 
 local function answerText(segments, default)
@@ -665,7 +948,7 @@ function TogetherTab.draw(parent, theCore)
   if not view then createView(parent) end
   local opening = not view:IsVisible()
   view:Show()
-  local data = core:together(measure)
+  local data = core:together(measure, selected)
   view.data = data
   if not data then
     view.scroller:Hide()
@@ -674,9 +957,36 @@ function TogetherTab.draw(parent, theCore)
     view.hidden:SetText("")
     view.first:SetText("")
     view.second:SetText("")
+    view.clear:Hide()
+    view.showButton:Hide()
+    view.empty:Hide()
+    if view.menu then view.menu:Hide() end
     return
   end
   view.scroller:Show()
+  view.showButton:Show()
+  view.showButton:SetText(data.show.label)
+  view.showButton:SetWidth(view.showButton.label:GetStringWidth() + 16)
+  drawMenu(data.show)
+  selected = data.selected
+  view.clear:SetShown(data.clear ~= nil)
+  view.first:ClearAllPoints()
+  view.first:SetPoint("TOPLEFT", INSET, -6)
+  if data.clear then
+    view.clear:SetText(data.clear)
+    view.clear:SetWidth(view.clear.label:GetStringWidth() + 16)
+    view.first:SetPoint("RIGHT", view.clear, "LEFT", -8, 0)
+  else
+    view.first:SetPoint("RIGHT", -INSET, 0)
+  end
+  if data.empty then
+    view.emptyText:SetText(data.empty.text .. " · ")
+    view.emptyAction.label:SetText(data.empty.action)
+    view.emptyAction:SetWidth(view.emptyAction.label:GetStringWidth())
+    view.empty:SetWidth(view.emptyText:GetStringWidth() + view.emptyAction:GetWidth())
+    view.empty:ClearAllPoints()
+    view.empty:SetPoint("TOP", view.scroller, "TOP", 0, -(laneY(1) + 30))
+  end
 
   view.as:SetText(("As %s %d"):format(classHex(data.as.classFilename) .. data.as.name .. "|r", data.as.level))
   view.asAlt:SetShown(data.as.alt)
@@ -695,6 +1005,7 @@ function TogetherTab.draw(parent, theCore)
   else
     TogetherTab.scrolled()
   end
+  TogetherTab.keys()
 end
 
 function TogetherTab.hide()
