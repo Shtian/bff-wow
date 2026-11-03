@@ -1,0 +1,707 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Question: what should a v2 "overlap finder" look like: a way to see which
+  Crew Characters you can play with and which dungeons (and group challenges) fit you together?
+  Four structurally different variants of a new panel tab ("Together"), switchable via ?variant=A..D,
+  the arrows in the bottom bar, or the ← → keys:
+    A  Level line (round 2, picked; reworked after an Impeccable critique): a horizontally scrolling
+       1–60 axis. Friends are pins above it (one dot per level, labels in at most 4 rows, merged as
+       "Simba +2"), dungeons are bars below it (at most 5 lanes, the rest as "+N here" chips, Member
+       dots on each bar). An answer line on top says who can play with you and the best dungeon
+       together; click a friend to see what you share. "Show" filters, with defaults that hide Alts,
+       far-off dungeons and raids, and carries the key.
+    B  Dungeon list: dungeon-first. Each dungeon row lists who fits it; grouped Now / Next / Later.
+    C  Party builder: answer-first. Picks the best group for a dungeon right now, with alternatives
+       and "almost" lines (who is a few levels short).
+    D  Pairs grid: people-first. Your Characters × the Crew's Members, cells are level gaps,
+       plus a ranked list of pairs that can play together.
+  ?me=1|2 plays as an Alt (15) or a level-58 Alt; ?crew=large|crowd|solo swaps the Crew (crowd = 12
+  Members bunched around 24 with long names, solo = just you).
+  Follows DESIGN.md loosely (460×380 panel, 124px sidebar, Ember Gold only for "can play").
+  Classic level ranges are rough, Horde-side. NEW marks the nine dungeons and two raids new in Forever (ranges from
+  Blizzard's Oct 20 2026 announcement). All Crew data is fake.
+  Run: open the file in a browser.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE · BFF overlap finder</title>
+<style>
+  :root {
+    --gold:#ffd14a; --gold-rgb:255,209,74; --on-gold:#1a1400; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99;
+    --online:#70e370; --offline:#54525e; --window:rgba(14,13,20,.97); --header:#1a1821; --raised:#1b1a23;
+    --line:rgba(255,255,255,.07); --border:rgba(255,255,255,.10); --track:rgba(255,255,255,.08); --fill:rgba(255,255,255,.30);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px 16px 110px; font:14px/1.25 "Arial Narrow", "Archivo Narrow", "Roboto Condensed", Arial, sans-serif; color:var(--text);
+    background: radial-gradient(ellipse at 40% 30%, #2a3a30 0%, #141a14 55%, #070a07 100%); min-height:100vh; }
+  .note { max-width:640px; margin:0 auto 14px; color:var(--muted); font-size:13px; }
+  .note b { color:var(--gold); font-weight:normal; }
+  .state { max-width:640px; margin:0 auto 12px; color:var(--dim); font:12px ui-monospace, Menlo, monospace; }
+  .stage { display:flex; justify-content:center; }
+  .zoom { zoom:1.35; }
+  .fr { font-family:"Friz Quadrata TT", Cinzel, Georgia, serif; }
+
+  .panel { width:460px; height:380px; background:var(--window); border:1px solid var(--border); display:flex; flex-direction:column; }
+  .head { height:30px; background:var(--header); display:flex; align-items:center; padding:0 10px 0 12px; border-bottom:1px solid var(--line); flex:none; }
+  .head .t { color:var(--gold); font-size:13px; flex:1; }
+  .head .on { color:var(--muted); font-size:12px; margin-right:12px; } .head .on::before { content:"●"; color:var(--online); margin-right:4px; font-size:8px; }
+  .head .x { color:var(--dim); font-size:12px; }
+  .body { flex:1; display:flex; min-height:0; }
+  .side { width:124px; border-right:1px solid var(--line); padding:6px; display:flex; flex-direction:column; flex:none; background:rgba(0,0,0,.25); }
+  .side div { height:30px; line-height:30px; padding:0 8px; color:var(--muted); font-size:14px; }
+  .side .sel { background:rgba(255,255,255,.08); color:var(--text); border-radius:2px; }
+  .side .grow { flex:1; }
+  .content { width:335px; display:flex; flex-direction:column; min-height:0; position:relative; }
+
+  :root { --cls-MAGE:#3FC7EB; --cls-WARRIOR:#C69B6D; --cls-ROGUE:#FFF468; --cls-DRUID:#FF7C0A; --cls-PRIEST:#fff; --cls-HUNTER:#AAD372;
+    --cls-WARLOCK:#8788EE; --cls-PALADIN:#F48CBA; --cls-SHAMAN:#0070DD; }
+  .c-MAGE{color:#3FC7EB}.c-WARRIOR{color:#C69B6D}.c-ROGUE{color:#FFF468}.c-DRUID{color:#FF7C0A}.c-PRIEST{color:#fff}
+  .c-HUNTER{color:#AAD372}.c-WARLOCK{color:#8788EE}.c-PALADIN{color:#F48CBA}.c-SHAMAN{color:#0070DD}
+
+  .label { font-family:"Friz Quadrata TT", Cinzel, Georgia, serif; font-size:10px; color:var(--dim); letter-spacing:.04em; }
+  .small { font-size:12px; } .tiny { font-size:11px; } .muted { color:var(--muted); } .dim { color:var(--dim); } .gold { color:var(--gold); }
+  .dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--offline); margin-right:4px; vertical-align:1px; }
+  .dot.on { background:var(--online); }
+  .tag { font-size:11px; color:var(--dim); background:rgba(255,255,255,.06); padding:0 4px; margin-left:4px; }
+  .toolbar { height:28px; flex:none; display:flex; align-items:center; gap:6px; padding:0 12px; border-bottom:1px solid var(--line); }
+  .toolbar .grow { flex:1; }
+  .btn { height:20px; padding:0 8px; font:12px inherit; font-family:inherit; color:var(--text); background:rgba(255,255,255,.06); border:0; cursor:pointer; }
+  .btn.on { background:rgba(255,255,255,.16); }
+  .btn.primary { background:var(--gold); color:var(--on-gold); height:24px; font-size:14px; padding:0 12px; }
+  .scroll { flex:1; overflow:auto; min-height:0; }
+  .scroll::-webkit-scrollbar { width:6px; height:6px; } .scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15); }
+  .foot { flex:none; border-top:1px solid var(--line); padding:5px 12px; font-size:12px; color:var(--muted); min-height:26px; }
+
+  /* A: level line (round 2) */
+  .a-tool { height:28px; flex:none; display:flex; align-items:center; gap:8px; padding:0 8px 0 12px; border-bottom:1px solid var(--line); }
+  .a-tool .as { font-size:12px; color:var(--muted); white-space:nowrap; }
+  .a-tool .grow { flex:1; }
+  .a-tool .hid { font-size:12px; color:var(--dim); white-space:nowrap; }
+  .sbtn { height:20px; padding:0 8px; font:12px "Arial Narrow", "Archivo Narrow", "Roboto Condensed", Arial, sans-serif; color:var(--text);
+    background:rgba(255,255,255,.06); border:1px solid var(--border); cursor:pointer; }
+  .sbtn:hover { background:rgba(255,255,255,.12); }
+  .sbtn.open { background:rgba(255,255,255,.14); }
+  .answer { height:46px; flex:none; padding:5px 12px 0; border-bottom:1px solid var(--line); position:relative; }
+  .answer .l1 { font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:4px; }
+  .answer .l2 { font-size:12px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .answer .l2 b { font-weight:normal; color:var(--text); }
+  .answer .none { color:var(--muted); }
+  .answer .clear { position:absolute; right:8px; top:6px; }
+  .answer.sel .l1 { padding-right:56px; }
+  .linewrap { position:relative; flex:1; min-height:0; }
+  .lscroll { position:absolute; inset:0; overflow-x:auto; overflow-y:hidden; cursor:grab; }
+  .lscroll::-webkit-scrollbar { height:0; }
+  .lscroll.drag { cursor:grabbing; }
+  .track { position:relative; height:100%; }
+  .band { position:absolute; top:0; bottom:0; background:rgba(var(--gold-rgb),.04); border-left:1px solid rgba(var(--gold-rgb),.45); border-right:1px solid rgba(var(--gold-rgb),.45); pointer-events:none; }
+  .band span { position:absolute; top:3px; left:5px; font-size:11px; color:var(--gold); white-space:nowrap; }
+  .axis { position:absolute; left:0; height:18px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); background:rgba(0,0,0,.25); }
+  .tick { position:absolute; top:0; width:1px; height:3px; background:rgba(255,255,255,.16); }
+  .tick.big { height:5px; background:rgba(255,255,255,.4); }
+  .tnum { position:absolute; top:4px; font-size:11px; color:var(--muted); transform:translateX(-50%); }
+  .tnum.me { color:var(--text); }
+  .stem { position:absolute; width:1px; background:rgba(255,255,255,.14); pointer-events:none; }
+  .pdot { position:absolute; width:11px; height:11px; border-radius:50%; border:2px solid var(--offline); box-shadow:0 0 0 1px #0e0d14; cursor:pointer; }
+  .pdot.on { border-color:var(--online); }
+  .pdot.me { outline:1px solid rgba(255,255,255,.7); outline-offset:2px; }
+  .pdot .n { position:absolute; left:9px; top:-9px; font-size:11px; color:var(--text); background:#2a2833; padding:0 3px; line-height:13px; }
+  .plab { position:absolute; height:17px; line-height:17px; white-space:nowrap; font-size:13px; color:var(--text); cursor:pointer; padding:0 3px; margin-left:-3px; }
+  .plab:hover, .plab.kin { background:rgba(255,255,255,.07); }
+  .plab .lv { color:var(--muted); font-size:11px; margin-left:4px; }
+  .plab .more { color:var(--muted); font-size:12px; margin-left:3px; }
+  .atag { font-size:11px; color:var(--muted); background:rgba(255,255,255,.08); padding:0 3px; margin-left:4px; line-height:13px; display:inline-block; }
+  .faded { opacity:.3; }
+  .dbar { position:absolute; height:17px; line-height:17px; font-size:12px; padding:0 4px; white-space:nowrap; display:flex; align-items:center; gap:4px;
+    background:rgba(255,255,255,.05); color:var(--dim); cursor:default; }
+  .dbar.fit { background:rgba(255,255,255,.12); color:var(--text); box-shadow:inset 0 -2px 0 var(--fill); }
+  .dbar.attune { background:transparent; outline:1px dashed rgba(255,255,255,.25); outline-offset:-1px; }
+  .dbar.attune.fit { outline-color:rgba(255,255,255,.5); }
+  .dbar.raids::before { content:""; width:7px; height:7px; transform:rotate(45deg); background:var(--fill); flex:none; margin-right:2px; }
+  .dbar.shared { outline:1px solid rgba(255,255,255,.6); outline-offset:-1px; color:var(--text); }
+  .dbar .in { position:sticky; left:4px; display:flex; align-items:center; gap:4px; }
+  .dbar .newp { font-size:11px; line-height:12px; padding:0 3px; background:rgba(255,255,255,.10); color:var(--muted); }
+  .dbar .grow { flex:1; min-width:4px; }
+  .dbar .md { width:6px; height:6px; border-radius:50%; flex:none; }
+  .dbar .mn { font-size:11px; color:var(--muted); }
+  .dbar.over { background:transparent; color:var(--muted); outline:1px solid var(--border); outline-offset:-1px; padding:0 5px; }
+  .back { position:absolute; top:4px; z-index:3; }
+  .back.l { left:6px; } .back.r { right:6px; }
+  .zonehint { position:absolute; left:0; right:0; text-align:center; font-size:12px; color:var(--dim); pointer-events:none; }
+  .zonehint u { color:var(--muted); pointer-events:auto; cursor:pointer; }
+  .ov { height:22px; flex:none; display:flex; align-items:center; padding:0 12px; border-top:1px solid var(--line); }
+  .ovt { position:relative; flex:1; height:10px; background:var(--track); cursor:pointer; }
+  .ovt i { position:absolute; top:2px; width:2px; height:6px; }
+  .ovt .meb { position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--gold); }
+  .ovt .view { position:absolute; top:-3px; bottom:-3px; border:1px solid rgba(255,255,255,.45); }
+  .menu { position:absolute; right:8px; top:27px; width:212px; z-index:20; background:#0e0d14; border:1px solid rgba(255,255,255,.18); padding:6px 0 8px; }
+  .menu .ml { display:flex; align-items:center; gap:6px; padding:8px 10px 4px; }
+  .menu .ml::after { content:""; flex:1; height:1px; background:var(--line); }
+  .menu .ck .sub { display:block; font-size:11px; color:var(--dim); }
+  .menu .ck { display:flex; align-items:center; gap:7px; min-height:22px; padding-top:2px; padding-bottom:2px; padding:0 10px; font-size:12px; color:var(--muted); cursor:pointer; }
+  .menu .ck:hover { background:rgba(255,255,255,.05); color:var(--text); }
+  .menu .box { width:14px; height:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.25); position:relative; flex:none; }
+  .menu .box.on::after { content:""; position:absolute; inset:3px; background:var(--gold); }
+  .menu .key { display:flex; align-items:center; gap:7px; padding:2px 10px; font-size:12px; color:var(--muted); }
+  .menu .sw { width:22px; height:9px; flex:none; }
+  .menu .help { padding:4px 10px 0; font-size:12px; color:var(--dim); line-height:1.4; }
+
+  /* B: dungeon list */
+  .sec { height:24px; line-height:28px; padding:0 12px; }
+  .drow { padding:5px 12px 6px; border-top:1px solid var(--line); cursor:pointer; }
+  .drow:hover { background:rgba(255,255,255,.05); }
+  .drow .top { display:flex; align-items:baseline; gap:6px; }
+  .drow .nm { font-size:15px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .drow .rg { font-size:12px; color:var(--muted); }
+  .cnt { font-size:11px; min-width:26px; text-align:center; background:rgba(255,255,255,.08); }
+  .cnt.good { background:var(--gold); color:var(--on-gold); }
+  .who { font-size:12px; margin-top:2px; color:var(--muted); line-height:16px; }
+  .who .c { margin-right:8px; white-space:nowrap; }
+  .drow.out .nm { color:var(--muted); }
+  .near { font-size:12px; color:var(--dim); }
+
+  /* C: party */
+  .hero { padding:10px 12px 8px; }
+  .hero .nm { font-size:17px; } .hero .sub { font-size:12px; color:var(--muted); margin-top:1px; }
+  .slot { height:24px; display:flex; align-items:center; padding:0 12px; border-top:1px solid var(--line); font-size:14px; }
+  .slot .grow { flex:1; } .slot .lv { width:24px; color:var(--muted); font-size:12px; }
+  .slot.empty { color:var(--dim); font-style:italic; }
+  .alt-row { display:flex; gap:6px; padding:4px 12px; font-size:13px; cursor:pointer; }
+  .alt-row:hover { background:rgba(255,255,255,.05); }
+  .alt-row .grow { flex:1; }
+
+  /* D: pairs grid */
+  table.grid { border-collapse:collapse; margin:8px 12px 4px; }
+  .grid th { font-weight:normal; font-size:12px; color:var(--muted); height:20px; padding:0; }
+  .grid th.vh { height:62px; vertical-align:bottom; } .grid th.vh div { writing-mode:vertical-rl; transform:rotate(180deg); margin:0 auto 4px; white-space:nowrap; }
+  .grid th.rh { text-align:left; padding-right:6px; font-size:13px; }
+  .grid td { width:30px; height:24px; text-align:center; font-size:12px; color:var(--dim); border:1px solid var(--line); cursor:default; }
+  .grid td.fit { background:rgba(var(--gold-rgb),.14); color:var(--gold); }
+  .grid td.near { background:rgba(255,255,255,.05); color:var(--muted); }
+  .grid td.hot { box-shadow: inset 0 0 0 1px rgba(255,255,255,.5); }
+  .pair { padding:4px 12px; border-top:1px solid var(--line); font-size:13px; }
+  .pair .d { font-size:12px; color:var(--muted); }
+
+  .tip { position:fixed; pointer-events:none; background:rgba(8,8,12,.95); border:1px solid rgba(255,255,255,.25); padding:7px 9px;
+    font-size:13px; z-index:50; min-width:170px; max-width:260px; display:none; line-height:1.35; }
+  .tip .t1 { color:#fff; font-size:14px; margin-bottom:2px; }
+
+  .bar-ui { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); display:flex; gap:10px; align-items:center;
+    background:#f4f1ea; color:#111; padding:7px 12px; border-radius:22px; box-shadow:0 6px 24px #000a; font:13px system-ui, sans-serif; z-index:100; white-space:nowrap; }
+  .bar-ui button { border:0; background:#ddd8cc; border-radius:12px; padding:3px 9px; cursor:pointer; font:inherit; }
+  .bar-ui button.on { background:#111; color:#fff; }
+  .bar-ui .lab { font-weight:600; min-width:190px; text-align:center; }
+  .bar-ui .sep { width:1px; height:18px; background:#0003; }
+</style>
+</head>
+<body>
+<div class="note">PROTOTYPE · <b>Overlap finder</b> (v2): four takes on "who can I play with, and where?" as a new <b>Together</b> tab. Flip with ← →. Hover things for details.</div>
+<div class="state" id="state"></div>
+<div class="stage"><div class="zoom">
+  <div class="panel">
+    <div class="head"><div class="t fr">Best Friends in Forever</div><div class="on" id="online"></div><div class="x">✕</div></div>
+    <div class="body">
+      <div class="side">
+        <div>Roster</div><div>Feed</div><div>Goals</div><div>When</div><div>Spares</div><div>Professions</div><div class="sel">Together</div>
+        <div class="grow"></div><div>Settings</div>
+      </div>
+      <div class="content" id="content"></div>
+    </div>
+  </div>
+</div></div>
+<div class="tip" id="tip"></div>
+
+<div class="bar-ui">
+  <button id="prev">‹</button><span class="lab" id="vlab"></span><button id="next">›</button>
+  <div class="sep"></div>
+  <button id="me">play as Alt</button><button id="crew">large Crew</button>
+</div>
+
+<script>
+// ---------- fake data ----------
+const DUNGEONS = [
+  { n:"Ragefire Chasm", lo:13, hi:18 }, { n:"Wailing Caverns", lo:17, hi:24 }, { n:"Shadowfang Keep", lo:22, hi:30 },
+  { n:"Blackfathom Deeps", lo:24, hi:32 }, { n:"Razorfen Kraul", lo:30, hi:40 }, { n:"Gnomeregan", lo:29, hi:38 },
+  { n:"SM Graveyard", lo:28, hi:38 }, { n:"SM Library", lo:29, hi:39 }, { n:"SM Armory", lo:32, hi:42 }, { n:"SM Cathedral", lo:35, hi:45 },
+  { n:"Razorfen Downs", lo:40, hi:50 }, { n:"Uldaman", lo:42, hi:52 }, { n:"Zul'Farrak", lo:44, hi:54 }, { n:"Maraudon", lo:46, hi:55 },
+  { n:"Sunken Temple", lo:50, hi:60 }, { n:"Blackrock Depths", lo:52, hi:60 }, { n:"Lower Blackrock Spire", lo:55, hi:60 },
+  { n:"Dire Maul", lo:56, hi:60 }, { n:"Scholomance", lo:58, hi:60 }, { n:"Stratholme", lo:58, hi:60 }, { n:"Upper Blackrock Spire", lo:58, hi:60 },
+  // New in WoW: Forever (Blizzard, "Explore the New Dungeons", Oct 20 2026). Raids per CurseForge/Zockify: Mount Hyjal, Dec 9 2026, level not stated.
+  { n:"Hall of Thanes", lo:13, hi:18, fv:true, where:"beneath Ironforge" }, { n:"Ruins of Lordaeron", lo:15, hi:20, fv:true, where:"Tirisfal Glades" },
+  { n:"Excavation Site", lo:24, hi:29, fv:true, where:"Wetlands" }, { n:"City of Dalaran", lo:28, hi:33, fv:true, where:"Alterac Mountains, attunement" },
+  { n:"The Drowned City", lo:35, hi:40, fv:true, where:"off Stranglethorn" }, { n:"Krol'dok Stronghold", lo:40, hi:45, fv:true, where:"Riverglades" },
+  { n:"Alcaz Prison", lo:48, hi:53, fv:true, where:"Dustwallow Marsh" }, { n:"Blackmaw Hold", lo:55, hi:60, fv:true, where:"Azshara" },
+  { n:"Shaper's Terrace", lo:58, hi:60, fv:true, where:"Un'Goro Crater" },
+  { n:"The Barrow Deeps", lo:60, hi:60, kind:"raid", fv:true, where:"Mount Hyjal, 10-player" }, { n:"Hyjal Summit", lo:60, hi:60, kind:"raid", fv:true, where:"Mount Hyjal, 20-player" },
+  { n:"Onyxia attunement", lo:55, hi:60, kind:"challenge", why:"quest chain" },
+  { n:"Molten Core", lo:60, hi:60, kind:"raid" }, { n:"Onyxia's Lair", lo:60, hi:60, kind:"raid" }, { n:"Zul'Gurub", lo:60, hi:60, kind:"raid" },
+];
+const SMALL = [
+  { display:"Gahz", own:true, online:true, chars:[ { name:"Gahzuria", cls:"MAGE", lvl:24, main:true }, { name:"Gahzlet", cls:"PRIEST", lvl:15 }, { name:"Gahzadin", cls:"PALADIN", lvl:58 } ] },
+  { display:"Simbad", online:true, chars:[ { name:"Simbadsson", cls:"WARRIOR", lvl:27, main:true }, { name:"Simbad", cls:"ROGUE", lvl:22, playing:true } ] },
+  { display:"Simone", chars:[ { name:"Simone", cls:"MAGE", lvl:41, main:true }, { name:"Simonette", cls:"PRIEST", lvl:19 } ] },
+  { display:"Simba", online:true, chars:[ { name:"Simba", cls:"DRUID", lvl:25, main:true } ] },
+];
+const EXTRA = [
+  { display:"Thornwick", chars:[ { name:"Thornwick", cls:"HUNTER", lvl:33, main:true }, { name:"Thornbank", cls:"WARLOCK", lvl:16 }, { name:"Thornlet", cls:"SHAMAN", lvl:8 } ] },
+  { display:"Mirelle", online:true, chars:[ { name:"Mirelle", cls:"PALADIN", lvl:52, main:true } ] },
+  { display:"Oskar", chars:[ { name:"Oskar", cls:"WARRIOR", lvl:60, main:true }, { name:"Oskarina", cls:"PRIEST", lvl:38 } ] },
+  { display:"Linnea", chars:[ { name:"Linnea", cls:"DRUID", lvl:26, main:true }, { name:"Linlin", cls:"MAGE", lvl:14 } ] },
+];
+// 8 more Members bunched around level 24, with long Forever names, to stress the line.
+const CROWD = [
+  { display:"Bartholomew Thistlebrook", online:true, chars:[ { name:"Bartholomew Thistlebrook", cls:"PALADIN", lvl:24, main:true } ] },
+  { display:"Krogg", online:true, chars:[ { name:"Krogg", cls:"HUNTER", lvl:25, main:true }, { name:"Kroggalt", cls:"SHAMAN", lvl:23 } ] },
+  { display:"Theodora", chars:[ { name:"Theodora", cls:"SHAMAN", lvl:25, main:true } ] },
+  { display:"Wilhelmina", online:true, chars:[ { name:"Wilhelmina", cls:"DRUID", lvl:24, main:true }, { name:"Willow", cls:"HUNTER", lvl:21 } ] },
+  { display:"Ulfric", chars:[ { name:"Ulfric", cls:"PALADIN", lvl:23, main:true } ] },
+  { display:"Sven", online:true, chars:[ { name:"Sven", cls:"PRIEST", lvl:24, main:true } ] },
+  { display:"Mirabelle", chars:[ { name:"Mirabelle Dawnwhisper", cls:"WARLOCK", lvl:26, main:true } ] },
+  { display:"Annaliese", online:true, chars:[ { name:"Annaliese", cls:"MAGE", lvl:22, main:true }, { name:"Anna", cls:"ROGUE", lvl:24, playing:true } ] },
+];
+const CREWS = ["small", "large", "crowd", "solo"];
+
+// ---------- state ----------
+const params = new URLSearchParams(location.search);
+const VARIANTS = { A:"Level line", B:"Dungeon list", C:"Party builder", D:"Pairs grid" };
+const KEYS = Object.keys(VARIANTS);
+let S = { variant: KEYS.includes(params.get("variant")) ? params.get("variant") : "A", me: Math.min(2, Math.max(0, +params.get("me") || 0)),
+          crew: CREWS.includes(params.get("crew")) ? params.get("crew") : "small", scope:"fits", pick:null, hl:null,
+          sel:[], menu:false, scroll:null, f:{ offline:true, alts:false, near:false, attune:true, raids:false } };
+const crew = () => S.crew === "large" ? SMALL.concat(EXTRA) : S.crew === "crowd" ? SMALL.concat(CROWD) : S.crew === "solo" ? [SMALL[0]] : SMALL;
+const allChars = () => crew().flatMap(m => m.chars.map(c => ({ ...c, m })));
+const you = () => SMALL[0].chars[S.me];
+const others = () => allChars().filter(c => !c.m.own);
+const fits = (c, d) => c.lvl >= d.lo && c.lvl <= d.hi;
+const canPlay = (a, b) => Math.abs(a.lvl - b.lvl) <= 3;
+const cname = c => `<span class="c-${c.cls}">${c.name}</span>`;
+const who = c => `${c.m.display}${c.main ? "" : `<span class="tag">alt</span>`}`;
+const esc = s => s.replace(/'/g, "&#39;");
+const dn = d => d.fv ? `<span class="fv">✦</span>${d.n}` : d.n;
+
+function setUrl() {
+  const p = new URLSearchParams();
+  p.set("variant", S.variant); if (S.me) p.set("me", S.me); if (S.crew !== "small") p.set("crew", S.crew);
+  history.replaceState(null, "", "?" + p);
+}
+
+// ---------- tooltip ----------
+const tip = document.getElementById("tip");
+document.addEventListener("mousemove", e => {
+  const t = e.target.closest("[data-tip]");
+  if (!t) { tip.style.display = "none"; return; }
+  tip.innerHTML = t.dataset.tip; tip.style.display = "block";
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px"; tip.style.top = (e.clientY + 14) + "px";
+});
+function dungeonTip(d) {
+  const me = you(), f = others().filter(c => fits(c, d));
+  const short = others().filter(c => c.lvl < d.lo && c.lvl >= d.lo - 3);
+  const kind = d.kind === "raid" ? "Raid" : d.kind === "challenge" ? `Challenge · ${d.why}` : "Dungeon";
+  return `<div class="t1">${dn(d)}</div><div class="dim">${kind} · ${d.lo === d.hi ? d.lo : d.lo + "–" + d.hi}${d.where ? " · " + d.where : ""}</div>` + (d.fv ? `<div style="color:#66bfff">New in Forever</div>` : "") +
+    `<div style="margin-top:4px">${fits(me, d) ? `<span class="gold">You fit</span>` : me.lvl < d.lo ? `You need ${d.lo - me.lvl} more levels` : `<span class="dim">You've outlevelled it</span>`}</div>` +
+    (f.length ? `<div style="margin-top:4px">${f.map(c => `${cname(c)} ${c.lvl} <span class="dim">${c.m.display}</span>`).join("<br>")}</div>` : `<div class="dim">Nobody else fits</div>`) +
+    (short.length ? `<div class="dim" style="margin-top:4px">Almost: ${short.map(c => `${c.name} (${d.lo - c.lvl} short)`).join(", ")}</div>` : "");
+}
+function charTip(c) {
+  const me = you(), d = DUNGEONS.filter(x => !x.kind && fits(c, x) && fits(me, x)).map(x => x.n);
+  return `<div class="t1">${cname(c)} <span class="dim">${c.lvl}</span></div><div class="muted">${c.m.display}${c.main ? " · Main" : " · Alt"} · <span class="dot ${c.m.online ? "on" : ""}"></span>${c.m.online ? (c.playing || (c.main && !c.m.chars.some(x => x.playing)) ? "online now" : "online on another Character") : "offline, last seen 2 d"}</div>` +
+    (c.m.own ? "" : `<div style="margin-top:4px">${canPlay(c, me) ? `<span class="gold">Can play with you</span> (${c.lvl === me.lvl ? "same level" : Math.abs(c.lvl - me.lvl) + " apart"})` : `<span class="dim">${Math.abs(c.lvl - me.lvl)} levels apart</span>`}</div>` +
+    (d.length ? `<div class="dim">Together: ${d.join(", ")}</div>` : ""));
+}
+
+// ---------- A: level line (round 2, after the critique) ----------
+// Fixed zones so nothing overflows vertically: 4 label rows + a dot rail above the axis, 5 dungeon lanes below.
+// "Can play" stays the Roster's rule (within 3 levels). Fitting a dungeon is separate and said so in tooltips.
+const A_PX = 24, A_PADL = 16, A_PADR = 90, A_ROWS = 4, A_LANES = 5, A_ROW = 18, A_LANE = 20;
+const ax = l => A_PADL + (l - 1) * A_PX;
+const AW = A_PADL + 59 * A_PX + A_PADR;
+const mctx = document.createElement("canvas").getContext("2d");
+const tw = (t, px) => { mctx.font = `${px}px "Arial Narrow", "Archivo Narrow", "Roboto Condensed", Arial, sans-serif`; return Math.ceil(mctx.measureText(t).width); };
+const isPlayed = c => c.m.online && (c.playing || (c.main && !c.m.chars.some(x => x.playing)));
+const listJoin = (a, max = 3) => a.length <= 1 ? (a[0] || "") : a.length <= max ? a.slice(0, -1).join(", ") + " and " + a[a.length - 1]
+  : a.slice(0, max - 1).join(", ") + " and " + (a.length - max + 1) + " more";
+// One Character per Member: the one closest to your level, so a Member counts once.
+const bestChar = (m, me, pred = () => true) => m.chars.map(c => ({ ...c, m })).filter(pred).sort((a, b) => Math.abs(a.lvl - me.lvl) - Math.abs(b.lvl - me.lvl))[0];
+const otherMembers = () => crew().filter(m => !m.own);
+const mref = (m, c) => c.main ? m.display : `${m.display}'s alt`;
+
+function aVisibleChars(me) {
+  return allChars().filter(c => {
+    if (c.m.own) return c.name === me.name || S.f.alts;
+    if (!S.f.offline && !c.m.online) return false;
+    return c.main || isPlayed(c) || S.f.alts;
+  });
+}
+function aDungeons(me) {
+  let list = DUNGEONS.filter(d => d.kind !== "raid" && (d.kind !== "challenge" || S.f.attune));
+  if (S.f.raids) list.push({ n:"Raids", lo:60, hi:60, kind:"raids", list: DUNGEONS.filter(d => d.kind === "raid") });
+  if (S.f.near) list = list.filter(d => d.hi >= me.lvl - 10 && d.lo <= me.lvl + 10);
+  return list.map(d => {
+    const fitters = otherMembers().map(m => ({ m, c: bestChar(m, me, c => fits(c, d)) })).filter(x => x.c)
+      .sort((a, b) => (isPlayed(b.c) ? 1 : 0) - (isPlayed(a.c) ? 1 : 0));
+    return { d, fitters, you: fits(me, d) };
+  });
+}
+function aDungeonTip(x, me) {
+  const d = x.d;
+  if (d.kind === "raids") return `<div class="t1">Raids at 60</div>` + d.list.map(r => `${r.n}${r.fv ? ` <span class="dim">new in Forever</span>` : ""} <span class="dim">${r.where ? "· " + r.where : ""}</span>`).join("<br>");
+  const kind = d.kind === "challenge" ? `Attunement · ${d.why}` : "Dungeon";
+  const youLine = x.you ? `<span class="gold">You fit</span>` : me.lvl < d.lo ? `You need ${d.lo - me.lvl} more levels` : `<span class="dim">You've outlevelled it</span>`;
+  const f = x.fitters.map(({ m, c }) => {
+    const gap = Math.abs(c.lvl - me.lvl);
+    return `${m.display} <span class="c-${c.cls}">${c.name}</span> ${c.lvl}${isPlayed(c) ? ` <span style="color:var(--online)">online</span>` : ""}${gap > 3 ? ` <span class="dim">· fits, but ${gap} levels from you</span>` : ""}`;
+  });
+  const short = otherMembers().filter(m => !x.fitters.some(f => f.m === m)).map(m => ({ m, c: bestChar(m, { lvl:d.lo }, c => c.lvl < d.lo && c.lvl >= d.lo - 3) })).filter(y => y.c);
+  return `<div class="t1">${d.n}</div><div class="dim">${kind} · ${d.lo === d.hi ? d.lo : d.lo + "–" + d.hi}${d.where ? " · " + d.where : ""}</div>` +
+    (d.fv ? `<div class="muted">New in WoW: Forever</div>` : "") + `<div style="margin-top:4px">${youLine}</div>` +
+    (f.length ? `<div style="margin-top:4px">${f.join("<br>")}</div>` : `<div class="dim">No friend fits it yet</div>`) +
+    (short.length ? `<div class="dim" style="margin-top:4px">Almost: ${short.map(y => `${y.m.display} (${d.lo - y.c.lvl} short)`).join(", ")}</div>` : "");
+}
+function aGroupTip(g, me) {
+  return g.pins.map(c => {
+    const own = c.m.own;
+    const gap = Math.abs(c.lvl - me.lvl);
+    return `<div style="margin:1px 0"><span class="dot ${isPlayed(c) ? "on" : ""}"></span>${own ? "You" : c.m.display} <span class="c-${c.cls}">${c.name}</span> ${c.lvl}` +
+      `${c.main ? "" : ` <span class="dim">alt</span>`}${own ? "" : gap <= 3 ? ` <span class="gold">can play</span>` : ` <span class="dim">${gap} ${c.lvl > me.lvl ? "ahead" : "behind"}</span>`}</div>`;
+  }).join("") + `<div class="dim" style="margin-top:4px">${isPlayedAny(g) ? "" : "Offline. "}Click to see where you fit together.</div>`;
+}
+const isPlayedAny = g => g.pins.some(isPlayed);
+
+function aAnswer(me) {
+  const ms = otherMembers();
+  if (!ms.length) return { l1:`<span class="none">You're the only one in the Crew so far.</span>`, l2:`Share your Crew code from Settings to bring friends in.` };
+  if (S.sel.length) {
+    const sel = ms.filter(m => S.sel.includes(m.display));
+    const shared = DUNGEONS.filter(d => d.kind !== "raid" && fits(me, d) && sel.every(m => m.chars.some(c => fits(c, d))));
+    const names = listJoin(sel.map(m => m.display));
+    const gaps = sel.map(m => { const c = bestChar(m, me); return { m, c, gap: c.lvl - me.lvl }; });
+    const far = gaps.filter(g => Math.abs(g.gap) > 3);
+    return { sel:true,
+      l1:`You and ${names}${far.length ? "" : ` <span class="gold">can play</span>`}`,
+      l2: shared.length ? `Together: <b>${shared.map(d => d.n).join(", ")}</b>`
+        : `No dungeon fits you both yet · ${far.map(g => `${g.m.display} is ${Math.abs(g.gap)} ${g.gap > 0 ? "ahead" : "behind"}`).join(", ") || "try questing together"}` };
+  }
+  const can = ms.map(m => ({ m, c: bestChar(m, me) })).filter(x => Math.abs(x.c.lvl - me.lvl) <= 3)
+    .sort((a, b) => (isPlayed(b.c) ? 1 : 0) - (isPlayed(a.c) ? 1 : 0) || Math.abs(a.c.lvl - me.lvl) - Math.abs(b.c.lvl - me.lvl));
+  if (!can.length) {
+    const near = ms.map(m => ({ m, c: bestChar(m, me) })).sort((a, b) => Math.abs(a.c.lvl - me.lvl) - Math.abs(b.c.lvl - me.lvl))[0];
+    const g = near.c.lvl - me.lvl;
+    return { l1:`<span class="none">Nobody is within 3 levels of you.</span>`,
+      l2:`Nearest: ${mref(near.m, near.c)} ${near.c.name}, ${Math.abs(g)} ${g > 0 ? "ahead" : "behind"}.` };
+  }
+  const short = n => n.length > 14 ? n.split(" ")[0] : n;
+  const names = can.map(x => short(x.m.display) + (x.c.main ? "" : " (alt)"));
+  const best = DUNGEONS.filter(d => d.kind !== "raid" && d.kind !== "challenge" && fits(me, d)).map(d => {
+    const w = can.filter(x => x.m.chars.some(c => fits(c, d) && Math.abs(c.lvl - me.lvl) <= 3));
+    return { d, w, on: w.filter(x => isPlayed(x.c)).length };
+  }).filter(x => x.w.length).sort((a, b) => b.w.length - a.w.length || b.on - a.on);
+  const bw = best.length ? best[0].w.map(x => short(x.m.display)) : [];
+  const l2 = best.length ? `Best together: <b>${best[0].d.n}</b> with ${bw.length > 2 ? bw.length + " friends" : listJoin(bw)}` +
+    (best[1] ? ` · also ${best[1].d.n}` : "") : `No dungeon fits you and them yet. Quest together.`;
+  const on = can.filter(x => isPlayed(x.c)).length;
+  const l1 = names.length > 3 ? `${names.length} friends <span class="gold">can play</span> with you <span class="muted" style="font-size:12px">· ${on} online now</span>`
+    : `${listJoin(names)} <span class="gold">can play</span> with you`;
+  return { l1, l2 };
+}
+
+function variantA(el) {
+  const me = you();
+  const ans = aAnswer(me);
+  const vis = aVisibleChars(me);
+  const hiddenAlts = allChars().filter(c => !c.m.own && !c.main && !isPlayed(c)).length;
+  const hiddenOff = otherMembers().filter(m => !m.online).length;
+  const hidNote = [!S.f.alts && hiddenAlts ? `${hiddenAlts} ${hiddenAlts === 1 ? "alt" : "alts"}` : "", !S.f.offline && hiddenOff ? `${hiddenOff} offline` : ""].filter(Boolean).join(", ");
+
+  // people: one group per level (merged), dot on the rail, label in up to 4 rows
+  const byLvl = new Map();
+  vis.forEach(c => { const k = c.lvl; if (!byLvl.has(k)) byLvl.set(k, []); byLvl.get(k).push(c); });
+  const groups = [...byLvl.entries()].sort((a, b) => a[0] - b[0]).map(([lvl, pins]) => {
+    pins.sort((a, b) => (b.m.own ? 1 : 0) - (a.m.own ? 1 : 0) || (isPlayed(b) ? 1 : 0) - (isPlayed(a) ? 1 : 0) || (b.main ? 1 : 0) - (a.main ? 1 : 0));
+    const lead = pins[0], name = lead.m.own ? "You" : lead.m.display;
+    const altTag = !lead.main;
+    let w = Math.min(tw(name, 13), 96) + 4 + tw(String(lvl), 11) + (altTag ? 26 : 0) + (pins.length > 1 ? tw("+" + (pins.length - 1), 12) + 4 : 0) + 8;
+    return { lvl, pins, lead, name, altTag, w, row:-1, members: [...new Set(pins.map(c => c.m.display))] };
+  });
+  // place labels: you first, then online, then the rest, nearest to the axis first
+  const rowsEnd = Array.from({ length: A_ROWS }, () => []);
+  const free = (r, a, b) => rowsEnd[r].every(([x, y]) => b + 6 <= x || a >= y + 6);
+  [...groups].sort((a, b) => (b.lead.m.own ? 1 : 0) - (a.lead.m.own ? 1 : 0) || (isPlayedAny(b) ? 1 : 0) - (isPlayedAny(a) ? 1 : 0) || Math.abs(a.lvl - me.lvl) - Math.abs(b.lvl - me.lvl))
+    .forEach(g => { const a = ax(g.lvl) - 5; for (let r = 0; r < A_ROWS; r++) if (free(r, a, a + g.w)) { rowsEnd[r].push([a, a + g.w]); g.row = r; break; } });
+
+  // dungeons: 5 lanes, most relevant first; whatever doesn't fit becomes a "+N here" chip
+  const ds = aDungeons(me).map(x => {
+    const nw = tw(x.d.kind === "raids" ? `Raids ${x.d.list.length}` : x.d.n, 12);
+    const dots = Math.min(x.fitters.length, 4) * 8 + (x.fitters.length > 4 ? 18 : 0);
+    const cw = nw + 10 + (x.d.fv ? 30 : 0) + (dots ? dots + 6 : 0) + (x.d.kind === "raids" ? 12 : 0);
+    const left = ax(x.d.lo) - (x.d.kind === "raids" ? 6 : 0);
+    return { ...x, left, w: Math.max((x.d.hi - x.d.lo) * A_PX, cw), lane:-1 };
+  });
+  const lanes = Array.from({ length: A_LANES }, () => []);
+  const lfree = (l, a, b) => lanes[l].every(([x, y]) => b + 3 <= x || a >= y + 3);
+  const over = [];
+  [...ds].sort((a, b) => (b.you ? 1 : 0) - (a.you ? 1 : 0) || b.fitters.length - a.fitters.length || a.d.lo - b.d.lo).forEach(x => {
+    for (let l = 0; l < A_LANES; l++) if (lfree(l, x.left, x.left + x.w)) { lanes[l].push([x.left, x.left + x.w]); x.lane = l; return; }
+    over.push(x);
+  });
+  const chips = [];
+  over.sort((a, b) => a.d.lo - b.d.lo).forEach(x => {
+    const c = chips.find(c => Math.abs(c.lo - x.d.lo) <= 3);
+    if (c) c.items.push(x); else chips.push({ lo: x.d.lo, items: [x] });
+  });
+  const placedChips = [];
+  chips.forEach(c => {
+    c.w = tw(`+${c.items.length} here`, 12) + 12;
+    for (let dx = 0; dx <= 6 * A_PX && c.lane == null; dx += A_PX / 2)
+      for (let l = A_LANES - 1; l >= 0; l--) { const a = ax(c.lo) + dx; if (lfree(l, a, a + c.w)) { lanes[l].push([a, a + c.w]); c.lane = l; c.left = a; break; } }
+    if (c.lane != null) placedChips.push(c); else if (placedChips.length) placedChips[placedChips.length - 1].items.push(...c.items);
+  });
+  chips.length = 0; chips.push(...placedChips);
+
+  // geometry
+  const top0 = 18, railY = top0 + A_ROWS * A_ROW + 6, axisY = railY + 14, laneY = axisY + 18 + 6;
+  const selSet = new Set(S.sel);
+  const sharedWith = x => S.sel.length && x.you && otherMembers().filter(m => selSet.has(m.display)).every(m => m.chars.some(c => fits(c, x.d)));
+
+  let h = `<div class="track" style="width:${AW}px">`;
+  h += `<div class="band" style="left:${ax(me.lvl - 3) - A_PX / 2}px;width:${7 * A_PX}px"><span>can play</span></div>`;
+  groups.forEach(g => {
+    const x = ax(g.lvl), sel = !S.sel.length || g.members.some(n => selSet.has(n)) || g.lead.m.own;
+    const fade = sel ? "" : "faded";
+    if (g.row >= 0) {
+      const y = top0 + (A_ROWS - 1 - g.row) * A_ROW;
+      h += `<div class="stem ${fade}" style="left:${x}px;top:${y + 15}px;height:${railY - y - 13}px"></div>`;
+      h += `<div class="plab ${fade}" data-g="${g.lvl}" style="left:${x - 2}px;top:${y}px">${esc(g.name.length > 16 ? g.name.slice(0, 15) + "…" : g.name)}${g.altTag ? `<span class="atag">alt</span>` : ""}<span class="lv">${g.lvl}</span>${g.pins.length > 1 ? `<span class="more">+${g.pins.length - 1}</span>` : ""}</div>`;
+    }
+    h += `<div class="pdot ${isPlayedAny(g) ? "on" : ""} ${g.lead.m.own ? "me" : ""} ${fade}" data-g="${g.lvl}" style="left:${x - 5.5}px;top:${railY - 5}px;background:var(--cls-${g.lead.cls})">${g.row < 0 && g.pins.length > 1 ? `<span class="n">${g.pins.length}</span>` : ""}</div>`;
+  });
+  h += `<div class="axis" style="top:${axisY}px;width:${AW}px">`;
+  for (let l = 1; l <= 60; l++) {
+    const big = l % 5 === 0 || l === 1;
+    h += `<div class="tick ${big ? "big" : ""}" style="left:${ax(l)}px"></div>`;
+    if (big || l === me.lvl) h += `<div class="tnum ${l === me.lvl ? "me" : ""}" style="left:${ax(l)}px">${l}</div>`;
+  }
+  h += `</div>`;
+  ds.filter(x => x.lane >= 0).forEach(x => {
+    const cls = ["dbar", x.you ? "fit" : "", x.d.kind === "challenge" ? "attune" : "", x.d.kind === "raids" ? "raids" : "", sharedWith(x) ? "shared" : "",
+      S.sel.length && !sharedWith(x) ? "faded" : ""].join(" ");
+    const dots = x.fitters.slice(0, 4).map(f => `<span class="md" style="background:var(--cls-${f.c.cls})"></span>`).join("") + (x.fitters.length > 4 ? `<span class="mn">+${x.fitters.length - 4}</span>` : "");
+    h += `<div class="${cls}" style="left:${x.left}px;top:${laneY + x.lane * A_LANE}px;width:${x.w}px" data-tip='${esc(aDungeonTip(x, me))}'>` +
+      `<span class="in"><span>${x.d.kind === "raids" ? `Raids ${x.d.list.length}` : x.d.n}</span>${x.d.fv ? `<span class="newp">NEW</span>` : ""}${dots ? `<span style="width:2px"></span>` + dots : ""}</span></div>`;
+  });
+  chips.forEach(c => {
+    const t = `<div class="t1">${c.items.length} more here</div>` + c.items.map(x => `${x.d.n} <span class="dim">${x.d.lo}–${x.d.hi}${x.fitters.length ? " · " + x.fitters.length + " fit" : ""}</span>`).join("<br>");
+    h += `<div class="dbar over" style="left:${c.left}px;top:${laneY + c.lane * A_LANE}px" data-tip='${esc(t)}'>+${c.items.length} here</div>`;
+  });
+  h += `</div>`;
+
+  const menu = !S.menu ? "" : `<div class="menu" id="amenu">
+    <div class="ml label">FRIENDS</div>
+    ${[["offline","Offline friends"],["alts","Alts<span class=\"sub\">Mains and played Characters always show</span>"]].map(([k, t]) => `<div class="ck" data-f="${k}"><span class="box ${S.f[k] ? "on" : ""}"></span><span>${t}</span></div>`).join("")}
+    <div class="ml label">DUNGEONS</div>
+    ${[["near","Only near your level (±10)"],["attune","Attunements"],["raids","Raids"]].map(([k, t]) => `<div class="ck" data-f="${k}"><span class="box ${S.f[k] ? "on" : ""}"></span><span>${t}</span></div>`).join("")}
+    <div class="ml label">KEY</div>
+    <div class="key"><span class="sw" style="background:rgba(255,255,255,.12);box-shadow:inset 0 -2px 0 var(--fill)"></span>Fits your level</div>
+    <div class="key"><span class="sw" style="outline:1px dashed rgba(255,255,255,.4);outline-offset:-1px"></span>Attunement</div>
+    <div class="key"><span class="newp" style="font-size:11px;padding:0 3px;background:rgba(255,255,255,.10)">NEW</span>New in WoW: Forever</div>
+    <div class="key"><span class="sw" style="display:flex;gap:2px;align-items:center"><i style="width:6px;height:6px;border-radius:50%;background:#FF7C0A"></i><i style="width:6px;height:6px;border-radius:50%;background:#FFF468"></i></span>Friends who fit it</div>
+    <div class="help">Drag or scroll to move along the levels. Click a friend to see where you fit together.</div>
+  </div>`;
+
+  el.innerHTML = `
+    <div class="a-tool"><span class="as">As <span class="c-${me.cls}">${me.name}</span> ${me.lvl}${me === SMALL[0].chars[0] ? "" : `<span class="atag">alt</span>`}</span>
+      <span class="grow"></span>${hidNote ? `<span class="hid">${hidNote} hidden</span>` : ""}<button class="sbtn ${S.menu ? "open" : ""}" id="ashow">Show ▾</button></div>
+    <div class="answer ${ans.sel ? "sel" : ""}"><div class="l1">${ans.l1}</div><div class="l2">${ans.l2}</div>${ans.sel ? `<button class="sbtn clear" id="aclear">Clear</button>` : ""}</div>
+    <div class="linewrap" id="lw"><div class="lscroll" id="sc">${h}</div>
+      <button class="sbtn back l" id="backl" style="display:none">‹ You</button><button class="sbtn back r" id="backr" style="display:none">You ›</button>
+      <div class="zonehint" id="zh" style="top:${laneY + 30}px;display:none">No dungeons shown at these levels · <u id="showall">Show all levels</u></div></div>
+    <div class="ov"><div class="ovt" id="ovt"></div></div>${menu}`;
+
+  const sc = el.querySelector("#sc"), ovt = el.querySelector("#ovt");
+  const k = () => ovt.clientWidth / AW;
+  const sync = () => {
+    const kk = k();
+    ovt.innerHTML = groups.map(g => `<i style="left:${ax(g.lvl) * kk - 1}px;background:var(--cls-${g.lead.cls});opacity:${isPlayedAny(g) ? 1 : .5}"></i>`).join("") +
+      `<div class="meb" style="left:${ax(me.lvl) * kk - 1}px"></div><div class="view" style="left:${sc.scrollLeft * kk}px;width:${sc.clientWidth * kk}px"></div>`;
+    const mx = ax(me.lvl) - sc.scrollLeft;
+    el.querySelector("#backl").style.display = mx < 0 ? "" : "none";
+    el.querySelector("#backr").style.display = mx > sc.clientWidth ? "" : "none";
+    const a = sc.scrollLeft, b = a + sc.clientWidth;
+    const anyBar = ds.some(x => x.lane >= 0 && x.left < b && x.left + x.w > a) || chips.some(c => c.left < b && c.left + c.w > a);
+    el.querySelector("#zh").style.display = !anyBar && S.f.near ? "" : "none";
+    S.scroll = sc.scrollLeft;
+  };
+  sc.scrollLeft = S.scroll != null ? S.scroll : ax(me.lvl) - sc.clientWidth / 2;
+  sync();
+  sc.addEventListener("scroll", sync);
+  sc.addEventListener("wheel", e => { sc.scrollLeft += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX; e.preventDefault(); }, { passive:false });
+  const jump = ev => { const r = ovt.getBoundingClientRect(); sc.scrollLeft = (ev.clientX - r.left) / r.width * AW - sc.clientWidth / 2; };
+  let ovDrag = false;
+  ovt.addEventListener("mousedown", e => { ovDrag = true; jump(e); });
+  addEventListener("mousemove", e => { if (ovDrag) jump(e); });
+  addEventListener("mouseup", () => { ovDrag = false; });
+  const toMe = () => sc.scrollTo({ left: ax(me.lvl) - sc.clientWidth / 2, behavior:"smooth" });
+  el.querySelector("#backl").onclick = toMe; el.querySelector("#backr").onclick = toMe;
+  el.querySelector("#showall").onclick = () => { S.f.near = false; S.scroll = null; render(); };
+  el.querySelector("#ashow").onclick = e => { e.stopPropagation(); S.menu = !S.menu; render(); };
+  el.querySelectorAll("[data-f]").forEach(r => r.onclick = e => { e.stopPropagation(); S.f[r.dataset.f] = !S.f[r.dataset.f]; render(); });
+  if (S.menu) el.querySelector("#amenu").onclick = e => e.stopPropagation();
+  const clr = el.querySelector("#aclear"); if (clr) clr.onclick = () => { S.sel = []; render(); };
+
+  // hover a friend: light up all of that Member's pins; click: select (shift adds)
+  const groupOf = n => groups.find(g => String(g.lvl) === n);
+  sc.querySelectorAll("[data-g]").forEach(p => {
+    const g = groupOf(p.dataset.g);
+    p.dataset.tip = aGroupTip(g, me);
+    p.addEventListener("mouseenter", () => sc.querySelectorAll(".plab").forEach(q => {
+      const gg = groupOf(q.dataset.g); q.classList.toggle("kin", gg !== g && gg.members.some(n => g.members.includes(n) && !g.lead.m.own));
+    }));
+    p.addEventListener("mouseleave", () => sc.querySelectorAll(".plab.kin").forEach(q => q.classList.remove("kin")));
+  });
+  let drag = null, moved = false;
+  sc.addEventListener("mousedown", e => { drag = { x:e.clientX, s:sc.scrollLeft }; moved = false; sc.classList.add("drag"); });
+  addEventListener("mousemove", e => { if (!drag) return; const dx = (e.clientX - drag.x) / 1.35; if (Math.abs(dx) > 3) moved = true; sc.scrollLeft = drag.s - dx; });
+  addEventListener("mouseup", () => { drag = null; sc.classList.remove("drag"); });
+  sc.addEventListener("click", e => {
+    if (moved) return;
+    const p = e.target.closest("[data-g]");
+    if (!p) { if (S.sel.length) { S.sel = []; render(); } return; }
+    const g = groupOf(p.dataset.g), names = g.members.filter(n => n !== SMALL[0].display);
+    if (!names.length) return;
+    const same = names.every(n => S.sel.includes(n)) && S.sel.length === names.length;
+    S.sel = same ? [] : e.shiftKey ? [...new Set(S.sel.concat(names))] : names;
+    render();
+  });
+}
+
+// ---------- B: dungeon list ----------
+function variantB(el) {
+  const me = you();
+  const rowsFor = d => {
+    const f = others().filter(c => fits(c, d));
+    const best = new Map(); // one Character per Member, closest to you
+    f.forEach(c => { const b = best.get(c.m); if (!b || Math.abs(c.lvl - me.lvl) < Math.abs(b.lvl - me.lvl)) best.set(c.m, c); });
+    return [...best.values()].sort((a, b) => (b.m.online ? 1 : 0) - (a.m.online ? 1 : 0) || Math.abs(a.lvl - me.lvl) - Math.abs(b.lvl - me.lvl));
+  };
+  const row = (d, cls) => {
+    const f = rowsFor(d), n = f.length + (fits(me, d) ? 1 : 0);
+    const short = others().filter(c => c.lvl < d.lo && c.lvl >= d.lo - 3 && !f.some(x => x.m === c.m));
+    return `<div class="drow ${cls}" data-tip='${esc(dungeonTip(d))}'>
+      <div class="top"><span class="cnt ${fits(me, d) && n >= 3 ? "good" : ""}">${n}/5</span><span class="nm">${dn(d)}${d.kind ? `<span class="tag">${d.kind === "raid" ? "raid" : d.why}</span>` : ""}</span><span class="rg">${d.lo === d.hi ? d.lo : d.lo + "–" + d.hi}</span></div>
+      <div class="who">${f.length ? f.map(c => `<span class="c"><span class="dot ${c.m.online ? "on" : ""}"></span>${c.m.display} <span class="c-${c.cls}">${c.lvl}</span>${c.main ? "" : `<span class="dim"> ${c.name}</span>`}</span>`).join("") : `<span class="dim">Nobody else yet</span>`}
+      ${short.length ? `<div class="near">Almost: ${short.map(c => `${c.m.display} ${c.lvl} (${d.lo - c.lvl} short)`).join(" · ")}</div>` : ""}</div></div>`;
+  };
+  const list = DUNGEONS.filter(d => S.scope === "all" || d.kind !== "raid");
+  const now = list.filter(d => fits(me, d)).sort((a, b) => rowsFor(b).length - rowsFor(a).length);
+  const next = list.filter(d => d.lo > me.lvl && d.lo <= me.lvl + 8);
+  const later = list.filter(d => d.lo > me.lvl + 8);
+  const done = list.filter(d => d.hi < me.lvl);
+  let h = `<div class="sec label">FITS YOU AT ${me.lvl}</div>` + (now.map(d => row(d, "")).join("") || `<div class="drow dim">Nothing fits yet</div>`);
+  h += `<div class="sec label">NEXT UP</div>` + next.map(d => row(d, "out")).join("");
+  if (S.scope === "all") {
+    h += `<div class="sec label">LATER</div>` + later.map(d => row(d, "out")).join("");
+    h += `<div class="sec label">BEHIND YOU</div>` + done.map(d => row(d, "out")).join("");
+  } else {
+    h += `<div class="drow dim small">${later.length} later, ${done.length} behind you · <u>show all</u></div>`;
+  }
+  el.innerHTML = `<div class="toolbar"><span class="muted small">As ${cname(me)} ${me.lvl}</span><span class="grow"></span>
+    <button class="btn ${S.scope === "fits" ? "on" : ""}" data-s="fits">For me</button><button class="btn ${S.scope === "all" ? "on" : ""}" data-s="all">All</button></div>
+    <div class="scroll">${h}</div>`;
+  el.querySelectorAll("[data-s]").forEach(b => b.onclick = () => { S.scope = b.dataset.s; render(); });
+  el.querySelectorAll(".drow u").forEach(u => u.onclick = () => { S.scope = "all"; render(); });
+}
+
+// ---------- C: party builder ----------
+function parties() {
+  const me = you();
+  return DUNGEONS.filter(d => d.kind !== "raid" && fits(me, d)).map(d => {
+    const best = new Map();
+    others().filter(c => fits(c, d)).forEach(c => {
+      const b = best.get(c.m), score = x => (x.m.online ? 0 : 100) + Math.abs(x.lvl - me.lvl);
+      if (!b || score(c) < score(b)) best.set(c.m, c);
+    });
+    const group = [...best.values()].sort((a, b) => (b.m.online ? 1 : 0) - (a.m.online ? 1 : 0) || Math.abs(a.lvl - me.lvl) - Math.abs(b.lvl - me.lvl)).slice(0, 4);
+    const online = group.filter(c => c.m.online).length;
+    const almost = others().filter(c => !best.has(c.m) && c.lvl < d.lo && c.lvl >= d.lo - 4)
+      .reduce((a, c) => (a.some(x => x.m === c.m) ? a : a.concat(c)), []);
+    return { d, group, online, almost, score: group.length * 10 + online * 3 - (d.kind ? 1 : 0) };
+  }).sort((a, b) => b.score - a.score);
+}
+function variantC(el) {
+  const me = you(), ps = parties();
+  if (!ps.length) { el.innerHTML = `<div class="hero dim">Nothing fits ${me.name} yet.</div>`; return; }
+  const p = ps.find(x => x.d.n === S.pick) || ps[0];
+  let slots = `<div class="slot"><span class="lv">${me.lvl}</span><span class="dot on"></span><span>You</span><span class="muted small" style="margin-left:6px">${cname(me)}</span><span class="grow"></span></div>`;
+  p.group.forEach(c => slots += `<div class="slot" data-tip='${esc(charTip(c))}'><span class="lv">${c.lvl}</span><span class="dot ${c.m.online ? "on" : ""}"></span><span>${c.m.display}</span><span class="small" style="margin-left:6px">${cname(c)}</span>${c.main ? "" : `<span class="tag">on alt</span>`}<span class="grow"></span><span class="dim small">${c.m.online ? "online" : "2 d ago"}</span></div>`);
+  for (let i = p.group.length; i < 4; i++) slots += `<div class="slot empty"><span class="lv"></span>open spot · pug or wait</div>`;
+  const alts = ps.filter(x => x !== p).slice(0, 3);
+  el.innerHTML = `<div class="scroll">
+    <div class="hero"><div class="label">${p === ps[0] ? "BEST BET RIGHT NOW" : "YOUR PICK"}</div>
+      <div class="nm fr" style="margin-top:3px">${dn(p.d)}</div>
+      <div class="sub">${p.d.kind ? p.d.why + " · " : ""}${p.d.lo}–${p.d.hi} · ${p.group.length + 1} of 5 fit · <span class="${p.online ? "gold" : ""}">${p.online + 1} online now</span></div></div>
+    ${slots}
+    <div style="display:flex;gap:6px;padding:8px 12px"><button class="btn primary">Ask the Crew</button><button class="btn" style="height:24px" id="whisp">Whisper online</button></div>
+    ${p.almost.length ? `<div class="sec label">ALMOST THERE</div>${p.almost.map(c => `<div class="alt-row"><span>${c.m.display} <span class="small">${cname(c)}</span> ${c.lvl}</span><span class="grow"></span><span class="dim small">${p.d.lo - c.lvl} levels short</span></div>`).join("")}` : ""}
+    <div class="sec label">ALSO WORKS</div>
+    ${alts.map(x => `<div class="alt-row" data-pick="${x.d.n}"><span>${dn(x.d)}</span><span class="grow"></span><span class="dim small">${x.group.length + 1} of 5 · ${x.online + 1} online</span></div>`).join("") || `<div class="alt-row dim">Nothing else</div>`}
+    ${p !== ps[0] ? `<div class="alt-row" data-pick=""><span class="muted">← back to best bet</span></div>` : ""}
+  </div>`;
+  el.querySelectorAll("[data-pick]").forEach(r => r.onclick = () => { S.pick = r.dataset.pick || null; render(); });
+}
+
+// ---------- D: pairs grid ----------
+function variantD(el) {
+  const mine = SMALL[0].chars, members = crew().filter(m => !m.own);
+  const closest = (c, m) => m.chars.reduce((b, x) => Math.abs(x.lvl - c.lvl) < Math.abs(b.lvl - c.lvl) ? x : b);
+  let h = `<table class="grid"><tr><th></th>${members.map(m => `<th class="vh"><div><span class="dot ${m.online ? "on" : ""}"></span>${m.display}</div></th>`).join("")}</tr>`;
+  mine.forEach((c, i) => {
+    h += `<tr><th class="rh">${i === S.me ? "▸ " : ""}${cname(c)} <span class="dim small">${c.lvl}</span></th>`;
+    members.forEach(m => {
+      const o = { ...closest(c, m), m }, diff = o.lvl - c.lvl, ad = Math.abs(diff);
+      const together = DUNGEONS.filter(d => !d.kind && fits(c, d) && fits(o, d)).map(d => d.n);
+      const t = `<div class="t1">${cname(c)} ${c.lvl} ↔ ${cname(o)} ${o.lvl}</div><div class="muted">${m.display}${o.main ? "" : " (alt)"} · ${ad === 0 ? "same level" : ad + (diff > 0 ? " ahead" : " behind")}</div>${together.length ? `<div class="dim" style="margin-top:3px">Together: ${together.join(", ")}</div>` : ""}`;
+      h += `<td class="${ad <= 3 ? "fit" : ad <= 6 ? "near" : ""}" data-tip='${esc(t)}'>${ad === 0 ? "=" : (diff > 0 ? "+" : "−") + ad}</td>`;
+    });
+    h += `</tr>`;
+  });
+  h += `</table><div class="tiny dim" style="padding:0 12px 6px">Each cell: their closest Character's level, relative to yours.</div>`;
+  const pairs = [];
+  mine.forEach(c => others().forEach(o => pairs.push({ c, o, ad: Math.abs(o.lvl - c.lvl) })));
+  const good = pairs.filter(p => p.ad <= 3).sort((a, b) => a.ad - b.ad || (b.o.m.online ? 1 : 0) - (a.o.m.online ? 1 : 0));
+  h += `<div class="sec label">PAIRS THAT CAN PLAY</div>` + good.map(p => {
+    const together = DUNGEONS.filter(d => !d.kind && fits(p.c, d) && fits(p.o, d)).map(d => d.n);
+    return `<div class="pair"><span class="small">${cname(p.c)} ${p.c.lvl}</span> <span class="dim">↔</span> <span class="dot ${p.o.m.online ? "on" : ""}"></span>${p.o.m.display} <span class="small">${cname(p.o)} ${p.o.lvl}</span>
+      <div class="d">${p.ad === 0 ? "Same level" : p.ad + " apart"}${together.length ? " · " + together.slice(0, 2).join(", ") : " · quest together"}</div></div>`;
+  }).join("");
+  el.innerHTML = `<div class="scroll">${h}</div>`;
+}
+
+// ---------- shell ----------
+function render() {
+  setUrl();
+  const el = document.getElementById("content");
+  ({ A:variantA, B:variantB, C:variantC, D:variantD })[S.variant](el);
+  document.getElementById("vlab").textContent = `${S.variant} · ${VARIANTS[S.variant]}`;
+  document.getElementById("me").textContent = `play as: ${you().name} ${you().lvl}`;
+  document.getElementById("crew").textContent = `Crew: ${S.crew}`;
+  const on = crew().filter(m => m.online).length;
+  document.getElementById("online").textContent = `${on} of ${crew().length} online`;
+  const me = you();
+  document.getElementById("state").textContent =
+    `variant=${S.variant} · you=${me.name} (${me.lvl}) · crew=${crew().length} Members, ${allChars().length} Characters · can play ±3: ${others().filter(c => canPlay(c, me)).map(c => c.name).join(", ") || "none"}` +
+    (S.variant === "A" ? ` · filters=${Object.entries(S.f).filter(e => e[1]).map(e => e[0]).join("+")} · selected=${S.sel.join(", ") || "none"}` : "") + (S.pick ? ` · pick=${S.pick}` : "");
+}
+const go = d => { const i = KEYS.indexOf(S.variant); S.variant = KEYS[(i + d + KEYS.length) % KEYS.length]; S.hl = null; S.menu = false; render(); };
+document.getElementById("prev").onclick = () => go(-1);
+document.getElementById("next").onclick = () => go(1);
+document.getElementById("me").onclick = () => { S.me = (S.me + 1) % 3; S.sel = []; S.scroll = null; S.pick = null; render(); };
+document.getElementById("crew").onclick = () => { S.crew = CREWS[(CREWS.indexOf(S.crew) + 1) % CREWS.length]; S.sel = []; S.scroll = null; S.pick = null; render(); };
+document.addEventListener("click", () => { if (S.menu) { S.menu = false; render(); } });
+addEventListener("keydown", e => {
+  if (e.target.closest("input, textarea, [contenteditable]")) return;
+  if (e.key === "Escape" && (S.menu || S.sel.length)) { S.menu = false; S.sel = []; render(); return; }
+  if (e.key === "ArrowLeft") go(-1); if (e.key === "ArrowRight") go(1);
+});
+render();
+</script>
+</body>
+</html>
