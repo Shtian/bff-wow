@@ -267,7 +267,7 @@ local function dashes(frame, width, height)
 end
 
 -- Hovering a friend lights up their Members' other labels on the line.
-local function lightKin(group)
+local function lightOtherLabels(group)
   local ids = {}
   for _, id in ipairs(group and group.memberIds or {}) do ids[id] = true end
   for _, label in ipairs(labelFrames) do
@@ -281,17 +281,17 @@ local function lightKin(group)
   end
 end
 
--- A friend's dot or label: a tooltip, lights up their other labels, and
+-- A group's dot or label: a tooltip, lights up their other labels, and
 -- picks them on click (shift adds).
-local function friendFrame()
+local function memberFrame()
   local frame = hoverable(view.track, groupTooltip)
   frame:SetScript("OnEnter", function(self)
     showTooltip(self)
-    lightKin(self.group)
+    lightOtherLabels(self.group)
   end)
   frame:SetScript("OnLeave", function()
     hideTooltip()
-    lightKin(nil)
+    lightOtherLabels(nil)
   end)
   frame.onClick = function(self) pick(self.group.memberIds, IsShiftKeyDown()) end
   return frame
@@ -388,7 +388,7 @@ local function createMenu(show)
   menu:SetScript("OnShow", function(self) self:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
   menu:SetScript("OnHide", function(self)
     self:UnregisterEvent("GLOBAL_MOUSE_DOWN")
-    TogetherTab.keys()
+    TogetherTab.escapeKeys()
   end)
   menu:SetScript("OnEvent", function(self)
     if not self:IsMouseOver() and not view.showButton:IsMouseOver() then self:Hide() end
@@ -407,13 +407,13 @@ end
 local function toggleMenu()
   if not view.menu then return end
   view.menu:SetShown(not view.menu:IsShown())
-  TogetherTab.keys()
+  TogetherTab.escapeKeys()
 end
 
 -- Escape closes the menu, else clears what's picked. The tab only takes
 -- the keyboard while there's one of those to undo, and never in combat,
 -- where it can't let other keys through.
-local function createKeys()
+local function createEscapeKeys()
   local keys = CreateFrame("Frame", nil, view)
   keys:SetScript("OnKeyDown", function(self, key)
     if InCombatLockdown() then return end
@@ -427,21 +427,27 @@ local function createKeys()
     else
       clearSelection()
     end
-    TogetherTab.keys()
+    TogetherTab.escapeKeys()
   end)
+  -- Let go before combat locks it in; take it back after.
   keys:RegisterEvent("PLAYER_REGEN_DISABLED")
-  keys:SetScript("OnEvent", function(self)
-    self:SetPropagateKeyboardInput(true)
-    self:EnableKeyboard(false)
+  keys:RegisterEvent("PLAYER_REGEN_ENABLED")
+  keys:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_REGEN_DISABLED" then
+      self:SetPropagateKeyboardInput(true)
+      self:EnableKeyboard(false)
+    else
+      TogetherTab.escapeKeys()
+    end
   end)
   return keys
 end
 
-function TogetherTab.keys()
+function TogetherTab.escapeKeys()
   if not view or InCombatLockdown() then return end
   local active = view:IsVisible() and ((view.menu and view.menu:IsShown()) or #selected > 0)
-  view.keys:SetPropagateKeyboardInput(true)
-  view.keys:EnableKeyboard(active and true or false)
+  view.escapeKeys:SetPropagateKeyboardInput(true)
+  view.escapeKeys:EnableKeyboard(active and true or false)
 end
 
 local function createView(parent)
@@ -593,15 +599,17 @@ local function createView(parent)
   view.emptyAction:SetScript("OnEnter", function(self) Skin.color(self.label, TEXT) end)
   view.emptyAction:SetScript("OnLeave", function(self) Skin.color(self.label, MUTED) end)
   view.emptyAction:SetScript("OnClick", function()
-    core:setSetting("togetherNear", false)
+    if not view.data or not view.data.empty then return end
+    core:setSetting(view.data.empty.setting, false)
     redraw()
+    centreOnYou()
   end)
   view.empty:Hide()
 
-  view.keys = createKeys()
+  view.escapeKeys = createEscapeKeys()
   view:SetScript("OnHide", function()
     if view.menu then view.menu:Hide() end
-    TogetherTab.keys()
+    TogetherTab.escapeKeys()
   end)
 end
 
@@ -657,7 +665,7 @@ local function drawAxis(data)
 end
 
 local function createDotFrame()
-  local frame = friendFrame()
+  local frame = memberFrame()
   local size = DOT + 2 * (RING + KEYLINE)
   frame:SetSize(size + 4, size + 4)
   frame.outline = frame:CreateTexture(nil, "ARTWORK", nil, 0)
@@ -686,7 +694,7 @@ local function createDotFrame()
 end
 
 local function createLabelFrame()
-  local frame = friendFrame()
+  local frame = memberFrame()
   frame:SetHeight(LABEL_HEIGHT)
   frame.hover = Skin.fill(frame, Skin.LINE, "HIGHLIGHT")
   frame.kin = Skin.fill(frame, Skin.LINE)
@@ -1005,7 +1013,7 @@ function TogetherTab.draw(parent, theCore)
   else
     TogetherTab.scrolled()
   end
-  TogetherTab.keys()
+  TogetherTab.escapeKeys()
 end
 
 function TogetherTab.hide()

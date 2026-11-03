@@ -679,6 +679,7 @@ describe("Together", function()
 
       assert.equal("No dungeons shown at these levels", view.empty.text)
       assert.equal("Show all levels", view.empty.action)
+      assert.equal("togetherNear", view.empty.setting)
       local xOf = function(level) return view.ticks[level].x end
       local function inSpan(x)
         for _, span in ipairs(view.empty.spans) do

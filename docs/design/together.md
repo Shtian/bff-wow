@@ -46,7 +46,7 @@ A **Together** tab answers "who can I play with, and where?": the Crew's Charact
 
 - **Clicking:** each group has `memberIds`, the other Members in it (never you). `Core.selectTogether(selected, memberIds, add)` gives the new pick: a click picks that group's Members, shift-click (`add`) adds them, and clicking exactly what's picked clears it. Your own dot (no memberIds) changes nothing.
 - **Shared:** a dungeon shown is `shared` when you and every picked Member fit it, through any of their Characters. Everything else is `faded`, and so is a group with no picked Member (yours never fades). A chip is shared when anything in it is.
-- **Answer line:** "You and Simbad **can play**" ("You, Simba and Simbad" for more; "can play" only while every picked Member has a Character within 3 levels), then "Together: The Deadmines, Shadowfang Keep, …" (the shared ones, by level), or "No dungeon fits you both yet · Simbad is 6 ahead" ("you all" for more; each picked Member over 3 levels away, nearest Character; "Quest together" when none is).
+- **Answer line:** "You and Simbad **can play**" ("You, Simba and Simbad" for more; "can play" only while every picked Member has a Character within 3 levels), then "Together: The Deadmines, Shadowfang Keep, …" (the shared ones shown, by level: a hidden attunement isn't listed, and "Raids" is while Raids is on), or "No dungeon fits you both yet · Simbad is 6 ahead" ("you all" for more; each picked Member over 3 levels away, nearest Character; "Quest together" when none is).
 
 ## Show menu
 
@@ -63,7 +63,7 @@ A **Together** tab answers "who can I play with, and where?": the Crew's Charact
 Then a key (Fits your level, Attunement, New in WoW: Forever, Friends who fit it) and the help line "Drag or scroll to move along the levels. Click a friend to see where you fit together."
 
 - **Raids:** one entry, `kind` `raids`, named "Raids 5", starting 6px left of 60 for its diamond. Its tooltip is "Raids at 60" with `raids`: each raid's name, `detail` ("40-player · Blackrock Mountain") and `forever`.
-- **Empty stretches:** with Only near your level on, `empty` has the text "No dungeons shown at these levels", the action "Show all levels" and `spans`, the stretches of the line (`left`, `right`) with nothing in a lane. Nil otherwise.
+- **Empty stretches:** with Only near your level on, `empty` has the text "No dungeons shown at these levels", the action "Show all levels", the `setting` it turns off and `spans`, the stretches of the line (`left`, `right`) with nothing in a lane. Nil otherwise.
 
 ## Showing
 
@@ -72,7 +72,7 @@ Then a key (Fits your level, Attunement, New in WoW: Forever, Friends who fit it
 - **Toolbar** (28px): "As Gahzuria 24" in class colour, an "alt" tag when you're on an Alt, and at the right the hidden note and a small "Show" button (no ▾: Arial Narrow may not have it). The button opens the Show menu under it: 212px, checkboxes as the Settings page's, each change redrawing the line straight away. Escape or a click outside closes it.
 - **Answer line** (46px): the first line in Body, the second in Small, Smoke Muted with the dungeon in Ash. A Clear button at its right while friends are picked.
 - **Picking:** a click (a press that moves under 4px) on a friend's dot or label picks them; shift adds. Clear, Escape, or a click on the line's empty space clears it. Picked-out friends, dungeons and chips fade to 30%; shared dungeons get a 1px light outline. Hovering a friend lights up the other labels of the Members in it. The tab takes the keyboard only while the menu is open or friends are picked, and never in combat, so Escape otherwise closes the panel as before.
-- **Empty stretch:** while the whole visible window is in one of `empty.spans`, "No dungeons shown at these levels · Show all levels" sits over the lanes; Show all levels turns the filter off.
+- **Empty stretch:** while the whole visible window is in one of `empty.spans`, "No dungeons shown at these levels · Show all levels" sits over the lanes; Show all levels turns the filter off and centres the line on you again.
 - **The line** scrolls sideways (drag or mouse wheel) and opens centred on the Character you play. Ticks every level, numbers every 5, at 1 and at your level. The can-play band has 1px gold edges, a 4% gold fill and a "can play" label.
 - **Friends** above the axis: a class-coloured dot per level on a rail, ringed green while someone there is being played and grey otherwise, as the map pins; yours has a light outline. Labels in Ash with the level and "+N", and a stem down to the dot.
 - **Dungeons** below the axis: bars at 5% white (12% when you fit, with a 2px Bar Fill underline), NEW on a neutral plate, a dashed edge for the attunement, a diamond before "Raids 5", and a 6px class-coloured dot per Member who fits. A bar's name slides along so it stays readable while the bar is partly scrolled off the left. Chips are a 1px Border box with "+N here".

@@ -237,7 +237,7 @@ end
 -- are picked, else nil), show (the Show menu: label, sections of { title,
 -- options: key (the setting), label, sub, value }, key { title, items of
 -- { kind, text } } and help), empty (with only near your level on: text,
--- action and spans of { left, right } with nothing in a lane; else nil),
+-- action, setting (what the action turns off) and spans of { left, right } with nothing in a lane; else nil),
 -- width, you (your level's x), band ({ left, right, text } for can play),
 -- ticks (per level: level, x, big, number, you), groups (a group per level
 -- of the Characters shown: level, x, label, alt, own, online,

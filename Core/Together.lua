@@ -762,8 +762,6 @@ local function hiddenNote(others, filters)
   return table.concat(parts, ", ") .. " hidden"
 end
 
-local DEFAULT_FILTERS = { offline = true, alts = false, near = false, attunements = true, raids = false }
-
 -- Picking friends on the line: clicking a label or dot picks the Members
 -- in it (memberIds), shift-clicking (add) adds them, and clicking what's
 -- already picked clears it. No Members (your own dot) changes nothing.
@@ -801,8 +799,7 @@ function Together.view(rows, measure, options)
   local own = rows[1]
   if not own or not own.own then return nil end
   measure = measure or estimate
-  options = options or {}
-  local filters = options.filters or DEFAULT_FILTERS
+  local filters = options.filters
   local yourLevel = own.level
 
   local members = membersOf(rows)
@@ -853,6 +850,7 @@ function Together.view(rows, measure, options)
     empty = filters.near and {
       text = "No dungeons shown at these levels",
       action = "Show all levels",
+      setting = "togetherNear",
       spans = emptySpans(bars, chips, width),
     } or nil,
     width = width,
