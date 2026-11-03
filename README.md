@@ -21,7 +21,7 @@ A World of Warcraft: Forever addon for friends who don't always play at the same
 </tr>
 <tr>
 <td><img src="docs/gallery/out/07-professions.png" alt="Who crafts what"><br><b>Who crafts what.</b> Every friend's professions and skill in one grid, so you know who to ask for a craft.</td>
-<td><img src="docs/gallery/out/08-together.png" alt="Who's near you"><br><b>Who's near you.</b> See who's near your level and which dungeons fit you together.</td>
+<td><img src="docs/gallery/out/08-together.png" alt="Dungeons together"><br><b>Dungeons together.</b> See which friends are close to your level, and the dungeons you can run together.</td>
 </tr>
 </table>
 

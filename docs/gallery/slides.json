@@ -139,16 +139,16 @@
   {
     "id": "08-together",
     "layout": "right",
-    "title": "Who's near you",
-    "caption": "See who's near your level and which dungeons fit you together.",
+    "title": "Dungeons together",
+    "caption": "See which friends are close to your level, and the dungeons you can run together.",
     "shots": [
       {
         "file": "together.jpg",
         "crop": [
-          680,
+          508,
           0,
-          616,
-          470
+          880,
+          680
         ]
       }
     ]

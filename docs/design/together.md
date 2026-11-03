@@ -73,4 +73,4 @@ Then a key (Fits your level, Attunement, New in WoW: Forever, Friends who fit it
 
 ## Telling people
 
-The README lists the tab ("Who's near you") with its gallery slide, `08-together` (`docs/gallery/slides.json`, from `shots/together.jpg`), and `/bff together` among the commands (#113).
+The README lists the tab ("Dungeons together": "near" would read as the world map pins) with its gallery slide, `08-together` (`docs/gallery/slides.json`, from `shots/together.jpg`), and `/bff together` among the commands (#113).
