@@ -13,7 +13,7 @@ A World of Warcraft: Forever addon for friends who don't always play at the same
 </tr>
 <tr>
 <td><img src="docs/gallery/out/03-feed.png" alt="Cheer every ding"><br><b>Cheer every ding.</b> One click sends a cheer for a ding, respects for a death, or a welcome for someone new.</td>
-<td><img src="docs/gallery/out/04-goals.png" alt="Level up together"><br><b>Level up together.</b> Goals the whole crew works towards. Nobody is ranked.</td>
+<td><img src="docs/gallery/out/04-goals.png" alt="Level up together"><br><b>Level up together.</b> Goals the whole crew works towards, and trophies for what you do together, like clearing a dungeon. Nobody is ranked.</td>
 </tr>
 <tr>
 <td><img src="docs/gallery/out/05-spares.png" alt="Pass on spare gear"><br><b>Pass on spare gear.</b> Offer an item to your friends. Whoever claims it first gets it by in-game mail.</td>
