@@ -1002,33 +1002,6 @@ local function createWhenView()
   whenView.note:SetJustifyH("LEFT")
 end
 
-local function shortDate(time)
-  return (date("%d %b", time):gsub("^0", ""))
-end
-
--- What the grid shows, and a note when there's little or nothing to see.
-local function whenTexts(view)
-  if not view.memberId then
-    local intro = ("How many of the %d Members usually play each hour: in %d of the last %d weeks. Your local time.")
-      :format(view.max, view.usually, view.weeks)
-    local note = view.empty and ("Nobody usually plays at any hour yet. It takes %d weeks of play to show.")
-      :format(view.usually) or ""
-    return "The Crew", intro, note
-  end
-  local name = view.own and "You" or view.displayName or "?"
-  local intro = ("How many of the last %d weeks %s played each hour. Your local time."):format(
-    view.weeks, view.own and "you" or name)
-  local note = ""
-  if view.noData then
-    note = ("%s's BFF doesn't share Play times yet."):format(name)
-  elseif view.collectingSince then
-    note = ("Collecting since %s: less than a week of data so far."):format(shortDate(view.collectingSince))
-  elseif view.empty then
-    note = ("No hour played for %d minutes or more in the last %d weeks."):format(view.minutes, view.weeks)
-  end
-  return name, intro, note
-end
-
 local function drawWhen()
   if not whenView then createWhenView() end
   local view = whenMember and core:playTimes(whenMember)
@@ -1037,11 +1010,10 @@ local function drawWhen()
     view = core:playTimes()
   end
   whenView.data = view
-  local pick, intro, note = whenTexts(view)
-  whenView.pick.label:SetText("Show: " .. pick)
+  whenView.pick.label:SetText("Show: " .. view.title)
   whenView.pick:SetWidth(whenView.pick.label:GetStringWidth() + 16)
-  whenView.intro:SetText(intro)
-  whenView.note:SetText(note)
+  whenView.intro:SetText(view.intro)
+  whenView.note:SetText(view.note or "")
   for _, cell in ipairs(whenView.cells) do
     shadeCell(cell, view.grid[cell.day][cell.hour], view.max)
   end

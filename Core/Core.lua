@@ -351,7 +351,10 @@ end
 -- usually play then, out of max. With one, that
 -- Member's weeks played (0–4) per hour, displayName, collectingSince (when
 -- they started, while under a week ago) and noData (their BFF shares no
--- Play times); nil for a Member the Roster doesn't show.
+-- Play times); nil for a Member the Roster doesn't show. And the words:
+-- title (the Crew, "You" or the Member's name), intro (what the grid
+-- shows) and note (no data, collecting since, or nothing to show; nil
+-- when there's nothing to say).
 function Core:playTimes(memberId)
   local now = self.now()
   local PlayTimes = ns.PlayTimes
@@ -372,7 +375,14 @@ function Core:playTimes(memberId)
     for _, row in ipairs(rows) do
       summaries[#summaries + 1] = self.ledger:record(row.memberId).playTimes
     end
-    return view(PlayTimes.usuallyPlaying(summaries, now), #rows)
+    local result = view(PlayTimes.usuallyPlaying(summaries, now), #rows)
+    result.title = "The Crew"
+    result.intro = ("How many of the %d Members usually play each hour: in %d of the last %d weeks. Your local time.")
+      :format(result.max, result.usually, result.weeks)
+    if result.empty then
+      result.note = ("Nobody usually plays at any hour yet. It takes %d weeks of play to show."):format(result.usually)
+    end
+    return result
   end
 
   for _, row in ipairs(rows) do
@@ -385,6 +395,19 @@ function Core:playTimes(memberId)
       result.own = row.own == true
       result.noData = summary == nil
       result.collectingSince = since and now - since < PlayTimes.WEEK and since or nil
+      local name = result.own and "You" or row.displayName or "?"
+      result.title = name
+      result.intro = ("How many of the last %d weeks %s played each hour. Your local time.")
+        :format(result.weeks, result.own and "you" or name)
+      if result.noData then
+        result.note = ("%s's BFF doesn't share Play times yet."):format(name)
+      elseif result.collectingSince then
+        result.note = ("Collecting since %s: less than a week of data so far.")
+          :format(ns.Text.shortDate(result.collectingSince, self.utcOffset))
+      elseif result.empty then
+        result.note = ("No hour played for %d minutes or more in the last %d weeks.")
+          :format(result.minutes, result.weeks)
+      end
       return result
     end
   end

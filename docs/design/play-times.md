@@ -33,7 +33,7 @@ A fourth tab in the sidebar, under Goals, within the panel's fixed height. `/bff
 - **The Crew** (default): a 7 × 24 grid, Monday to Sunday, 00 to 23, each cell shaded by how many Members **usually play** then (played in at least 2 of the last 4 weeks), out of every Member your Roster shows: you, and everyone not Left, not Removed and not hidden by the 30-day rule. The count is in each cell's tooltip.
 - **One Member:** picked from the "Show:" menu, or with "When does <display name> play?" on their row's right-click menu. Cells shaded by weeks played, 0 to 4.
 - **Local time:** the grid is shifted from UTC by the viewer's `utcOffset`, rounded to the hour (half-hour time zones are off by 30 minutes). DST changes take effect on the next login, like the Feed's days.
-- **Little data:** a Member who started collecting under a week ago shows "Collecting since <date>"; one whose BFF doesn't share Play times says so; an empty Crew view says nobody usually plays yet rather than showing a blank grid silently.
+- **Little data:** a Member who started collecting under a week ago shows "Collecting since <date>"; one whose BFF doesn't share Play times says so; an empty Crew view says nobody usually plays yet rather than showing a blank grid silently. Core words all of it: `playTimes()` returns the picker's `title`, the `intro` above the grid and the `note` below it (nil when there's nothing to say).
 - No Feed entries, Toasts or chat lines.
 
 ## Dev
