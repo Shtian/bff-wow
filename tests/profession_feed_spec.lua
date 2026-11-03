@@ -243,5 +243,21 @@ describe("Profession Feed entries", function()
     assert.same({ "Ann picked up Tailoring", "Ann reached 150 Alchemy" }, said)
     assert.equal(1000 + TAILORING, (summary.professions[1].kind == "newProfession" and summary.professions[1]
       or summary.professions[2]).icon)
+    for _, item in ipairs(summary.professions) do assert.is_false(item.highlight) end
+  end)
+
+  it("highlight maxing a profession in While you were away", function()
+    local net, clients = crew({ "Ann", "Bob" }, { alchemy(290) })
+    local a, b = clients[1], clients[2]
+    b:logout()
+    net:run(2)
+    a:play({ professions = { alchemy(300) } })
+    net:run(2)
+    b.events = {}
+    b:login()
+    net:run(40)
+    local summary = events(b, "awaySummary")[1]
+    assert.equal("Ann maxed Alchemy", summary.professions[1].text)
+    assert.is_true(summary.professions[1].highlight)
   end)
 end)

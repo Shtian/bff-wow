@@ -57,13 +57,14 @@ local function levels(summary)
   return { from = character.from, level = character.level }
 end
 
--- A Member's Character rows without their Reaction buttons.
+-- A Member's Character rows without their Reaction buttons and wording.
+local WORDING = { cheer = true, respects = true, label = true, gained = true }
 local function rows(member)
   local list = {}
   for i, character in ipairs(member.characters) do
     local row = {}
     for k, v in pairs(character) do
-      if k ~= "cheer" and k ~= "respects" then row[k] = v end
+      if not WORDING[k] then row[k] = v end
     end
     list[i] = row
   end
@@ -327,5 +328,78 @@ describe("While you were away", function()
     assert.equal(2, #events(a, "reaction"))
     assert.equal(1, #events(eve, "reaction"))
     assert.equal("Cid welcomed you", events(eve, "reaction")[1].text)
+  end)
+
+  it("words the scoreboard: Character labels and levels gained", function()
+    local net, clients = crew({ "Ann", "Bob" }, { Ann = 18 })
+    local a, b = clients[1], clients[2]
+    local thrall = a.character.guid
+    a.core:setMain(thrall)
+    a.character = playing("Jaina", 10, { guid = "Player-0-Jaina", classFilename = "MAGE" })
+    a:play()
+    net:run(5)
+
+    b:logout()
+    net:run(5)
+    a:play({ level = 12 })
+    net:run(5)
+    a.character = playing("Rexxar", 5, { guid = "Player-0-Rexxar", classFilename = "HUNTER" })
+    a:play()
+    net:run(5)
+    a.character = playing("Ann", 20, { guid = thrall })
+    a:play()
+    net:run(5)
+
+    relog(net, b)
+    local summary = summaries(b)[1]
+    assert.equal("3 things happened while you were away.", summary.intro)
+    assert.equal(60, summary.maxLevel)
+    local labels, gained = {}, {}
+    for i, character in ipairs(summary.members[1].characters) do
+      labels[i] = character.label or false
+      gained[i] = character.gained or false
+    end
+    -- No label on a Main named like the Member.
+    assert.same({ false, "Alt Jaina", "Alt Rexxar" }, labels)
+    assert.same({ "+2", "+2", "new" }, gained)
+  end)
+
+  it("names a Main named unlike the Member, and says one thing in the singular", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    a.core:setDisplayName("Annie")
+    net:run(5)
+    b:logout()
+    net:run(5)
+    a:play({ deaths = 1 })
+    net:run(5)
+
+    relog(net, b)
+    local summary = summaries(b)[1]
+    assert.equal("1 thing happened while you were away.", summary.intro)
+    local character = summary.members[1].characters[1]
+    assert.equal("Ann", character.label)
+    assert.is_nil(character.gained)
+  end)
+
+  it("tags a Member joined, highlighted, or left, but not max level", function()
+    local net, clients, code = crew({ "Ann", "Bob", "Cid", "Dee" }, { Ann = 59 })
+    local a, c, d = clients[1], clients[3], clients[4]
+    d:logout()
+    net:run(5)
+    a:play({ level = 60 })
+    net:run(5)
+    c.core:leaveCrew()
+    net:run(5)
+    local eve = net:add("Eve"):login()
+    eve:join(code)
+    net:run(40)
+
+    relog(net, d)
+    local tags = {}
+    for _, member in ipairs(summaries(d)[1].members) do tags[member.displayName] = member.tags end
+    assert.same({ { text = "joined", highlight = true } }, tags.Eve)
+    assert.same({ { text = "left", highlight = false } }, tags.Cid)
+    assert.same({}, tags.Ann)
   end)
 end)

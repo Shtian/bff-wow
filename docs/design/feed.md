@@ -111,7 +111,7 @@ Kept deep: Core decides what is seen and what the settings allow, so UI and App 
 
 - **Creation options:**
   - `initialLogin`: `isInitialLogin` from `PLAYER_ENTERING_WORLD`. A reload already creates a new Core, so no input method is needed.
-  - `maxLevel`: from `GetMaxLevelForPlayerExpansion()`.
+  - `maxLevel`: from `GetMaxLevelForPlayerExpansion()`. The summary passes it on for the popup's level bars.
 - **Listener events:**
   - `feedEntry(entry)`: fires only when the chat-line setting is on, and Core marks the entry as seen as it fires. App prints `entry.text`.
   - `awaySummary(summary)`: fires once per initial login when the summary has settled, only when the popup setting is on and the summary isn't empty. Core marks those entries as seen as it fires. App waits for combat to end and then shows it.

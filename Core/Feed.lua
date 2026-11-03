@@ -484,8 +484,15 @@ function Feed:tick()
   return self.settle:tick()
 end
 
--- Entries shown in the summary on their own highlighted line.
-local HIGHLIGHT = { maxLevel = true, joined = true, left = true, goal = true }
+-- Entries that are the news, highlighted wherever they show: the Feed
+-- tab, While you were away and toasts. Leaving isn't.
+local HIGHLIGHTED = { maxLevel = true, joined = true, goal = true, professionMaxed = true }
+Feed.HIGHLIGHTED = HIGHLIGHTED
+
+-- Entries listed with a Member in the summary (highlights), and of those,
+-- the ones that tag them by name (max level has its star instead).
+local MEMBER_NEWS = { maxLevel = true, joined = true, left = true, goal = true }
+local TAGS = { joined = true, left = true }
 
 -- A Reaction button in the summary: { key, reacted }, or nil.
 local function button(self, entry)
@@ -504,7 +511,8 @@ local function cheerRank(entry)
 end
 
 -- One Character's row in a Member's block: { name, main, from, level,
--- deaths, new, maxLevel, cheer, respects }. The level range runs from the
+-- deaths, new, maxLevel, gained, cheer, respects }. gained is "new" or
+-- "+N" levels, nil when neither. The level range runs from the
 -- lowest "before" to the highest "after" (max level counts towards it), a
 -- new Character has its level but no from, and deaths add up. Cheer is
 -- keyed to the highest level and Respects to the highest death total. Nil
@@ -537,12 +545,20 @@ local function characterRow(self, entries, character, isMain)
     end
   end
   if row.new then row.from = nil end
+  if row.new then
+    row.gained = "new"
+  elseif row.from then
+    row.gained = "+" .. (row.level - row.from)
+  end
   row.cheer, row.respects = button(self, cheer), button(self, respects)
   return any and row or nil
 end
 
 -- One Member's block: a row per Character with events, the Main's first,
--- then the rest by latest activity, and a Welcome when they joined.
+-- then the rest by latest activity, and a Welcome when they joined. Each
+-- row's label names its Character: "Alt Jaina", the Main's name, or nil
+-- for a Main named like the Member. tags are { text, highlight } for
+-- joined and left.
 local function memberBlock(self, id, entries)
   local record = self.ledger:record(id)
   local main = record and ns.Roster.main(record, self.now())
@@ -554,13 +570,17 @@ local function memberBlock(self, id, entries)
     time = 0,
     characters = {},
     highlights = {},
+    tags = {},
   }
 
   local byCharacter, characters = {}, {}
   for _, entry in ipairs(entries) do
     block.time = math.max(block.time, entry.time)
-    if HIGHLIGHT[entry.kind] then
+    if MEMBER_NEWS[entry.kind] then
       block.highlights[#block.highlights + 1] = { kind = entry.kind, text = entry.text }
+    end
+    if TAGS[entry.kind] then
+      block.tags[#block.tags + 1] = { text = entry.kind, highlight = HIGHLIGHTED[entry.kind] == true }
     end
     if entry.kind == "joined" then block.welcome = button(self, entry) or block.welcome end
     if entry.guid then
@@ -584,7 +604,14 @@ local function memberBlock(self, id, entries)
   for _, forCharacter in ipairs(characters) do
     local character = record and record.characters[forCharacter.guid]
     local row = characterRow(self, forCharacter, character, forCharacter.guid == mainGuid)
-    if row then block.characters[#block.characters + 1] = row end
+    if row then
+      if not row.main then
+        row.label = "Alt " .. row.name
+      elseif row.name ~= block.displayName then
+        row.label = row.name
+      end
+      block.characters[#block.characters + 1] = row
+    end
   end
   return block
 end
@@ -621,11 +648,13 @@ end
 -- While you were away: the unseen entries from other Members, one block
 -- per Member, most recent activity first, the Crew goals reached, newest
 -- first ({ text, time }), profession news, newest first ({ kind, text,
--- time, icon, cheer }), the unseen Reactions to your own, and
+-- time, icon, cheer, highlight }), the unseen Reactions to your own, and
 -- spares: the Spare notices given (Spares:takeNews), then the
 -- Gives, newest first ({ kind = "gave", text, time }), as { members,
--- goals, spares, professions, count, noticed }. Marks them seen. Nil when there
--- are none.
+-- goals, spares, professions, count, intro, maxLevel, noticed }, intro
+-- being the scoreboard's "N things happened while you were away." and
+-- maxLevel the top of its level bars. Marks them seen. Nil when there are
+-- none.
 function Feed:takeSummary(spares)
   spares = spares or {}
   local byMember, ids, goals, gives, professions, count = {}, {}, {}, {}, {}, 0
@@ -636,6 +665,7 @@ function Feed:takeSummary(spares)
       count = count + 1
       table.insert(professions, 1, {
         kind = entry.kind, text = entry.text, time = entry.time, icon = entry.icon, cheer = button(self, entry),
+        highlight = HIGHLIGHTED[entry.kind] == true,
       })
     elseif not entry.seen and entry.kind == "goal" then
       entry.seen = true
@@ -669,6 +699,9 @@ function Feed:takeSummary(spares)
   end)
   return {
     members = members, goals = goals, spares = spares, professions = professions, count = count, noticed = noticed,
+    intro = count == 1 and "1 thing happened while you were away."
+      or ("%d things happened while you were away."):format(count),
+    maxLevel = self.maxLevel,
   }
 end
 

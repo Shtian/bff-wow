@@ -201,13 +201,10 @@ local function drawRow(item, member, character, first, maxLevel)
   item.member:SetShown(first)
   if first then
     item.icon:SetAtlas("classicon-" .. (member.classFilename or ""):lower())
-    -- Joined is news, in gold; left is said plainly.
+    -- Highlighted tags (joined) in gold, the rest (left) plainly.
     local tags = {}
-    for _, highlight in ipairs(member.highlights) do
-      if highlight.kind ~= "maxLevel" then
-        local color = Skin.FEED_HIGHLIGHT[highlight.kind] and Skin.GOLD or Skin.MUTED
-        tags[#tags + 1] = hex(color) .. highlight.kind .. "|r"
-      end
+    for i, tag in ipairs(member.tags) do
+      tags[i] = hex(tag.highlight and Skin.GOLD or Skin.MUTED) .. tag.text .. "|r"
     end
     local text = classHex(member.classFilename) .. member.displayName .. "|r"
     if #tags > 0 then text = text .. "  " .. table.concat(tags, ", ") end
@@ -223,11 +220,7 @@ local function drawRow(item, member, character, first, maxLevel)
   drawButton(item.cheer, "cheer", character and character.cheer)
   drawButton(item.respects, "respects", character and character.respects)
 
-  -- The Character's name, unless it is the Member's own name on their Main.
-  local name
-  if character and not (character.main and character.name == member.displayName) then
-    name = character.main and character.name or "Alt " .. character.name
-  end
+  local name = character and character.label
   item.character:SetText(name or "")
   item.character:SetShown(name ~= nil)
 
@@ -244,13 +237,8 @@ local function drawRow(item, member, character, first, maxLevel)
   end
 
   drawLevel(item, character or {}, maxLevel)
-  if character and character.new then
-    item.gained:SetText(hex(GAINED) .. "new|r")
-  elseif character and character.from then
-    item.gained:SetText(hex(GAINED) .. "+" .. (character.level - character.from) .. "|r")
-  else
-    item.gained:SetText("")
-  end
+  local gained = character and character.gained
+  item.gained:SetText(gained and hex(GAINED) .. gained .. "|r" or "")
   item.deaths:SetText(character and character.deaths or "")
   item:Show()
   return height
@@ -344,7 +332,7 @@ local function drawProfessions(news, y)
     entry:ClearAllPoints()
     entry:SetPoint("TOPLEFT", INSET, y)
     entry:SetPoint("TOPRIGHT", -INSET, y)
-    local text = Skin.FEED_HIGHLIGHT[item.kind] and hex(Skin.GOLD) .. item.text .. "|r" or item.text
+    local text = item.highlight and hex(Skin.GOLD) .. item.text .. "|r" or item.text
     local icon = item.icon or Skin.FEED_PICTURES[item.kind]
     entry.text:SetText(Skin.iconGlyph(icon, 14) .. "  " .. text)
     drawButton(entry.cheer, "cheer", item.cheer)
@@ -355,7 +343,7 @@ local function drawProfessions(news, y)
 end
 
 -- Shows the summary from Core's awaySummary: { members, goals,
--- spares, professions, count, noticed }. With no Member news, only Your
+-- spares, professions, count, intro, maxLevel, noticed }. With no Member news, only Your
 -- Crew noticed, Crew goals, Spares and Professions show.
 function Away.show(summary)
   if not frame then create() end
@@ -368,8 +356,7 @@ function Away.show(summary)
   frame.intro:SetShown(scoreboard)
   for _, label in ipairs(frame.headings) do label:SetShown(scoreboard) end
   if scoreboard then
-    frame.intro:SetText(summary.count == 1 and "1 thing happened while you were away."
-      or ("%d things happened while you were away."):format(summary.count))
+    frame.intro:SetText(summary.intro)
     frame.intro:ClearAllPoints()
     frame.intro:SetPoint("TOPLEFT", INSET, y - SECTION_TOP)
     for _, label in ipairs(frame.headings) do
@@ -379,7 +366,7 @@ function Away.show(summary)
     y = y - SECTION_TOP - INTRO - HEADINGS
   end
 
-  local maxLevel = GetMaxLevelForPlayerExpansion()
+  local maxLevel = summary.maxLevel
   local index = 0
   for _, member in ipairs(summary.members) do
     local characters = member.characters
