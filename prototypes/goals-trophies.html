@@ -1,0 +1,472 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Questions:
+    1. The Goals tab reads as six identical grey bars. How can colour make it more engaging?
+    2. Reached rungs vanish: only the last one shows, as a muted caption. How do past wins stay visible?
+    3. Boss trophies (which bosses the Crew has killed) don't fit the current view. Where do they live?
+  Three variants, switch with the bar at the bottom:
+    A  Ladder: today's rows, each with a coloured track icon, notched bar and a chip per reached rung. Trophies on a second sub-tab.
+    B  Cabinet: the newest win up top in gold, a shelf of medals for every rung and boss, open goals as tiles, dungeons as rows.
+    C  Log: a quest-log split. Tracks and dungeons on the left, the selected one's full history on the right.
+  Colour comes from the game, not new brand colours:
+    - Track hues reuse the Feed kinds (green levels, red deaths, violet professions), so a goal looks like the news it makes.
+    - Rung tiers use WoW's item quality colours (uncommon, rare, epic, legendary). Players already read them as "how big".
+    - Gold stays news: only a rung reached in the last 3 days, and a cleared dungeon, glow gold.
+  This breaks DESIGN.md's One Ember Rule on purpose (colour is the brief). If one is picked, DESIGN.md needs a "trophy colours" rule.
+  Boss data does not exist yet: it needs a new record field (ENCOUNTER_END / BOSS_KILL) and sync. All data here is fake.
+  Sizes match UI/Panel.lua: panel 640 x 520 (min 460 x 380), sidebar 124. Run: open the file in a browser.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE · BFF goals and trophies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;600&family=Cinzel:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold:#ffd14a; --gold-rgb:255,209,74; --on-gold:#1a1400; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99;
+    --online:#70e370; --night:#0e0d14; --window:rgba(14,13,20,.97); --header:#1a1821; --raised:#1b1a23;
+    --line:rgba(255,255,255,.07); --border:rgba(255,255,255,.10); --track:rgba(255,255,255,.08); --fill:rgba(255,255,255,.30);
+    /* Feed kinds, reused as track hues */
+    --lvl:#70e370; --death:#f2665c; --prof:#c799ff; --crew:#66bfff;
+    /* WoW item quality, as rung tiers (rare lifted from #0070dd so it reads on Night Window) */
+    --q1:#1eff00; --q2:#3a9bff; --q3:#b55cf5; --q4:#ff8000;
+    --friz:"Friz Quadrata TT", Cinzel, Georgia, serif;
+  }
+  * { box-sizing:border-box; }
+  ::selection { background:rgba(var(--gold-rgb),.35); color:#fff; }
+  body { margin:0; padding:20px 16px 90px; font:14px/1.25 "Arial Narrow", "Archivo Narrow", Arial, sans-serif; color:var(--text);
+    background: radial-gradient(ellipse at 40% 30%, #34302a 0%, #17140f 55%, #090807 100%); min-height:100vh; }
+  .note { max-width:760px; margin:0 auto 14px; color:var(--muted); font-size:14px; }
+  .note b { color:var(--gold); font-weight:normal; }
+  .stage { display:flex; justify-content:center; }
+  .zoom { zoom:1.2; }
+
+  .panel { width:640px; height:520px; background:var(--window); border:1px solid var(--border); display:flex; flex-direction:column; }
+  body.small .panel { width:460px; height:380px; }
+  .head { height:30px; background:var(--header); display:flex; align-items:center; padding:0 10px 0 12px; border-bottom:1px solid var(--line); flex:none; }
+  .head .t { font-family:var(--friz); color:var(--gold); font-size:13px; flex:1; }
+  .head .on { color:var(--muted); font-size:12px; margin-right:12px; display:flex; align-items:center; gap:5px; }
+  .head .on i { width:6px; height:6px; border-radius:50%; background:var(--online); }
+  .head .x { width:10px; height:10px; position:relative; opacity:.6; }
+  .head .x::before, .head .x::after { content:""; position:absolute; left:4px; top:-1px; width:2px; height:12px; background:#aaa; transform:rotate(45deg); }
+  .head .x::after { transform:rotate(-45deg); }
+  .body { flex:1; display:flex; min-height:0; }
+  .side { width:124px; border-right:1px solid var(--line); padding:6px; display:flex; flex-direction:column; flex:none; background:rgba(0,0,0,.25); }
+  .side div { height:30px; line-height:30px; padding:0 8px; color:var(--muted); font-size:14px; }
+  .side .sel { background:rgba(255,255,255,.08); color:var(--text); border-radius:2px; }
+  .side .grow { flex:1; } .side .dev { font-size:11px; color:var(--dim); height:16px; line-height:16px; }
+  .content { flex:1; min-width:0; display:flex; flex-direction:column; min-height:0; position:relative; }
+  .scroll { flex:1; overflow-y:auto; overflow-x:hidden; min-height:0; }
+  .scroll::-webkit-scrollbar { width:6px; } .scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15); }
+
+  /* shared bits */
+  .label { font-family:var(--friz); font-size:10px; color:var(--dim); display:flex; align-items:center; gap:8px; margin:14px 12px 8px; white-space:nowrap; }
+  .label::after { content:""; flex:1; height:1px; background:var(--line); order:1; }
+  .label .r { order:2; color:var(--muted); font-family:inherit; }
+  .ico { position:relative; flex:none; background:var(--night); overflow:hidden; }
+  .ico img { width:100%; height:100%; object-fit:cover; transform:scale(1.18); display:block; }
+  .ico::after { content:""; position:absolute; inset:0; box-shadow:inset 0 0 0 1px var(--edge, rgba(255,255,255,.2)); pointer-events:none; }
+  .ico.off img { filter:grayscale(1) brightness(.55); opacity:.6; }
+  .ico .fb { position:absolute; inset:0; display:grid; place-items:center; font-family:var(--friz); font-size:11px; color:var(--muted); }
+  .bar { height:6px; background:var(--track); position:relative; }
+  .bar > i { position:absolute; left:0; top:0; bottom:0; background:var(--hue, var(--fill)); }
+  .bar .tick { position:absolute; top:-2px; bottom:-2px; width:1px; background:rgba(14,13,20,.9); }
+  .h { font-family:var(--friz); font-size:12px; color:var(--text); }
+  .num { font-variant-numeric:tabular-nums; }
+  .muted { color:var(--muted); } .dim { color:var(--dim); } .gold { color:var(--gold); }
+  .sub { display:flex; gap:2px; padding:8px 12px 0; border-bottom:1px solid var(--line); flex:none; }
+  .sub button { all:unset; cursor:pointer; padding:6px 10px 7px; font-size:14px; color:var(--muted); position:relative; display:flex; gap:6px; align-items:center; }
+  .sub button:hover { color:var(--text); background:rgba(255,255,255,.04); }
+  .sub button.sel { color:var(--text); }
+  .sub button.sel::after { content:""; position:absolute; left:6px; right:6px; bottom:-1px; height:2px; background:var(--text); }
+  .sub .count { font-size:11px; padding:0 4px; height:14px; line-height:14px; background:rgba(255,255,255,.08); color:var(--text); }
+  .sub .count.news { background:var(--gold); color:var(--on-gold); }
+
+  /* ---------- A: Ladder ---------- */
+  .a-row { display:flex; gap:12px; padding:12px; border-top:1px solid var(--line); }
+  .a-row:first-child { border-top:0; }
+  .a-row:hover { background:rgba(255,255,255,.03); }
+  .a-row .ico { width:36px; height:36px; }
+  .a-main { flex:1; min-width:0; }
+  .a-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px; }
+  .a-top .num { font-size:14px; } .a-top .num .of { color:var(--dim); }
+  .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; align-items:center; }
+  .chip { height:18px; line-height:18px; padding:0 6px; font-size:12px; background:rgba(255,255,255,.05); color:var(--text);
+    box-shadow:inset 0 0 0 1px var(--q, rgba(255,255,255,.12)); cursor:default; }
+  .chip.next { color:var(--dim); background:transparent; box-shadow:inset 0 0 0 1px rgba(255,255,255,.12); }
+  .chip.new { background:var(--gold); color:var(--on-gold); box-shadow:none; }
+  .chip.new b { font-weight:600; font-size:11px; margin-left:4px; }
+  .chips .more { font-size:12px; color:var(--dim); margin-left:4px; }
+  .profs { display:flex; gap:3px; margin-top:8px; }
+  .profs .ico { width:18px; height:18px; }
+  .a-dungeon { padding:0 12px 4px; }
+  .heads { display:flex; flex-wrap:wrap; gap:6px; }
+  .heads .ico { width:40px; height:40px; cursor:default; }
+  .heads .ico.final { width:40px; }
+  .heads .ico .crown { position:absolute; left:0; right:0; bottom:0; height:3px; background:var(--q4); }
+  .cleared { color:var(--gold); }
+
+  /* ---------- B: Cabinet ---------- */
+  .b-latest { margin:12px 12px 0; display:flex; gap:12px; align-items:center; padding:10px 12px; background:rgba(var(--gold-rgb),.07);
+    box-shadow:inset 0 0 0 1px rgba(var(--gold-rgb),.35); }
+  .b-latest .ico { width:40px; height:40px; --edge:rgba(var(--gold-rgb),.7); }
+  .b-latest .t { font-family:var(--friz); color:var(--gold); font-size:13px; }
+  .b-latest .s { color:var(--muted); font-size:12px; margin-top:3px; }
+  .shelf { display:flex; gap:6px; padding:0 12px 2px; overflow-x:auto; }
+  .shelf::-webkit-scrollbar { height:4px; } .shelf::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15); }
+  .medal { flex:none; width:52px; text-align:center; cursor:default; }
+  .medal .ico { width:40px; height:40px; margin:0 auto; --edge:var(--q); }
+  .medal .ico::before { content:""; position:absolute; left:0; right:0; bottom:0; height:3px; background:var(--q); z-index:1; }
+  .medal .v { font-size:12px; margin-top:4px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .medal .d { font-size:11px; color:var(--dim); }
+  .medal.new .v { color:var(--gold); }
+  .tiles { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); margin:0 12px; border:1px solid var(--line); }
+  body.small .tiles { grid-template-columns:1fr; }
+  .tile { background:var(--night); padding:10px; display:grid; grid-template-columns:28px 1fr; gap:4px 10px; align-items:center; }
+  .tile .ico { width:28px; height:28px; grid-row:span 2; }
+  .tile .h { font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tile .big { font-size:18px; line-height:1; } .tile .big .of { font-size:13px; color:var(--dim); }
+  .tile .bar { grid-column:1 / -1; margin-top:4px; height:4px; }
+  .tile .nx { grid-column:1 / -1; font-size:12px; color:var(--dim); }
+  .tile.done .big { color:var(--gold); }
+  .b-dun { display:flex; align-items:center; gap:10px; padding:7px 12px; border-top:1px solid var(--line); cursor:pointer; }
+  .b-dun:first-of-type { border-top:0; }
+  .b-dun:hover { background:rgba(255,255,255,.05); }
+  .b-dun .n { width:140px; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pips { flex:1; display:flex; gap:3px; }
+  .pips i { width:14px; height:14px; background:rgba(255,255,255,.07); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); }
+  .pips i.k { background:var(--q2); box-shadow:none; }
+  .pips i.k.fin { background:var(--q4); }
+  .b-dun .c { font-size:13px; width:60px; text-align:right; }
+  .b-open { padding:4px 12px 10px 162px; }
+  body.small .b-open { padding-left:12px; }
+  .medal.more { cursor:pointer; }
+  .medal .slot { width:40px; height:40px; margin:0 auto; display:grid; place-items:center; font-size:15px; color:var(--text);
+    background:rgba(255,255,255,.05); box-shadow:inset 0 0 0 1px rgba(255,255,255,.18); }
+  .medal.more:hover .slot { background:rgba(255,255,255,.1); }
+  .medal.more .v { color:var(--text); }
+  .medal.empty .ico { --q:transparent; --edge:rgba(255,255,255,.1); }
+  .medal.empty .v { color:var(--dim); }
+  .cab-head { display:flex; align-items:center; gap:12px; padding:0 12px; height:38px; border-bottom:1px solid var(--line); flex:none; }
+  .cab-head .h { flex:1; font-size:13px; }
+  .back { all:unset; cursor:pointer; height:20px; line-height:20px; padding:0 8px; font-size:12px; background:rgba(255,255,255,.06);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.1); color:var(--text); }
+  .back:hover { background:rgba(255,255,255,.12); }
+  .cab-grid { display:grid; grid-template-columns:repeat(auto-fill, 60px); gap:10px 4px; padding:0 12px; }
+  .cab-grid .medal { width:60px; }
+  .cab-track { margin-bottom:12px; }
+  .cab-t { display:flex; align-items:center; gap:8px; padding:0 12px 6px; }
+  .cab-t .ico { width:16px; height:16px; } .cab-t .h { font-size:11px; color:var(--muted); }
+
+  /* ---------- C: Log ---------- */
+  .c-wrap { flex:1; display:flex; min-height:0; }
+  .c-list { width:190px; flex:none; border-right:1px solid var(--line); }
+  body.small .c-list { width:150px; }
+  .c-item { display:flex; align-items:center; gap:8px; padding:0 10px 0 12px; height:32px; cursor:pointer; }
+  .c-item:hover { background:rgba(255,255,255,.05); }
+  .c-item.sel { background:rgba(255,255,255,.08); }
+  .c-item .ico { width:20px; height:20px; }
+  .c-item .n { flex:1; min-width:0; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .c-item .m { font-size:12px; color:var(--muted); }
+  .c-item .m.gold { color:var(--gold); }
+  .c-item .dot { width:6px; height:6px; background:var(--gold); flex:none; }
+  .c-detail { flex:1; min-width:0; }
+  .c-hero { display:flex; gap:14px; align-items:center; padding:16px 14px 12px; }
+  .c-hero .ico { width:48px; height:48px; }
+  .c-hero .t { font-family:var(--friz); font-size:14px; }
+  .c-hero .big { font-size:26px; line-height:1.1; margin-top:2px; } .c-hero .big .of { font-size:15px; color:var(--dim); }
+  .c-bar { margin:0 14px; }
+  .c-cap { margin:6px 14px 0; font-size:12px; color:var(--muted); }
+  .ladder { margin:4px 14px 12px; position:relative; }
+  .rung { display:flex; align-items:center; gap:10px; height:30px; position:relative; }
+  .rung::before { content:""; position:absolute; left:6px; top:0; bottom:0; width:1px; background:var(--line); }
+  .rung:first-child::before { top:50%; } .rung:last-child::before { bottom:50%; }
+  .rung .node { width:13px; height:13px; flex:none; position:relative; z-index:1; background:var(--night); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }
+  .rung.got .node { background:var(--q); box-shadow:none; }
+  .rung.new .node { background:var(--gold); }
+  .rung .v { flex:1; font-size:15px; }
+  .rung.todo .v { color:var(--dim); }
+  .rung .d { font-size:12px; color:var(--muted); }
+  .rung.new .v { color:var(--gold); }
+  .rung .tag { font-size:11px; height:14px; line-height:14px; padding:0 4px; background:var(--gold); color:var(--on-gold); margin-left:6px; }
+  .boss { display:flex; align-items:center; gap:10px; padding:6px 14px; border-top:1px solid var(--line); }
+  .boss .ico { width:32px; height:32px; }
+  .boss .n { font-size:15px; } .boss .w { font-size:12px; color:var(--muted); }
+  .boss.todo .n { color:var(--dim); }
+  .boss .d { margin-left:auto; font-size:12px; color:var(--muted); text-align:right; }
+
+  .tip { position:fixed; pointer-events:none; background:rgba(8,8,12,.95); border:1px solid rgba(255,255,255,.25); padding:7px 9px;
+    font:13px/1.35 "Arial Narrow", "Archivo Narrow", Arial, sans-serif; z-index:50; min-width:150px; max-width:240px; display:none; color:var(--muted); }
+  .tip .t1 { color:#fff; font-size:14px; }
+
+  .bar-ui { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); display:flex; gap:8px; align-items:center;
+    background:#f4f1ea; color:#111; padding:7px 12px; border-radius:22px; box-shadow:0 6px 24px #000a; font:13px system-ui, sans-serif; z-index:100; }
+  .bar-ui button { border:0; background:#ddd8cc; border-radius:12px; padding:3px 10px; cursor:pointer; font:inherit; }
+  .bar-ui button.on { background:#111; color:#fff; }
+  .bar-ui .sep { width:1px; height:18px; background:#0003; }
+</style>
+</head>
+<body>
+<div class="note">PROTOTYPE · <b>Goals and trophies, round 2</b>: B is the pick; a trophy is now a dungeon or raid clear, and the shelf ends in a See all tile that opens the full cabinet. A: rows with a chip per reached rung, trophies on a sub-tab. B: a trophy cabinet. C: a quest-log split. Hover icons, chips and medals for details.</div>
+<div class="stage"><div class="zoom">
+  <div class="panel">
+    <div class="head"><div class="t">Best Friends in Forever</div><div class="on"><i></i>2 of 3 online</div><div class="x"></div></div>
+    <div class="body">
+      <div class="side">
+        <div>Roster</div><div>Feed</div><div class="sel">Goals</div><div>When</div><div>Spares</div><div>Professions</div><div>Together</div>
+        <div class="grow"></div><div>Settings</div><div class="dev">dev</div>
+      </div>
+      <div class="content" id="content"></div>
+    </div>
+  </div>
+</div></div>
+<div class="tip" id="tip"></div>
+<div class="bar-ui">
+  <button data-v="A">A · Ladder</button><button data-v="B">B · Cabinet</button><button data-v="C">C · Log</button>
+  <div class="sep"></div><button id="small">460 × 380</button>
+</div>
+
+<script>
+const ICON = n => `https://wow.zamimg.com/images/wow/icons/large/${n}.jpg`;
+const NOW = new Date(2026, 10, 3);
+const day = s => { const [d, m] = s.split(" "); return new Date(2026, m === "Oct" ? 9 : 10, +d); };
+const isNew = s => (NOW - day(s)) / 864e5 <= 2;
+const tier = i => ["--q1", "--q2", "--q3", "--q4"][Math.min(Math.floor(i / 2), 3)];
+const fmt = n => n.toLocaleString("en-GB");
+
+const PROFS = [
+  ["Alchemy","trade_alchemy",1],["Blacksmithing","trade_blacksmithing",1],["Enchanting","trade_engraving",1],
+  ["Engineering","trade_engineering",0],["Herbalism","trade_herbalism",1],["Leatherworking","trade_leatherworking",0],
+  ["Mining","trade_mining",1],["Skinning","inv_misc_pelt_wolf_01",1],["Tailoring","trade_tailoring",1],
+  ["Cooking","inv_misc_food_15",1],["Fishing","trade_fishing",0],["First Aid","spell_holy_sealofsacrifice",1],
+];
+// rungs: [label, date reached]; next: the rung being worked towards.
+const GOALS = [
+  { id:"lvl", title:"Crew levels", hue:"--lvl", icon:"achievement_level_20", value:183, goal:200, next:"200",
+    rungs:[["50","24 Oct"],["100","28 Oct"],["150","3 Nov"]] },
+  { id:"every", title:"Everyone at level 30", hue:"--lvl", icon:"achievement_level_30", value:3, goal:4, unit:"Members", next:"30",
+    rungs:[["10","26 Oct"],["20","3 Nov"]] },
+  { id:"death", title:"Crew deaths", hue:"--death", icon:"inv_misc_bone_humanskull_01", value:21, goal:25, next:"25", rungs:[] },
+  { id:"prof", title:"Every profession in the Crew", hue:"--prof", icon:"inv_misc_book_11", value:9, goal:12, next:"12",
+    rungs:[["Mining","22 Oct"],["Herbalism","22 Oct"],["Skinning","23 Oct"],["Tailoring","24 Oct"],["Cooking","25 Oct"],
+           ["Blacksmithing","27 Oct"],["Alchemy","29 Oct"],["Enchanting","1 Nov"],["First Aid","3 Nov"]], professions:true },
+  { id:"skill", title:"Crew skill", hue:"--prof", icon:"inv_pick_02", value:3112, goal:5000, next:"5,000",
+    rungs:[["500","23 Oct"],["1,000","26 Oct"],["2,500","3 Nov"]] },
+  { id:"rank", title:"Everyone an Apprentice", hue:"--prof", icon:"inv_misc_note_06", value:3, goal:4, unit:"Members", next:"Apprentice", rungs:[] },
+];
+// Bosses: [name, head icon, killed date or null, party]. The last boss is the dungeon's final one.
+const DUNGEONS = [
+  { name:"Ragefire Chasm", lvl:"13–18", bosses:[
+    ["Oggleflint","inv_misc_head_troll_01","25 Oct","Gahz, Simbad, Simone"],["Taragaman the Hungerer","inv_misc_head_dragon_black","25 Oct","Gahz, Simbad, Simone"],
+    ["Jergosh the Invoker","inv_misc_head_orc_01","25 Oct","Gahz, Simbad, Simone"],["Bazzalan","inv_misc_head_orc_02","25 Oct","Gahz, Simbad, Simone"]] },
+  { name:"The Deadmines", lvl:"17–26", bosses:[
+    ["Rhahk'Zor","inv_misc_head_gnoll_01","31 Oct","Simbad, Simone, Simba"],["Sneed","inv_misc_head_gnome_01","31 Oct","Simbad, Simone, Simba"],
+    ["Gilnid","inv_misc_head_gnome_02","31 Oct","Simbad, Simone, Simba"],["Mr. Smite","inv_misc_head_tauren_01","2 Nov","Gahz, Simbad, Simone, Simba"],
+    ["Captain Greenskin","inv_misc_head_orc_01","3 Nov","Gahz, Simbad, Simone, Simba"],["Cookie","inv_misc_head_murloc_01","3 Nov","Gahz, Simbad, Simone, Simba"],
+    ["Edwin VanCleef","inv_misc_head_human_01","3 Nov","Gahz, Simbad, Simone, Simba"]] },
+  { name:"Wailing Caverns", lvl:"17–24", bosses:[
+    ["Lady Anacondra","inv_misc_head_elf_01","1 Nov","Gahz, Simone"],["Lord Cobrahn","inv_misc_head_elf_02","1 Nov","Gahz, Simone"],
+    ["Kresh","inv_misc_head_dragon_green",null],["Lord Pythas","inv_misc_head_elf_01",null],["Skum","inv_misc_head_murloc_01",null],
+    ["Lord Serpentis","inv_misc_head_elf_02",null],["Verdan the Everliving","inv_misc_head_dragon_green",null],["Mutanus the Devourer","inv_misc_head_murloc_01",null]] },
+  { name:"Shadowfang Keep", lvl:"22–30", bosses:[
+    ["Rethilgore","inv_misc_head_undead_01",null],["Razorclaw the Butcher","inv_misc_head_human_02",null],["Baron Silverlaine","inv_misc_head_undead_01",null],
+    ["Commander Springvale","inv_misc_head_undead_02",null],["Odo the Blindwatcher","ability_hunter_pet_wolf",null],["Fenrus the Devourer","ability_hunter_pet_wolf",null],
+    ["Wolf Master Nandos","ability_hunter_pet_wolf",null],["Archmage Arugal","inv_misc_head_undead_02",null]] },
+];
+DUNGEONS.forEach(d => { d.killed = d.bosses.filter(b => b[2]).length; d.cleared = d.killed === d.bosses.length;
+  d.clearedOn = d.cleared ? d.bosses.at(-1)[2] : null; });
+// Every instance, for the cabinet: a trophy is a full clear, not a boss.
+const INSTANCES = [
+  ["Ragefire Chasm","d","13–18","inv_misc_head_orc_02","25 Oct","Gahz, Simbad, Simone"],
+  ["Wailing Caverns","d","17–24","inv_misc_head_murloc_01"],
+  ["The Deadmines","d","17–26","inv_misc_head_human_01","3 Nov","Gahz, Simbad, Simone, Simba"],
+  ["Shadowfang Keep","d","22–30","inv_misc_head_undead_02"],
+  ["Blackfathom Deeps","d","24–32","inv_misc_head_murloc_01"],
+  ["The Stockade","d","24–32","inv_misc_head_human_02","30 Oct","Simbad, Simone, Simba"],
+  ["Gnomeregan","d","29–38","inv_misc_head_gnome_01"],
+  ["Razorfen Kraul","d","29–38","inv_misc_head_quillboar_01"],
+  ["Scarlet Monastery","d","34–45","inv_misc_head_human_01"],
+  ["Razorfen Downs","d","37–46","inv_misc_head_undead_01"],
+  ["Uldaman","d","41–51","inv_misc_head_dwarf_01"],
+  ["Zul'Farrak","d","44–54","inv_misc_head_troll_01"],
+  ["Maraudon","d","46–55","inv_misc_head_centaur_01"],
+  ["Sunken Temple","d","50–60","inv_misc_head_dragon_green"],
+  ["Blackrock Depths","d","52–60","inv_misc_head_dwarf_01"],
+  ["Blackrock Spire","d","55–60","inv_misc_head_dragon_black"],
+  ["Dire Maul","d","55–60","inv_misc_head_elf_02"],
+  ["Scholomance","d","58–60","inv_misc_head_undead_02"],
+  ["Stratholme","d","58–60","inv_misc_head_undead_01"],
+  ["Zul'Gurub","r","60","inv_misc_head_troll_01"],
+  ["Onyxia's Lair","r","60","inv_misc_head_dragon_01"],
+  ["Molten Core","r","60","inv_misc_head_dragon_black"],
+  ["Blackwing Lair","r","60","inv_misc_head_dragon_black"],
+  ["Ruins of Ahn'Qiraj","r","60","inv_misc_head_elf_01"],
+  ["Temple of Ahn'Qiraj","r","60","inv_misc_head_elf_01"],
+  ["Naxxramas","r","60","inv_misc_head_undead_02"],
+].map(([name, kind, lvl, icon, on, who]) => ({ name, kind, lvl, icon, on, who }));
+let cabinet = false;
+const kills = DUNGEONS.reduce((n, d) => n + d.killed, 0), bossCount = DUNGEONS.reduce((n, d) => n + d.bosses.length, 0);
+const newRungs = GOALS.reduce((n, g) => n + g.rungs.filter(r => isNew(r[1])).length, 0);
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
+const tipAttr = (t, ...lines) => `data-tip="${esc(JSON.stringify([t, ...lines]))}"`;
+const ico = (name, { cls = "", edge, tip = "", style = "" } = {}) =>
+  `<div class="ico ${cls}" ${tip} style="${edge ? `--edge:${edge};` : ""}${style}"><img src="${ICON(name)}" alt="" onerror="this.remove()"></div>`;
+const hueEdge = g => `color-mix(in srgb, var(${g.hue}) 60%, transparent)`;
+const barHTML = (g, ticks) => {
+  const pct = Math.min(g.value / g.goal, 1) * 100;
+  return `<div class="bar" style="--hue:color-mix(in srgb, var(${g.hue}) 75%, transparent)"><i style="width:${pct}%"></i>${ticks || ""}</div>`;
+};
+const numHTML = g => `<span class="num">${fmt(g.value)} <span class="of">/ ${fmt(g.goal)}${g.unit ? " " + g.unit : ""}</span></span>`;
+const profStrip = () => `<div class="profs">${PROFS.map(([n, i, lit]) =>
+  ico(i, { cls: lit ? "" : "off", edge: lit ? "color-mix(in srgb, var(--prof) 55%, transparent)" : "", tip: tipAttr(n, lit ? "In the Crew" : "Nobody yet") })).join("")}</div>`;
+const bossTip = b => b[2] ? tipAttr(b[0], `Killed ${b[2]}`, b[3]) : tipAttr(b[0], "Not killed yet");
+
+let variant = "B", subTab = "goals", openDungeon = "The Deadmines", selected = "lvl";
+const content = document.getElementById("content");
+
+function renderA() {
+  const tabs = `<div class="sub">
+    <button class="${subTab === "goals" ? "sel" : ""}" data-sub="goals">Goals ${newRungs ? `<span class="count news">${newRungs} new</span>` : ""}</button>
+    <button class="${subTab === "trophies" ? "sel" : ""}" data-sub="trophies">Boss trophies <span class="count">${kills} / ${bossCount}</span></button></div>`;
+  let body = "";
+  if (subTab === "goals") {
+    body = GOALS.map(g => {
+      const shown = g.professions ? [] : g.rungs.slice(-4);
+      const hidden = g.professions ? 0 : g.rungs.length - shown.length;
+      const chips = shown.map((r, i) => {
+        const at = hidden + i;
+        return isNew(r[1]) ? `<span class="chip new" ${tipAttr(`Reached ${r[0]}`, r[1])}>${esc(r[0])}<b>NEW</b></span>`
+          : `<span class="chip" style="--q:var(${tier(at)})" ${tipAttr(`Reached ${r[0]}`, r[1])}>${esc(r[0])}</span>`;
+      }).join("");
+      const tail = g.professions ? profStrip()
+        : `<div class="chips">${hidden ? `<span class="more">+${hidden}</span>` : ""}${chips}<span class="chip next">${esc(g.next)}</span>
+           ${g.rungs.length ? "" : `<span class="more">First rung, not reached yet</span>`}</div>`;
+      return `<div class="a-row">${ico(g.icon, { edge: hueEdge(g) })}<div class="a-main">
+        <div class="a-top"><span class="h">${esc(g.title)}</span>${numHTML(g)}</div>${barHTML(g)}${tail}</div></div>`;
+    }).join("");
+  } else {
+    body = DUNGEONS.map(d => `<div class="label">${d.name.toUpperCase()}<span class="r ${d.cleared ? "cleared" : ""}">${d.cleared ? `Cleared ${d.clearedOn}` : `${d.killed} / ${d.bosses.length}`}</span></div>
+      <div class="a-dungeon"><div class="heads">${d.bosses.map((b, i) => {
+        const fin = i === d.bosses.length - 1;
+        return `<div class="ico ${b[2] ? "" : "off"}" ${bossTip(b)} style="--edge:${b[2] ? (fin ? "var(--q4)" : "color-mix(in srgb, var(--q2) 70%, transparent)") : "rgba(255,255,255,.1)"}"><img src="${ICON(b[1])}" alt="" onerror="this.remove()">${fin && b[2] ? '<span class="crown"></span>' : ""}</div>`;
+      }).join("")}</div></div>`).join("") + `<div style="height:12px"></div>`;
+  }
+  content.innerHTML = tabs + `<div class="scroll">${body}</div>`;
+}
+
+function renderB() {
+  // Trophies: each goal rung, and each dungeon or raid cleared. Newest first.
+  const all = [];
+  GOALS.forEach(g => g.rungs.forEach((r, i) => all.push({ v: r[0], d: r[1], icon: g.professions ? PROFS.find(p => p[0] === r[0])[1] : g.icon,
+    q: g.professions ? "--q2" : tier(i), t: g.professions ? `${r[0]} in the Crew` : `${g.title}: ${r[0]}`, kind: "goal" })));
+  INSTANCES.filter(x => x.on).forEach(x => all.push({ v: x.name.replace(/^The /, ""), d: x.on, icon: x.icon,
+    q: x.kind === "r" ? "--q4" : "--q3", t: `Cleared ${x.name}`, who: x.who, kind: x.kind }));
+  all.sort((a, b) => day(b.d) - day(a.d));
+  const medal = m => `<div class="medal ${isNew(m.d) ? "new" : ""}" ${tipAttr(m.t, m.d, m.who || "")}>
+    ${ico(m.icon, { style: `--q:var(${m.q})` })}<div class="v">${esc(m.v)}</div><div class="d">${m.d}</div></div>`;
+  if (cabinet) return renderCabinet(all, medal);
+
+  const SHELF = 7;
+  const newClears = all.filter(m => m.kind !== "goal" && isNew(m.d)).length;
+  const shelf = all.slice(0, SHELF).map(medal).join("")
+    + (all.length > SHELF ? `<div class="medal more" data-cab="1"><div class="slot">+${all.length - SHELF}</div><div class="v">See all</div><div class="d">${all.length} trophies</div></div>` : "");
+  const tiles = GOALS.map(g => `<div class="tile">${ico(g.icon, { edge: hueEdge(g) })}<div class="h">${esc(g.title)}</div>
+    <div class="big num">${fmt(g.value)} <span class="of">/ ${fmt(g.goal)}</span></div>${barHTML(g)}
+    <div class="nx">${g.rungs.length ? `${g.rungs.length} reached · last ${g.rungs.at(-1)[1]}` : "Not reached yet"}</div></div>`).join("");
+  // Dungeons on their way to a clear: bosses are progress, not trophies.
+  const partial = DUNGEONS.filter(d => d.killed && !d.cleared);
+  const duns = partial.map(d => `<div class="b-dun" data-dun="${esc(d.name)}"><span class="n">${d.name}</span>
+    <span class="pips">${d.bosses.map(b => `<i class="${b[2] ? "k" : ""}" ${bossTip(b)}></i>`).join("")}</span>
+    <span class="c num muted">${d.killed} / ${d.bosses.length}</span></div>
+    ${openDungeon === d.name ? `<div class="b-open heads">${d.bosses.map(b => ico(b[1], { cls: b[2] ? "" : "off", tip: bossTip(b),
+      edge: b[2] ? "rgba(255,255,255,.3)" : "" })).join("")}</div>` : ""}`).join("");
+  content.innerHTML = `<div class="scroll">
+    <div class="b-latest">${ico("inv_misc_head_human_01", { edge: "rgba(var(--gold-rgb),.7)" })}<div><div class="t">The Crew cleared The Deadmines!</div>
+      <div class="s">3 Nov · Also new since you were last here: ${newRungs} goals${newClears > 1 ? `, ${newClears - 1} more clears` : ""}</div></div></div>
+    <div class="label">TROPHY SHELF<span class="r">${all.length}</span></div><div class="shelf">${shelf}</div>
+    <div class="label">WORKING ON</div><div class="tiles">${tiles}</div>
+    ${partial.length ? `<div class="label">HALFWAY THROUGH<span class="r">bosses down, no clear yet</span></div>${duns}` : ""}<div style="height:10px"></div></div>`;
+}
+
+// The full cabinet: every instance as a slot (empty until cleared), then every goal rung by track.
+function renderCabinet(all, medal) {
+  const slot = x => x.on
+    ? `<div class="medal ${isNew(x.on) ? "new" : ""}" ${tipAttr(`Cleared ${x.name}`, x.on, x.who)}>${ico(x.icon, { style: `--q:var(${x.kind === "r" ? "--q4" : "--q3"})` })}
+       <div class="v">${esc(x.name.replace(/^The /, ""))}</div><div class="d">${x.on}</div></div>`
+    : `<div class="medal empty" ${tipAttr(x.name, `Levels ${x.lvl}`, "Not cleared yet")}>${ico(x.icon, { cls: "off" })}
+       <div class="v">${esc(x.name.replace(/^The /, ""))}</div><div class="d">${x.lvl}</div></div>`;
+  const group = kind => INSTANCES.filter(x => x.kind === kind);
+  const count = kind => `${group(kind).filter(x => x.on).length} / ${group(kind).length}`;
+  const goals = GOALS.filter(g => g.rungs.length).map(g => `<div class="cab-track"><div class="cab-t">${ico(g.icon, { edge: hueEdge(g) })}<span class="h">${esc(g.title)}</span></div>
+    <div class="cab-grid">${all.filter(m => m.kind === "goal" && m.t.startsWith(g.professions ? "" : g.title + ":") && (g.professions ? m.t.endsWith("in the Crew") : true))
+      .sort((a, b) => day(a.d) - day(b.d)).map(medal).join("")}</div></div>`).join("");
+  content.innerHTML = `<div class="cab-head"><button class="back" data-cab="0">Back to Goals</button><span class="h">Trophy cabinet</span><span class="muted num">${all.length} trophies</span></div>
+    <div class="scroll">
+    <div class="label">DUNGEONS CLEARED<span class="r">${count("d")}</span></div><div class="cab-grid">${group("d").map(slot).join("")}</div>
+    <div class="label">RAIDS CLEARED<span class="r">${count("r")}</span></div><div class="cab-grid">${group("r").map(slot).join("")}</div>
+    <div class="label">GOALS REACHED<span class="r">${all.filter(m => m.kind === "goal").length}</span></div>${goals}<div style="height:12px"></div></div>`;
+}
+
+function renderC() {
+  const item = (id, icon, name, meta, opts = {}) => `<div class="c-item ${selected === id ? "sel" : ""}" data-sel="${esc(id)}">
+    ${ico(icon, { edge: opts.edge })}<span class="n">${esc(name)}</span>${opts.dot ? '<span class="dot"></span>' : ""}<span class="m ${opts.gold ? "gold" : ""} num">${meta}</span></div>`;
+  const list = `<div class="label">GOALS</div>` + GOALS.map(g => item(g.id, g.icon, g.title, `${Math.round(g.value / g.goal * 100)}%`,
+      { edge: hueEdge(g), dot: g.rungs.some(r => isNew(r[1])) })).join("")
+    + `<div class="label">BOSS TROPHIES</div>` + DUNGEONS.map(d => item(d.name, d.bosses.at(-1)[1], d.name,
+      d.cleared ? "Cleared" : `${d.killed}/${d.bosses.length}`, { gold: d.cleared, edge: d.killed ? "color-mix(in srgb, var(--q2) 70%, transparent)" : "" })).join("");
+  let detail;
+  const g = GOALS.find(x => x.id === selected);
+  if (g) {
+    const rows = [`<div class="rung todo"><span class="node"></span><span class="v">${esc(g.next)}</span><span class="d">next, ${fmt(g.goal - g.value)} to go</span></div>`]
+      .concat(g.rungs.map((r, i) => `<div class="rung got ${isNew(r[1]) ? "new" : ""}" style="--q:var(${tier(i)})"><span class="node"></span>
+        <span class="v">${esc(r[0])}${isNew(r[1]) ? '<span class="tag">NEW</span>' : ""}</span><span class="d">${r[1]}</span></div>`).reverse());
+    detail = `<div class="c-hero">${ico(g.icon, { edge: hueEdge(g) })}<div><div class="t">${esc(g.title)}</div>
+      <div class="big num">${fmt(g.value)} <span class="of">/ ${fmt(g.goal)}${g.unit ? " " + g.unit : ""}</span></div></div></div>
+      <div class="c-bar">${barHTML(g)}</div>${g.professions ? `<div style="margin:0 14px">${profStrip()}</div>` : ""}
+      <div class="label">${g.rungs.length ? `REACHED ${g.rungs.length}` : "NOTHING REACHED YET"}</div><div class="ladder">${rows.join("")}</div>`;
+  } else {
+    const d = DUNGEONS.find(x => x.name === selected);
+    detail = `<div class="c-hero">${ico(d.bosses.at(-1)[1], { edge: d.cleared ? "var(--q4)" : "" })}<div><div class="t">${d.name}</div>
+      <div class="big num ${d.cleared ? "gold" : ""}">${d.cleared ? "Cleared" : `${d.killed} <span class="of">/ ${d.bosses.length} bosses</span>`}</div></div></div>
+      <div class="c-cap">Levels ${d.lvl}${d.cleared ? ` · cleared ${d.clearedOn}` : ""}</div><div style="height:10px"></div>
+      ${d.bosses.map((b, i) => `<div class="boss ${b[2] ? "" : "todo"}">${ico(b[1], { cls: b[2] ? "" : "off",
+        edge: b[2] ? (i === d.bosses.length - 1 ? "var(--q4)" : "color-mix(in srgb, var(--q2) 70%, transparent)") : "" })}
+        <div><div class="n">${esc(b[0])}</div>${b[2] ? `<div class="w">${esc(b[3])}</div>` : ""}</div>
+        <div class="d">${b[2] ? b[2] : "Not yet"}</div></div>`).join("")}`;
+  }
+  content.innerHTML = `<div class="c-wrap"><div class="c-list scroll">${list}</div><div class="c-detail scroll">${detail}</div></div>`;
+}
+
+function render() {
+  ({ A: renderA, B: renderB, C: renderC })[variant]();
+  document.querySelectorAll(".bar-ui [data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === variant));
+}
+content.addEventListener("click", e => {
+  const s = e.target.closest("[data-sub]"), d = e.target.closest("[data-dun]"), c = e.target.closest("[data-sel]");
+  const cab = e.target.closest("[data-cab]");
+  if (cab) cabinet = cab.dataset.cab === "1";
+  else if (s) subTab = s.dataset.sub;
+  else if (d) openDungeon = openDungeon === d.dataset.dun ? null : d.dataset.dun;
+  else if (c) selected = c.dataset.sel;
+  else return;
+  render();
+});
+document.querySelectorAll(".bar-ui [data-v]").forEach(b => b.onclick = () => { variant = b.dataset.v; render(); });
+document.getElementById("small").onclick = e => { document.body.classList.toggle("small"); e.target.classList.toggle("on"); };
+
+const tip = document.getElementById("tip");
+document.addEventListener("mouseover", e => {
+  const el = e.target.closest("[data-tip]");
+  if (!el) { tip.style.display = "none"; return; }
+  const [t, ...lines] = JSON.parse(el.dataset.tip);
+  tip.innerHTML = `<div class="t1">${esc(t)}</div>` + lines.filter(Boolean).map(l => `<div>${esc(l)}</div>`).join("");
+  const r = el.getBoundingClientRect();
+  tip.style.display = "block"; tip.style.left = r.right + 8 + "px"; tip.style.top = r.top + "px";
+});
+const q = new URLSearchParams(location.search).get("v");
+if (q && "ABC".includes(q)) variant = q;
+render();
+</script>
+</body>
