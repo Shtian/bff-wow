@@ -217,8 +217,9 @@ function Goals.countedChanged(before, record)
 end
 
 -- db is the whole saved table; Goals keeps `goals`: reached (per track,
--- rung to when it was reached), baselined (the silent baseline is done)
--- and seen (when the Goals tab was last opened).
+-- rung to when it was reached), quiet (per track, the rungs reached
+-- without news: the baseline's, or by who counts changing), baselined (the
+-- silent baseline is done) and seen (when the Goals tab was last opened).
 function Goals.new(db, ledger, now, maxLevel)
   local self = setmetatable({ db = db, ledger = ledger, now = now, maxLevel = maxLevel }, Goals)
   self:load()
@@ -229,7 +230,11 @@ function Goals:load()
   self.visiting = false
   local saved = self.db.goals or {}
   saved.reached = saved.reached or {}
-  for _, track in ipairs(Goals.TRACKS) do saved.reached[track] = saved.reached[track] or {} end
+  saved.quiet = saved.quiet or {}
+  for _, track in ipairs(Goals.TRACKS) do
+    saved.reached[track] = saved.reached[track] or {}
+    saved.quiet[track] = saved.quiet[track] or {}
+  end
   self.db.goals = saved
   self.settle = ns.Settle.new(self.now, saved.baselined)
 end
@@ -255,6 +260,13 @@ local function highestReached(self, track)
   return top
 end
 
+-- Records a rung (a profession's skill line, for Every profession) as
+-- reached now; quiet ones aren't news, on the Goals tab either.
+local function reach(self, track, rung, quiet)
+  self.db.goals.reached[track][rung] = self.now()
+  if quiet then self.db.goals.quiet[track][rung] = true end
+end
+
 local function count(set)
   local n = 0
   for _ in pairs(set) do n = n + 1 end
@@ -264,12 +276,12 @@ end
 -- Every profession: reached per skill line. Records the ones had now and
 -- returns the Feed entry's { track, rung (how many are reached), text }
 -- for any newly had, or nil.
-local function recordProfessions(self, _, progress)
+local function recordProfessions(self, _, progress, quiet)
   local saved = self.db.goals.reached.professions
   local nouns = {}
   for _, p in ipairs(PROFESSIONS) do
     if progress.covered[p.skillLine] and not saved[p.skillLine] then
-      saved[p.skillLine] = self.now()
+      reach(self, "professions", p.skillLine, quiet)
       nouns[#nouns + 1] = p.noun
     end
   end
@@ -315,12 +327,12 @@ TRACK.professions.row = professionsRow
 
 -- A ladder's rungs passed now: records them, and returns the highest
 -- newly reached as { track, rung, text }, or nil.
-local function recordLadder(self, track, progress)
+local function recordLadder(self, track, progress, quiet)
   local saved = self.db.goals.reached[track]
   local newest
   for _, rung in ipairs(Goals.rungs(track, TRACK[track].value(progress), self.maxLevel)) do
     if not saved[rung] then
-      saved[rung] = self.now()
+      reach(self, track, rung, quiet)
       newest = rung
     end
   end
@@ -335,7 +347,7 @@ local function record(self, quiet)
   local progress = Goals.progress(counted(self))
   local reached = {}
   for _, track in ipairs(Goals.TRACKS) do
-    local entry = (TRACK[track].record or recordLadder)(self, track, progress)
+    local entry = (TRACK[track].record or recordLadder)(self, track, progress, quiet)
     if entry and not quiet then reached[#reached + 1] = entry end
   end
   return reached
@@ -421,10 +433,13 @@ local function quality(nth)
   return QUALITIES[nth] or TOP_QUALITY
 end
 
-local function trophy(self, track, fields)
+-- key is the rung as saved: a profession's skill line, for Every
+-- profession. A quiet rung is never fresh.
+local function trophy(self, track, key, fields)
   fields.track = track
   fields.title = TRACK[track].name
-  fields.fresh = self.now() - fields.time < FRESH
+  fields.quiet = self.db.goals.quiet[track][key] == true
+  fields.fresh = not fields.quiet and self.now() - fields.time < FRESH
   return fields
 end
 
@@ -437,7 +452,7 @@ local function ladderTrophies(self, track)
   table.sort(rungs)
   local list = {}
   for nth, rung in ipairs(rungs) do
-    list[nth] = trophy(self, track, {
+    list[nth] = trophy(self, track, rung, {
       rung = rung,
       time = saved[rung],
       label = spec.label and spec.label(rung) or grouped(rung),
@@ -463,7 +478,7 @@ local function professionTrophies(self, _, progress)
   local list = {}
   for nth, item in ipairs(reached) do
     local had = progress.covered[item.p.skillLine]
-    list[nth] = trophy(self, "professions", {
+    list[nth] = trophy(self, "professions", item.p.skillLine, {
       rung = nth,
       time = item.time,
       label = had and had.name or item.p.name,
@@ -495,14 +510,15 @@ end
 -- The trophy cabinet: every rung reached, as trophies { track, title (the
 -- track's name), rung, label (how the tab words the rung: "2,500",
 -- "Journeyman", "Engineering"), text (its Feed entry's), time, quality
--- ("uncommon", "rare", "epic" or "legendary"), fresh (reached in the last
--- 3 days, so still news), icon (Every profession's: the profession's) }.
+-- ("uncommon", "rare", "epic" or "legendary"), quiet (reached without
+-- news: the baseline's, or by who counts changing), fresh (reached in the
+-- last 3 days and not quiet, so still news), icon (Every profession's: the profession's) }.
 -- Returns { settled (the baseline is taken; until then nothing is
 -- reached), count, shelf (every trophy, newest first), cabinet (a group {
 -- track, title, trophies (oldest first) } per track with any, in
 -- Goals.TRACKS order), latest (the newest trophy, or nil) and sinceSeen
--- (how many others were reached since the Goals tab was last opened: 0
--- if it never was) }.
+-- (how many others were reached, not quietly, since the Goals tab was
+-- last opened: 0 if it never was) }.
 function Goals:trophies()
   local result = { settled = self.db.goals.baselined == true, count = 0, shelf = {}, cabinet = {}, sinceSeen = 0 }
   local progress = Goals.progress(counted(self))
@@ -527,7 +543,7 @@ function Goals:trophies()
   if self.visiting then since = self.since end
   if since then
     for i = 2, #result.shelf do
-      if result.shelf[i].time > since then result.sinceSeen = result.sinceSeen + 1 end
+      if result.shelf[i].time > since and not result.shelf[i].quiet then result.sinceSeen = result.sinceSeen + 1 end
     end
   end
   return result

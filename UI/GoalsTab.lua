@@ -301,7 +301,7 @@ local function showTileTooltip(tile)
     if not p.lit then missing[#missing + 1] = p.name end
   end
   if #missing == 0 then
-    GameTooltip:AddLine("Every profession is in the Crew", GOLD[1], GOLD[2], GOLD[3])
+    GameTooltip:AddLine("Every profession is in the Crew", MUTED[1], MUTED[2], MUTED[3])
   else
     GameTooltip:AddLine("Nobody yet: " .. table.concat(missing, ", "), MUTED[1], MUTED[2], MUTED[3], true)
   end
@@ -426,8 +426,6 @@ local function createCabinetHead()
   head.title = Skin.label(head, "heading", TEXT)
   head.title:SetPoint("LEFT", head.back, "RIGHT", 12, 0)
   head.title:SetText("Trophy cabinet")
-  head.count = Skin.label(head, "small", MUTED)
-  head.count:SetPoint("RIGHT", -INSET, 0)
   return head
 end
 
@@ -447,7 +445,6 @@ local function drawCabinet(trophies, width)
   cabinetHead:ClearAllPoints()
   cabinetHead:SetPoint("TOPLEFT", view.content, "TOPLEFT", 0, 0)
   cabinetHead:SetPoint("RIGHT", view.content, "RIGHT")
-  cabinetHead.count:SetText(("%d trophies"):format(trophies.count))
   cabinetHead:Show()
   local y = drawHeading("GOALS REACHED", trophies.count, -CABINET_HEAD - 4)
   for _, group in ipairs(trophies.cabinet) do

@@ -52,7 +52,7 @@ Track names: "Crew levels", "Everyone at level 30" (the next rung; "Everyone at 
 
 **Empty state.** Before the silent baseline has settled, the tab shows "Counting up the Crew" where the latest win and shelf would be; with it settled and nothing reached, "No trophies yet". Working on shows either way.
 
-**Colour** (DESIGN.md, the Trophy Colours Rule): track hues reuse the Feed kinds (green for Crew levels and Everyone at level N, red for Crew deaths, violet for the profession tracks) on the track icon's edge and the bar. A medal's tier is WoW's item quality by how many rungs its track has reached: 1st–2nd uncommon, 3rd–4th rare, 5th–6th epic, 7th on legendary; Every profession's are all rare. Gold stays news: the latest-win plate, and the value of a rung reached in the last 3 days (**fresh**).
+**Colour** (DESIGN.md, the Trophy Colours Rule): track hues reuse the Feed kinds (green for Crew levels and Everyone at level N, red for Crew deaths, violet for the profession tracks) on the track icon's edge and the bar. A medal's tier is WoW's item quality by how many rungs its track has reached: 1st–2nd uncommon, 3rd–4th rare, 5th–6th epic, 7th on legendary; Every profession's are all rare. Gold stays news: the latest-win plate, and the value of a rung reached in the last 3 days (**fresh**). A rung recorded quietly (the silent baseline, or who counts changing) is never fresh, and isn't counted in "since you last looked"; which rungs were quiet is kept in `db.goals.quiet`.
 
 ## In Core
 

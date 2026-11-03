@@ -184,6 +184,24 @@ describe("Trophies", function()
     assert.equal(0, b.core:trophies().sinceSeen)
   end)
 
+  it("aren't news when reached quietly: not fresh, nor counted since the tab was opened", function()
+    local net, clients = crew({ "Ann", "Bob" }, { Ann = { level = 30, deaths = 30 }, Bob = { level = 21 } }, false)
+    local a = clients[1]
+    -- Opened while the Crew is still being counted.
+    a.core:openGoals()
+    a.core:leaveGoals()
+    net:run(40)
+    a:play({ deaths = 50 })
+    net:run(3)
+    a.core:openGoals()
+    local trophies = a.core:trophies()
+    assert.equal("deaths 50", trophies.latest.track .. " " .. trophies.latest.label)
+    assert.is_true(trophies.latest.fresh)
+    -- The baseline's rungs: reached, but not news.
+    assert.equal(0, trophies.sinceSeen)
+    for i = 2, #trophies.shelf do assert.is_false(trophies.shelf[i].fresh) end
+  end)
+
   it("count how many rungs each track has reached on the Goals tab", function()
     local net, clients = crew({ "Ann" }, { Ann = { level = 30 } })
     local a = clients[1]
