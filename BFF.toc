@@ -30,6 +30,7 @@ Core/SpareRules.lua
 Core/Spares.lua
 Core/Feed.lua
 Core/Roster.lua
+Core/Together.lua
 Core/Goals.lua
 Core/Core.lua
 
@@ -39,6 +40,7 @@ Game/ChannelLink.lua
 
 UI/Skin.lua
 UI/Panel.lua
+UI/TogetherTab.lua
 UI/Minimap.lua
 UI/MapPins.lua
 UI/Away.lua
