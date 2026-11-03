@@ -220,14 +220,6 @@ function Skin.classColor(classFilename)
   return 1, 1, 1
 end
 
--- How long ago, as Last seen words it: 5m, 3h, 2d.
-function Skin.ago(seconds)
-  seconds = math.max(0, seconds)
-  if seconds < 60 * 60 then return ("%dm"):format(math.floor(seconds / 60)) end
-  if seconds < 24 * 60 * 60 then return ("%dh"):format(math.floor(seconds / 3600 + 0.5)) end
-  return ("%dd"):format(math.floor(seconds / 86400 + 0.5))
-end
-
 -- A game icon inline in text, cropped inside its bevel: "|T...|t".
 function Skin.iconGlyph(texture, size)
   return ("|T%s:%d:%d:0:0:64:64:5:59:5:59|t"):format(texture, size, size)

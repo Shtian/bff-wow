@@ -56,9 +56,6 @@ local REDRAW_EVERY = 30
 local SCROLL_STEP = 40
 
 local TITLE = "Best Friends in Forever"
-local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
-local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
-local PAUSED = "You appear offline: the others don't see you. Change it in Settings."
 local FEED_EMPTY_TITLE = "Nothing yet"
 local FEED_EMPTY = "Dings, deaths and new Characters show up here."
 -- The stretch of timeline behind an empty Feed's one node.
@@ -136,13 +133,6 @@ local function className(classFilename)
   return LOCALIZED_CLASS_NAMES_MALE[classFilename] or classFilename or ""
 end
 
-local ago = Skin.ago
-
-local function lastSeenText(online, sinceSeen)
-  if online then return "online" end
-  return ago(sinceSeen) .. " ago"
-end
-
 -- Whisper and Invite, guarded since Midnight moved some chat functions.
 local function whisper(name)
   local sendTell = ChatFrameUtil and ChatFrameUtil.SendTell or ChatFrame_SendTell
@@ -206,7 +196,7 @@ local function showTooltip(owner)
   if character.playing then
     GameTooltip:AddLine(row.own and "Playing now" or "Online now", ONLINE[1], ONLINE[2], ONLINE[3])
   else
-    GameTooltip:AddLine("Last seen " .. ago(character.sinceSeen) .. " ago", MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:AddLine("Last seen " .. character.lastSeenText, MUTED[1], MUTED[2], MUTED[3])
   end
   if not row.online and row.via then
     GameTooltip:AddLine("Heard via " .. row.via, MUTED[1], MUTED[2], MUTED[3])
@@ -366,7 +356,7 @@ local function drawRow(row, data)
   placeTags(row.level, { row.member, row.onAlt, row.canPlay })
   row.zone:SetText(data.zone or "")
 
-  row.seen:SetText(data.own and "" or lastSeenText(data.online, data.sinceSeen))
+  row.seen:SetText(data.lastSeenText or "")
   Skin.color(row.seen, data.online and ONLINE or DIM)
   if #data.alts > 0 then
     row.more:SetText(("%s%d more"):format(expanded[data.memberId] and "- " or "+ ", #data.alts))
@@ -413,7 +403,7 @@ local function drawAlt(alt, row, data)
   setTag(alt.canPlay, data.canPlay and "can play" or nil, GOLD)
   placeTags(alt.level, { alt.main, alt.canPlay })
   local zone = data.zone and data.zone .. " · " or ""
-  alt.right:SetText(zone .. ago(data.sinceSeen) .. " ago")
+  alt.right:SetText(zone .. data.lastSeenText)
   alt:Show()
 end
 
@@ -1768,17 +1758,9 @@ local function drawFooter(crew, summary)
   footer.code:SetText(crew.code)
   footer.code:HighlightText()
 
-  local status = ""
-  if crew.leaving then
-    status = LEAVING
-  elseif core:isPaused() then
-    status = PAUSED
-  elseif crew.alone then
-    status = WAITING
-  end
-  footer.status:SetText(status)
+  footer.status:SetText(crew.status or "")
   local height = 46
-  if status ~= "" then height = height + footer.status:GetStringHeight() + 6 end
+  if crew.status then height = height + footer.status:GetStringHeight() + 6 end
   footer:SetHeight(height)
   footer:Show()
   return height

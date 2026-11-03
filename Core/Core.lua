@@ -197,9 +197,10 @@ end
 -- shared them, else up to 5 { skillLine, name, icon, skill, max, secondary,
 -- rank ("Apprentice" to "Artisan", from max), full (skill at max), capped
 -- (skill at Professions.CAP) }, main professions first), mapId, x, y and
--- instance (where last seen; see mapPins()), lastPlayed, sinceSeen, playing
--- (being played right now), main and canPlay (within Core.CAN_PLAY_LEVELS
--- of the Character you play).
+-- instance (where last seen; see mapPins()), lastPlayed, sinceSeen,
+-- lastSeenText (Last seen in words: "5m ago"; on a row "online" while
+-- online, and nil on your own), playing (being played right now), main and
+-- canPlay (within Core.CAN_PLAY_LEVELS of the Character you play).
 function Core:rows(order)
   return ns.Roster.rows(self.ledger, self.now(), order)
 end
@@ -223,8 +224,9 @@ end
 -- Character (being played while online, else the Main) has a known spot,
 -- unsorted. A pin has memberId, displayName, name, classFilename, level,
 -- mapId, x and y (0–1 on that map), zone, instance (the instance's name
--- while inside one, the spot then being the last one outside), online and
--- sinceSeen (seconds since the Member was last seen).
+-- while inside one, the spot then being the last one outside), online,
+-- sinceSeen (seconds since the Member was last seen) and lastSeenText (as
+-- rows() words it).
 function Core:mapPins()
   local pins = {}
   for _, row in ipairs(ns.Roster.rows(self.ledger, self.now())) do
@@ -242,6 +244,7 @@ function Core:mapPins()
         instance = row.instance,
         online = row.online,
         sinceSeen = row.sinceSeen,
+        lastSeenText = row.lastSeenText,
       }
     end
   end
@@ -791,19 +794,36 @@ function Core:displayName()
   return self.ledger:displayName()
 end
 
+-- The Roster footer's status lines, in priority order.
+local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
+local PAUSED = "You appear offline: the others don't see you. Change it in Settings."
+local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
+
 -- The Crew: code, channel and password, leaving while a leave hasn't
--- reached the link yet, and alone while no other Member is known. Nil when
--- not in a Crew.
+-- reached the link yet, alone while no other Member is known, and status:
+-- the Roster footer's line, the first that applies of leaving, appearing
+-- offline (Pause sharing) and waiting for the Crew (alone), else nil. Nil
+-- when not in a Crew.
 function Core:crew()
   local saved = self.db.crew
   if not saved then return nil end
   local channel, password = ns.CrewCode.channel(saved.code)
+  local alone = not self.ledger:knowsOthers()
+  local status
+  if saved.leaving then
+    status = LEAVING
+  elseif self:isPaused() then
+    status = PAUSED
+  elseif alone then
+    status = WAITING
+  end
   return {
     code = saved.code,
     channel = channel,
     password = password,
     leaving = saved.leaving,
-    alone = not self.ledger:knowsOthers(),
+    alone = alone,
+    status = status,
   }
 end
 

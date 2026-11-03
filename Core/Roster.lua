@@ -83,6 +83,7 @@ local function describeCharacter(character, main, yourLevel, now)
     instance = character.instance,
     lastPlayed = character.lastPlayed,
     sinceSeen = now - character.lastPlayed,
+    lastSeenText = ns.Text.ago(now - character.lastPlayed) .. " ago",
     playing = false,
     main = character == main,
     canPlay = canPlay(character, yourLevel),
@@ -103,6 +104,7 @@ local function rowFor(record, characters, online, yourLevel, now)
   row.mainSet = record.main ~= nil and record.main == main.guid
   row.lastSeen = characters[1].lastPlayed
   row.sinceSeen = now - row.lastSeen
+  row.lastSeenText = online and "online" or ns.Text.ago(row.sinceSeen) .. " ago"
   row.altsCanPlay = false
   row.alts = {}
   for _, character in ipairs(characters) do
@@ -172,6 +174,8 @@ local function buildRows(ledger, now)
     if #characters > 0 then
       ownRow = rowFor(own, characters, true, nil, now)
       ownRow.own = true
+      -- Your own row shows no Last seen.
+      ownRow.lastSeenText = nil
     end
   end
   local yourLevel = ownRow and ownRow.level
