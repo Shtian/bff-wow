@@ -45,45 +45,45 @@ After a run, fill in the tables below from the saved log, and add each final bos
 
 ## Final bosses
 
-Names match `Core/Together.lua`'s dungeon table. "Classic final boss" is classic's last boss (**expected**); Forever's new instances have no expectation. The encounter IDs in `finals` today are only the three classic raids', taken from classic and **to confirm**.
+Names match `Core/Together.lua`'s dungeon table. "Classic final boss" is classic's last boss (**expected**); Forever's new instances have no expectation. The encounter IDs in `finals` today are **datamined** from Forever's `DungeonEncounter` table ([wago.tools](https://wago.tools/db2/DungeonEncounter), build 1.60.1.70755, the `wowf` product), the three classic raids' matching classic's. Where there are several (one per difficulty or season, a wing, a side, or two bosses in no fixed order), `finals` lists all of them and any one clears the instance; a run narrows that down. Not in the table yet, so still unknown: Excavation Site (probably Relic Guardian, 3482), City of Dalaran (probably Shade of the Archmage, 3303), Blackmaw Hold, The Drowned City, Krol'dok Stronghold, Alcaz Prison, Shaper's Terrace, The Barrow Deeps and Hyjal Summit.
 
 | Instance | Kind | Classic final boss | Encounter ID |
 |---|---|---|---|
-| Ragefire Chasm | dungeon | Taragaman the Hungerer or Bazzalan (no fixed order) | unknown |
-| Hall of Thanes | dungeon (Forever) | unknown | unknown |
-| Ruins of Lordaeron | dungeon (Forever) | unknown | unknown |
-| Wailing Caverns | dungeon | Mutanus the Devourer | unknown |
-| The Deadmines | dungeon | Edwin VanCleef | unknown |
-| Shadowfang Keep | dungeon | Archmage Arugal | unknown |
-| Blackfathom Deeps | dungeon | Aku'mai | unknown |
-| The Stockade | dungeon | Bazil Thredd (no fixed order) | unknown |
+| Ragefire Chasm | dungeon | Taragaman the Hungerer or Bazzalan (no fixed order) | 2733 or 2735 (datamined, to confirm) |
+| Hall of Thanes | dungeon (Forever) | unknown | 3496 (datamined, to confirm) |
+| Ruins of Lordaeron | dungeon (Forever) | unknown | 3354 (datamined, to confirm) |
+| Wailing Caverns | dungeon | Mutanus the Devourer | 592 (datamined, to confirm) |
+| The Deadmines | dungeon | Edwin VanCleef | 2747 (datamined, to confirm) |
+| Shadowfang Keep | dungeon | Archmage Arugal | 2755 (datamined, to confirm) |
+| Blackfathom Deeps | dungeon | Aku'mai | 2910, 2891 or 2767 (one per difficulty) (datamined, to confirm) |
+| The Stockade | dungeon | Bazil Thredd (no fixed order) | 2760 (datamined, to confirm) |
 | Excavation Site | dungeon (Forever) | unknown | unknown |
-| SM Graveyard | dungeon | Bloodmage Thalnos | unknown |
+| SM Graveyard | dungeon | Bloodmage Thalnos | 2779 (datamined, to confirm) |
 | City of Dalaran | dungeon (Forever) | unknown | unknown |
-| Gnomeregan | dungeon | Mekgineer Thermaplugg | unknown |
-| SM Library | dungeon | Arcanist Doan | unknown |
-| Razorfen Kraul | dungeon | Charlga Razorflank | unknown |
-| SM Armory | dungeon | Herod | unknown |
-| SM Cathedral | dungeon | High Inquisitor Whitemane | unknown |
+| Gnomeregan | dungeon | Mekgineer Thermaplugg | 2772 or 2940 (one per difficulty) (datamined, to confirm) |
+| SM Library | dungeon | Arcanist Doan | 447 (datamined, to confirm) |
+| Razorfen Kraul | dungeon | Charlga Razorflank | 2778 (datamined, to confirm) |
+| SM Armory | dungeon | Herod | 448 (datamined, to confirm) |
+| SM Cathedral | dungeon | High Inquisitor Whitemane | 450 (datamined, to confirm) |
 | The Drowned City | dungeon (Forever) | unknown | unknown |
-| Razorfen Downs | dungeon | Amnennar the Coldbringer | unknown |
+| Razorfen Downs | dungeon | Amnennar the Coldbringer | 2785 (datamined, to confirm) |
 | Krol'dok Stronghold | dungeon (Forever) | unknown | unknown |
-| Uldaman | dungeon | Archaedas | unknown |
-| Zul'Farrak | dungeon | Chief Ukorz Sandscalp | unknown |
-| Maraudon | dungeon | Princess Theradras | unknown |
+| Uldaman | dungeon | Archaedas | 554 (datamined, to confirm) |
+| Zul'Farrak | dungeon | Chief Ukorz Sandscalp | 600 (datamined, to confirm) |
+| Maraudon | dungeon | Princess Theradras | 429 (datamined, to confirm) |
 | Alcaz Prison | dungeon (Forever) | unknown | unknown |
-| Sunken Temple | dungeon | Shade of Eranikus | unknown |
-| Blackrock Depths | dungeon | Emperor Dagran Thaurissan | unknown |
-| Lower Blackrock Spire | dungeon | Overlord Wyrmthalak | unknown |
+| Sunken Temple | dungeon | Shade of Eranikus | 3584, 2959 or 493 (one per difficulty) (datamined, to confirm) |
+| Blackrock Depths | dungeon | Emperor Dagran Thaurissan | 2790 (datamined, to confirm) |
+| Lower Blackrock Spire | dungeon | Overlord Wyrmthalak | 275 (datamined, to confirm) |
 | Blackmaw Hold | dungeon (Forever) | unknown | unknown |
-| Dire Maul | dungeon | three wings: Alzzin the Wildshaper (East), Prince Tortheldrin (West), King Gordok (North) | unknown |
-| Scholomance | dungeon | Darkmaster Gandling | unknown |
-| Stratholme | dungeon | two sides: Balnazzar (Live), Baron Rivendare (Undead) | unknown |
-| Upper Blackrock Spire | dungeon | General Drakkisath | unknown |
+| Dire Maul | dungeon | three wings: Alzzin the Wildshaper (East), Prince Tortheldrin (West), King Gordok (North) | 346, 361 or 368 (one per wing) (datamined, to confirm) |
+| Scholomance | dungeon | Darkmaster Gandling | 2801 (datamined, to confirm) |
+| Stratholme | dungeon | two sides: Balnazzar (Live), Baron Rivendare (Undead) | 478 or 484 (one per side) (datamined, to confirm) |
+| Upper Blackrock Spire | dungeon | General Drakkisath | 3069 (datamined, to confirm) |
 | Shaper's Terrace | dungeon (Forever) | unknown | unknown |
-| Molten Core | raid | Ragnaros | 672 (classic's, to confirm) |
-| Onyxia's Lair | raid | Onyxia | 1084 (classic's, to confirm) |
-| Zul'Gurub | raid | Hakkar | 793 (classic's, to confirm) |
+| Molten Core | raid | Ragnaros | 672 (datamined, matches classic, to confirm) |
+| Onyxia's Lair | raid | Onyxia | 1084 (datamined, matches classic, to confirm) |
+| Zul'Gurub | raid | Hakkar | 793 (datamined, matches classic, to confirm) |
 | The Barrow Deeps | raid (Forever) | unknown | unknown |
 | Hyjal Summit | raid (Forever) | unknown | unknown |
 
