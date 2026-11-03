@@ -1,6 +1,6 @@
 -- Panel: the BFF window, in the Skin's flat look. Without a Crew it shows
 -- the setup view (display name, Start or Join); in one, a sidebar with
--- Roster, Feed, Goals, When, Spares, Professions and Settings. The Roster has your own row pinned on top,
+-- Roster, Feed, Goals, When, Spares, Professions, Together and Settings. The Roster has your own row pinned on top,
 -- then a row per Member with expandable Alts, a sort menu, a tooltip and
 -- right-click menu per Character, and a footer with the hidden count,
 -- removed Members and the Crew code. The Feed is a timeline
@@ -15,7 +15,8 @@
 -- enough level, then your own with their winning Claim and Give and
 -- Withdraw. Professions is a grid of all twelve professions, a row per
 -- Member and a tile each with their best Character's skill, sortable by a
--- profession. It never sees a Member record.
+-- profession. Together is a level line of friends and dungeons, drawn by
+-- TogetherTab. It never sees a Member record.
 
 local _, ns = ...
 
@@ -478,7 +479,7 @@ local function drawSection(count)
   section.line:SetPoint("RIGHT", count > 0 and section.spares or section.sort, "LEFT", -8, 0)
 end
 
--- The sidebar: Roster, Feed, Goals, When, Spares and Professions on top, Settings and
+-- The sidebar: Roster, Feed, Goals, When, Spares, Professions and Together on top, Settings and
 -- the addon's version at the bottom, as plain labels. The selected one's
 -- chip marks it.
 local function navButton(label, onClick)
@@ -530,6 +531,9 @@ local function createNav()
   nav.professions = navButton("Professions", open("professions"))
   nav.professions:SetPoint("TOPLEFT", nav.spares, "BOTTOMLEFT")
   nav.professions:SetPoint("TOPRIGHT", nav.spares, "BOTTOMRIGHT")
+  nav.together = navButton("Together", open("together"))
+  nav.together:SetPoint("TOPLEFT", nav.professions, "BOTTOMLEFT")
+  nav.together:SetPoint("TOPRIGHT", nav.professions, "BOTTOMRIGHT")
   -- The panel steps aside so it doesn't cover the settings.
   nav.settings = navButton("Settings", function()
     if ns.Settings.open() then frame:Hide() end
@@ -551,6 +555,7 @@ local function drawNav(unseen, sparesUnseen)
   setSelected(nav.when, tab == "when")
   setSelected(nav.spares, tab == "spares")
   setSelected(nav.professions, tab == "professions")
+  setSelected(nav.together, tab == "together")
   setSelected(nav.settings, false)
   nav.feed.badge:SetText(unseen)
   nav.feed.badge:SetShown(unseen > 0 and tab ~= "feed")
@@ -1767,7 +1772,7 @@ local function drawFooter(crew, summary)
 end
 
 -- Hides every tab's view but the one named ("roster", "feed", "goals",
--- "when", "spares", "professions"; nil hides them all). Each draw function shows
+-- "when", "spares", "professions", "together"; nil hides them all). Each draw function shows
 -- its own.
 local function hideViewsBut(name)
   if name ~= "roster" then
@@ -1779,6 +1784,7 @@ local function hideViewsBut(name)
   if name ~= "when" and whenView then whenView:Hide() end
   if name ~= "spares" and sparesView then sparesView:Hide() end
   if name ~= "professions" and professionsView then professionsView:Hide() end
+  if name ~= "together" then ns.TogetherTab.hide() end
 end
 
 local function drawRoster(crew, summary)
@@ -1850,6 +1856,8 @@ function Panel.refresh()
     drawSpares()
   elseif tab == "professions" then
     drawProfessions()
+  elseif tab == "together" then
+    ns.TogetherTab.draw(frame.content, core)
   else
     drawRoster(crew, summary)
   end
@@ -1866,8 +1874,8 @@ function Panel.toggle()
   frame:SetShown(not frame:IsShown())
 end
 
--- Opens the panel on a tab: "roster", "feed", "goals", "when", "spares"
--- or "professions".
+-- Opens the panel on a tab: "roster", "feed", "goals", "when", "spares",
+-- "professions" or "together".
 function Panel.show(name)
   if not frame then create() end
   tab = name

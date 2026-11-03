@@ -75,6 +75,18 @@ _Avoid_: Popup, alert, notification (when meaning a toast)
 The hours of the week a Member usually plays, from the last 4 weeks of their own client's counting, across all their Characters. A Member **usually plays** an hour they played at least 10 minutes in, in at least 2 of those weeks.
 _Avoid_: Schedule, availability, activity
 
+**Together (tab)**:
+The panel's view of who a Member can play with, and where: the Crew's Characters and the game's dungeons on one level line, with an answer line that says it in words.
+_Avoid_: Overlap finder (the feature's working name), level line (when meaning the tab)
+
+**Can play**:
+A Character is within 3 levels of the Character you play, so you can play together. The Roster and Together share the rule.
+_Avoid_: In range, near, fits
+
+**Fits (a dungeon)**:
+A Character fits a dungeon when its level is inside the dungeon's recommended range. Separate from Can play: a friend can fit a dungeon you fit and still be too far from you to play together.
+_Avoid_: Can do, eligible
+
 **Last seen**:
 When a Member or Character was last played, as reported by that Member's own client rather than observed by others.
 _Avoid_: Last online, last active

@@ -23,6 +23,9 @@ Core.CAN_PLAY_LEVELS = ns.Roster.CAN_PLAY
 -- phrase in reaction news: "Bob and Cleo cheered your ding to 30".
 Core.reactionText = ns.Reactions.text
 Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
+-- The game's dungeons and the Together tab's line geometry (see together()).
+Core.DUNGEONS = ns.Together.DUNGEONS
+Core.TOGETHER_LAYOUT = ns.Together.LAYOUT
 
 -- The tooltip's gold line for a Character's money (copper): whole gold,
 -- floored, with thousands separators ("Gold: 1,234"). Nil when the
@@ -218,6 +221,30 @@ end
 -- max, rank, full, capped), best first.
 function Core:professions(order, sortBy)
   return ns.Professions.tab(ns.Roster.rows(self.ledger, self.now(), order), sortBy)
+end
+
+-- The Together tab: the Crew's Characters and the game's dungeons on one
+-- level line, ready to lay out (docs/design/together.md), or nil before
+-- you play a Character. measure(text, font) gives a text's width in pixels
+-- in Skin's "small" or "tiny" font; without it widths are estimated.
+-- Positions are pixels from level 1's left edge, in Core.TOGETHER_LAYOUT's
+-- geometry: as (the Character you play: name, classFilename, level, alt),
+-- hidden ("3 alts hidden", or nil), answer (two lines, each a list of
+-- { text, style }, style "text", "muted" or "highlight"), width, you (your
+-- level's x), band ({ left, right, text } for can play), ticks (per level:
+-- level, x, big, number, you), groups (a group per level of the Characters
+-- shown: level, x, label, alt, own, online, classFilename, count, more,
+-- row (1 nearest the axis, nil when only the dot shows), labelX,
+-- labelWidth, and characters: memberId, member ("You" for yours), name,
+-- classFilename, level, alt, online, own, canPlay and apart), bars (a
+-- dungeon each: name, kind, new, from, to, fits, count, dots (class of each
+-- Member who fits, up to 4), moreDots, x, width, lane (1 nearest the axis)
+-- and tooltip: title, detail, new, you, fits, fitters (memberId, member,
+-- name, classFilename, level, online, far), none and almost) and chips
+-- ("+N here": x, width, lane, text, title, and items, the bars folded in,
+-- each with its detail).
+function Core:together(measure)
+  return ns.Together.view(ns.Roster.rows(self.ledger, self.now()), measure)
 end
 
 -- The world map's pins: one per other Member the panel shows whose shown

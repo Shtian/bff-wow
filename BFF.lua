@@ -294,6 +294,10 @@ function commands.professions()
   ns.Panel.show("professions")
 end
 
+function commands.together()
+  ns.Panel.show("together")
+end
+
 function commands.settings()
   ns.Settings.open()
 end
@@ -339,7 +343,7 @@ SlashCmdList.BFF = function(input)
   elseif commands[command] then
     commands[command](rest)
   else
-    say("/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff professions, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
+    say("/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff professions, /bff together, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
   end
 end
 
