@@ -160,6 +160,20 @@ describe("One Crew at a time", function()
     assert.is_true(core:startCrew("Stian").alone)
   end)
 
+  it("words its status: leaving, then appearing offline, then waiting for the Crew", function()
+    local core = load().Core.new(newDeps())
+    core:updateOwn(character())
+    core:startCrew("Stian")
+    local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
+    local PAUSED = "You appear offline: the others don't see you. Change it in Settings."
+    local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
+    assert.equal(WAITING, core:crew().status)
+    core:setPaused(true)
+    assert.equal(PAUSED, core:crew().status)
+    core:leaveCrew()
+    assert.equal(LEAVING, core:crew().status)
+  end)
+
   it("remembers the Crew across a reload", function()
     local db = {}
     local crew = load().Core.new(newDeps(db)):startCrew("AA")

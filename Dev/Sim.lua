@@ -834,18 +834,18 @@ SLASH_BFFDEV1 = "/bffdev"
 local SAMPLE_TOASTS = {
   { kind = "ding", text = "Simone dinged 24" },
   { kind = "death", text = "Simbad died 2 times" },
-  { kind = "maxLevel", text = "Simba reached max level!" },
+  { kind = "maxLevel", text = "Simba reached max level!", highlight = true },
   { kind = "newCharacter", text = "Simone has a new Character: Simonette (Priest)" },
-  { kind = "joined", text = "Simbad joined the Crew" },
+  { kind = "joined", text = "Simbad joined the Crew", highlight = true },
   { kind = "left", text = "Simba left the Crew" },
-  { kind = "goal", text = "The Crew reached 300 Crew levels!" },
-  { kind = "goal", text = "The Crew has an Engineer now!" },
+  { kind = "goal", text = "The Crew reached 300 Crew levels!", highlight = true },
+  { kind = "goal", text = "The Crew has an Engineer now!", highlight = true },
   { kind = "claimed", text = "Simone claimed [Cruel Barb] for Simonette", opens = "spares" },
   { kind = "given", text = "Simbad sent you [Staff of Westfall]. Check Simonette's mailbox.", opens = "spares" },
   { kind = "gave", text = "Simbad gave Simone [Staff of Westfall]" },
   { kind = "newProfession", text = "Simone's Alt Simmy picked up Tailoring", icon = 136249 },
   { kind = "professionSkill", text = "Simbad reached 225 Blacksmithing", icon = 136241 },
-  { kind = "professionMaxed", text = "Simone maxed Alchemy", icon = 136240 },
+  { kind = "professionMaxed", text = "Simone maxed Alchemy", icon = 136240, highlight = true },
 }
 
 -- /bffdev toggles the console; /bffdev toast [n] shows n sample toasts

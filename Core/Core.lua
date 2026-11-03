@@ -197,9 +197,10 @@ end
 -- shared them, else up to 5 { skillLine, name, icon, skill, max, secondary,
 -- rank ("Apprentice" to "Artisan", from max), full (skill at max), capped
 -- (skill at Professions.CAP) }, main professions first), mapId, x, y and
--- instance (where last seen; see mapPins()), lastPlayed, sinceSeen, playing
--- (being played right now), main and canPlay (within Core.CAN_PLAY_LEVELS
--- of the Character you play).
+-- instance (where last seen; see mapPins()), lastPlayed, sinceSeen,
+-- lastSeenText (Last seen in words: "5m ago"; on a row "online" while
+-- online, and nil on your own), playing (being played right now), main and
+-- canPlay (within Core.CAN_PLAY_LEVELS of the Character you play).
 function Core:rows(order)
   return ns.Roster.rows(self.ledger, self.now(), order)
 end
@@ -223,8 +224,9 @@ end
 -- Character (being played while online, else the Main) has a known spot,
 -- unsorted. A pin has memberId, displayName, name, classFilename, level,
 -- mapId, x and y (0–1 on that map), zone, instance (the instance's name
--- while inside one, the spot then being the last one outside), online and
--- sinceSeen (seconds since the Member was last seen).
+-- while inside one, the spot then being the last one outside), online,
+-- sinceSeen (seconds since the Member was last seen) and lastSeenText (as
+-- rows() words it).
 function Core:mapPins()
   local pins = {}
   for _, row in ipairs(ns.Roster.rows(self.ledger, self.now())) do
@@ -242,6 +244,7 @@ function Core:mapPins()
         instance = row.instance,
         online = row.online,
         sinceSeen = row.sinceSeen,
+        lastSeenText = row.lastSeenText,
       }
     end
   end
@@ -323,18 +326,22 @@ function Core:goals()
   return self.crewGoals:rows()
 end
 
--- The Feed tab: { days = { { daysAgo, time, entries } }, unseen }, newest
--- first, where unseen counts others' entries and Reactions to your own not
--- yet shown. An entry has kind ("ding", "death", "newCharacter",
--- "maxLevel", "joined", "left", "newProfession", "professionSkill",
--- "professionMaxed" or "goal": a Crew goal reached, with no
--- memberId), time, memberId, guid (for Character
--- events), text, from (the level before a ding or max level, or the skill
--- before a profession milestone), level, count (deaths), skillLine,
--- profession (its name), milestone and icon (for profession kinds), own and seen (false while it has unseen Reactions). And for
--- Reactions: reaction ("cheer", "respects" or "welcome", nil for left),
--- key (for react()), reactors ({ memberId, name, you }, in the order they
--- reacted), reacted (you have) and canReact (not yours, and it has a key).
+-- The Feed tab: { days = { { daysAgo, time, title, entries } }, unseen },
+-- newest first, where unseen counts others' entries and Reactions to your
+-- own not yet shown, and a day's title is "TODAY", "YESTERDAY" or "MONDAY
+-- 02 NOVEMBER", in local time. An entry has kind ("ding", "death",
+-- "newCharacter", "maxLevel", "joined", "left", "newProfession",
+-- "professionSkill", "professionMaxed" or "goal": a Crew goal reached,
+-- with no memberId), time, memberId, guid (for Character events), text,
+-- from (the level before a ding or max level, or the skill before a
+-- profession milestone), level, count (deaths), skillLine, profession (its
+-- name), milestone and icon (for profession kinds), own, seen (false while
+-- it has unseen Reactions), highlight (the news: max level, joined, a Crew
+-- goal, a profession maxed) and new (New in the open Feed visit; see
+-- openFeed()). And for Reactions: reaction ("cheer", "respects" or
+-- "welcome", nil for left), key (for react()), reactors ({ memberId, name,
+-- you }, in the order they reacted, name "You" for you), reacted (you
+-- have) and canReact (not yours, and it has a key).
 function Core:feed()
   return self.log:view(self.utcOffset)
 end
@@ -347,7 +354,10 @@ end
 -- usually play then, out of max. With one, that
 -- Member's weeks played (0–4) per hour, displayName, collectingSince (when
 -- they started, while under a week ago) and noData (their BFF shares no
--- Play times); nil for a Member the Roster doesn't show.
+-- Play times); nil for a Member the Roster doesn't show. And the words:
+-- title (the Crew, "You" or the Member's name), intro (what the grid
+-- shows) and note (no data, collecting since, or nothing to show; nil
+-- when there's nothing to say).
 function Core:playTimes(memberId)
   local now = self.now()
   local PlayTimes = ns.PlayTimes
@@ -368,7 +378,14 @@ function Core:playTimes(memberId)
     for _, row in ipairs(rows) do
       summaries[#summaries + 1] = self.ledger:record(row.memberId).playTimes
     end
-    return view(PlayTimes.usuallyPlaying(summaries, now), #rows)
+    local result = view(PlayTimes.usuallyPlaying(summaries, now), #rows)
+    result.title = "The Crew"
+    result.intro = ("How many of the %d Members usually play each hour: in %d of the last %d weeks. Your local time.")
+      :format(result.max, result.usually, result.weeks)
+    if result.empty then
+      result.note = ("Nobody usually plays at any hour yet. It takes %d weeks of play to show."):format(result.usually)
+    end
+    return result
   end
 
   for _, row in ipairs(rows) do
@@ -381,6 +398,19 @@ function Core:playTimes(memberId)
       result.own = row.own == true
       result.noData = summary == nil
       result.collectingSince = since and now - since < PlayTimes.WEEK and since or nil
+      local name = result.own and "You" or row.displayName or "?"
+      result.title = name
+      result.intro = ("How many of the last %d weeks %s played each hour. Your local time.")
+        :format(result.weeks, result.own and "you" or name)
+      if result.noData then
+        result.note = ("%s's BFF doesn't share Play times yet."):format(name)
+      elseif result.collectingSince then
+        result.note = ("Collecting since %s: less than a week of data so far.")
+          :format(ns.Text.shortDate(result.collectingSince, self.utcOffset))
+      elseif result.empty then
+        result.note = ("No hour played for %d minutes or more in the last %d weeks.")
+          :format(result.minutes, result.weeks)
+      end
       return result
     end
   end
@@ -420,9 +450,28 @@ end
 -- time, expires, winner, claims, given ({ memberId, name, character }
 -- once Given), canGive, canWithdraw, state }. unseen counts notices not
 -- yet shown, claims and open your open Claims and Spares, out of
--- maxClaims and maxOpen.
+-- maxClaims and maxOpen. Each row also comes worded: info (the line under
+-- the item: who posted it or how long is left, and the Claim state),
+-- primary and secondary (the buttons shown: { label, enabled } for Claim
+-- or Give, { label } for Withdraw; nil when not shown), highlight (a
+-- winning Claim of yours, a Claim on yours, or your item gone) and dimmed
+-- (none of your Characters is high enough level, or yours was Given).
+-- claimFor lists your Characters a Claim can be for, Main first: { guid,
+-- label ("Jaina (30)") }.
 function Core:spares()
-  return self.spareLife:view()
+  local view = self.spareLife:view()
+  local claimFor = {}
+  local own = ns.Roster.rows(self.ledger, self.now())[1]
+  if own and own.own then
+    local characters = { own }
+    for _, alt in ipairs(own.alts) do characters[#characters + 1] = alt end
+    for _, character in ipairs(characters) do
+      local entry = { guid = character.guid, label = ("%s (%d)"):format(character.name, character.level) }
+      if character.main then table.insert(claimFor, 1, entry) else claimFor[#claimFor + 1] = entry end
+    end
+  end
+  view.claimFor = claimFor
+  return view
 end
 
 -- An own write that others should get now.
@@ -512,9 +561,17 @@ function Core:sparesSeen()
   if self.spareLife:markAllSeen() then self.listener("changed") end
 end
 
--- The Feed tab was opened: every entry and Reaction is seen.
-function Core:feedSeen()
-  if self.log:markAllSeen() then self.listener("changed") end
+-- The Feed tab is shown: call it on every draw, before reading feed().
+-- It starts a Feed visit if none is open, and every entry and Reaction
+-- unseen now is New in feed() until leaveFeed(), and is seen.
+function Core:openFeed()
+  if self.log:open() then self.listener("changed") end
+end
+
+-- The Feed tab was left (another tab, or the panel hidden): the visit
+-- ends, and nothing is New.
+function Core:leaveFeed()
+  self.log:leave()
 end
 
 -- Settings: the local preferences, one list of them. Each has its key, the
@@ -737,19 +794,36 @@ function Core:displayName()
   return self.ledger:displayName()
 end
 
+-- The Roster footer's status lines, in priority order.
+local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
+local PAUSED = "You appear offline: the others don't see you. Change it in Settings."
+local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
+
 -- The Crew: code, channel and password, leaving while a leave hasn't
--- reached the link yet, and alone while no other Member is known. Nil when
--- not in a Crew.
+-- reached the link yet, alone while no other Member is known, and status:
+-- the Roster footer's line, the first that applies of leaving, appearing
+-- offline (Pause sharing) and waiting for the Crew (alone), else nil. Nil
+-- when not in a Crew.
 function Core:crew()
   local saved = self.db.crew
   if not saved then return nil end
   local channel, password = ns.CrewCode.channel(saved.code)
+  local alone = not self.ledger:knowsOthers()
+  local status
+  if saved.leaving then
+    status = LEAVING
+  elseif self:isPaused() then
+    status = PAUSED
+  elseif alone then
+    status = WAITING
+  end
   return {
     code = saved.code,
     channel = channel,
     password = password,
     leaving = saved.leaving,
-    alone = not self.ledger:knowsOthers(),
+    alone = alone,
+    status = status,
   }
 end
 

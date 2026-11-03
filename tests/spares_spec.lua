@@ -602,6 +602,77 @@ describe("Spares", function()
   end)
 end)
 
+describe("The Spares tab's words", function()
+  -- A row's buttons, info, highlight and dimmed, as the panel draws them.
+  local function drawn(row)
+    return {
+      primary = row.primary, secondary = row.secondary, info = row.info,
+      highlight = row.highlight, dimmed = row.dimmed,
+    }
+  end
+
+  it("words the Crew's Spares and yours, and which buttons show", function()
+    local net, clients = crew({ "Ann", "Bob", "Cleo" }, { Cleo = 5 })
+    local a, b, c = clients[1], clients[2], clients[3]
+    local id = post(net, a)
+    assert.same({
+      primary = { label = "Claim", enabled = true }, info = "Ann · No claims yet", highlight = false, dimmed = false,
+    }, drawn(crewRow(b, a, id)))
+    assert.same({
+      primary = { label = "Claim", enabled = true }, info = "Ann · No claims yet", highlight = false, dimmed = true,
+    }, drawn(crewRow(c, a, id)))
+    assert.same({
+      primary = { label = "Give", enabled = false }, secondary = { label = "Withdraw" },
+      info = "30d left · No claims yet", highlight = false, dimmed = false,
+    }, drawn(yourRow(a, id)))
+
+    -- Bob's Claim wins: gold for Bob and for Ann, not for Cleo.
+    assert.is_true(b.core:claimSpare(a.memberId, id))
+    net:run(5)
+    assert.same({
+      secondary = { label = "Withdraw" }, info = "Ann · You claimed it for Bob", highlight = true, dimmed = false,
+    }, drawn(crewRow(b, a, id)))
+    assert.is_false(crewRow(c, a, id).highlight)
+    assert.same({
+      primary = { label = "Give", enabled = true }, secondary = { label = "Withdraw" },
+      info = "30d left · Bob claimed it for Bob", highlight = true, dimmed = false,
+    }, drawn(yourRow(a, id)))
+
+    -- Given: no buttons, and dimmed.
+    assert.is_true(a.core:giveSpare(id, b.memberId))
+    net:run(5)
+    assert.same({ info = "Given to Bob (Bob)", highlight = false, dimmed = true }, drawn(yourRow(a, id)))
+  end)
+
+  it("says when your Spare's item has left your bags", function()
+    local GUID = "Item-0-0000000000A1B2C3"
+    local net, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    a:putItem(GUID, "bags")
+    local id = assert(a.core:postSpare(BARB, 18, { guid = GUID, bindType = 2 }))
+    a:bagsUpdated()
+    net:run(5)
+    a:putItem(GUID, nil):bagsUpdated()
+    local row = yourRow(a, id)
+    assert.equal("This item has left your bags · No claims yet", row.info)
+    assert.is_true(row.highlight)
+  end)
+
+  it("lists your Characters to claim for, Main first", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local b = clients[2]
+    local main = b.character.guid
+    b.character = playing("Jaina", 30, { guid = "Player-0-Jaina" })
+    b:play()
+    net:run(3)
+    assert.same({ { guid = "Player-0-Jaina", label = "Jaina (30)" }, { guid = main, label = "Bob (20)" } },
+      view(b).claimFor)
+    b.core:setMain(main)
+    assert.same({ { guid = main, label = "Bob (20)" }, { guid = "Player-0-Jaina", label = "Jaina (30)" } },
+      view(b).claimFor)
+  end)
+end)
+
 describe("Spare items in the bags", function()
   local GUID = "Item-0-0000000000A1B2C3"
 

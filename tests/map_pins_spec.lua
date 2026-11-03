@@ -73,6 +73,7 @@ describe("Map pins", function()
       zone = "Elwynn Forest",
       online = true,
       sinceSeen = 20,
+      lastSeenText = "online",
     }, pin)
     assert.is_nil(pinFor(a, a))
     assert.equal(1, #a.core:mapPins())

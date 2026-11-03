@@ -56,9 +56,6 @@ local REDRAW_EVERY = 30
 local SCROLL_STEP = 40
 
 local TITLE = "Best Friends in Forever"
-local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
-local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
-local PAUSED = "You appear offline: the others don't see you. Change it in Settings."
 local FEED_EMPTY_TITLE = "Nothing yet"
 local FEED_EMPTY = "Dings, deaths and new Characters show up here."
 -- The stretch of timeline behind an empty Feed's one node.
@@ -107,7 +104,6 @@ local ONLINE = Skin.ONLINE
 local ERROR = { 1, 0.42, 0.42 }
 
 local SORTS = { { "online", "Online first" }, { "level", "Level" }, { "name", "Name" } }
-local HIGHLIGHT = Skin.FEED_HIGHLIGHT
 
 local core
 local frame
@@ -123,27 +119,18 @@ local professionsView
 local footer
 local rowFrames = {}
 local altFrames = {}
--- What the UI itself remembers: the tab, the sort, which Members show
--- Alts, and which Feed entries were unseen when the Feed was opened (they
--- keep their "new" tag until you leave the Feed).
+-- What the UI itself remembers: the tab, the sort and which Members show
+-- Alts. Which Feed entries are New is Core's (openFeed, leaveFeed).
 local tab = "roster"
 -- The When tab's Member, or nil for the Crew.
 local whenMember
 local order = "online"
 local expanded = {}
-local fresh = {}
 
 local classColor = Skin.classColor
 
 local function className(classFilename)
   return LOCALIZED_CLASS_NAMES_MALE[classFilename] or classFilename or ""
-end
-
-local ago = Skin.ago
-
-local function lastSeenText(online, sinceSeen)
-  if online then return "online" end
-  return ago(sinceSeen) .. " ago"
 end
 
 -- Whisper and Invite, guarded since Midnight moved some chat functions.
@@ -209,7 +196,7 @@ local function showTooltip(owner)
   if character.playing then
     GameTooltip:AddLine(row.own and "Playing now" or "Online now", ONLINE[1], ONLINE[2], ONLINE[3])
   else
-    GameTooltip:AddLine("Last seen " .. ago(character.sinceSeen) .. " ago", MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:AddLine("Last seen " .. character.lastSeenText, MUTED[1], MUTED[2], MUTED[3])
   end
   if not row.online and row.via then
     GameTooltip:AddLine("Heard via " .. row.via, MUTED[1], MUTED[2], MUTED[3])
@@ -369,7 +356,7 @@ local function drawRow(row, data)
   placeTags(row.level, { row.member, row.onAlt, row.canPlay })
   row.zone:SetText(data.zone or "")
 
-  row.seen:SetText(data.own and "" or lastSeenText(data.online, data.sinceSeen))
+  row.seen:SetText(data.lastSeenText or "")
   Skin.color(row.seen, data.online and ONLINE or DIM)
   if #data.alts > 0 then
     row.more:SetText(("%s%d more"):format(expanded[data.memberId] and "- " or "+ ", #data.alts))
@@ -416,7 +403,7 @@ local function drawAlt(alt, row, data)
   setTag(alt.canPlay, data.canPlay and "can play" or nil, GOLD)
   placeTags(alt.level, { alt.main, alt.canPlay })
   local zone = data.zone and data.zone .. " · " or ""
-  alt.right:SetText(zone .. ago(data.sinceSeen) .. " ago")
+  alt.right:SetText(zone .. data.lastSeenText)
   alt:Show()
 end
 
@@ -701,23 +688,13 @@ local function createFeedEntry()
   return entry
 end
 
-local function dayTitle(day)
-  if day.daysAgo == 0 then return "TODAY" end
-  if day.daysAgo == 1 then return "YESTERDAY" end
-  return date("%A %d %B", day.time):upper()
-end
-
-local function entryKey(entry)
-  return ("%d:%s:%s:%s"):format(entry.time, entry.memberId or "", entry.kind, entry.guid or "")
-end
-
 -- Who reacted, after the time: the Reaction's icon and their names, You
 -- a step brighter than the others.
 local function reactorsText(entry)
   if #entry.reactors == 0 then return "" end
   local names = {}
   for i, reactor in ipairs(entry.reactors) do
-    names[i] = reactor.you and Skin.hex(TEXT) .. "You|r" or reactor.name
+    names[i] = reactor.you and Skin.hex(TEXT) .. reactor.name .. "|r" or reactor.name
   end
   return Skin.reactionGlyph(entry.reaction, 12) .. " " .. table.concat(names, ", ")
 end
@@ -731,24 +708,16 @@ local function drawFeedEntry(line, entry)
   end
   line.node:SetKind(entry.kind, entry.icon)
   line.text:SetText(entry.text)
-  Skin.color(line.text, HIGHLIGHT[entry.kind] and GOLD or entry.own and MUTED or TEXT)
+  Skin.color(line.text, entry.highlight and GOLD or entry.own and MUTED or TEXT)
   line.time:SetText(date("%H:%M", entry.time))
-  local isNew = fresh[entryKey(entry)]
   line.new:ClearAllPoints()
   line.new:SetPoint("LEFT", line.text, "LEFT", line.text:GetStringWidth() + 6, 0)
-  line.new:SetShown(isNew == true)
+  line.new:SetShown(entry.new)
 end
 
--- Draws the Feed and marks it seen; what was unseen keeps its tag while
--- the Feed stays open.
+-- Draws the Feed, which Panel.refresh has opened (core:openFeed).
 local function drawFeed(feed)
   if not feedView then createFeedView() end
-  for _, day in ipairs(feed.days) do
-    for _, entry in ipairs(day.entries) do
-      if not entry.seen then fresh[entryKey(entry)] = true end
-    end
-  end
-
   local y, dayCount, entryCount = -INSET, 0, 0
   for _, day in ipairs(feed.days) do
     dayCount = dayCount + 1
@@ -756,7 +725,7 @@ local function drawFeed(feed)
     chip:ClearAllPoints()
     chip:SetPoint("TOPLEFT", feedView.content, "TOPLEFT", INSET - 4, y)
     chip:SetPoint("RIGHT", feedView.content, "RIGHT", -INSET, 0)
-    chip.label:SetText(dayTitle(day))
+    chip.label:SetText(day.title)
     chip:Show()
     y = y - FEED_DAY
     for _, entry in ipairs(day.entries) do
@@ -780,7 +749,6 @@ local function drawFeed(feed)
   feedView.content:SetHeight(math.max(-y + INSET, 1))
   feedView:Show()
   updateThumb(feedView)
-  if feed.unseen > 0 then core:feedSeen() end
 end
 
 -- Goals: a row per track, scrolling within the panel's fixed height.
@@ -1024,33 +992,6 @@ local function createWhenView()
   whenView.note:SetJustifyH("LEFT")
 end
 
-local function shortDate(time)
-  return (date("%d %b", time):gsub("^0", ""))
-end
-
--- What the grid shows, and a note when there's little or nothing to see.
-local function whenTexts(view)
-  if not view.memberId then
-    local intro = ("How many of the %d Members usually play each hour: in %d of the last %d weeks. Your local time.")
-      :format(view.max, view.usually, view.weeks)
-    local note = view.empty and ("Nobody usually plays at any hour yet. It takes %d weeks of play to show.")
-      :format(view.usually) or ""
-    return "The Crew", intro, note
-  end
-  local name = view.own and "You" or view.displayName or "?"
-  local intro = ("How many of the last %d weeks %s played each hour. Your local time."):format(
-    view.weeks, view.own and "you" or name)
-  local note = ""
-  if view.noData then
-    note = ("%s's BFF doesn't share Play times yet."):format(name)
-  elseif view.collectingSince then
-    note = ("Collecting since %s: less than a week of data so far."):format(shortDate(view.collectingSince))
-  elseif view.empty then
-    note = ("No hour played for %d minutes or more in the last %d weeks."):format(view.minutes, view.weeks)
-  end
-  return name, intro, note
-end
-
 local function drawWhen()
   if not whenView then createWhenView() end
   local view = whenMember and core:playTimes(whenMember)
@@ -1059,11 +1000,10 @@ local function drawWhen()
     view = core:playTimes()
   end
   whenView.data = view
-  local pick, intro, note = whenTexts(view)
-  whenView.pick.label:SetText("Show: " .. pick)
+  whenView.pick.label:SetText("Show: " .. view.title)
   whenView.pick:SetWidth(whenView.pick.label:GetStringWidth() + 16)
-  whenView.intro:SetText(intro)
-  whenView.note:SetText(note)
+  whenView.intro:SetText(view.intro)
+  whenView.note:SetText(view.note or "")
   for _, cell in ipairs(whenView.cells) do
     shadeCell(cell, view.grid[cell.day][cell.hour], view.max)
   end
@@ -1187,15 +1127,12 @@ end
 
 -- Right-click Claim: pick which of your Characters it's for.
 local function showClaimMenu(owner, data)
-  local own = core:rows()[1]
-  if not own then return end
+  local claimFor = sparesView.claimFor
+  if not claimFor or #claimFor == 0 then return end
   MenuUtil.CreateContextMenu(owner, function(_, root)
     root:CreateTitle("Claim it for")
-    local characters = { own }
-    for _, alt in ipairs(own.alts) do characters[#characters + 1] = alt end
-    for _, character in ipairs(characters) do
-      local label = ("%s (%d)"):format(character.name, character.level)
-      root:CreateButton(label, function() claim(data, character.guid) end)
+    for _, character in ipairs(claimFor) do
+      root:CreateButton(character.label, function() claim(data, character.guid) end)
     end
   end)
 end
@@ -1301,35 +1238,24 @@ local function drawSpareText(row, data, width)
   row.info:SetWidth(width)
 end
 
+-- Draws a row as Core words it. A Given Spare of yours dims less than
+-- one of the Crew's you can't use.
 local function drawSpareRow(row, data, yours)
   row.data, row.yours = data, yours
   row.icon:SetTexture(getItemIcon and getItemIcon(data.item) or QUESTION_MARK)
-  local left = data.expires > 0 and ago(data.expires) .. " left" or "ending"
-  if yours then
-    if data.gone then
-      row.info:SetText(("This item has left your bags · %s"):format(data.state))
-    else
-      row.info:SetText(data.given and data.state or ("%s · %s"):format(left, data.state))
-    end
-    Skin.color(row.info, (data.winner or data.gone) and GOLD or MUTED)
-    drawSpareText(row, data, placeSpareButtons(row, not data.given and "Give" or nil,
-      data.canWithdraw and "Withdraw" or nil))
-    row.primary:SetEnabled(data.canGive)
-    row:SetAlpha(data.given and 0.6 or 1)
-  else
-    row.info:SetText(("%s · %s"):format(data.owner, data.state))
-    Skin.color(row.info, data.winner and data.winner.you and GOLD or MUTED)
-    drawSpareText(row, data, placeSpareButtons(row, data.canClaim and "Claim" or nil,
-      data.claimed and "Withdraw" or nil))
-    row.primary:SetEnabled(true)
-    row:SetAlpha(data.usable and 1 or 0.45)
-  end
+  row.info:SetText(data.info)
+  Skin.color(row.info, data.highlight and GOLD or MUTED)
+  drawSpareText(row, data, placeSpareButtons(row, data.primary and data.primary.label,
+    data.secondary and data.secondary.label))
+  if data.primary then row.primary:SetEnabled(data.primary.enabled) end
+  row:SetAlpha(data.dimmed and (yours and 0.6 or 0.45) or 1)
   row:Show()
 end
 
 local function drawSpares()
   if not sparesView then createSparesView() end
   local view = core:spares()
+  sparesView.claimFor = view.claimFor
   local y, headings, rows, notes = -4, 0, 0, 0
   local function heading(text, count)
     headings = headings + 1
@@ -1650,7 +1576,7 @@ local function create()
   frame:SetPoint("CENTER")
   frame:SetHeight(HEIGHT)
   frame:SetScript("OnShow", Panel.refresh)
-  frame:SetScript("OnHide", function() fresh = {} end)
+  frame:SetScript("OnHide", function() core:leaveFeed() end)
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
     sinceRedraw = sinceRedraw + elapsed
@@ -1832,17 +1758,9 @@ local function drawFooter(crew, summary)
   footer.code:SetText(crew.code)
   footer.code:HighlightText()
 
-  local status = ""
-  if crew.leaving then
-    status = LEAVING
-  elseif core:isPaused() then
-    status = PAUSED
-  elseif crew.alone then
-    status = WAITING
-  end
-  footer.status:SetText(status)
+  footer.status:SetText(crew.status or "")
   local height = 46
-  if status ~= "" then height = height + footer.status:GetStringHeight() + 6 end
+  if crew.status then height = height + footer.status:GetStringHeight() + 6 end
   footer:SetHeight(height)
   footer:Show()
   return height
@@ -1914,28 +1832,25 @@ function Panel.refresh()
     return
   end
   if setup then setup:Hide() end
+  -- Showing the Feed starts or continues a Feed visit, before anything is
+  -- read; any other tab ends it.
+  if tab == "feed" then core:openFeed() else core:leaveFeed() end
 
   local summary = core:summary()
   frame.headerRight:SetText(("%d of %d online"):format(summary.online, summary.members))
-  local feed = core:feed()
-  drawNav(feed.unseen, core:unseenSpares())
+  drawNav(core:unseen(), core:unseenSpares())
   hideViewsBut(tab)
   if tab == "feed" then
-    drawFeed(feed)
+    drawFeed(core:feed())
   elseif tab == "goals" then
-    fresh = {}
     drawGoals()
   elseif tab == "when" then
-    fresh = {}
     drawWhen()
   elseif tab == "spares" then
-    fresh = {}
     drawSpares()
   elseif tab == "professions" then
-    fresh = {}
     drawProfessions()
   else
-    fresh = {}
     drawRoster(crew, summary)
   end
 end

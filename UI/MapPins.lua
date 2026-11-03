@@ -39,7 +39,7 @@ local function showTooltip(frame)
   if pin.online then
     GameTooltip:AddLine("Online now", Skin.ONLINE[1], Skin.ONLINE[2], Skin.ONLINE[3])
   else
-    GameTooltip:AddLine("Last seen " .. Skin.ago(pin.sinceSeen) .. " ago", Skin.MUTED[1], Skin.MUTED[2], Skin.MUTED[3])
+    GameTooltip:AddLine("Last seen " .. pin.lastSeenText, Skin.MUTED[1], Skin.MUTED[2], Skin.MUTED[3])
   end
   GameTooltip:Show()
 end

@@ -18,6 +18,7 @@ Libs/HereBeDragons/HereBeDragons-2.0.lua
 Libs/HereBeDragons/HereBeDragons-Pins-2.0.lua
 
 Core/Codec.lua
+Core/Text.lua
 Core/CrewCode.lua
 Core/PlayTimes.lua
 Core/Professions.lua

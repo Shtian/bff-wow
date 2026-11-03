@@ -346,7 +346,7 @@ local function unseenReactions(self, entry)
 end
 
 -- Marks every entry and Reaction seen. Returns true if any wasn't.
-function Feed:markAllSeen()
+local function markAllSeen(self)
   local any = false
   for _, entry in ipairs(self.db.feed) do
     if not entry.seen then
@@ -359,6 +359,25 @@ function Feed:markAllSeen()
     end
   end
   return any
+end
+
+-- The Feed tab is open: a visit starts, if one isn't open already. Every
+-- entry unseen now, or with an unseen Reaction, is New until the visit
+-- ends, and is then marked seen. Called on every draw of the tab, so what
+-- arrives during the visit and is still unseen at the next draw is New
+-- too. Returns true if anything was unseen.
+function Feed:open()
+  local visit = self.visit or {}
+  self.visit = visit
+  for _, entry in ipairs(self.db.feed) do
+    if not entry.seen or #unseenReactions(self, entry) > 0 then visit[entry] = true end
+  end
+  return markAllSeen(self)
+end
+
+-- The Feed tab was left: the visit ends, and nothing is New.
+function Feed:leave()
+  self.visit = nil
 end
 
 -- How many entries and Reactions haven't been seen.
@@ -484,8 +503,14 @@ function Feed:tick()
   return self.settle:tick()
 end
 
--- Entries shown in the summary on their own highlighted line.
-local HIGHLIGHT = { maxLevel = true, joined = true, left = true, goal = true }
+-- Entries that are the news, highlighted wherever they show: the Feed
+-- tab, While you were away and toasts. Leaving isn't.
+local HIGHLIGHTED = { maxLevel = true, joined = true, goal = true, professionMaxed = true }
+
+-- Entries listed with a Member in the summary (highlights), and of those,
+-- the ones that tag them by name (max level has its star instead).
+local MEMBER_NEWS = { maxLevel = true, joined = true, left = true, goal = true }
+local TAGS = { joined = true, left = true }
 
 -- A Reaction button in the summary: { key, reacted }, or nil.
 local function button(self, entry)
@@ -504,7 +529,8 @@ local function cheerRank(entry)
 end
 
 -- One Character's row in a Member's block: { name, main, from, level,
--- deaths, new, maxLevel, cheer, respects }. The level range runs from the
+-- deaths, new, maxLevel, gained, cheer, respects }. gained is "new" or
+-- "+N" levels, nil when neither. The level range runs from the
 -- lowest "before" to the highest "after" (max level counts towards it), a
 -- new Character has its level but no from, and deaths add up. Cheer is
 -- keyed to the highest level and Respects to the highest death total. Nil
@@ -537,12 +563,20 @@ local function characterRow(self, entries, character, isMain)
     end
   end
   if row.new then row.from = nil end
+  if row.new then
+    row.gained = "new"
+  elseif row.from then
+    row.gained = "+" .. (row.level - row.from)
+  end
   row.cheer, row.respects = button(self, cheer), button(self, respects)
   return any and row or nil
 end
 
 -- One Member's block: a row per Character with events, the Main's first,
--- then the rest by latest activity, and a Welcome when they joined.
+-- then the rest by latest activity, and a Welcome when they joined. Each
+-- row's label names its Character: "Alt Jaina", the Main's name, or nil
+-- for a Main named like the Member. tags are { text, highlight } for
+-- joined and left.
 local function memberBlock(self, id, entries)
   local record = self.ledger:record(id)
   local main = record and ns.Roster.main(record, self.now())
@@ -554,13 +588,17 @@ local function memberBlock(self, id, entries)
     time = 0,
     characters = {},
     highlights = {},
+    tags = {},
   }
 
   local byCharacter, characters = {}, {}
   for _, entry in ipairs(entries) do
     block.time = math.max(block.time, entry.time)
-    if HIGHLIGHT[entry.kind] then
+    if MEMBER_NEWS[entry.kind] then
       block.highlights[#block.highlights + 1] = { kind = entry.kind, text = entry.text }
+    end
+    if TAGS[entry.kind] then
+      block.tags[#block.tags + 1] = { text = entry.kind, highlight = HIGHLIGHTED[entry.kind] == true }
     end
     if entry.kind == "joined" then block.welcome = button(self, entry) or block.welcome end
     if entry.guid then
@@ -584,7 +622,14 @@ local function memberBlock(self, id, entries)
   for _, forCharacter in ipairs(characters) do
     local character = record and record.characters[forCharacter.guid]
     local row = characterRow(self, forCharacter, character, forCharacter.guid == mainGuid)
-    if row then block.characters[#block.characters + 1] = row end
+    if row then
+      if not row.main then
+        row.label = "Alt " .. row.name
+      elseif row.name ~= block.displayName then
+        row.label = row.name
+      end
+      block.characters[#block.characters + 1] = row
+    end
   end
   return block
 end
@@ -621,11 +666,13 @@ end
 -- While you were away: the unseen entries from other Members, one block
 -- per Member, most recent activity first, the Crew goals reached, newest
 -- first ({ text, time }), profession news, newest first ({ kind, text,
--- time, icon, cheer }), the unseen Reactions to your own, and
+-- time, icon, cheer, highlight }), the unseen Reactions to your own, and
 -- spares: the Spare notices given (Spares:takeNews), then the
 -- Gives, newest first ({ kind = "gave", text, time }), as { members,
--- goals, spares, professions, count, noticed }. Marks them seen. Nil when there
--- are none.
+-- goals, spares, professions, count, intro, maxLevel, noticed }, intro
+-- being the scoreboard's "N things happened while you were away." and
+-- maxLevel the top of its level bars. Marks them seen. Nil when there are
+-- none.
 function Feed:takeSummary(spares)
   spares = spares or {}
   local byMember, ids, goals, gives, professions, count = {}, {}, {}, {}, {}, 0
@@ -636,6 +683,7 @@ function Feed:takeSummary(spares)
       count = count + 1
       table.insert(professions, 1, {
         kind = entry.kind, text = entry.text, time = entry.time, icon = entry.icon, cheer = button(self, entry),
+        highlight = HIGHLIGHTED[entry.kind] == true,
       })
     elseif not entry.seen and entry.kind == "goal" then
       entry.seen = true
@@ -669,18 +717,24 @@ function Feed:takeSummary(spares)
   end)
   return {
     members = members, goals = goals, spares = spares, professions = professions, count = count, noticed = noticed,
+    intro = count == 1 and "1 thing happened while you were away."
+      or ("%d things happened while you were away."):format(count),
+    maxLevel = self.maxLevel,
   }
 end
 
 -- An entry as handed out: a fresh table UI may keep. Seen is false while
--- it has unseen Reactions. reaction is the one that applies, key what
--- react() takes, reactors who reacted ({ memberId, name, you }), reacted
--- whether you have, and canReact whether you can at all.
+-- it has unseen Reactions, highlight says it's the news, and new that it
+-- is New in the open Feed visit. reaction is the one that applies, key
+-- what react() takes, reactors who reacted ({ memberId, name, you }, name
+-- being "You" for you), reacted whether you have, and canReact whether
+-- you can at all.
 function Feed:describe(entry)
   local me = self.ledger:memberId()
   local reactors = {}
   for i, id in ipairs(reactorIds(self, entry)) do
-    reactors[i] = { memberId = id, name = reactorName(self, id), you = id == me }
+    local you = id == me
+    reactors[i] = { memberId = id, name = you and "You" or reactorName(self, id), you = you }
   end
   local key = Reactions.keyOf(entry)
   return {
@@ -698,6 +752,8 @@ function Feed:describe(entry)
     icon = entry.icon,
     own = entry.own == true,
     seen = entry.seen == true and #unseenReactions(self, entry) == 0,
+    highlight = HIGHLIGHTED[entry.kind] == true,
+    new = self.visit ~= nil and self.visit[entry] == true,
     reaction = Reactions.forKind(entry.kind),
     key = key,
     reactors = reactors,
@@ -707,7 +763,8 @@ function Feed:describe(entry)
 end
 
 -- The log newest first, grouped by day (utcOffset shifts day boundaries
--- to local time): { days = { { daysAgo, time, entries } }, unseen }.
+-- to local time): { days = { { daysAgo, time, title, entries } }, unseen },
+-- title being "TODAY", "YESTERDAY" or "MONDAY 02 NOVEMBER".
 function Feed:view(utcOffset)
   local today = math.floor((self.now() + utcOffset) / DAY)
   local days = {}
@@ -722,6 +779,9 @@ function Feed:view(utcOffset)
     end
     group.entries[#group.entries + 1] = self:describe(entry)
   end
-  for _, group in ipairs(days) do group.day = nil end
+  for _, group in ipairs(days) do
+    group.day = nil
+    group.title = ns.Text.dayTitle(group.daysAgo, group.time, utcOffset)
+  end
   return { days = days, unseen = self:unseen() }
 end

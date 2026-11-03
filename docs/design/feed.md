@@ -111,13 +111,13 @@ Kept deep: Core decides what is seen and what the settings allow, so UI and App 
 
 - **Creation options:**
   - `initialLogin`: `isInitialLogin` from `PLAYER_ENTERING_WORLD`. A reload already creates a new Core, so no input method is needed.
-  - `maxLevel`: from `GetMaxLevelForPlayerExpansion()`.
+  - `maxLevel`: from `GetMaxLevelForPlayerExpansion()`. The summary passes it on for the popup's level bars.
 - **Listener events:**
   - `feedEntry(entry)`: fires only when the chat-line setting is on, and Core marks the entry as seen as it fires. App prints `entry.text`.
   - `awaySummary(summary)`: fires once per initial login when the summary has settled, only when the popup setting is on and the summary isn't empty. Core marks those entries as seen as it fires. App waits for combat to end and then shows it.
   - `rowsChanged` is renamed to **`changed`**: "re-read whatever you show". The panel, the Feed tab and the minimap badge all redraw from it, so the Feed needs no redraw event of its own.
-- **Read:** `feed()` returns the Feed tab's entries grouped by day, plus the unseen count.
-- **Command:** `feedSeen()`, called when the Feed tab is opened.
+- **Read:** `feed()` returns the Feed tab's entries grouped by day, plus the unseen count. Each day has its finished title, and each entry a `highlight` flag (the news, in gold) and a `new` flag (New in the open Feed visit).
+- **Commands:** `openFeed()`, called on every draw of the Feed tab, starts a Feed visit if none is open and marks everything seen; what was unseen then is New until `leaveFeed()`, called on leaving the tab or hiding the panel.
 - **Member record:** gains `joinedAt`, written on starting or joining a Crew.
 
 ## Scenarios to add to the FakeNet tests

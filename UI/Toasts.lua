@@ -154,7 +154,7 @@ end
 
 local function drawToast(frame, toast)
   local entry = toast.entry
-  local highlight = entry and Skin.FEED_HIGHLIGHT[entry.kind] == true
+  local highlight = entry ~= nil and entry.highlight == true
   local canReact = entry ~= nil and not entry.entryKey and entry.canReact == true
   frame.react:SetShown(canReact)
   if canReact then frame.react:SetReaction(entry.reaction, entry.reacted) end
