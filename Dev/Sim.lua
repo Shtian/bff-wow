@@ -18,6 +18,13 @@ local Sim = {}
 ns.Sim = Sim
 
 local DAY = 24 * 60 * 60
+-- WoW: Forever's level span. Simulated Members keep to it even on a client
+-- with a higher cap (testing on retail), so the Together line and the
+-- Roster look as they will in game.
+local MAX_LEVEL = 60
+-- Their levels are around yours, or around this when you're above the
+-- span (a retail Character).
+local BASE_LEVEL = 24
 -- How long after starting the offline Member logs out.
 local LOGOUT_AFTER = 20
 
@@ -156,7 +163,7 @@ end
 local function character(i, j, spec, yourLevel)
   return {
     guid = guidFor(i, j), name = spec.name, classFilename = spec.classFilename,
-    level = math.max(1, yourLevel + spec.levelOffset), xp = 300 * j, maxXp = 1000 + 200 * i,
+    level = math.max(1, math.min(MAX_LEVEL, yourLevel + spec.levelOffset)), xp = 300 * j, maxXp = 1000 + 200 * i,
     zone = spec.zone, deaths = i + j, professions = spec.professions,
   }
 end
@@ -215,7 +222,8 @@ function Sim.start(core)
   local now = GetServerTime()
   local own = core:rows()[1]
   local yourLevel = own and own.level or 10
-  net = ns.FakeNet.new({ clock = now, maxLevel = GetMaxLevelForPlayerExpansion() })
+  if yourLevel > MAX_LEVEL then yourLevel = BASE_LEVEL end
+  net = ns.FakeNet.new({ clock = now, maxLevel = math.min(MAX_LEVEL, GetMaxLevelForPlayerExpansion()) })
   local you = net:attach(core)
   yourId = core.ledger:memberId()
   -- The simulated Members only belong to the Crew the sim started in. Once
