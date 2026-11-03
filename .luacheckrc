@@ -73,6 +73,7 @@ stds.wow = {
     "NUM_BAG_SLOTS",
     "NUM_CHAT_WINDOWS",
     "NUM_TOTAL_EQUIPPED_BAG_SLOTS",
+    "PixelUtil",
     "PlaySound",
     "RAID_CLASS_COLORS",
     "RemoveChatWindowChannel",

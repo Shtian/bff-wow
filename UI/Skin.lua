@@ -327,19 +327,40 @@ local ICONS = {
   } },
 }
 
+-- One screen pixel in a frame's UI units.
+local function screenPixel(frame)
+  local factor = PixelUtil and PixelUtil.GetPixelToUIUnitFactor and PixelUtil.GetPixelToUIUnitFactor() or 1
+  return factor / frame:GetEffectiveScale()
+end
+
+-- Lays an icon's rectangles out in whole screen pixels: each unit of the
+-- drawing is the same number of pixels (about one UI unit's worth), so a
+-- 1-unit stem and a 3-unit row keep their shape at any UI scale.
+local function layOutIcon(icon)
+  local pixel = screenPixel(icon)
+  local unit = math.max(1, math.floor(1 / pixel + 0.5)) * pixel
+  icon:SetSize(icon.spec.width * unit, icon.spec.height * unit)
+  for i, rect in ipairs(icon.spec.rects) do
+    local part = icon.parts[i]
+    part:ClearAllPoints()
+    part:SetPoint("TOPLEFT", rect[1] * unit, -rect[2] * unit)
+    part:SetSize(rect[3] * unit, rect[4] * unit)
+  end
+end
+
 -- An icon by kind ("filter" or "sort") in a colour; :SetColor recolours it.
 function Skin.icon(parent, kind, color)
-  local spec = ICONS[kind]
   local icon = CreateFrame("Frame", nil, parent)
-  icon:SetSize(spec.width, spec.height)
+  icon.spec = ICONS[kind]
   icon.parts = {}
-  for i, rect in ipairs(spec.rects) do
+  for i = 1, #icon.spec.rects do
     local part = icon:CreateTexture(nil, "ARTWORK")
     part:SetColorTexture(1, 1, 1, 1)
-    part:SetPoint("TOPLEFT", rect[1], -rect[2])
-    part:SetSize(rect[3], rect[4])
     icon.parts[i] = part
   end
+  layOutIcon(icon)
+  -- The UI scale may have changed since.
+  icon:SetScript("OnShow", layOutIcon)
   function icon:SetColor(value)
     for _, part in ipairs(self.parts) do part:SetVertexColor(value[1], value[2], value[3], value[4] or 1) end
   end
