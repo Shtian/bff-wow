@@ -3,6 +3,21 @@
 
 
 
+
+## 0.4.0
+<sub>2026-11-03</sub>
+
+- *(minor)*
+  New Together tab (and `/bff together`): your Crew and the game's dungeons on one level line. See who can play with you, which dungeons fit you together, and who's a few levels short, with the nine new Forever dungeons marked NEW.
+- *(minor)*
+  Together tab: click a friend to see the dungeons you share (shift-click adds more, Escape or Clear to stop), and a Show menu to hide offline friends, show Alts, keep only dungeons near your level, hide attunements or show raids. Your choices are kept across reloads.
+- *(minor)*
+  The BFF panel opens bigger (640×520) and can be resized: drag the grip in its bottom right corner, down to the old 460×380 or up to 900×800. Every tab uses the extra room, and the panel reopens at the size and place you left it, on every Character. Double-click the grip, or use Reset BFF window in Settings, to put it back.
+- *(patch)* Moved the panel's and While you were away's wording into Core, so it's tested offline. Nothing looks different in game.
+- *(patch)* Kept a development file (`skills-lock.json`) out of the release zip. Nothing changes in game.
+- *(patch)*
+  Together tab: larger text, every dungeon on the line (no more "+N here"), a green dot on online friends' names, and Clear moved up next to Show. The answer line above the level line is gone, since the line and overview already show who you can play with and where. The Show buttons on Together and When get a filter icon, and the Roster's sort button an up and down arrow.
+
 ## 0.3.0
 <sub>2026-11-02</sub>
 
