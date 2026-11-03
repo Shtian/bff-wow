@@ -72,15 +72,15 @@
     "id": "04-goals",
     "layout": "right",
     "title": "Level up together",
-    "caption": "Goals the whole crew works towards, like everyone reaching level 80. Nobody is ranked.",
+    "caption": "Goals the whole crew works towards, and the trophies you earn along the way. Nobody is ranked.",
     "shots": [
       {
         "file": "goals.jpg",
         "crop": [
-          680,
-          10,
-          552,
-          460
+          523,
+          0,
+          880,
+          680
         ]
       }
     ]

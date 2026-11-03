@@ -2,7 +2,8 @@
 -- counts deaths, kept per Character in BFF_CharacterDB, so a client crash
 -- loses that session's deaths (see docs/design/code-structure.md), and
 -- reads its professions (on PLAYER_ENTERING_WORLD and SKILL_LINES_CHANGED),
--- where the Character stands for Core's locate(), and item info for Spares.
+-- where the Character stands for Core's locate(), item info for Spares,
+-- and a boss kill's payload with the party for Core's encounterEnded().
 
 local _, ns = ...
 
@@ -96,6 +97,60 @@ end
 function Snapshot.locate()
   local ok, location = pcall(locate)
   return ok and location or nil
+end
+
+-- A value as Core may see it: nil when secret, so Core never compares one.
+local function readable(value)
+  if issecretvalue and issecretvalue(value) then return nil end
+  return value
+end
+
+-- The group's units, you included.
+local function groupUnits()
+  local units = {}
+  if IsInRaid() then
+    for i = 1, GetNumGroupMembers() do units[#units + 1] = "raid" .. i end
+  else
+    units[1] = "player"
+    for i = 1, 4 do units[#units + 1] = "party" .. i end
+  end
+  return units
+end
+
+-- Who is in the group: { guid, name } per member, either nil when secret.
+-- The name is UnitName's, without the realm.
+function Snapshot.party()
+  local party = {}
+  for _, unit in ipairs(groupUnits()) do
+    if UnitExists(unit) then
+      party[#party + 1] = { guid = readable(UnitGUID(unit)), name = readable((UnitName(unit))) }
+    end
+  end
+  return party
+end
+
+local function encounter(encounterID, success)
+  local _, instanceType = GetInstanceInfo()
+  success = readable(success)
+  -- The wiki has success as 1 or 0; take a boolean too.
+  if success == 1 then success = true elseif success == 0 then success = false end
+  if type(success) ~= "boolean" then success = nil end
+  return {
+    encounterId = readable(encounterID),
+    success = success,
+    instanceType = readable(instanceType),
+    party = Snapshot.party(),
+  }
+end
+
+-- ENCOUNTER_END's payload (encounterID, encounterName, difficultyID,
+-- groupSize, success) as Core's encounterEnded() takes it, with the
+-- instance type and the party. A value that reads secret is nil, and a
+-- read that errors (a restriction we don't know of) is nil altogether, so
+-- Core records nothing.
+function Snapshot.encounter(encounterID, _, _, _, success)
+  local ok, result = pcall(encounter, encounterID, success)
+  return ok and result or nil
 end
 
 -- Item info, through C_Item where the client has it.

@@ -4,7 +4,7 @@ Answers [Crew goals: built-in goal tracks, a Goals tab and a Feed entry when rea
 
 ## The idea in one line
 
-Each client works out six built-in goal tracks from the Member records it already holds, remembers which rungs it has seen reached, and adds one Crew-wide Feed entry when a new rung is reached. No record fields, no sync change.
+Each client works out six built-in goal tracks from the Member records it already holds, remembers which rungs it has seen reached, and adds one Crew-wide Feed entry when a new rung is reached. Goal tracks add no record fields and no sync change; clears, the other kind of trophy, do (`docs/design/trophies.md`).
 
 ## Tracks and rungs
 
@@ -58,7 +58,9 @@ Track names: "Crew levels", "Everyone at level 30" (the next rung; "Everyone at 
 
 - **Goals** (`Core/Goals.lua`): the ladders, progress from a list of records, the saved reached rungs, the baseline and the tab's rows. Pure; tested through Core and directly for the ladders.
 - **Feed** turns reached rungs into `goal` entries (`Feed:goalsReached`), and While you were away lists them on their own as `summary.goals` (`{ text, time }`, newest first), shown under "Crew goals" in gold.
-- **Core:** `goals()` for the Working on tiles: a row per track, with `reached` (how many rungs it has) and `last.date` ("3 Nov"). `trophies()` for the rest: `{ settled, count, shelf (newest first), cabinet ({ track, title, trophies } per track with any, oldest first), latest, sinceSeen }`, a trophy being `{ track, title, rung, label, text (its Feed entry's), time, date, quality, fresh, icon }`. Core decides each trophy's quality and whether it's fresh; Skin maps them to colours. `openGoals()` on every draw of the tab and `leaveGoals()` when it's left make a **Goals visit**, like the Feed's: `sinceSeen` counts from the tab's previous opening through the visit. When the tab was last opened is kept in `db.goals.seen`, so a new Crew starts again. `feedEntry` and `awaySummary` carry goal entries as they do others.
+- **Core:** `goals()` for the Working on tiles: a row per track, with `reached` (how many rungs it has) and `last.date` ("3 Nov"). `trophies()` for the rest: `{ settled, count, goalsReached, shelf (newest first), cabinet ({ track, title, trophies } per track with any, oldest first), dungeons and raids (the clears' grids, `docs/design/trophies.md`), latest, sinceSeen }`, a trophy being `{ track, title, rung, label, text (its Feed entry's), time, date, quality, fresh, icon }`. Core decides each trophy's quality and whether it's fresh; Skin maps them to colours. `openGoals()` on every draw of the tab and `leaveGoals()` when it's left make a **Goals visit**, like the Feed's: `sinceSeen` counts from the tab's previous opening through the visit. When the tab was last opened is kept in `db.goals.seen`, so a new Crew starts again. `feedEntry` and `awaySummary` carry goal entries as they do others.
+
+Clears are trophies too: see `docs/design/trophies.md`.
 
 ## Dev
 

@@ -7,10 +7,13 @@
 -- test Spare, Claim your newest one or log out,
 -- one that plays out a stretch of you being away so While you were away
 -- shows (with Reactions to your entries), one that reaches the next Crew
--- deaths goal, and a live log of what
--- your Core sends, receives and fires. /bffdev toast [n] shows sample
--- toasts. Left out of releases; it lives here, not in a file of its own,
--- so the .toc (a shipped file) stays as it is.
+-- deaths goal, one where simulated Members clear the next dungeon, and a
+-- live log of what your Core sends, receives and fires. /bffdev toast [n]
+-- shows sample toasts. Also the encounter logger: every ENCOUNTER_END is
+-- printed and saved with what the game and BFF made of it, for
+-- docs/research/boss-kills.md (/bffdev encounters). Left out of releases;
+-- it lives here, not in a file of its own, so the .toc (a shipped file)
+-- stays as it is.
 
 local _, ns = ...
 
@@ -27,6 +30,15 @@ local MAX_LEVEL = 60
 local BASE_LEVEL = 24
 -- How long after starting the offline Member logs out.
 local LOGOUT_AFTER = 20
+
+-- Made-up final bosses for every dungeon and raid, since Forever's
+-- encounter IDs aren't known yet: the simulated Members' Cores know these,
+-- so their clears are recorded through the real encounterEnded().
+local SIM_BOSS = 900000
+local SIM_FINALS = {}
+for _, dungeon in ipairs(ns.Core.DUNGEONS) do
+  if dungeon.kind == "dungeon" or dungeon.kind == "raid" then SIM_FINALS[SIM_BOSS + dungeon.index] = dungeon.name end
+end
 
 -- Professions as Snapshot reads them: skill line ID, name, icon file ID,
 -- then skill and max per Character that has it.
@@ -223,7 +235,9 @@ function Sim.start(core)
   local own = core:rows()[1]
   local yourLevel = own and own.level or 10
   if yourLevel > MAX_LEVEL then yourLevel = BASE_LEVEL end
-  net = ns.FakeNet.new({ clock = now, maxLevel = math.min(MAX_LEVEL, GetMaxLevelForPlayerExpansion()) })
+  net = ns.FakeNet.new({
+    clock = now, maxLevel = math.min(MAX_LEVEL, GetMaxLevelForPlayerExpansion()), finalBosses = SIM_FINALS,
+  })
   local you = net:attach(core)
   yourId = core.ledger:memberId()
   -- The simulated Members only belong to the Crew the sim started in. Once
@@ -487,6 +501,41 @@ function Sim.goal(core)
       return goal.rung
     end
   end
+end
+
+-- The simulated Members online clear the first dungeon (or raid, with
+-- kind "raid") the Crew hasn't, in one party, each recording it as their
+-- client would. The Crew trophy's Feed entry and toast follow once their
+-- records reach you. Returns the instance's name, or nil and
+-- "notRunning", "nobodyOnline" or "allCleared".
+function Sim.clear(core, kind)
+  if not net then return nil, "notRunning" end
+  local party = {}
+  for _, member in ipairs(members) do
+    if member.core then party[#party + 1] = member end
+  end
+  if #party == 0 then return nil, "nobodyOnline" end
+  local trophies = core:trophies()
+  local grid = kind == "raid" and trophies.raids or trophies.dungeons
+  local target
+  for _, slot in ipairs(grid.slots) do
+    if not slot.cleared then target = target or slot end
+  end
+  if not target then return nil, "allCleared" end
+  local id
+  for boss, name in pairs(SIM_FINALS) do
+    if name == target.name then id = boss end
+  end
+  local group = {}
+  for i, member in ipairs(party) do
+    group[i] = { guid = member.character.guid, name = member.character.name }
+  end
+  for _, member in ipairs(party) do
+    member.core:encounterEnded({
+      encounterId = id, success = true, instanceType = kind == "raid" and "raid" or "party", party = group,
+    })
+  end
+  return target.name
 end
 
 -- Logs the simulated Members out; you see them go offline. abandoned (you
@@ -782,10 +831,21 @@ local function create()
     end
   end)
   frame.goal:SetPoint("LEFT", frame.away, "RIGHT", 6, 0)
+  frame.dungeon = Skin.button(frame, "Dungeon", function()
+    local name, reason = Sim.clear(watched)
+    if name then
+      log(color(DIM, ("sim  the simulated Members online clear %s"):format(name)))
+    elseif reason == "nobodyOnline" then
+      log(color(DIM, "sim  log a simulated Member in first"))
+    elseif reason == "allCleared" then
+      log(color(DIM, "sim  the Crew has cleared every dungeon"))
+    end
+  end)
+  frame.dungeon:SetPoint("LEFT", frame.goal, "RIGHT", 6, 0)
   local changed = Skin.checkbox(frame, "Log every \"changed\"", function(self)
     showChanged = self:GetChecked()
   end)
-  changed:SetPoint("LEFT", frame.goal, "RIGHT", 12, 0)
+  changed:SetPoint("LEFT", frame.dungeon, "RIGHT", 12, 0)
 
   frame.empty = Skin.label(frame, "small", Skin.MUTED)
   frame.empty:SetPoint("TOPLEFT", INSET, top - 38)
@@ -848,6 +908,7 @@ local SAMPLE_TOASTS = {
   { kind = "left", text = "Simba left the Crew" },
   { kind = "goal", text = "The Crew reached 300 Crew levels!", highlight = true },
   { kind = "goal", text = "The Crew has an Engineer now!", highlight = true },
+  { kind = "goal", text = "The Crew cleared The Deadmines!", highlight = true },
   { kind = "claimed", text = "Simone claimed [Cruel Barb] for Simonette", opens = "spares" },
   { kind = "given", text = "Simbad sent you [Staff of Westfall]. Check Simonette's mailbox.", opens = "spares" },
   { kind = "gave", text = "Simbad gave Simone [Staff of Westfall]" },
@@ -856,12 +917,112 @@ local SAMPLE_TOASTS = {
   { kind = "professionMaxed", text = "Simone maxed Alchemy", icon = 136240, highlight = true },
 }
 
+-- The encounter logger: every ENCOUNTER_END, printed and saved in
+-- BFF_DB.devEncounters (the newest ENCOUNTER_LOG_MAX), with whether each
+-- value is secret, GetInstanceInfo(), the group, and what BFF made of it.
+-- For docs/research/boss-kills.md.
+local ENCOUNTER_LOG_MAX = 200
+local SECRET = "<secret>"
+
+-- A value as it can be saved and printed, and whether it's secret.
+local function plain(value)
+  if issecretvalue and issecretvalue(value) then return SECRET, true end
+  return value, false
+end
+
+local function logEncounter(...)
+  local args = { ... }
+  local entry = { time = GetServerTime(), secret = {}, instance = {} }
+  local fields = { "encounterID", "encounterName", "difficultyID", "groupSize", "success" }
+  for i, field in ipairs(fields) do
+    entry[field], entry.secret[field] = plain(args[i])
+  end
+  local info = { GetInstanceInfo() }
+  local infoFields = {
+    "name", "instanceType", "difficultyID", "difficultyName", "maxPlayers",
+    "dynamicDifficulty", "isDynamic", "instanceID", "instanceGroupSize", "LfgDungeonID",
+  }
+  for i, field in ipairs(infoFields) do
+    entry.instance[field] = (plain(info[i]))
+    if select(2, plain(info[i])) then entry.secret["instance." .. field] = true end
+  end
+  -- Read raw here, so a secret GUID or name shows as secret, not missing.
+  entry.party = {}
+  local units = {}
+  if IsInRaid() then
+    for i = 1, GetNumGroupMembers() do units[#units + 1] = "raid" .. i end
+  else
+    units[1] = "player"
+    for i = 1, 4 do units[#units + 1] = "party" .. i end
+  end
+  for _, unit in ipairs(units) do
+    if UnitExists(unit) then
+      local guid, guidSecret = plain(UnitGUID(unit))
+      local name, nameSecret = plain((UnitName(unit)))
+      entry.party[#entry.party + 1] = { unit = unit, guid = guid, name = name }
+      if guidSecret then entry.secret[unit .. ".guid"] = true end
+      if nameSecret then entry.secret[unit .. ".name"] = true end
+    end
+  end
+  local name, reason = ns.Clears.cleared(ns.Snapshot.encounter(...), ns.Core.FINAL_BOSSES)
+  entry.bff = name and ("clears " .. name) or reason
+  BFF_DB.devEncounters = BFF_DB.devEncounters or {}
+  local saved = BFF_DB.devEncounters
+  saved[#saved + 1] = entry
+  while #saved > ENCOUNTER_LOG_MAX do table.remove(saved, 1) end
+
+  local secrets = {}
+  for field in pairs(entry.secret) do
+    if entry.secret[field] then secrets[#secrets + 1] = field end
+  end
+  local names = {}
+  for i, unit in ipairs(entry.party) do names[i] = unit.name or "?" end
+  print(("BFF dev: ENCOUNTER_END %s %q in %s (%s, instance %s) success %s; party %s; secret: %s; BFF: %s"):format(
+    tostring(entry.encounterID), tostring(entry.encounterName), tostring(entry.instance.name),
+    tostring(entry.instance.instanceType), tostring(entry.instance.instanceID), tostring(entry.success),
+    table.concat(names, ", "), #secrets > 0 and table.concat(secrets, ", ") or "none", entry.bff))
+  log(color(EVENT, "encounter  ") .. ("%s %s: %s"):format(tostring(entry.encounterID), tostring(entry.encounterName), entry.bff))
+end
+
+local encounterFrame = CreateFrame("Frame")
+encounterFrame:RegisterEvent("ENCOUNTER_END")
+encounterFrame:SetScript("OnEvent", function(_, _, ...)
+  local ok, err = pcall(logEncounter, ...)
+  if not ok then print("BFF dev: couldn't log ENCOUNTER_END: " .. tostring(err)) end
+end)
+
+-- /bffdev encounters: how many are saved and the last few; with "clear",
+-- empties the log.
+local function showEncounters(rest)
+  if rest == "clear" then
+    BFF_DB.devEncounters = nil
+    return print("BFF dev: encounter log cleared.")
+  end
+  local saved = BFF_DB.devEncounters or {}
+  print(("BFF dev: %d encounters saved in BFF_DB.devEncounters (written to SavedVariables on /reload or logout)."):format(#saved))
+  for i = math.max(1, #saved - 4), #saved do
+    local e = saved[i]
+    print(("  %s %s %q in %s (instance %s): %s"):format(date("%d %b %H:%M", e.time), tostring(e.encounterID),
+      tostring(e.encounterName), tostring(e.instance.name), tostring(e.instance.instanceID), tostring(e.bff)))
+  end
+end
+
 -- /bffdev toggles the console; /bffdev toast [n] shows n sample toasts
 -- (default 1), straight to the toasts and not through Core; /bffdev purge
--- runs Sim.purge.
+-- runs Sim.purge; /bffdev clear [raid] makes the simulated Members online
+-- clear the next dungeon (or raid); /bffdev encounters [clear] shows (or
+-- empties) the encounter log.
 SlashCmdList.BFFDEV = function(input)
   if not ns.core then return end
   local command, count = (input or ""):match("^%s*(%S*)%s*(%d*)")
+  local rest = (input or ""):match("^%s*%S*%s*(.-)%s*$")
+  if command == "encounters" then return showEncounters(rest) end
+  if command == "clear" then
+    local name, reason = Sim.clear(ns.core, rest == "raid" and "raid" or nil)
+    print(name and ("BFF dev: the simulated Members online clear %s."):format(name)
+      or ("BFF dev: no clear (%s)."):format(reason))
+    return
+  end
   if command == "purge" then
     local purged = Sim.purge(ns.core)
     print(purged and ("BFF: %d simulated Members marked as left."):format(purged)

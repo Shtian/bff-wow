@@ -98,8 +98,12 @@ A target the whole Crew reaches together, where every Member's progress counts a
 _Avoid_: Challenge, quest, achievement, milestone
 
 **Trophy**:
-A Crew goal rung the Crew has reached, kept as a medal on the Goals tab with when it was reached. It's **fresh** for 3 days, while it's still news. The **trophy cabinet** is every trophy, by track.
+A Crew goal rung the Crew has reached, or an instance it has cleared (the Crew's first Clear of it), kept as a medal on the Goals tab with when. It's **fresh** for 3 days, while it's still news. The **trophy cabinet** is every trophy: the dungeons and raids, cleared or not, then the goal rungs by track.
 _Avoid_: Achievement, badge, award
+
+**Clear**:
+A dungeon or raid run to its final boss's death, recorded by each Member in the party, with the Members who were there. Only a final boss counts; strangers in the party aren't named. The Crew's first Clear of an instance is its Trophy, and everyone in any party that cleared it is credited.
+_Avoid_: Kill (when meaning the whole run), completion, run
 
 **Crew levels**:
 The sum, over the Crew's Members, of each Member's highest Character level. Alts don't add to it.
