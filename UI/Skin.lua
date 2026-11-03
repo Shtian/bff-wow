@@ -316,6 +316,49 @@ function Skin.round(parent, texture)
   return texture
 end
 
+-- Small flat icons, drawn from solid rectangles ({ x, y, width, height }
+-- from the icon's top left) since Arial Narrow has no such glyphs: filter
+-- is three narrowing bars, a funnel; sort is an up arrow beside a down one.
+local ICONS = {
+  filter = { width = 10, height = 8, rects = { { 0, 0, 10, 2 }, { 2, 3, 6, 2 }, { 4, 6, 2, 2 } } },
+  sort = { width = 11, height = 9, rects = {
+    { 2, 0, 1, 1 }, { 1, 1, 3, 1 }, { 0, 2, 5, 1 }, { 2, 3, 1, 6 },
+    { 8, 0, 1, 6 }, { 6, 6, 5, 1 }, { 7, 7, 3, 1 }, { 8, 8, 1, 1 },
+  } },
+}
+
+-- An icon by kind ("filter" or "sort") in a colour; :SetColor recolours it.
+function Skin.icon(parent, kind, color)
+  local spec = ICONS[kind]
+  local icon = CreateFrame("Frame", nil, parent)
+  icon:SetSize(spec.width, spec.height)
+  icon.parts = {}
+  for i, rect in ipairs(spec.rects) do
+    local part = icon:CreateTexture(nil, "ARTWORK")
+    part:SetColorTexture(1, 1, 1, 1)
+    part:SetPoint("TOPLEFT", rect[1], -rect[2])
+    part:SetSize(rect[3], rect[4])
+    icon.parts[i] = part
+  end
+  function icon:SetColor(value)
+    for _, part in ipairs(self.parts) do part:SetVertexColor(value[1], value[2], value[3], value[4] or 1) end
+  end
+  icon:SetColor(color or Skin.TEXT)
+  return icon
+end
+
+-- Puts an icon before a button's centred label, the pair centred together.
+-- Returns the room the icon takes, to add to the button's width.
+function Skin.leadIcon(button, kind, color)
+  local icon = Skin.icon(button, kind, color)
+  local room = icon:GetWidth() + 4
+  button.label:ClearAllPoints()
+  button.label:SetPoint("CENTER", room / 2, 0)
+  icon:SetPoint("RIGHT", button.label, "LEFT", -4, 0)
+  button.icon = icon
+  return room
+end
+
 -- A label on a small dark plate, like a level: call :SetText on the result.
 function Skin.badge(parent, fontName, textColor, plateColor)
   local plate = CreateFrame("Frame", nil, parent)

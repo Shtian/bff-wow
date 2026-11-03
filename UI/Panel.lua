@@ -460,7 +460,7 @@ local function createSection()
   Skin.border(section.sort, Skin.BORDER)
   Skin.fill(section.sort, Skin.HOVER, "HIGHLIGHT")
   section.sort.label = Skin.label(section.sort, "small", MUTED)
-  section.sort.label:SetPoint("CENTER")
+  section.sort.iconRoom = Skin.leadIcon(section.sort, "sort", MUTED)
   section.sort:SetScript("OnClick", showSortMenu)
 
   -- "2 Spares for you", which opens their tab.
@@ -484,7 +484,7 @@ local function drawSection(count)
   for _, sort in ipairs(SORTS) do
     if sort[1] == order then section.sort.label:SetText("Sort: " .. sort[2]) end
   end
-  section.sort:SetWidth(section.sort.label:GetStringWidth() + 16)
+  section.sort:SetWidth(section.sort.label:GetStringWidth() + section.sort.iconRoom + 16)
   section.spares.label:SetText(count == 1 and "1 Spare for you"
     or ("%d Spares for you"):format(count))
   section.spares:SetWidth(section.spares.label:GetStringWidth())
@@ -959,7 +959,7 @@ local function createWhenView()
   Skin.border(whenView.pick, Skin.BORDER)
   Skin.fill(whenView.pick, Skin.HOVER, "HIGHLIGHT")
   whenView.pick.label = Skin.label(whenView.pick, "small", TEXT)
-  whenView.pick.label:SetPoint("CENTER")
+  whenView.pick.iconRoom = Skin.leadIcon(whenView.pick, "filter", TEXT)
   whenView.pick:SetScript("OnClick", showWhenMenu)
 
   whenView.intro = Skin.label(whenView, "small", MUTED)
@@ -1023,7 +1023,7 @@ local function drawWhen()
   end
   whenView.data = view
   whenView.pick.label:SetText("Show: " .. view.title)
-  whenView.pick:SetWidth(whenView.pick.label:GetStringWidth() + 16)
+  whenView.pick:SetWidth(whenView.pick.label:GetStringWidth() + whenView.pick.iconRoom + 16)
   whenView.intro:SetWidth(contentWidth() - 2 * INSET)
   whenView.intro:SetText(view.intro)
   whenView.note:SetWidth(contentWidth() - 2 * INSET)
