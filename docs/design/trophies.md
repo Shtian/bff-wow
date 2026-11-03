@@ -33,7 +33,7 @@ Each client keeps its own; nothing about the Crew's trophies is synced beyond th
 `trophies()` gains clears (`docs/design/code-structure.md` has the fields):
 
 - **Shelf and latest win:** clear trophies join the goal rungs, newest first by the first clear's time. A clear can be the gold latest-win plate, worded like its Feed entry. `sinceSeen` counts them too.
-- **Medal:** a clear's icon by kind (`Skin.CLEAR_ICONS`), its tier epic for a dungeon, legendary for a raid (Core decides; DESIGN.md, Trophy Colours Rule), its label the instance without "The ", and its date. Gold value while fresh, as for rungs. Hover: the instance, "Cleared 3 Nov", and the party's names ("You" first).
+- **Medal:** a clear's icon by kind (`Skin.CLEAR_ICONS`), its tier epic for a dungeon, legendary for a raid (Core decides; DESIGN.md, Trophy Colours Rule), its label the instance without "The ", and its date. Gold value while fresh, as for rungs, counted from when the clear first reached this client (a clear can sync days late), while its date is the clear's own. Hover: the instance, "Cleared 3 Nov", and the party's names ("You" first).
 - **Cabinet:** "DUNGEONS CLEARED n / N" and "RAIDS CLEARED n / N" (attunements left out) above "GOALS REACHED", each a grid with a slot per instance in the dungeon table's level order: the clear's medal once cleared, otherwise a greyed icon with its name and level range ("17–26"). Hover an empty slot for its name, levels and "Not cleared yet". `trophies().dungeons` and `.raids` are the grids: `{ cleared, total, slots }`.
 - **See all** always shows once there's a trophy, since the cabinet holds the empty slots too: "+N" when the shelf hides some, "…" otherwise.
 

@@ -227,7 +227,7 @@ end
 -- rung to when it was reached), quiet (per track, the rungs reached
 -- without news: the baseline's, or by who counts changing), clears (per
 -- instance name, the Crew's clear: { time (the first), members (a set of
--- Member ids credited), quiet }), baselined (the silent baseline is done)
+-- Member ids credited), quiet, seen (when it was first kept here) }), baselined (the silent baseline is done)
 -- and seen (when the Goals tab was last opened).
 function Goals.new(db, ledger, now, maxLevel)
   local self = setmetatable({ db = db, ledger = ledger, now = now, maxLevel = maxLevel }, Goals)
@@ -354,7 +354,7 @@ end
 -- The Crew's clears in the records: a first clear of an instance is a new
 -- trophy, at the earliest clear's time; a later or earlier one only adds
 -- who's credited, or moves the time back. Returns the new trophies as {
--- track "clears", rung (the instance's name), text }, in level order,
+-- track "clears", rung (the instance's place in the dungeon table), text }, in level order,
 -- unless quiet.
 local function recordClears(self, records, quiet)
   local saved = self.db.goals.clears
@@ -365,14 +365,14 @@ local function recordClears(self, records, quiet)
       had.time = math.min(had.time, clear.time)
       for id in pairs(clear.members) do had.members[id] = true end
     else
-      saved[name] = { time = clear.time, members = clear.members, quiet = quiet or nil }
+      saved[name] = { time = clear.time, members = clear.members, quiet = quiet or nil, seen = self.now() }
       if not quiet then new[#new + 1] = Clears.instance(name) end
     end
   end
   table.sort(new, function(x, y) return x.index < y.index end)
   local entries = {}
   for i, dungeon in ipairs(new) do
-    entries[i] = { track = "clears", rung = dungeon.name, text = Clears.text(dungeon.name) }
+    entries[i] = { track = "clears", rung = dungeon.index, text = Clears.text(dungeon.name) }
   end
   return entries
 end
@@ -563,7 +563,8 @@ local function clearTrophies(self)
         time = saved.time,
         quality = CLEAR_QUALITIES[dungeon.kind],
         quiet = quiet,
-        fresh = not quiet and self.now() - saved.time < FRESH,
+        -- Fresh from when it reached you: a clear can sync days late.
+        fresh = not quiet and self.now() - (saved.seen or saved.time) < FRESH,
         party = partyNames(self, saved.members),
       }
     end

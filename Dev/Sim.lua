@@ -946,8 +946,24 @@ local function logEncounter(...)
     entry.instance[field] = (plain(info[i]))
     if select(2, plain(info[i])) then entry.secret["instance." .. field] = true end
   end
+  -- Read raw here, so a secret GUID or name shows as secret, not missing.
   entry.party = {}
-  for i, unit in ipairs(ns.Snapshot.party()) do entry.party[i] = { guid = unit.guid, name = unit.name } end
+  local units = {}
+  if IsInRaid() then
+    for i = 1, GetNumGroupMembers() do units[#units + 1] = "raid" .. i end
+  else
+    units[1] = "player"
+    for i = 1, 4 do units[#units + 1] = "party" .. i end
+  end
+  for _, unit in ipairs(units) do
+    if UnitExists(unit) then
+      local guid, guidSecret = plain(UnitGUID(unit))
+      local name, nameSecret = plain((UnitName(unit)))
+      entry.party[#entry.party + 1] = { unit = unit, guid = guid, name = name }
+      if guidSecret then entry.secret[unit .. ".guid"] = true end
+      if nameSecret then entry.secret[unit .. ".name"] = true end
+    end
+  end
   local name, reason = ns.Clears.cleared(ns.Snapshot.encounter(...), ns.Core.FINAL_BOSSES)
   entry.bff = name and ("clears " .. name) or reason
   BFF_DB.devEncounters = BFF_DB.devEncounters or {}

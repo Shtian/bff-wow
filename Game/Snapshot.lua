@@ -104,7 +104,6 @@ local function readable(value)
   if issecretvalue and issecretvalue(value) then return nil end
   return value
 end
-Snapshot.readable = readable
 
 -- The group's units, you included.
 local function groupUnits()
