@@ -6,6 +6,13 @@
 
 
 
+
+## 1.0.1
+<sub>2026-11-05</sub>
+
+- *(patch)*
+  Fixed Crews not syncing on WoW: Forever, which drops addon messages sent to custom channels: BFF now whispers each message to every other Character online in the Crew.
+
 ## 1.0.0
 <sub>2026-11-05</sub>
 
