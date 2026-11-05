@@ -17,144 +17,161 @@
       {
         "file": "away.jpg",
         "crop": [
-          700,
-          240,
-          520,
-          360
+          625,
+          110,
+          670,
+          560
         ]
       },
       {
         "file": "toast.jpg",
         "crop": [
-          1258,
-          0,
-          308,
-          100
+          762,
+          170,
+          396,
+          124
         ]
       }
     ]
   },
   {
-    "id": "02-roster",
+    "id": "02-camp",
     "layout": "right",
+    "title": "Gather round the fire",
+    "caption": "Your friends around one campfire: awake while they play, asleep while they don’t, with a grave for each recent death.",
+    "shots": [
+      {
+        "file": "camp.jpg",
+        "crop": [
+          560,
+          58,
+          700,
+          160
+        ]
+      }
+    ]
+  },
+  {
+    "id": "03-roster",
+    "layout": "left",
     "title": "Your whole crew",
     "caption": "Every friend's characters, levels and whereabouts, and when each was last seen.",
     "shots": [
       {
         "file": "roster.jpg",
         "crop": [
-          680,
-          10,
-          552,
-          460
+          485,
+          4,
+          982,
+          790
         ]
       }
     ]
   },
   {
-    "id": "03-feed",
-    "layout": "left",
+    "id": "04-feed",
+    "layout": "right",
     "title": "Cheer every ding",
     "caption": "One click sends a cheer for a ding, respects for a death, or a welcome for someone new.",
     "shots": [
       {
         "file": "feed.jpg",
         "crop": [
-          680,
-          10,
-          552,
-          460
+          485,
+          4,
+          982,
+          790
         ]
       }
     ]
   },
   {
-    "id": "04-goals",
-    "layout": "right",
+    "id": "05-goals",
+    "layout": "left",
     "title": "Level up together",
     "caption": "Goals the whole crew works towards, and the trophies you earn along the way. Nobody is ranked.",
     "shots": [
       {
         "file": "goals.jpg",
         "crop": [
-          523,
-          0,
-          880,
-          680
+          485,
+          4,
+          982,
+          790
         ]
       }
     ]
   },
   {
-    "id": "05-spares",
-    "layout": "left",
+    "id": "06-spares",
+    "layout": "right",
     "title": "Pass on spare gear",
     "caption": "Offer an item to your friends. Whoever claims it first gets it by in‑game mail.",
     "shots": [
       {
         "file": "spares.jpg",
         "crop": [
-          680,
-          10,
-          552,
-          460
+          485,
+          4,
+          982,
+          790
         ]
       }
     ]
   },
   {
-    "id": "06-when",
-    "layout": "right",
+    "id": "07-when",
+    "layout": "left",
     "title": "When everyone plays",
     "caption": "A heatmap of the hours each friend usually plays, in your own time zone.",
     "shots": [
       {
         "file": "when.jpg",
         "crop": [
-          680,
-          10,
-          552,
-          460
+          485,
+          4,
+          982,
+          790
         ]
       }
     ]
   },
   {
-    "id": "07-professions",
-    "layout": "left",
+    "id": "08-professions",
+    "layout": "right",
     "title": "Who crafts what",
     "caption": "Every friend’s professions and skill in one grid, so you know who to ask for a craft.",
     "shots": [
       {
-        "file": "professions.png",
+        "file": "professions.jpg",
         "crop": [
-          660,
-          20,
-          760,
-          465
+          470,
+          4,
+          1130,
+          790
         ]
       }
     ]
   },
   {
-    "id": "08-together",
-    "layout": "right",
+    "id": "09-together",
+    "layout": "left",
     "title": "Dungeons together",
     "caption": "See which friends are close to your level, and the dungeons you can run together.",
     "shots": [
       {
         "file": "together.jpg",
         "crop": [
-          508,
-          0,
-          880,
-          680
+          485,
+          4,
+          982,
+          790
         ]
       }
     ]
   },
   {
-    "id": "09-crew",
+    "id": "10-crew",
     "layout": "steps",
     "title": "Start a crew",
     "caption": "No server, no account, and no shared guild needed.",
