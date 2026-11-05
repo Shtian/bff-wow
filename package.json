@@ -5,7 +5,9 @@
   "description": "Best Friends in Forever, a World of Warcraft: Forever addon",
   "repository": "github:Shtian/bff-wow",
   "scripts": {
-    "gallery": "node docs/gallery/render.mjs"
+    "gallery": "node docs/gallery/render.mjs",
+    "demo": "node docs/gallery/demo/capture.mjs",
+    "demo:assets": "node docs/gallery/demo/assets.mjs"
   },
   "devDependencies": {
     "@varlock/bumpy": "1.19.0",

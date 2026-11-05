@@ -1,0 +1,5 @@
+# Blizzard's icons and font, fetched or copied locally by assets.mjs.
+assets/
+# Too big to commit. The GIFs in out/ are committed: the repo's README uses them.
+out/*.mp4
+out/still-*.png
