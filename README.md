@@ -9,19 +9,23 @@ A World of Warcraft: Forever addon for friends who don't always play at the same
 <table>
 <tr>
 <td width="50%"><img src="docs/gallery/out/01-hero.png" alt="While you were away"><br><b>While you were away.</b> On login, every ding, death and new character your friends had since you last played.</td>
-<td width="50%"><img src="docs/gallery/out/02-roster.png" alt="Your whole crew"><br><b>Your whole crew.</b> Every friend's characters, levels and whereabouts, and when each was last seen.</td>
+<td width="50%"><img src="docs/gallery/out/02-camp.png" alt="Gather round the fire"><br><b>Gather round the fire.</b> Your friends around one campfire at the top of the panel: awake while they play, asleep while they don't, with a grave for each recent death and a flower once someone pays respects.</td>
 </tr>
 <tr>
-<td><img src="docs/gallery/out/03-feed.png" alt="Cheer every ding"><br><b>Cheer every ding.</b> One click sends a cheer for a ding, respects for a death, or a welcome for someone new.</td>
-<td><img src="docs/gallery/out/04-goals.png" alt="Level up together"><br><b>Level up together.</b> Goals the whole crew works towards, and trophies for what you do together, like clearing a dungeon. Nobody is ranked.</td>
+<td><img src="docs/gallery/out/03-roster.png" alt="Your whole crew"><br><b>Your whole crew.</b> Every friend's characters, levels and whereabouts, and when each was last seen.</td>
+<td><img src="docs/gallery/out/04-feed.png" alt="Cheer every ding"><br><b>Cheer every ding.</b> One click sends a cheer for a ding, respects for a death, or a welcome for someone new.</td>
 </tr>
 <tr>
-<td><img src="docs/gallery/out/05-spares.png" alt="Pass on spare gear"><br><b>Pass on spare gear.</b> Offer an item to your friends. Whoever claims it first gets it by in-game mail.</td>
-<td><img src="docs/gallery/out/06-when.png" alt="When everyone plays"><br><b>When everyone plays.</b> A heatmap of the hours each friend usually plays, in your own time zone.</td>
+<td><img src="docs/gallery/out/05-goals.png" alt="Level up together"><br><b>Level up together.</b> Goals the whole crew works towards, and trophies for what you do together, like clearing a dungeon. Nobody is ranked.</td>
+<td><img src="docs/gallery/out/06-spares.png" alt="Pass on spare gear"><br><b>Pass on spare gear.</b> Offer an item to your friends. Whoever claims it first gets it by in-game mail.</td>
 </tr>
 <tr>
-<td><img src="docs/gallery/out/07-professions.png" alt="Who crafts what"><br><b>Who crafts what.</b> Every friend's professions and skill in one grid, so you know who to ask for a craft.</td>
-<td><img src="docs/gallery/out/08-together.png" alt="Dungeons together"><br><b>Dungeons together.</b> See which friends are close to your level, and the dungeons you can run together.</td>
+<td><img src="docs/gallery/out/07-when.png" alt="When everyone plays"><br><b>When everyone plays.</b> A heatmap of the hours each friend usually plays, in your own time zone.</td>
+<td><img src="docs/gallery/out/08-professions.png" alt="Who crafts what"><br><b>Who crafts what.</b> Every friend's professions and skill in one grid, so you know who to ask for a craft.</td>
+</tr>
+<tr>
+<td><img src="docs/gallery/out/09-together.png" alt="Dungeons together"><br><b>Dungeons together.</b> See which friends are close to your level, and the dungeons you can run together.</td>
+<td></td>
 </tr>
 </table>
 

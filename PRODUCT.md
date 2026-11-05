@@ -14,7 +14,7 @@ Any small group of real-life friends playing World of Warcraft: Forever who don'
 
 ## Product Purpose
 
-BFF keeps a friend group connected when they play at different times. It gives the group a shared friends panel (the Roster: every Member's Characters, levels, whereabouts and when they were last seen) and a Feed of what happened while you were away. It also lets the group react to each other's news, work towards Crew goals, pass items on, and see when everyone usually plays. It succeeds when friends who rarely overlap still feel they're playing together.
+BFF keeps a friend group connected when they play at different times. It gives the group a shared friends panel (the Roster: every Member's Characters, levels, whereabouts and when they were last seen) and a Feed of what happened while you were away. It also lets the group react to each other's news, work towards Crew goals and trophies, pass items on, see when everyone usually plays, who crafts what and which dungeons they can run together, and see the whole Crew around one campfire (the Camp). It succeeds when friends who rarely overlap still feel they're playing together.
 
 ## Positioning
 
@@ -29,8 +29,8 @@ It's built around people, not characters or guilds. A Member is one real person 
 
 ## Capabilities and Constraints
 
-- Shipped: Roster, Feed, While you were away, Reactions (Cheer, Respects, Welcome), toasts with optional sound, Crew goals, Spares (Claim and Give), Play times heatmap, map pins, minimap button, settings.
-- Planned, not built: Competitions (ranked contests) and a level-overlap finder.
+- Shipped (1.0): Roster, Feed, While you were away, the Camp, Reactions (Cheer, Respects, Welcome), toasts with optional sound, Crew goals and trophies (including dungeon and raid clears), Spares (Claim and Give), Play times heatmap, Professions, Together (levels and dungeons you can run together), map pins, minimap button, settings.
+- Planned, not built: Competitions (ranked contests).
 - Terminology lives in `CONTEXT.md` (Crew, Member, Character, Feed, Crew goal, Spare, …). Crew goals deliberately name and rank nobody.
 - In-game UI is built from WoW frames, not web tech. Its look is set in `UI/Skin.lua`: dark windows, a gold accent, Friz Quadrata titles and Arial Narrow text, drawn with solid colour textures and long-standing game textures. It runs in Lua 5.1 under Midnight's addon restrictions.
 - Character names on Forever can have a first and a last name.
