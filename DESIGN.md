@@ -290,6 +290,8 @@ Brand images are 1920×1080, plus a 1600×520 banner. Split layouts put a 640px 
 ### Named Rules
 **The Flat Ledger Rule.** Nothing in the addon casts a shadow. If something needs to stand out, give it a lighter plate or a gold edge.
 
+**The Lit Camp Rule.** The Camp (`docs/design/camp.md`) is the one place the addon is lit rather than a ledger: a night sky dithered towards the horizon, the fire's glow on the ground, pixel-art figures. The exception is scoped to the Camp's band, the popup's Camp and the small figures on Roster rows and toasts, the way the Trophy Colours Rule is scoped to the Goals tab. Everything around it stays flat. The other rules still hold inside it: no teal in the Camp (Two Rings), and gold in UI text only for news (One Ember): names are in class colour, and only a max level's gained tag is gold. The spark sprite is the Camp's only gold mark on a person. Its colours live in the art (`scripts/camp-art.mjs`) and in `RAID_CLASS_COLORS`, never as one-off UI values. Figures' cloth is authored white and `#9E9E9E` so the class tint multiplies to the prototype's tones. Art pixels are whole screen pixels at about 3 UI units in the band and 2 on rows and toasts, filtered `NEAREST`; names stay in UI units.
+
 ## Shapes
 
 Square in the game. Textures have no corner radius, so windows, buttons, inputs and pictures are hard-edged rectangles framed by 1px lines. A few places want softness: the selected-tab chip steps its corners in by 2px of single-pixel rows. Circles appear only through the game's portrait mask, for online dots and map pins (a class-coloured dot in a 3px ring, green while online, with a 1px Night Window keyline outside it so it reads on a bright map). Game icons are cropped inside their bevel (7–8% from each side) and given a faded 1px edge in their kind's colour.
@@ -345,8 +347,11 @@ An 18×9 infinity (`Media/Forever.tga`, `Skin.foreverMark`), drawn after the emb
 ### Reaction button
 A small square (18–20px) holding the Reaction's icon, desaturated at 55% alpha until clicked. Once given it's full colour with a faint 1px edge (30% white), and its tooltip says "You reacted". In a Feed entry's reactor list, "You" is Ash Text among Smoke Muted names.
 
+### Camp band
+Full panel width, under the header and above the sidebar and every tab: about 120px, or about 78px in a window under 460px high, rounded to whole art pixels and bottom-aligned so the short one crops the sky. Names in Small, class-coloured, centred above each figure and cut to the room Core gives them. In While you were away it's the popup's top (440 wide), with levels gained over heads in Online Green, gold for max level. Plays no sound, and stops animating while hidden.
+
 ### Toast
-300×40, Night Window at 88%, a 24px Feed picture, Body text (Ember Gold for news), and an optional Reaction button. A 2px timer line shows the time left at 18% white on every toast. Toasts fade over 0.6s.
+300×40, Night Window at 88%, a 24px Feed picture (the Member's Camp figure instead, for an entry about a Member while the Camp is on), Body text (Ember Gold for news), and an optional Reaction button. A 2px timer line shows the time left at 18% white on every toast. Toasts fade over 0.6s.
 
 ### Empty state
 Centred in its view, built from the house's own shapes rather than an illustration. The empty Feed is a 120px stretch of the timeline with one node (the ding picture, desaturated at half strength, grey edge), a Heading beside it and one Small Smoke Muted line under that. The Goals tab with nothing on its shelf (before the first sync has settled, or with nothing reached) shows a desaturated goal picture, 40px, with a Heading and a Small Smoke Muted line beside it, centred where the latest win and shelf would be; the Working on tiles stay below. The panel before joining a Crew is a 320px block centred in the window: Display name across, then Start a Crew and Join a Crew in two 150px columns split by a vertical Hairline.
@@ -374,7 +379,7 @@ A 2px line fading in from gold, meeting a teal line at a small white spark: the 
 ### Don't:
 - **Don't** use Blizzard parchment, stone frames, ornate gilded borders or Blizzard frame templates for BFF's look.
 - **Don't** use teal in the addon (The Two Rings Rule).
-- **Don't** add shadows, gradients or glows to in-game frames (The Flat Ledger Rule).
+- **Don't** add shadows, gradients or glows to in-game frames (The Flat Ledger Rule), outside the Camp (The Lit Camp Rule).
 - **Don't** introduce a third typeface.
 - **Don't** fade a gold button to show it's disabled, or mark a row with a coloured side stripe.
 - **Don't** put icons in the sidebar or box a label in a chip.

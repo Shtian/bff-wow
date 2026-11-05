@@ -16,7 +16,11 @@
 -- profession. Together is a level line of friends and dungeons, drawn by
 -- TogetherTab. A grip in the bottom right corner resizes the window, and
 -- Core keeps its size and position; views lay out to the current width
--- and redraw when a resize ends. It never sees a Member record.
+-- and redraw when a resize ends. While Core has a Camp (camp()), its band
+-- runs across the window under the header, above the sidebar and every
+-- tab, drawn by CampScene; Roster rows show a small seated figure in place
+-- of the class icon, and a Cheer makes a seated friend hop. It never sees
+-- a Member record.
 
 local _, ns = ...
 
@@ -55,6 +59,8 @@ local NEW_DOT = 6
 local LINE_X = INSET + NODE / 2 - 1
 -- Last seen goes stale, so the open panel redraws this often.
 local REDRAW_EVERY = 30
+-- Under this high, the Camp band is its short one.
+local CAMP_SMALL_UNDER = 460
 local SCROLL_STEP = 40
 
 local TITLE = "Best Friends in Forever"
@@ -109,6 +115,9 @@ local SORTS = { { "online", "Online first" }, { "level", "Level" }, { "name", "N
 
 local core
 local frame
+-- The Camp band, and its height now (0 while there's no Camp).
+local camp
+local campHeight = 0
 local setup
 local nav
 local section
@@ -137,7 +146,7 @@ local function contentWidth()
 end
 
 local function contentHeight()
-  return frame:GetHeight() - HEADER - 1
+  return frame:GetHeight() - HEADER - campHeight - 1
 end
 
 -- A scroll view's width: the content less the thumb's gutter.
@@ -326,6 +335,9 @@ local function createRow()
   row.icon = row:CreateTexture(nil, "ARTWORK")
   row.icon:SetSize(28, 28)
   row.icon:SetPoint("TOPLEFT", INSET, -7)
+  -- The Camp's seated figure, in the class icon's place.
+  row.figure = ns.CampScene.figure(row)
+  row.figure:SetPoint("BOTTOM", row.icon, "BOTTOM", 0, 1)
   row.dot = createDot(row, 8)
   row.dot.ring:SetPoint("CENTER", row.icon, "BOTTOMRIGHT", -1, 1)
 
@@ -363,6 +375,8 @@ local function drawRow(row, data)
   row.ownBackground:SetShown(data.own)
   setDot(row.dot, data.online)
   row.icon:SetAtlas("classicon-" .. (data.classFilename or ""):lower())
+  row.icon:SetShown(not camp:IsShown())
+  if camp:IsShown() then row.figure:SetClass(data.classFilename) else row.figure:Hide() end
   row.name:SetText(data.name)
   row.name:SetTextColor(classColor(data.classFilename))
   row.level:SetText(data.level)
@@ -372,7 +386,7 @@ local function drawRow(row, data)
   placeTags(row.level, { row.member, row.onAlt, row.canPlay })
   row.zone:SetText(data.zone or "")
 
-  row.seen:SetText(data.lastSeenText or "")
+  row.seen:SetText(data.status or "")
   Skin.color(row.seen, data.online and ONLINE or DIM)
   if #data.alts > 0 then
     row.more:SetText(("%s%d more"):format(expanded[data.memberId] and "- " or "+ ", #data.alts))
@@ -447,13 +461,20 @@ local function showSortMenu(owner)
 end
 
 -- "CREW ———— 2 Spares for you [Sort: Online first]" between your
--- row and the Members'.
+-- row and the Members'. Core names each row's section; the first carries
+-- the sort and Spares, and any later one (ASLEEP IN CAMP) is a plain label
+-- and line.
+local function sectionLabel(parent)
+  local label = Skin.label(parent, "label", DIM)
+  label:SetPoint("LEFT", INSET, -2)
+  return label
+end
+
 local function createSection()
   section = CreateFrame("Frame", nil, rosterView.content)
   section:SetHeight(SECTION)
-  local label = Skin.label(section, "label", DIM)
-  label:SetPoint("LEFT", INSET, -2)
-  label:SetText("CREW")
+  local label = sectionLabel(section)
+  section.label = label
 
   section.sort = CreateFrame("Button", nil, section)
   section.sort:SetHeight(SMALL_BUTTON)
@@ -478,6 +499,24 @@ local function createSection()
   line:SetHeight(1)
   line:SetPoint("LEFT", label, "RIGHT", 8, 0)
   section.line = line
+end
+
+local laterSections = {}
+
+-- A later section's heading: the label, and the line to the right edge.
+local function laterSection(index)
+  local heading = laterSections[index]
+  if heading then return heading end
+  heading = CreateFrame("Frame", nil, rosterView.content)
+  heading:SetHeight(SECTION)
+  heading.label = sectionLabel(heading)
+  local line = heading:CreateTexture(nil, "ARTWORK")
+  line:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
+  line:SetHeight(1)
+  line:SetPoint("LEFT", heading.label, "RIGHT", 8, 0)
+  line:SetPoint("RIGHT", -INSET, 0)
+  laterSections[index] = heading
+  return heading
 end
 
 -- count is the open Spares you could use.
@@ -711,7 +750,9 @@ local function createFeedEntry()
   -- The Reaction button, always shown like a toast's.
   entry.react = Skin.reactionButton(entry, REACT, function(self)
     local data = self:GetParent().data
-    if data and data.key then core:react(data.key) end
+    if data and data.key and core:react(data.key) and data.reaction == "cheer" then
+      Panel.cheered(data.memberId)
+    end
   end)
   entry.react:SetPoint("TOPRIGHT", -INSET - 4, -4)
   feedView.entries[#feedView.entries + 1] = entry
@@ -1603,8 +1644,12 @@ local function create()
   Skin.round(frame.header, frame.onlineDot)
   frame.onlineDot:SetPoint("RIGHT", frame.headerRight, "LEFT", -5, 0)
 
+  camp = ns.CampScene.new(frame)
+  camp:SetPoint("TOPLEFT", 1, -HEADER)
+  camp:SetPoint("TOPRIGHT", -1, -HEADER)
+  Skin.edge(camp, "BOTTOM", Skin.LINE, "OVERLAY")
+
   frame.sidebar = CreateFrame("Frame", nil, frame)
-  frame.sidebar:SetPoint("TOPLEFT", 1, -HEADER)
   frame.sidebar:SetPoint("BOTTOMLEFT", 1, 1)
   frame.sidebar:SetWidth(SIDEBAR - 1)
   Skin.fill(frame.sidebar, Skin.SIDEBAR)
@@ -1613,12 +1658,34 @@ local function create()
   frame.content = CreateFrame("Frame", nil, frame)
 end
 
--- With a Crew the content sits right of the sidebar; without one it takes
+-- The Camp band, when Core has one: across the window, under the header,
+-- at its full height, or the short one in a small window. Nil without a
+-- Crew.
+local function drawCamp(inCrew)
+  local view
+  if inCrew then
+    local width = frame:GetWidth() - 2
+    local columns, height = camp:Measure(width, frame:GetHeight() < CAMP_SMALL_UNDER and ns.CampScene.SHORT_HEIGHT or ns.CampScene.HEIGHT)
+    view = core:camp(columns)
+    campHeight = view and height or 0
+  else
+    campHeight = 0
+  end
+  camp:SetHeight(math.max(campHeight, 1))
+  camp:Draw(view)
+end
+
+-- With a Crew the content sits right of the sidebar, under the Camp; without one it takes
 -- the whole window.
 local function layout(inCrew)
+  drawCamp(inCrew)
+  local top = -HEADER - campHeight
   frame.sidebar:SetShown(inCrew)
+  frame.sidebar:ClearAllPoints()
+  frame.sidebar:SetPoint("TOPLEFT", 1, top)
+  frame.sidebar:SetPoint("BOTTOMLEFT", 1, 1)
   frame.content:ClearAllPoints()
-  frame.content:SetPoint("TOPLEFT", inCrew and SIDEBAR or 1, -HEADER)
+  frame.content:SetPoint("TOPLEFT", inCrew and SIDEBAR or 1, top)
   frame.content:SetPoint("BOTTOMRIGHT", -1, 1)
   frame.onlineDot:SetShown(inCrew)
   if not inCrew then frame.headerRight:SetText("") end
@@ -1806,11 +1873,19 @@ local function drawRoster(crew, summary)
   section:Hide()
 
   local y = -6
-  local rowCount, altCount = 0, 0
-  for i, data in ipairs(core:rows(order)) do
-    if not data.own and not section:IsShown() and i > 1 then
-      place(section, y)
-      section:Show()
+  local rowCount, altCount, later = 0, 0, 0
+  local current
+  for _, data in ipairs(core:rows(order)) do
+    if not data.own and data.section ~= current then
+      current = data.section
+      local heading = section
+      if section:IsShown() then
+        later = later + 1
+        heading = laterSection(later)
+      end
+      heading.label:SetText(current)
+      place(heading, y)
+      heading:Show()
       y = y - SECTION
     end
     rowCount = rowCount + 1
@@ -1830,6 +1905,7 @@ local function drawRoster(crew, summary)
   end
   hideAll(rowFrames, rowCount + 1)
   hideAll(altFrames, altCount + 1)
+  hideAll(laterSections, later + 1)
 
   rosterView.content:SetHeight(-y + 6)
   updateThumb(rosterView)
@@ -1853,7 +1929,7 @@ function Panel.refresh()
   if tab == "goals" then core:openGoals() else core:leaveGoals() end
 
   local summary = core:summary()
-  frame.headerRight:SetText(("%d of %d online"):format(summary.online, summary.members))
+  frame.headerRight:SetText(summary.header)
   drawNav(core:unseen(), core:unseenSpares())
   hideViewsBut(tab)
   if tab == "feed" then
@@ -1878,7 +1954,13 @@ end
 -- reset) puts the window there and redraws the views at its size.
 function Panel.settingChanged(key)
   if key == "panelPlace" and frame then applyPlace() end
-  if key == "paused" or key == "panelPlace" then Panel.refresh() end
+  if key == "paused" or key == "panelPlace" or key == "camp" then Panel.refresh() end
+end
+
+-- You Cheered a Member (from the Feed, a toast or While you were away):
+-- they hop, if they're seated by the fire.
+function Panel.cheered(memberId)
+  if camp and memberId then camp:Hop(memberId) end
 end
 
 function Panel.toggle()

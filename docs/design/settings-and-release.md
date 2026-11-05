@@ -23,6 +23,7 @@ One page in the game's native Settings panel (Esc → Options → AddOns → **B
 | **Notifications and display** | Chat message for live events | on | #14 |
 | | Show While you were away on login | on | #14 |
 | | Show minimap button | on | #7 |
+| | Show the Camp | on | #127, `docs/design/camp.md` |
 | **Toasts** | Show toasts for live events | on | `docs/design/toasts.md` |
 | | Sound, with a Play button | Friend online | `docs/design/toasts.md` |
 | | Move toasts button | | `docs/design/toasts.md` |
@@ -51,6 +52,7 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `chatLines` | `chatLinesOff = true`, or nil while on |
   | `awayPopup` | `awayPopupOff = true`, or nil while on |
   | `minimap` | `hide = true` inside the minimap table LibDBIcon reads, or nil while on |
+  | `camp` | `campOff = true`, or nil while on |
   | `toasts` | `toastsOff = true`, or nil while on |
   | `toastSound` | the sound's name, or nil for the default |
   | `toastPosition` | `{ x, y }`, or nil for the default |

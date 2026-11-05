@@ -5,8 +5,10 @@
 -- they're placed: down from the top half of the screen, up from the
 -- bottom half. A left click opens the Feed (the Spares tab for a
 -- notice), a right click dismisses, and an entry you can react to has a
--- Reaction button at its right edge. See docs/design/toasts.md and
--- docs/design/reactions.md.
+-- Reaction button at its right edge. An entry about a Member that Core
+-- gives a figure shows that Member's Camp figure in place of the picture.
+-- See docs/design/toasts.md, docs/design/reactions.md and
+-- docs/design/camp.md.
 
 local _, ns = ...
 
@@ -105,6 +107,7 @@ local function onReact(self)
   local ok, reason = core:react(entry.key)
   entry.reacted = ok or reason == "reacted"
   self:SetReaction(entry.reaction, entry.reacted)
+  if ok and entry.reaction == "cheer" then ns.Panel.cheered(entry.memberId) end
 end
 
 local function createToast()
@@ -122,6 +125,8 @@ local function createToast()
 
   toast.picture = Skin.feedPicture(toast, PICTURE)
   toast.picture:SetPoint("LEFT", 10, 0)
+  toast.figure = ns.CampScene.figure(toast)
+  toast.figure:SetPoint("CENTER", toast.picture)
   -- The overflow toast's small grey icon, centred where the picture goes
   -- (the picture is hidden then).
   toast.icon = toast:CreateTexture(nil, "ARTWORK")
@@ -159,8 +164,11 @@ local function drawToast(frame, toast)
   frame.react:SetShown(canReact)
   if canReact then frame.react:SetReaction(entry.reaction, entry.reacted) end
   frame.text:SetPoint("RIGHT", canReact and -(REACT + 16) or -10, 0)
+  local figure = entry ~= nil and entry.figure
   frame.picture:SetShown(entry ~= nil)
+  frame.picture:SetAlpha(figure and 0 or 1)
   frame.icon:SetShown(entry == nil)
+  if figure then frame.figure:SetClass(figure) else frame.figure:Hide() end
   if entry then
     drawPicture(frame, entry)
     frame.text:SetText(entry.text)

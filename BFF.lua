@@ -198,6 +198,10 @@ eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 -- A boss died: Core decides whether it's a clear.
 eventFrame:RegisterEvent("ENCOUNTER_END")
+-- The Camp's art pixel is a whole number of screen pixels: worked out
+-- again when the UI scale or the window changes.
+eventFrame:RegisterEvent("UI_SCALE_CHANGED")
+eventFrame:RegisterEvent("DISPLAY_SIZE_CHANGED")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_ENTERING_WORLD" and not ns.core then
     start((...))
@@ -207,6 +211,8 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     if ns.core then ns.core:bagsUpdated() end
   elseif event == "ENCOUNTER_END" then
     if ns.core then ns.core:encounterEnded(ns.Snapshot.encounter(...)) end
+  elseif event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
+    if ns.core then ns.Panel.refresh() end
   elseif event == "PLAYER_REGEN_ENABLED" then
     eventFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
     local summary = pendingAway

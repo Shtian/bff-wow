@@ -762,6 +762,17 @@ function Feed:describe(entry)
   }
 end
 
+-- The entries from `time` on, newest first, as describe() gives them.
+function Feed:since(time)
+  local list = {}
+  local log = self.db.feed
+  for i = #log, 1, -1 do
+    if log[i].time < time then break end
+    list[#list + 1] = self:describe(log[i])
+  end
+  return list
+end
+
 -- The log newest first, grouped by day (utcOffset shifts day boundaries
 -- to local time): { days = { { daysAgo, time, title, entries } }, unseen },
 -- title being "TODAY", "YESTERDAY" or "MONDAY 02 NOVEMBER".
