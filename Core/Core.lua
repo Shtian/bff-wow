@@ -289,7 +289,7 @@ end
 -- sits in ("BY THE FIRE" and "ASLEEP IN CAMP" when sorted Online first with
 -- the Camp on, else "CREW").
 function Core:rows(order)
-  return ns.Camp.word(ns.Roster.rows(self.ledger, self.now(), order), self:setting("camp"), order)
+  return ns.Camp.wordRows(ns.Roster.rows(self.ledger, self.now(), order), self:setting("camp"), order)
 end
 
 -- The Professions tab: professions, a { skillLine, name, icon, secondary,
@@ -398,14 +398,10 @@ end
 -- { x } when there's room; more counts the Members that didn't fit, nil
 -- when all did, and moreText words it ("+2 more"). Derived on read: no record changes and nothing is sent.
 -- See docs/design/camp.md.
-local function campView(self, columns, options)
-  local now = self.now()
-  return ns.Camp.view(ns.Roster.rows(self.ledger, now), self.log:since(now - ns.Camp.RECENT), now, columns, options)
-end
-
 function Core:camp(columns)
   if not self:setting("camp") then return nil end
-  return campView(self, columns)
+  local now = self.now()
+  return ns.Camp.view(ns.Roster.rows(self.ledger, now), self.log:since(now - ns.Camp.RECENT), now, columns)
 end
 
 -- Counts for the title and minimap button: online, members, canPlay (online
@@ -461,18 +457,9 @@ local function awaySummary(self)
   local summary = self.log:takeSummary(self.spareLife:takeNews())
   if not summary then return end
   if self:setting("camp") then
-    summary.intro = ns.Camp.intro(summary.count, true)
-    summary.camp = campView(self, ns.Camp.LAYOUT.awayColumns, { tent = false })
-    local byMember = {}
-    for _, member in ipairs(summary.members) do byMember[member.memberId] = member end
-    for _, actor in ipairs(summary.camp.actors) do
-      local member = byMember[actor.memberId]
-      local main = member and member.characters[1]
-      if main and main.main and main.gained then
-        actor.gained = main.gained
-        actor.highlight = main.maxLevel or nil
-      end
-    end
+    local now = self.now()
+    summary.camp, summary.intro = ns.Camp.away(ns.Roster.rows(self.ledger, now),
+      self.log:since(now - ns.Camp.RECENT), now, summary)
   end
   self.listener("awaySummary", summary)
   self.listener("changed")

@@ -22,9 +22,8 @@ ns.Away = Away
 local Skin = ns.Skin
 
 local WIDTH = 400
--- Wider with the Camp, and the scene's height (in whole art pixels).
+-- Wider with the Camp.
 local CAMP_WIDTH = 440
-local CAMP_HEIGHT = 120
 local INSET = 14
 -- The intro line's slot above the column headings.
 local INTRO = 34
@@ -363,7 +362,7 @@ function Away.show(summary)
   local top = -Skin.HEADER_HEIGHT
   frame:SetWidth(summary.camp and CAMP_WIDTH or WIDTH)
   if summary.camp then
-    local _, height = frame.camp:Measure(CAMP_WIDTH - 2, CAMP_HEIGHT)
+    local _, height = frame.camp:Measure(CAMP_WIDTH - 2, ns.CampScene.HEIGHT)
     frame.camp:SetHeight(height)
     top = top - height
   end

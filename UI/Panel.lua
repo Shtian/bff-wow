@@ -58,10 +58,7 @@ local NODE = 26
 local LINE_X = INSET + NODE / 2 - 1
 -- Last seen goes stale, so the open panel redraws this often.
 local REDRAW_EVERY = 30
--- The Camp band's height, and the shorter one under SMALL_UNDER high;
--- each rounds down to whole art pixels.
-local CAMP_HEIGHT = 120
-local CAMP_SHORT = 78
+-- Under this high, the Camp band is its short one.
 local CAMP_SMALL_UNDER = 460
 local SCROLL_STEP = 40
 
@@ -1664,7 +1661,7 @@ local function drawCamp(inCrew)
   local view
   if inCrew then
     local width = frame:GetWidth() - 2
-    local columns, height = camp:Measure(width, frame:GetHeight() < CAMP_SMALL_UNDER and CAMP_SHORT or CAMP_HEIGHT)
+    local columns, height = camp:Measure(width, frame:GetHeight() < CAMP_SMALL_UNDER and ns.CampScene.SHORT_HEIGHT or ns.CampScene.HEIGHT)
     view = core:camp(columns)
     campHeight = view and height or 0
   else

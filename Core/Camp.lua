@@ -11,7 +11,7 @@ ns.Camp = Camp
 
 local DAY = 24 * 60 * 60
 
--- The scene's geometry, in art pixels. x runs from the fire's centre,
+-- The Camp's geometry, in art pixels. x runs from the fire's centre,
 -- negative to the left. The fire's logs keep `fire` clear on each side,
 -- a figure is `seated` or `asleep` wide, a grave `grave` wide with
 -- `graveGap` before it, `gap` sits between neighbours and `margin` inside
@@ -197,7 +197,7 @@ end
 -- "asleep · 5m ago", or with the Camp off its Last seen), and each other
 -- Member's section label ("BY THE FIRE" and "ASLEEP IN CAMP" under Online
 -- first with the Camp on, else "CREW").
-function Camp.word(rows, on, order)
+function Camp.wordRows(rows, on, order)
   local split = on and (order == nil or order == "online")
   for _, row in ipairs(rows) do
     if row.own then
@@ -223,12 +223,24 @@ function Camp.header(summary, on)
   return ("%d of %d online"):format(summary.online, summary.members)
 end
 
--- While you were away's intro.
-function Camp.intro(count, on)
-  if on then
-    return count == 1 and "The fire kept burning. 1 thing happened in camp."
-      or ("The fire kept burning. %d things happened in camp."):format(count)
+-- While you were away in the Camp's voice: the Camp at the popup's width
+-- without the tent, each actor tagged with what their Main gained
+-- (gained, as the scoreboard words it, and highlight for max level) from
+-- the summary's member blocks, and the intro.
+function Camp.away(rows, entries, now, summary)
+  local view = Camp.view(rows, entries, now, LAYOUT.awayColumns, { tent = false })
+  local byMember = {}
+  for _, member in ipairs(summary.members) do byMember[member.memberId] = member end
+  for _, actor in ipairs(view.actors) do
+    local member = byMember[actor.memberId]
+    local main = member and member.characters[1]
+    if main and main.main and main.gained then
+      actor.gained = main.gained
+      actor.highlight = main.maxLevel or nil
+    end
   end
-  return count == 1 and "1 thing happened while you were away."
-    or ("%d things happened while you were away."):format(count)
+  local count = summary.count
+  local intro = count == 1 and "The fire kept burning. 1 thing happened in camp."
+    or ("The fire kept burning. %d things happened in camp."):format(count)
+  return view, intro
 end

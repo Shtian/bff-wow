@@ -20,6 +20,10 @@ local LAYOUT = ns.Core.CAMP_LAYOUT
 -- About 3 UI units per art pixel in the band, and 2 on rows and toasts.
 CampScene.BAND_TARGET = 3
 CampScene.FIGURE_TARGET = 2
+-- The band's height in UI units, and the panel's shorter one in a small
+-- window; each rounds down to whole art pixels.
+CampScene.HEIGHT = 120
+CampScene.SHORT_HEIGHT = 78
 -- Animation ticks per second, and how long a Cheer's hop lasts.
 local FPS = 6
 local HOP_FOR = 0.7
@@ -29,8 +33,11 @@ local ROW = {
   seat = 3, seated = 4, hop = 6, asleep = 3, grave = 3, flower = 2,
   logs = 3, fire = 5, tent = 5, ember = 16,
 }
--- Each sprite's x from its actor's (or grave's) left edge.
-local OFFSET = { seat = -1, sleep = 11, flower = 2 }
+-- Each sprite's x from its actor's (or grave's) left edge. A spark sits
+-- by a seated figure's head, or on a sleeper's blanket, so even the short
+-- band never crops it.
+local OFFSET = { seat = -1, sleep = 11, flower = 2, seatedSpark = 9, asleepSpark = 11 }
+local SPARK_ROW = { seated = 13, asleep = 4 }
 -- The name's gap above a figure's head, in art rows.
 local LABEL_GAP = 1
 
@@ -170,9 +177,9 @@ local function drawActor(scene, parts, actor, f)
   label:ClearAllPoints()
   label:SetPoint("BOTTOM", scene.art, "BOTTOMLEFT", (scene.fire + centre) * scene.unit, (top + LABEL_GAP) * scene.unit)
   label:SetWidth(actor.labelWidth * scene.unit)
-  local text = scene.tags and actor.gained or (not scene.tags and actor.label) or nil
+  local text = scene.gains and actor.gained or (not scene.gains and actor.label) or nil
   label:SetText(text or "")
-  if scene.tags then
+  if scene.gains then
     Skin.color(label, actor.highlight and Skin.GOLD or Skin.ONLINE)
   else
     label:SetTextColor(Skin.classColor(actor.classFilename))
@@ -181,8 +188,10 @@ local function drawActor(scene, parts, actor, f)
 
   if actor.spark and math.floor(f / 3) % 2 == 0 then
     setSprite(parts.spark, "spark", scene.unit)
-    local labelRows = text and math.ceil(label:GetStringHeight() / scene.unit) or 0
-    put(scene, parts.spark, math.floor(centre) - 2, top + LABEL_GAP + labelRows + 1)
+    local seated = actor.pose == "seated"
+    local lift = seated and hopping(scene, actor) and ROW.hop - ROW.seated or 0
+    put(scene, parts.spark, x + (seated and OFFSET.seatedSpark or OFFSET.asleepSpark),
+      SPARK_ROW[actor.pose] + lift)
   else
     parts.spark:Hide()
   end
@@ -239,14 +248,14 @@ local function onUpdate(band)
   drawFrame(scene, f)
 end
 
--- A Camp band in parent. tags: show each actor's gained text (While you
+-- A Camp band in parent. gains: show each actor's gained text (While you
 -- were away) instead of names.
-function CampScene.new(parent, tags)
+function CampScene.new(parent, gains)
   local band = CreateFrame("Frame", nil, parent)
   band:SetClipsChildren(true)
   local scene = {
     band = band,
-    tags = tags,
+    gains = gains,
     hops = {},
     actorParts = pool(function()
       return {
