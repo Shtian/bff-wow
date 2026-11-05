@@ -10,7 +10,7 @@ BFF is for a small group of friends who don't always play at the same time. It s
 - **Gather round the fire:** the Camp, a small pixel campsite at the top of the panel and in While you were away. Friends who are online sit by the fire and the rest sleep in bedrolls. A recent death leaves a grave, respects put a flower on it, and a fresh max level gets a spark. You can switch it off in Settings.
 - **Your whole crew:** every friend's characters, levels and whereabouts, and when each was last seen. Alts are grouped under the person who plays them.
 - **Cheer every ding:** one click sends a cheer for a ding, respects for a death, or a welcome for someone new. Toasts can play an optional sound.
-- **Level up together:** goals the whole crew works towards, like everyone reaching level 80, and trophies for what you do together, like clearing a dungeon or a raid. Nobody is ranked.
+- **Level up together:** goals the whole crew works towards, like everyone reaching level 60, and trophies for what you do together, like clearing a dungeon or a raid. Nobody is ranked.
 - **Who crafts what:** every friend's professions and skill in one grid, so you know who to ask for a craft. Hover a tile to see which characters have that profession. You also get feed entries when friends pick up a profession, reach a new rank or max it.
 - **Pass on spare gear:** offer an item to your friends. Whoever claims it first gets it by in-game mail.
 - **When everyone plays:** a heatmap of the hours each friend usually plays, in your own time zone.
