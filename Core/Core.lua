@@ -26,6 +26,8 @@ Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
 -- The game's dungeons and the Together tab's line geometry (see together()).
 Core.DUNGEONS = ns.Together.DUNGEONS
 Core.TOGETHER_LAYOUT = ns.Together.LAYOUT
+-- The Camp's geometry in art pixels (see camp()).
+Core.CAMP_LAYOUT = ns.Camp.LAYOUT
 -- The final bosses known: encounter ID to the name of the instance a kill
 -- clears (see encounterEnded()).
 Core.FINAL_BOSSES = ns.Clears.FINAL_BOSSES
@@ -125,6 +127,19 @@ end
 -- it has. With both off nothing is announced or seen, so they wait for
 -- While you were away. Entries already seen (a gave entry your notice
 -- covers) make none.
+-- A Feed entry as a Live event: as describe() gives it, plus figure (the
+-- class of the Member's shown Character, for the toast's figure) while
+-- the Camp is on and the Roster shows the Member.
+local function liveEntry(self, entry)
+  local described = self.log:describe(entry)
+  if described.memberId and self:setting("camp") then
+    for _, row in ipairs(ns.Roster.rows(self.ledger, self.now())) do
+      if row.memberId == described.memberId then described.figure = row.classFilename end
+    end
+  end
+  return described
+end
+
 local function announce(self, entries, reactions, notices)
   if not self.log:isSettled() then return end
   local to = outlets(self)
@@ -132,7 +147,7 @@ local function announce(self, entries, reactions, notices)
   for _, entry in ipairs(entries) do
     if not entry.seen then
       self.log:markSeen(entry)
-      self.listener("feedEntry", self.log:describe(entry), to)
+      self.listener("feedEntry", liveEntry(self, entry), to)
     end
   end
   for _, item in ipairs(reactions or {}) do
@@ -267,9 +282,14 @@ end
 -- instance (where last seen; see mapPins()), lastPlayed, sinceSeen,
 -- lastSeenText (Last seen in words: "5m ago"; on a row "online" while
 -- online, and nil on your own), playing (being played right now), main and
--- canPlay (within Core.CAN_PLAY_LEVELS of the Character you play).
+-- canPlay (within Core.CAN_PLAY_LEVELS of the Character you play). Each
+-- row also has status, the finished right-hand text ("by the fire" and
+-- "asleep · 5m ago" with the Camp on, else lastSeenText; nil on your own),
+-- and each other Member's row section, the label of the Roster section it
+-- sits in ("BY THE FIRE" and "ASLEEP IN CAMP" when sorted Online first with
+-- the Camp on, else "CREW").
 function Core:rows(order)
-  return ns.Roster.rows(self.ledger, self.now(), order)
+  return ns.Camp.word(ns.Roster.rows(self.ledger, self.now(), order), self:setting("camp"), order)
 end
 
 -- The Professions tab: professions, a { skillLine, name, icon, secondary,
@@ -365,13 +385,39 @@ function Core:mapPins()
   return pins
 end
 
+-- The Camp: the Crew as a campsite `columns` art pixels wide (the band's
+-- width in art pixels, which only UI knows), or nil while the Camp setting
+-- is off. Positions are art pixels from the fire's centre, in
+-- Core.CAMP_LAYOUT's geometry: { columns, actors, graves, tent, more }.
+-- actors are every Member the Roster shows, you first, as many as fit:
+-- { memberId, pose ("seated" or "asleep"), label ("You" or the display
+-- name), classFilename (of the Character the Roster shows), x (the
+-- figure's left edge), width (the figure's), labelWidth (room for the name
+-- above it), spark (max level in the last day), you }. graves are { memberId,
+-- x, flower (anyone paid Respects) }, a death each in the last day; tent is
+-- { x } when there's room; more counts the Members that didn't fit, nil
+-- when all did, and moreText words it ("+2 more"). Derived on read: no record changes and nothing is sent.
+-- See docs/design/camp.md.
+local function campView(self, columns, options)
+  local now = self.now()
+  return ns.Camp.view(ns.Roster.rows(self.ledger, now), self.log:since(now - ns.Camp.RECENT), now, columns, options)
+end
+
+function Core:camp(columns)
+  if not self:setting("camp") then return nil end
+  return campView(self, columns)
+end
+
 -- Counts for the title and minimap button: online, members, canPlay (online
 -- Members whose Character being played can play with you), hidden
 -- (Characters unseen for Core.HIDE_AFTER_DAYS) and spares (others'
--- open Spares one of your Characters is high enough level for).
+-- open Spares one of your Characters is high enough level for), and
+-- header, the panel header's finished count ("1 of 4 online", or "2 of 5
+-- by the fire", you counted, with the Camp on).
 function Core:summary()
   local summary = ns.Roster.summary(self.ledger, self.now())
   summary.spares = self.spareLife:usableCount()
+  summary.header = ns.Camp.header(summary, self:setting("camp"))
   return summary
 end
 
@@ -406,11 +452,28 @@ end
 -- first: { text, reaction, time } per own entry with unseen Reactions.
 -- goals is the Crew goals reached ({ text, time }), and spares the
 -- Spare notices, then the Gives, each newest first: { kind
--- ("claimed", "given" or "gave"), text, time }.
+-- ("claimed", "given" or "gave"), text, time }. With the Camp on, camp is
+-- the Camp at Core.CAMP_LAYOUT.awayColumns without the tent, each actor
+-- with gained (its Main's, as the scoreboard words it, nil with nothing
+-- gained) and highlight (max level), and intro is in the Camp's voice.
 local function awaySummary(self)
   if not self:isAwayPopupOn() then return end
   local summary = self.log:takeSummary(self.spareLife:takeNews())
   if not summary then return end
+  if self:setting("camp") then
+    summary.intro = ns.Camp.intro(summary.count, true)
+    summary.camp = campView(self, ns.Camp.LAYOUT.awayColumns, { tent = false })
+    local byMember = {}
+    for _, member in ipairs(summary.members) do byMember[member.memberId] = member end
+    for _, actor in ipairs(summary.camp.actors) do
+      local member = byMember[actor.memberId]
+      local main = member and member.characters[1]
+      if main and main.main and main.gained then
+        actor.gained = main.gained
+        actor.highlight = main.maxLevel or nil
+      end
+    end
+  end
   self.listener("awaySummary", summary)
   self.listener("changed")
 end
@@ -851,6 +914,12 @@ local SETTINGS = {
     key = "minimap", section = NOTIFICATIONS, kind = "toggle",
     label = "Show minimap button",
     saved = offFlag("hide", "minimap"),
+  },
+  -- The Camp (camp()), and its wording in rows(), summary() and the rest.
+  {
+    key = "camp", section = NOTIFICATIONS, kind = "toggle",
+    label = "Show the Camp",
+    saved = offFlag("campOff"),
   },
   -- The panel's size and position (panelPlace()); the page shows a reset.
   {

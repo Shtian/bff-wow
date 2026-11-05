@@ -9,8 +9,10 @@
 -- the jump (gold when it reached max level), levels gained, deaths, and
 -- Cheer and Respects buttons. The Member's name sits on their first row,
 -- with joined or left beside it, and a Welcome by joined. Dismiss and Open
--- Feed. App shows it once out of combat. See docs/design/feed.md and
--- docs/design/reactions.md.
+-- Feed. With a camp in the summary it opens on the Camp, each friend's
+-- levels gained over their head, and widens for it. App shows it once out
+-- of combat. See docs/design/feed.md, docs/design/reactions.md and
+-- docs/design/camp.md.
 
 local _, ns = ...
 
@@ -20,6 +22,9 @@ ns.Away = Away
 local Skin = ns.Skin
 
 local WIDTH = 400
+-- Wider with the Camp, and the scene's height (in whole art pixels).
+local CAMP_WIDTH = 440
+local CAMP_HEIGHT = 120
 local INSET = 14
 -- The intro line's slot above the column headings.
 local INTRO = 34
@@ -80,6 +85,10 @@ end
 local function create()
   frame = Skin.window("BFFAway", WIDTH, "While you were away")
   frame:SetPoint("CENTER", 0, 120)
+  frame.camp = ns.CampScene.new(frame, true)
+  frame.camp:SetPoint("TOPLEFT", 1, -Skin.HEADER_HEIGHT)
+  frame.camp:SetPoint("TOPRIGHT", -1, -Skin.HEADER_HEIGHT)
+  Skin.edge(frame.camp, "BOTTOM", Skin.LINE, "OVERLAY")
 
   frame.noticed = Skin.label(frame, "label", Skin.DIM)
   frame.noticed:SetText("YOUR CREW NOTICED")
@@ -111,6 +120,10 @@ local function react(button)
   if not button.key or button.done then return end
   local ok, reason = ns.core:react(button.key)
   button:SetReaction(button.reaction, ok or reason == "reacted")
+  if ok and button.reaction == "cheer" then
+    frame.camp:Hop(button.key.memberId)
+    ns.Panel.cheered(button.key.memberId)
+  end
 end
 
 -- Draws a Reaction button from a summary button ({ key, reacted }), or
@@ -347,7 +360,15 @@ end
 -- Crew noticed, Crew goals, Spares and Professions show.
 function Away.show(summary)
   if not frame then create() end
-  local y = drawNoticed(summary.noticed or {}, -Skin.HEADER_HEIGHT)
+  local top = -Skin.HEADER_HEIGHT
+  frame:SetWidth(summary.camp and CAMP_WIDTH or WIDTH)
+  if summary.camp then
+    local _, height = frame.camp:Measure(CAMP_WIDTH - 2, CAMP_HEIGHT)
+    frame.camp:SetHeight(height)
+    top = top - height
+  end
+  frame.camp:Draw(summary.camp)
+  local y = drawNoticed(summary.noticed or {}, top)
   y = drawGoals(summary.goals or {}, y)
   y = drawSpares(summary.spares or {}, y)
   y = drawProfessions(summary.professions or {}, y)

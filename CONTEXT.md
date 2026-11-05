@@ -67,6 +67,14 @@ _Avoid_: Like, emote, kudos
 A new Feed entry from another Member, a Reaction to one of your entries, or a Spare notice, announced as it happens by a chat line, a Toast or both.
 _Avoid_: Notification, alert, live news
 
+**Camp**:
+The scene of the Crew shown at the top of the panel and in While you were away: every Member the Roster shows around a campfire, seated by it while online and asleep in a bedroll while not, with a Grave for each recent death and a spark over a fresh max level. Another way of showing what the Roster and the Feed already say; it has no data of its own. Respects show in it as a flower on the Grave.
+_Avoid_: Scene (when meaning the Camp), campsite, diorama
+
+**Grave**:
+The mark a death in the last 24 hours leaves in the Camp, beside its Member: one per death, at most 2 per Member and 4 in the Camp. It gets a flower once any Member has paid Respects to that death.
+_Avoid_: Tombstone, death marker
+
 **Toast**:
 A small on-screen notice for a Live event, with an optional sound. Shows the same things as the chat line.
 _Avoid_: Popup, alert, notification (when meaning a toast)

@@ -352,7 +352,7 @@ describe("While you were away", function()
 
     relog(net, b)
     local summary = summaries(b)[1]
-    assert.equal("3 things happened while you were away.", summary.intro)
+    assert.equal("The fire kept burning. 3 things happened in camp.", summary.intro)
     assert.equal(60, summary.maxLevel)
     local labels, gained = {}, {}
     for i, character in ipairs(summary.members[1].characters) do
@@ -376,7 +376,7 @@ describe("While you were away", function()
 
     relog(net, b)
     local summary = summaries(b)[1]
-    assert.equal("1 thing happened while you were away.", summary.intro)
+    assert.equal("The fire kept burning. 1 thing happened in camp.", summary.intro)
     local character = summary.members[1].characters[1]
     assert.equal("Ann", character.label)
     assert.is_nil(character.gained)

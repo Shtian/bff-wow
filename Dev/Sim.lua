@@ -1,7 +1,9 @@
 -- Sim: /bff sim attaches a few simulated Members to your real Core through
 -- FakeNet, so the panel can be tried without another Member online. Their
 -- records are kept and relayed like real ones, so it only runs in a Crew
--- where no one else is known yet: start a test Crew for it. Also the dev
+-- where no one else is known yet: start a test Crew for it. It fills the
+-- Camp: two sit by the fire, two fall asleep, one with a fresh max level,
+-- and one by the fire leaves two graves. Also the dev
 -- console (/bffdev, opened by /bff sim too): buttons that make each
 -- simulated Member ding, die, move, react to your newest entry, offer a
 -- test Spare, Claim your newest one or log out,
@@ -28,8 +30,11 @@ local MAX_LEVEL = 60
 -- Their levels are around yours, or around this when you're above the
 -- span (a retail Character).
 local BASE_LEVEL = 24
--- How long after starting the offline Member logs out.
+-- How long after starting the offline Members log out.
 local LOGOUT_AFTER = 20
+-- How long after starting the Camp gets its news: Simone dies twice (two
+-- graves) and Simba reaches max level (a spark) before going to sleep.
+local CAMP_NEWS_AFTER = 5
 
 -- Made-up final bosses for every dungeon and raid, since Forever's
 -- encounter IDs aren't known yet: the simulated Members' Cores know these,
@@ -86,6 +91,10 @@ local MEMBERS = {
   { name = "Simba", offline = true, characters = {
     { name = "Simba", classFilename = "DRUID", levelOffset = 6, zone = "Teldrassil" },
     { name = "Simbalina", classFilename = "HUNTER", levelOffset = -15, zone = "Durotar", ago = 40 * DAY },
+  } },
+  -- Another sleeper for the Camp.
+  { name = "Mirelle", offline = true, characters = {
+    { name = "Mirelle", classFilename = "PALADIN", levelOffset = -5, zone = "Darkshore" },
   } },
 }
 
@@ -266,6 +275,12 @@ function Sim.start(core)
       end)
     end
   end
+  C_Timer.After(CAMP_NEWS_AFTER, function()
+    if members ~= current then return end
+    local simone, simba = members[1], members[3]
+    if simone.core then simone:play({ deaths = (simone.character.deaths or 0) + 2 }) end
+    if simba.core then simba:play({ level = net.maxLevel, xp = 0 }) end
+  end)
   ticker = C_Timer.NewTicker(1, function()
     if not inSimCrew() then return Sim.stop(true) end
     net:step(GetServerTime())
