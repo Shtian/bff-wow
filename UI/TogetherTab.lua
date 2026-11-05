@@ -152,7 +152,7 @@ local function dungeonTooltip(owner)
   if tooltip.forever then line(tooltip.forever, MUTED) end
   for _, raid in ipairs(tooltip.raids or {}) do
     line(colored(raid.name, TEXT) .. " " .. colored(raid.detail, DIM)
-      .. (raid.forever and " " .. colored("NEW", MUTED) or ""))
+      .. (raid.forever and " " .. Skin.foreverGlyph(MUTED) or ""))
   end
   line(tooltip.you, tooltip.fits and TEXT or DIM)
   for _, fitter in ipairs(tooltip.fitters) do
@@ -326,9 +326,7 @@ local function keySwatch(parent, kind)
   elseif kind == "attunement" then
     swatch.dashed = true
   elseif kind == "forever" then
-    swatch.badge = Skin.badge(swatch, TINY, MUTED)
-    swatch.badge:SetPoint("LEFT")
-    swatch.badge:SetText("NEW")
+    Skin.foreverMark(swatch):SetPoint("LEFT")
   elseif kind == "fitters" then
     for i, classFilename in ipairs({ "DRUID", "ROGUE" }) do
       local dot = swatch:CreateTexture(nil, "ARTWORK")
@@ -801,8 +799,7 @@ local function createBarFrame()
   frame.diamond:SetColorTexture(Skin.BAR[1], Skin.BAR[2], Skin.BAR[3], 1)
   frame.diamond:SetRotation(math.rad(45))
   frame.name = Skin.label(frame.inner, SMALL)
-  frame.forever = Skin.badge(frame.inner, TINY, MUTED)
-  frame.forever:SetText("NEW")
+  frame.forever = Skin.foreverMark(frame.inner)
   frame.dots = {}
   frame.more = Skin.label(frame.inner, TINY, MUTED)
   return frame
@@ -831,6 +828,7 @@ local function drawBar(frame, bar)
   local anchor, width = frame.name, (raids and 12 or 0) + frame.name:GetStringWidth()
   frame.forever:SetShown(bar.forever)
   if bar.forever then
+    Skin.color(frame.forever, (bar.fits or bar.shared) and TEXT or MUTED)
     frame.forever:ClearAllPoints()
     frame.forever:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
     anchor = frame.forever

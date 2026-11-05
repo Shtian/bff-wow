@@ -51,6 +51,7 @@ local REACT = 20
 local FEED_DAY = 26
 -- The timeline's line runs through the middle of the entry pictures.
 local NODE = 26
+local NEW_DOT = 6
 local LINE_X = INSET + NODE / 2 - 1
 -- Last seen goes stale, so the open panel redraws this often.
 local REDRAW_EVERY = 30
@@ -693,8 +694,13 @@ local function createFeedEntry()
   entry.text:SetPoint("TOPLEFT", node, "TOPRIGHT", 10, -2)
   entry.text:SetPoint("RIGHT", -INSET - 36, 0)
   entry.text:SetWordWrap(false)
-  entry.new = Skin.badge(entry, "tiny", { 0.1, 0.08, 0 }, GOLD)
-  entry.new:SetText("NEW")
+  -- New in this Feed visit: an unread dot in the margin, level with the
+  -- picture's centre.
+  entry.new = Skin.fill(entry, GOLD, "ARTWORK")
+  entry.new:ClearAllPoints()
+  entry.new:SetSize(NEW_DOT, NEW_DOT)
+  entry.new:SetPoint("CENTER", node, "LEFT", -(NEW_DOT / 2 + 3), 0)
+  Skin.round(entry, entry.new)
   entry.time = Skin.label(entry, "small", MUTED)
   entry.time:SetPoint("TOPLEFT", entry.text, "BOTTOMLEFT", 0, -2)
   entry.reactors = Skin.label(entry, "small", MUTED)
@@ -734,8 +740,6 @@ local function drawFeedEntry(line, entry)
   line.text:SetText(entry.text)
   Skin.color(line.text, entry.highlight and GOLD or entry.own and MUTED or TEXT)
   line.time:SetText(date("%H:%M", entry.time))
-  line.new:ClearAllPoints()
-  line.new:SetPoint("LEFT", line.text, "LEFT", line.text:GetStringWidth() + 6, 0)
   line.new:SetShown(entry.new)
 end
 

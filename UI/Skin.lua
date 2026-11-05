@@ -435,6 +435,26 @@ function Skin.badge(parent, fontName, textColor, plateColor)
   return plate
 end
 
+-- The mark for what's new in WoW: Forever: an infinity like the one in the
+-- game's emblem, white in the file so a caller can tint it.
+local FOREVER_MARK = "Interface\\AddOns\\BFF\\Media\\Forever"
+local FOREVER_MARK_WIDTH = 18
+local FOREVER_MARK_HEIGHT = 9
+
+function Skin.foreverMark(parent, color)
+  local mark = parent:CreateTexture(nil, "ARTWORK")
+  mark:SetTexture(FOREVER_MARK)
+  mark:SetSize(FOREVER_MARK_WIDTH, FOREVER_MARK_HEIGHT)
+  Skin.color(mark, color or Skin.MUTED)
+  return mark
+end
+
+-- The same mark inline in text, tinted: "|T...|t".
+function Skin.foreverGlyph(color)
+  return ("|T%s:%d:%d:0:0:64:32:0:64:0:32:%d:%d:%d|t"):format(FOREVER_MARK, FOREVER_MARK_HEIGHT,
+    FOREVER_MARK_WIDTH, color[1] * 255, color[2] * 255, color[3] * 255)
+end
+
 local function hover(button, shown)
   if button:IsEnabled() then button.hover:SetShown(shown) end
 end

@@ -106,6 +106,8 @@ local LAYOUT = {
   -- A bar shows at most this many Member dots, then "+N".
   dots = 4,
   dot = 8,
+  -- The Forever mark on a bar.
+  foreverMark = 18,
   -- The online dot before an online friend's label, and its gap.
   online = 10,
 }
@@ -441,7 +443,7 @@ local function buildBars(dungeons, others, yourLevel, measure, chosen)
     -- The raids' entry starts a little left of 60, for its diamond.
     local raids = dungeon.kind == "raids"
     local content = measure(dungeon.name, "small") + 10
-      + (dungeon.forever and measure("NEW", "tiny") + 10 or 0)
+      + (dungeon.forever and LAYOUT.foreverMark + 4 or 0)
       + (#dots > 0 and #dots * LAYOUT.dot + 6 or 0)
       + (moreDots > 0 and measure("+" .. moreDots, "tiny") + 4 or 0)
       + (raids and 12 or 0)

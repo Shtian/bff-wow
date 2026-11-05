@@ -210,7 +210,7 @@ BFF has its own flat skin. It deliberately rejects Blizzard's parchment, stone f
 A night palette: one warm accent glowing against cool, slightly violet near-blacks, plus small semantic colours for kinds of news.
 
 ### Primary
-- **Ember Gold** (ember-gold): window titles; news text (the Feed's max level, joined and goal entries, toasts for them, While you were away's goal lines and "joined" tag); a goal bar once complete; "can play"; the primary button; unseen-count badges; checkbox ticks; and the Play times heatmap, where it's a scale rather than news. On brand surfaces it's the solid title colour and the numerals of a how-to; **Ember Gold Deep** (ember-gold-deep) is the gold half of the braid divider.
+- **Ember Gold** (ember-gold): window titles; news text (the Feed's max level, joined and goal entries, toasts for them, While you were away's goal lines and "joined" tag); a goal bar once complete; "can play"; the primary button; unseen-count badges; a New Feed entry's unread dot; checkbox ticks; and the Play times heatmap, where it's a scale rather than news. On brand surfaces it's the solid title colour and the numerals of a how-to; **Ember Gold Deep** (ember-gold-deep) is the gold half of the braid divider.
 
 ### Secondary
 - **Brand Teal** (brand-teal): the icon's second ring. On brand surfaces: the teal half of the braid divider and of a frame's top line, and a faint light on slides without scenery. In the addon it appears only inside the icon itself (the minimap button and the game's addon list), never as a UI colour.
@@ -257,7 +257,7 @@ Hues and tiers are `Skin.TROPHY_HUES` and `Skin.TROPHY_QUALITIES`; don't use the
 - **Body** (Arial Narrow, 15px): Member names and primary row text.
 - **Text** (Arial Narrow, 14px): default UI text, buttons, inputs, sidebar tabs.
 - **Small** (Arial Narrow, 12px): Character lines, checkbox labels, header-right status, level badges, small buttons, intro and helper lines.
-- **Tiny** (Arial Narrow, 11px): badge text ("NEW", unseen counts, the minimap count), chart captions (heatmap hours and legend) and a medal's date. Nothing smaller ships.
+- **Tiny** (Arial Narrow, 11px): badge text (unseen counts, the minimap count), chart captions (heatmap hours and legend) and a medal's date. Nothing smaller ships.
 - **Figure** (Arial Narrow, 18px): the big progress numbers on Goals tiles, and nothing else.
 The gallery has its own scale, sized for 1920×1080 images that are also seen as roughly 300px-wide thumbnails on CurseForge:
 - **Brand display** (Cinzel 600, 104px, 1.06, solid Ember Gold): the hero's title.
@@ -311,7 +311,7 @@ Quiet and flat. Components are faint fills and hairlines, so the content and the
 
 ### Chips
 - **Navigation chip:** the selected tab gets an 8% white chip and the hovered one a 4% chip, inset 6px×2px with 2px stepped corners.
-- **Badge:** a 14px-high plate at 8% white with Small text, for levels. At least as wide as it is tall, and hidden when there's no value (no "-"). Unseen counts on tabs and "NEW" on Feed entries use a gold plate with near-black Tiny text. The minimap button's online count sits on a Night Window plate with Ash Tiny text, off the icon's rings.
+- **Badge:** a 14px-high plate at 8% white with Small text, for levels. At least as wide as it is tall, and hidden when there's no value (no "-"). Unseen counts on tabs use a gold plate with near-black Tiny text. The minimap button's online count sits on a Night Window plate with Ash Tiny text, off the icon's rings.
 
 ### Cards / Containers
 - **Window:** Night Window at 95%, 1px Border all round, a 30px Header Plate with a Hairline under it, a gold Friz title 12px in, and close and status on the right. Movable, closes on Escape.
@@ -335,6 +335,12 @@ A trophy for a Crew goal rung reached, on the Goals tab: the track's icon (a pro
 
 ### Feed picture (signature)
 A square full-colour game icon on an opaque Night Window back, with a 1px edge in its kind's colour at 55% alpha: green for dings, gold for max level and goals, red for deaths, blue for Crew news, violet for Spares, grey for leaving. Used on the Feed's timeline, where the line runs through the pictures' centres, and on toasts.
+
+### Unread dot
+A 6px Ember Gold dot in the 12px margin left of a Feed picture, level with its centre, on each New entry. It's the only mark on the row: the count lives on the sidebar's badge, and a divider wouldn't work because a Reaction can make an older entry New.
+
+### Forever mark
+An 18×9 infinity (`Media/Forever.tga`, `Skin.foreverMark`), drawn after the emblem's ribbon: fat around the loops and pinched at the crossing. It marks dungeons and raids new in WoW: Forever on Together's bars, in tooltips and in the Show menu's key, in Ash Text on a bar you fit and Smoke Muted elsewhere. It's never gold, because a new dungeon isn't news.
 
 ### Reaction button
 A small square (18–20px) holding the Reaction's icon, desaturated at 55% alpha until clicked. Once given it's full colour with a faint 1px edge (30% white), and its tooltip says "You reacted". In a Feed entry's reactor list, "You" is Ash Text among Smoke Muted names.
