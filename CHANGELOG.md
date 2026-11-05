@@ -5,6 +5,17 @@
 
 
 
+
+## 1.0.0
+<sub>2026-11-05</sub>
+
+- *(major)*
+  BFF 1.0: the Camp joins the Roster, Feed, While you were away, Reactions, Crew goals and trophies, Spares, Play times, Professions and Together. Nothing breaks for an existing Crew; this marks the addon as complete for its first full release.
+- *(minor)*
+  Added the Camp: a pixel campsite of the Crew at the top of the panel and in While you were away, with graves, flowers and sparks for recent news, and a setting to turn it off.
+- *(patch)*
+  New Feed entries now show a small gold unread dot instead of a NEW tag on every row, and dungeons and raids new in WoW: Forever show an infinity mark.
+
 ## 0.5.0
 <sub>2026-11-03</sub>
 
