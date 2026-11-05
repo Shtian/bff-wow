@@ -5,7 +5,7 @@
 -- It works out nothing about the Crew: positions are Core's, in art pixels
 -- from the fire. One art pixel is a whole number of screen pixels near a
 -- target size (artUnit), so the art stays crisp at any UI scale. One
--- OnUpdate on the band steps the fire, embers, sleep marks and sparks, and
+-- OnUpdate on the band steps the fire, embers and sleep marks, and
 -- runs only while the band is shown. Silent. See docs/design/camp.md.
 
 local _, ns = ...
@@ -36,7 +36,13 @@ local ROW = {
 -- Each sprite's x from its actor's (or grave's) left edge. A spark sits
 -- by a seated figure's head, or on a sleeper's blanket, so even the short
 -- band never crops it.
-local OFFSET = { seat = -1, sleep = 11, flower = 2, seatedSpark = 9, asleepSpark = 11 }
+local OFFSET = { seat = -1, flower = 2, seatedSpark = 9, asleepSpark = 11 }
+-- A sleeper's three z's, small to normal, staggered up from the head:
+-- each one's x from the sleeper's left edge and its bottom row from the
+-- bedroll's top. They appear one at a time, hold, then clear, a step every
+-- SLEEP_STEP ticks; the name sits above the tallest.
+local SLEEP = { { x = 7, row = 0 }, { x = 12, row = 3 }, { x = 6, row = 5 } }
+local SLEEP_STEP = 4
 local SPARK_ROW = { seated = 13, asleep = 4 }
 -- The name's gap above a figure's head, in art rows.
 local LABEL_GAP = 1
@@ -154,7 +160,7 @@ local function drawActor(scene, parts, actor, f)
     setSprite(parts.skin, hop and "hop" or "seated", scene.unit)
     put(scene, parts.cloth, x, row)
     put(scene, parts.skin, x, row)
-    parts.sleep:Hide()
+    for _, z in ipairs(parts.sleep) do z:Hide() end
     top = row + Sheet.sprites.seated[4]
   else
     parts.seat:Hide()
@@ -162,13 +168,19 @@ local function drawActor(scene, parts, actor, f)
     setSprite(parts.skin, "asleep", scene.unit)
     put(scene, parts.cloth, x, ROW.asleep)
     put(scene, parts.skin, x, ROW.asleep)
-    top = ROW.asleep + Sheet.sprites.asleep[4]
-    if math.floor(f / 5) % 2 == 0 then
-      setSprite(parts.sleep, "sleep", scene.unit)
-      put(scene, parts.sleep, x + OFFSET.sleep, top)
-    else
-      parts.sleep:Hide()
+    local bed = ROW.asleep + Sheet.sprites.asleep[4]
+    -- Steps 0-2 add a z each, 3 holds all three, 4 clears.
+    local shown = math.floor(f / SLEEP_STEP) % 5
+    shown = shown == 4 and 0 or math.min(shown + 1, 3)
+    for i, z in ipairs(parts.sleep) do
+      if i <= shown then
+        setSprite(z, "sleep" .. i, scene.unit)
+        put(scene, z, x + SLEEP[i].x, bed + SLEEP[i].row)
+      else
+        z:Hide()
+      end
     end
+    top = bed + SLEEP[3].row + Sheet.sprites.sleep3[4]
   end
   tint(parts.cloth, actor.classFilename)
 
@@ -186,7 +198,7 @@ local function drawActor(scene, parts, actor, f)
   end
   label:SetShown(text ~= nil)
 
-  if actor.spark and math.floor(f / 3) % 2 == 0 then
+  if actor.spark then
     setSprite(parts.spark, "spark", scene.unit)
     local seated = actor.pose == "seated"
     local lift = seated and hopping(scene, actor) and ROW.hop - ROW.seated or 0
@@ -262,7 +274,11 @@ function CampScene.new(parent, gains)
         seat = texture(band.art, "ARTWORK", 0),
         cloth = texture(band.art, "ARTWORK", 1),
         skin = texture(band.art, "ARTWORK", 2),
-        sleep = texture(band.art, "ARTWORK", 2),
+        sleep = {
+          texture(band.art, "ARTWORK", 2),
+          texture(band.art, "ARTWORK", 2),
+          texture(band.art, "ARTWORK", 2),
+        },
         spark = texture(band.art, "OVERLAY", 0),
         label = nameLabel(band.art),
       }

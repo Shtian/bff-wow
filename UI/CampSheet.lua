@@ -24,10 +24,12 @@ ns.CampSheet = {
     fire3 = { 27, 16, 11, 12 },
     logs = { 40, 16, 15, 4 },
     seat = { 57, 16, 14, 3 },
-    sleep = { 73, 16, 5, 5 },
-    ember = { 80, 16, 1, 1 },
-    emberCool = { 83, 16, 1, 1 },
-    tent = { 86, 16, 33, 22 },
+    sleep1 = { 73, 16, 3, 4 },
+    sleep2 = { 78, 16, 4, 4 },
+    sleep3 = { 84, 16, 5, 5 },
+    ember = { 91, 16, 1, 1 },
+    emberCool = { 94, 16, 1, 1 },
+    tent = { 1, 30, 33, 22 },
   },
   -- The backdrop's file, its size in texels, and the column the fire's
   -- centre sits on.

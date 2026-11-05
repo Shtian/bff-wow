@@ -38,7 +38,12 @@ const FIRE = [
 ];
 const LOGS = ["..BB.......BB..", ".BBBBb...bBBBB.", "bbBBBBBBBBBBBbb", "..bbbbbbbbbbb.."];
 const SEAT = ["BBBBBBBBBBBBBB", "bbbbbbbbbbbbbb", "bbbbbbbbbbbbbb"];
-const SLEEP = ["ZZZZZ", "...Z.", "..Z..", ".Z...", "ZZZZZ"];
+// Sleep marks: three z's, small to normal, rising from the sleeper's head.
+const SLEEP = [
+  ["ZZZ", ".Z.", "Z..", "ZZZ"],
+  ["ZZZZ", "..Z.", ".Z..", "ZZZZ"],
+  ["ZZZZZ", "...Z.", "..Z..", ".Z...", "ZZZZZ"],
+];
 const EMBER = ["G"];
 const EMBER_COOL = ["R"];
 
@@ -79,7 +84,7 @@ const SPRITES = [
   ["asleepCloth", cloth(BED, BED_CLOTH)], ["asleep", skin(BED)],
   ["grave", skin(GRAVE)], ["flower", skin(FLOWER)], ["spark", skin(SPARK)],
   ["fire1", skin(FIRE[0])], ["fire2", skin(FIRE[1])], ["fire3", skin(FIRE[2])],
-  ["logs", skin(LOGS)], ["seat", skin(SEAT)], ["sleep", skin(SLEEP)],
+  ["logs", skin(LOGS)], ["seat", skin(SEAT)], ["sleep1", skin(SLEEP[0])], ["sleep2", skin(SLEEP[1])], ["sleep3", skin(SLEEP[2])],
   ["ember", skin(EMBER)], ["emberCool", skin(EMBER_COOL)],
   ["tent", tent()],
 ];
