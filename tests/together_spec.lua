@@ -539,14 +539,14 @@ describe("Together", function()
       assert.equal("Raids at 60", raids.tooltip.title)
       local listed = {}
       for i, raid in ipairs(raids.tooltip.raids) do
-        listed[i] = ("%s · %s%s"):format(raid.name, raid.detail, raid.forever and " NEW" or "")
+        listed[i] = ("%s · %s%s"):format(raid.name, raid.detail, raid.forever and " forever" or "")
       end
       assert.same({
         "Molten Core · 40-player · Blackrock Mountain",
         "Onyxia's Lair · 40-player · Dustwallow Marsh",
         "Zul'Gurub · 20-player · Stranglethorn Vale",
-        "The Barrow Deeps · 10-player · Mount Hyjal NEW",
-        "Hyjal Summit · 20-player · Mount Hyjal NEW",
+        "The Barrow Deeps · 10-player · Mount Hyjal forever",
+        "Hyjal Summit · 20-player · Mount Hyjal forever",
       }, listed)
     end)
 
