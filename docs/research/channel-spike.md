@@ -4,7 +4,7 @@ Results for [#6](https://github.com/Shtian/bff-wow/issues/6). Run on 2026-10-31 
 
 ## On WoW: Forever (2026-11-05)
 
-At launch, on the live Forever client, two Members in the same Crew channel could see each other in `/chatlist`, but BFF never synced. A test addon message sent with `C_ChatInfo.SendAddonMessage(prefix, text, "CHANNEL", index)` returned `0` (success) and never arrived, matching reports from other Forever addon authors. They also see addon whispers and party messages arrive, while `YELL` returns error 4. The channel link now uses the channel for presence only and whispers each message to every other Character in it (`docs/design/code-structure.md`, the link port). Still to check on Forever: whether addon whispers reach a "First Last" name as the member list prints it, and whether cross-faction whispers arrive.
+At launch, on the live Forever client, two Members in the same Crew channel could see each other in `/chatlist`, but BFF never synced. A test addon message sent with `C_ChatInfo.SendAddonMessage(prefix, text, "CHANNEL", index)` returned `0` (success) and never arrived, matching reports from other Forever addon authors. They also see addon whispers and party messages arrive, while `YELL` returns error 4. The channel link now uses the channel for presence only and whispers each message to every other Character in it (`docs/design/code-structure.md`, the link port). An addon whisper to a "First Last" name, written as the member list prints it (`SendAddonMessage(prefix, text, "WHISPER", "Moorwyn Stormgaard")`), arrived; the receiver's `sender` was `Ironfist Dawncrusher`, with no realm. Still to check on Forever: whether cross-faction whispers arrive.
 
 ## Answer (retail)
 
