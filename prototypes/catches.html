@@ -3,7 +3,9 @@
   PROTOTYPE, throwaway. Question: what should Catches (a Crew-wide catch collection, filled in the
   first time any Member catches each kind of fish or fishing find) look like in the panel?
   Three structurally different variants, switchable with ?variant=A|B|C, the bottom bar or ← →:
-    A · Field guide: a grid of tiles by category, uncaught ones as dim outlines. Collection-first.
+    A · Field guide: a grid of tiles, uncaught ones as dim outlines. Collection-first.
+        Round 2 (picked): a Show filter picker and a Group picker (Where to fish, the default, or Type),
+        both the app's 20px picker opening the game's context menu, as the Roster's Sort.
     B · Ledger: a row per kind, who caught it first and when. Story-first, like the Feed.
     C · Waters: a row per stretch of water (by level), its types as chips. Where-to-fish-first.
   Toggles: counts (Crew total only vs per Member), uncaught names (??? vs shown), a new Crew vs a
@@ -76,7 +78,27 @@
 
   .btn { font-size:12px; padding:2px 8px; background:rgba(255,255,255,.06); color:var(--text); border:0; cursor:pointer; font-family:inherit; }
 
+  /* Pickers, as the Roster's Sort and the When tab's Show: a 20px secondary plate, 1px border, a lead icon. */
+  .pickers { display:flex; gap:6px; margin-top:8px; justify-content:flex-end; }
+  .picker { height:20px; display:flex; align-items:center; gap:4px; padding:0 8px; background:rgba(255,255,255,.06);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.10); color:var(--muted); font-size:12px; cursor:pointer; }
+  .picker:hover { background:rgba(255,255,255,.11); }
+  .picker svg { flex:none; }
+  .menu { position:fixed; z-index:60; background:rgba(8,8,12,.96); border:1px solid rgba(255,255,255,.25); padding:6px 0; min-width:150px; font-size:13px; }
+  .menu .mt { color:var(--gold); padding:2px 12px 4px; font-size:12px; }
+  .menu .mi { display:flex; align-items:center; gap:8px; padding:3px 12px; cursor:pointer; color:var(--text); }
+  .menu .mi:hover { background:rgba(255,255,255,.08); }
+  .menu .mi .dot { width:9px; height:9px; border-radius:50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.4); }
+  .menu .mi.on .dot { background:var(--gold); box-shadow:none; }
+  .menu .mi .n { margin-left:auto; color:var(--dim); font-size:12px; }
+
   /* A · Field guide */
+  .fg-sec .where { font-size:12px; color:var(--dim); margin:-3px 0 6px; }
+  .fg-sec .h .nm { font-family:"Friz Quadrata TT", Cinzel, Georgia, serif; font-size:12px; text-transform:none; letter-spacing:0; color:var(--text); }
+  .fg-sec .h .lv { color:var(--dim); font-size:12px; margin-left:6px; }
+  .fg-sec .h .pc { font-size:12px; color:var(--muted); }
+  .fg-sec .h .pc.done { color:var(--text); }
+  .fg-sec + .fg-sec.water { border-top:1px solid var(--line); padding-top:8px; }
   .fg-sec { padding:8px 12px 2px; }
   .fg-sec .h { display:flex; justify-content:space-between; margin-bottom:6px; }
   .fg-grid { display:flex; flex-wrap:wrap; gap:4px; }
@@ -271,7 +293,7 @@ const VARIANTS = [["A","Field guide"],["B","Ledger"],["C","Waters"]];
 const state = {
   variant: VARIANTS.some(v => v[0] === q.get("variant")) ? q.get("variant") : "A",
   counts: q.get("counts") === "member", names: q.get("names") === "show", crew: q.get("crew") === "new" ? "new" : "seasoned",
-  min: q.get("size") === "min", filter:"all", sort:"new", open:null,
+  min: q.get("size") === "min", filter:"all", group: q.get("group") === "type" ? "type" : "where", menu:null, sort:"new", open:null,
 };
 function save() {
   const p = new URLSearchParams({ variant: state.variant });
@@ -279,6 +301,7 @@ function save() {
   if (state.names) p.set("names","show");
   if (state.crew === "new") p.set("crew","new");
   if (state.min) p.set("size","min");
+  if (state.group === "type") p.set("group","type");
   try { history.replaceState(null, "", "?" + p); } catch (e) { /* inline preview */ }
 }
 
@@ -327,25 +350,64 @@ function freshList(view, max) {
     .map(([kid, e]) => ({ k: KIND[kid], e }));
 }
 
-// A · Field guide
+// A · Field guide, with a Show filter and a Group picker (by where you fish, or by type).
+const FILTERS = [["all","All"],["fish","Fish"],["rare","Rare catches"],["treasure","Treasure"],["missing","Not caught yet"]];
+const GROUPS = [["where","Where to fish"],["type","Type"]];
+const FUNNEL = `<svg width="10" height="8" viewBox="0 0 10 8" fill="currentColor"><rect x="0" y="0" width="10" height="2"/><rect x="2" y="3" width="6" height="2"/><rect x="4" y="6" width="2" height="2"/></svg>`;
+const SORTICON = `<svg width="11" height="9" viewBox="0 0 11 9" fill="currentColor"><rect x="2" y="0" width="1" height="1"/><rect x="1" y="1" width="3" height="1"/><rect x="0" y="2" width="5" height="1"/><rect x="2" y="3" width="1" height="6"/><rect x="8" y="0" width="1" height="6"/><rect x="6" y="6" width="5" height="1"/><rect x="7" y="7" width="3" height="1"/><rect x="8" y="8" width="1" height="1"/></svg>`;
+const passes = (k, view) => state.filter === "all" ? true : state.filter === "missing" ? !view[k.id] : k.cat === state.filter;
 function variantA(view) {
-  const filters = [["all","All"],...CATS.map(c => [c[0], c[1].split(" ")[0]])];
-  let html = summary(view, `<div class="chips" style="margin-top:8px">${filters.map(([id, l]) =>
-    `<span class="chip${state.filter === id ? " on" : ""}" data-filter="${id}">${l}</span>`).join("")}</div>`);
+  const fl = FILTERS.find(f => f[0] === state.filter)[1], gl = GROUPS.find(g => g[0] === state.group)[1];
+  let html = summary(view, `<div class="pickers">` +
+    `<span class="picker" data-menu="group">${SORTICON}Group: ${gl}</span>` +
+    `<span class="picker" data-menu="filter">${FUNNEL}Show: ${fl}</span></div>`);
   html += `<div class="scroll">`;
-  CATS.forEach(([cat, label]) => {
-    if (state.filter !== "all" && state.filter !== cat) return;
-    const ks = KINDS.filter(k => k.cat === cat), got = ks.filter(k => view[k.id]).length;
-    html += `<div class="fg-sec"><div class="h"><span class="label">${label}</span><span class="label">${got} / ${ks.length}</span></div>` +
-      `<div class="fg-grid">${ks.map(k => icon(k, view[k.id], 28)).join("")}</div></div>`;
+  const sections = state.group === "where"
+    ? WATERS.map(w => ({ water:w, ks: KINDS.filter(k => k.water === w.id) }))
+    : CATS.map(([cat, label]) => ({ label, ks: KINDS.filter(k => k.cat === cat) }));
+  let any = false;
+  sections.forEach(sec => {
+    const shown = sec.ks.filter(k => passes(k, view));
+    if (!shown.length) return;
+    any = true;
+    const got = sec.ks.filter(k => view[k.id]).length, done = got === sec.ks.length;
+    if (sec.water) {
+      const w = sec.water;
+      html += `<div class="fg-sec water"><div class="h"><span><span class="nm">${w.name}</span><span class="lv">${w.lv}</span></span>` +
+        `<span class="pc${done ? " done" : ""}">${got} / ${sec.ks.length}</span></div><div class="where">${w.where}</div>` +
+        `<div class="fg-grid">${shown.map(k => icon(k, view[k.id], 28)).join("")}</div></div>`;
+    } else {
+      html += `<div class="fg-sec"><div class="h"><span class="label">${sec.label}</span><span class="label">${got} / ${sec.ks.length}</span></div>` +
+        `<div class="fg-grid">${shown.map(k => icon(k, view[k.id], 28)).join("")}</div></div>`;
+    }
   });
+  if (!any) html += `<div style="padding:16px 12px" class="muted">Nothing to show. The Crew has caught every type.</div>`;
   html += `</div>`;
   const fresh = freshList(view, state.min ? 2 : 3);
   if (fresh.length) html += `<div class="fg-fresh"><div class="label" style="margin-bottom:2px">Fresh</div>` + fresh.map(({ k, e }) =>
     `<div class="r">${icon(k, e, 16)}<span class="t"><span class="c-${cls(e.first)}">${who(e.first)}</span> ` +
-    `<span class="gold">${k.cat === "rare" ? "caught " + k.name : "caught the first " + k.name.replace(/^Raw /, "")}</span></span><span class="dim">${ago(e.first.ago)}</span></div>`).join("") + `</div>`;
+    `<span class="gold">${k.cat === "rare" ? "caught " + k.name : "caught the first " + k.name.replace(/^Raw /, "")}</span></span><span class="dim">${e.first.zone} · ${ago(e.first.ago)}</span></div>`).join("") + `</div>`;
   return html;
 }
+
+// The picker's menu: the game's context menu, a title and radio items (as the Roster's Sort by).
+function openMenu(kind, el) {
+  closeMenu();
+  const view = window.__view;
+  const items = kind === "filter"
+    ? FILTERS.map(([id, l]) => [id, l, id === "all" ? KINDS.length : KINDS.filter(k => id === "missing" ? !view[k.id] : k.cat === id).length])
+    : GROUPS.map(([id, l]) => [id, l, null]);
+  const cur = kind === "filter" ? state.filter : state.group;
+  const m = document.createElement("div");
+  m.className = "menu";
+  m.innerHTML = `<div class="mt">${kind === "filter" ? "Show" : "Group by"}</div>` + items.map(([id, l, n]) =>
+    `<div class="mi${id === cur ? " on" : ""}" data-pick="${kind}:${id}"><span class="dot"></span>${l}${n != null ? `<span class="n">${n}</span>` : ""}</div>`).join("");
+  document.body.appendChild(m);
+  const r = el.getBoundingClientRect();
+  m.style.left = r.left + "px"; m.style.top = r.bottom + 2 + "px";
+  state.menu = m;
+}
+function closeMenu() { if (state.menu) { state.menu.remove(); state.menu = null; } }
 
 // B · Ledger
 function variantB(view) {
@@ -469,16 +531,21 @@ document.addEventListener("mouseover", e => {
   tip.style.left = Math.min(r.right + 6, innerWidth - 270) + "px"; tip.style.top = r.top - 4 + "px";
 });
 document.addEventListener("click", e => {
+  const pk = e.target.closest("[data-pick]"), mn = e.target.closest("[data-menu]");
+  if (pk) { const [kind, id] = pk.dataset.pick.split(":"); state[kind === "filter" ? "filter" : "group"] = id; closeMenu(); render(); return; }
+  if (mn) { const open = state.menu && state.menu.dataset.for === mn.dataset.menu; closeMenu(); if (!open) { openMenu(mn.dataset.menu, mn); state.menu.dataset.for = mn.dataset.menu; } return; }
+  if (!e.target.closest(".menu")) closeMenu();
   const f = e.target.closest("[data-filter]"), s = e.target.closest("[data-sort]"), o = e.target.closest("[data-open]");
   if (f) { state.filter = f.dataset.filter; render(); }
   if (s) { state.sort = s.dataset.sort; render(); }
   if (o) { const id = +o.dataset.open; state.open = state.open === id ? null : id; render(); }
 });
-const cycle = d => { const i = VARIANTS.findIndex(v => v[0] === state.variant); state.variant = VARIANTS[(i + d + VARIANTS.length) % VARIANTS.length][0]; render(); };
+const cycle = d => { closeMenu(); const i = VARIANTS.findIndex(v => v[0] === state.variant); state.variant = VARIANTS[(i + d + VARIANTS.length) % VARIANTS.length][0]; render(); };
 document.getElementById("prev").onclick = () => cycle(-1);
 document.getElementById("next").onclick = () => cycle(1);
 document.addEventListener("keydown", e => {
   if (e.target.closest("input, textarea, [contenteditable]")) return;
+  if (e.key === "Escape") closeMenu();
   if (e.key === "ArrowLeft") cycle(-1);
   if (e.key === "ArrowRight") cycle(1);
 });
