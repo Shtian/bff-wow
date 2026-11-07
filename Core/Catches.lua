@@ -471,7 +471,7 @@ end
 -- While you were away's line over the Crew's catches (collect()'s view):
 -- the counted types others first caught after since, "4 new types caught
 -- (Tor 3, Mira 1)", most first. Nil when there are none.
-function Catches.newTypes(view, since)
+function Catches.newTypesLine(view, since)
   local byWho, names, total = {}, {}, 0
   for _, t in ipairs(view.types) do
     local first = t.first

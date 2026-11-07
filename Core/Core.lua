@@ -135,10 +135,11 @@ end
 -- covers) make none.
 -- A Feed entry as a Live event: as describe() gives it, plus figure (the
 -- class of the Member's shown Character, for the toast's figure) while
--- the Camp is on and the Roster shows the Member.
+-- the Camp is on and the Roster shows the Member. A rare find has none: its
+-- toast shows the item.
 local function liveEntry(self, entry)
   local described = self.log:describe(entry)
-  if described.memberId and self:setting("camp") then
+  if described.memberId and described.kind ~= "rareFind" and self:setting("camp") then
     for _, row in ipairs(ns.Roster.rows(self.ledger, self.now())) do
       if row.memberId == described.memberId then described.figure = row.classFilename end
     end
@@ -555,8 +556,8 @@ end
 -- gained) and highlight (max level), and intro is in the Camp's voice.
 local function awaySummary(self)
   if not self:isAwayPopupOn() then return end
-  local newTypes = self.awaySince and ns.Catches.newTypes(self:catches(), self.awaySince)
-  local summary = self.log:takeSummary(self.spareLife:takeNews(), newTypes)
+  local newTypesLine = self.awaySince and ns.Catches.newTypesLine(self:catches(), self.awaySince)
+  local summary = self.log:takeSummary(self.spareLife:takeNews(), newTypesLine)
   if not summary then return end
   if self:setting("camp") then
     local now = self.now()
@@ -569,7 +570,7 @@ end
 
 -- Called once a second. Core decides what is due.
 function Core:tick()
-  -- Written every second, so a crash leaves it right too.
+  -- Every second, since nothing tells Core of a logout.
   self.db.lastOnline = self.now()
   -- Counts the second played.
   if self.playTracker:tick() then self.playTimesDue = true end

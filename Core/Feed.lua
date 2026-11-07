@@ -252,6 +252,11 @@ local function gaveEntries(self, before, after, list)
   end
 end
 
+-- "Tor caught Feralas Ahi".
+local function caughtText(who, item)
+  return ("%s caught %s"):format(who, item)
+end
+
 -- The rare finds in a record that held the rare types in had, as entries
 -- added to list. The time is the catch's, so every client agrees on it.
 local function rareEntries(self, had, record, own, list)
@@ -263,7 +268,7 @@ local function rareEntries(self, had, record, own, list)
     local character = rare.guid and record.characters[rare.guid]
     local who = character and subject(self, record, character, own)
       or own and "You" or memberName(self, record)
-    local entry = newEntry("rareFind", record, own, ("%s caught %s"):format(who, rare.name), character)
+    local entry = newEntry("rareFind", record, own, caughtText(who, rare.name), character)
     entry.time = rare.time
     -- The type keys Reactions (docs/adr/0002).
     entry.catch, entry.itemId, entry.fish, entry.who = rare.id, rare.itemId, rare.name, who
@@ -446,7 +451,7 @@ end
 local function textOf(self, entry)
   if entry.kind == "gave" then return gaveText(self, entry) end
   local look = lookOf(self, entry)
-  if look.text then return ("%s caught %s"):format(entry.who, look.text) end
+  if look.text then return caughtText(entry.who, look.text) end
   return entry.text
 end
 
@@ -710,13 +715,13 @@ end
 -- time, icon, cheer, highlight }), the unseen Reactions to your own,
 -- spares: the Spare notices given (Spares:takeNews), then the
 -- Gives, newest first ({ kind = "gave", text, time }), and catches: the
--- line of new types given (Catches.newTypes, { kind = "catches", text }),
+-- line of new types given (Catches.newTypesLine, { kind = "catches", text }),
 -- then the rare finds, newest first ({ kind, text, time, icon, cheer }), as { members,
 -- goals, spares, professions, catches, count, intro, maxLevel, noticed }, intro
 -- being the scoreboard's "N things happened while you were away." and
 -- maxLevel the top of its level bars. Marks them seen. Nil when there are
 -- none.
-function Feed:takeSummary(spares, newTypes)
+function Feed:takeSummary(spares, newTypesLine)
   spares = spares or {}
   local byMember, ids, goals, gives, professions, catches, count = {}, {}, {}, {}, {}, {}, 0
   for _, entry in ipairs(self.db.feed) do
@@ -755,9 +760,9 @@ function Feed:takeSummary(spares, newTypes)
       memberEntries[#memberEntries + 1] = entry
     end
   end
-  if newTypes then
+  if newTypesLine then
     count = count + 1
-    table.insert(catches, 1, { kind = "catches", text = newTypes })
+    table.insert(catches, 1, { kind = "catches", text = newTypesLine })
   end
   local noticed = takeNoticed(self)
   if count == 0 and #noticed == 0 and #spares == 0 then return nil end

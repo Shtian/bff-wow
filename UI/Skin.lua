@@ -106,6 +106,8 @@ Skin.FEED_EDGES = {
   newProfession = PROFESSION,
   professionSkill = PROFESSION,
   professionMaxed = Skin.GOLD,
+  -- A rare find's edge is its item's quality: none for common.
+  rareFind = false,
 }
 local EDGE_ALPHA = 0.55
 -- A given Reaction's edge: a quiet frame, not gold, so the Feed's gold stays
@@ -188,7 +190,8 @@ Skin.CLEAR_ICONS = {
 -- covered), the edge, and the icon inset 1px with its own bevel cropped.
 -- :SetKind(kind, icon, edge) draws a Feed kind, with the entry's own icon
 -- and edge if it has them (a profession's icon, a rare find's item);
--- :SetPicture(texture, edgeColor) any icon.
+-- :SetPicture(texture, edgeColor) any icon, with no edge when edgeColor is
+-- false.
 function Skin.feedPicture(parent, size)
   local frame = CreateFrame("Frame", nil, parent)
   frame:SetSize(size, size)
@@ -204,6 +207,7 @@ function Skin.feedPicture(parent, size)
   function frame:SetPicture(texture, edgeColor)
     local color = edgeColor or Skin.FEED_ICON_COLOR
     self.edge:SetColorTexture(color[1], color[2], color[3], EDGE_ALPHA)
+    self.edge:SetShown(edgeColor ~= false)
     self.picture:SetTexture(texture)
   end
   function frame:SetKind(kind, icon, edge)

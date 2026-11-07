@@ -296,6 +296,13 @@ describe("Rare finds", function()
     assert.same(edge, entry.edge)
   end)
 
+  it("keeps the item's picture on its toast, with no Camp figure over it", function()
+    local net, clients = crew({ "Ana", "Bob" })
+    assert.is_true(clients[2].core:setting("camp"))
+    send(net, clients[1], AHI)
+    assert.is_nil(live(clients[2], "rareFind")[1].figure)
+  end)
+
   it("reaches the catcher as a Cheer, however many clients made the entry", function()
     local net, clients = crew({ "Ana", "Bob" })
     send(net, clients[1], AHI)
