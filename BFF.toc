@@ -46,6 +46,7 @@ UI/CampSheet.lua
 UI/CampScene.lua
 UI/Panel.lua
 UI/TogetherTab.lua
+UI/CatchesTab.lua
 UI/GoalsTab.lua
 UI/Minimap.lua
 UI/MapPins.lua

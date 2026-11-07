@@ -1,9 +1,9 @@
 -- Catches: the pure parts of the Crew's fishing catches. The list of types
 -- (data: a new type or zone is one row), reading what was fished from
 -- the loot window (handed the API, so offline tests can fake it), how catches are
--- kept in a Member's own record, and the Crew's catches over every record:
--- per type, the earliest catch and the Crew's count. Stateless, tested
--- through Core. See docs/design/catches.md and
+-- kept in a Member's own record, the Crew's catches over every record
+-- (per type, the earliest catch and the Crew's count), and the Catches
+-- tab over them. Stateless, tested through Core. See docs/design/catches.md and
 -- docs/research/fishing-catches.md.
 
 local _, ns = ...
@@ -11,20 +11,21 @@ local _, ns = ...
 local Catches = {}
 ns.Catches = Catches
 
--- Waters by zone level, lowest first. Zones are as an English client names
+-- Waters by zone level, lowest first: low and high are the band's zone
+-- levels (none for New on Forever). Zones are as an English client names
 -- them, for showing which zones a band covers.
 Catches.WATERS = {
-  { id = "1-10", name = "Level 1–10", zones = { "Elwynn Forest", "Dun Morogh", "Teldrassil", "Durotar", "Mulgore",
+  { id = "1-10", low = 1, high = 10, name = "Level 1–10", zones = { "Elwynn Forest", "Dun Morogh", "Teldrassil", "Durotar", "Mulgore",
     "Tirisfal Glades", "the capitals" } },
-  { id = "10-25", name = "Level 10–25", zones = { "Westfall", "Loch Modan", "Darkshore", "Silverpine Forest",
+  { id = "10-25", low = 10, high = 25, name = "Level 10–25", zones = { "Westfall", "Loch Modan", "Darkshore", "Silverpine Forest",
     "The Barrens", "Redridge Mountains" } },
-  { id = "20-35", name = "Level 20–35", zones = { "Ashenvale", "Duskwood", "Hillsbrad Foothills", "Wetlands",
+  { id = "20-35", low = 20, high = 35, name = "Level 20–35", zones = { "Ashenvale", "Duskwood", "Hillsbrad Foothills", "Wetlands",
     "Stonetalon Mountains", "Thousand Needles" } },
-  { id = "30-45", name = "Level 30–45", zones = { "Stranglethorn Vale", "Arathi Highlands", "Alterac Mountains",
+  { id = "30-45", low = 30, high = 45, name = "Level 30–45", zones = { "Stranglethorn Vale", "Arathi Highlands", "Alterac Mountains",
     "Desolace", "Dustwallow Marsh", "Swamp of Sorrows" } },
-  { id = "40-55", name = "Level 40–55", zones = { "Tanaris", "Feralas", "The Hinterlands", "Azshara", "Felwood",
+  { id = "40-55", low = 40, high = 55, name = "Level 40–55", zones = { "Tanaris", "Feralas", "The Hinterlands", "Azshara", "Felwood",
     "Un'Goro Crater" } },
-  { id = "50-60", name = "Level 50–60", zones = { "Western Plaguelands", "Eastern Plaguelands", "Winterspring",
+  { id = "50-60", low = 50, high = 60, name = "Level 50–60", zones = { "Western Plaguelands", "Eastern Plaguelands", "Winterspring",
     "Burning Steppes", "Silithus", "Moonglade", "Deadwind Pass" } },
   { id = "new", name = "New on Forever", zones = { "Riverglades", "Gilneas", "Shen'dralas", "Mount Hyjal",
     "Shark-Infested Waters" } },
@@ -43,24 +44,30 @@ end)()
 -- and icon come from the item ID. kind: "fish", "quest" (Nat Pagle's),
 -- "bloated", "family", "contest" or "treasure". waters: lowest first.
 -- extra: shown but never counted, and why: "season", "contest" or
--- "unconfirmed" (not confirmed on Forever yet).
-local function fish(id, name, waters, extra)
-  return { id = id, name = name, kind = "fish", waters = waters, extra = extra }
+-- "unconfirmed" (not confirmed on Forever yet). note: a line for the
+-- tooltip, where there's something to know (where it bites, how to open it).
+local OPEN = "Right-click it to open it"
+local LOCKED = "Needs lockpicking"
+local CONTEST = "Only on Sundays, in the Stranglethorn Fishing Extravaganza (a fishing contest)"
+local function fish(id, name, waters, note, extra)
+  return { id = id, name = name, kind = "fish", waters = waters, note = note, extra = extra }
 end
-local function quest(id, name, waters)
-  return { id = id, name = name, kind = "quest", waters = waters }
+local function quest(id, name, waters, where)
+  return { id = id, name = name, kind = "quest", waters = waters, note = "For Nat Pagle's quest. " .. where }
 end
 local function bloated(id, name, waters)
-  return { id = id, name = name, kind = "bloated", waters = waters }
+  return { id = id, name = name, kind = "bloated", waters = waters, note = OPEN }
 end
-local function family(id, name, items, waters)
-  return { id = id, name = name, kind = "family", items = items, waters = waters }
+local function family(id, name, fishName, items, waters)
+  return { id = id, name = name, kind = "family", items = items, waters = waters,
+    note = ('Any %s with a weight in its name, like "19 Pound Catfish". Any weight counts. Heavier ones sell for more')
+      :format(fishName) }
 end
 local function contest(id, name)
-  return { id = id, name = name, kind = "contest", waters = { W4 }, extra = "contest" }
+  return { id = id, name = name, kind = "contest", waters = { W4 }, note = CONTEST, extra = "contest" }
 end
-local function treasure(id, name, waters)
-  return { id = id, name = name, kind = "treasure", waters = waters, extra = "unconfirmed" }
+local function treasure(id, name, waters, note)
+  return { id = id, name = name, kind = "treasure", waters = waters, note = note, extra = "unconfirmed" }
 end
 
 Catches.TYPES = {
@@ -68,33 +75,33 @@ Catches.TYPES = {
   fish(6291, "Raw Brilliant Smallfish", { W1, W2, W3 }),
   fish(6303, "Raw Slitherskin Mackerel", { W1, W2 }),
   fish(6289, "Raw Longjaw Mud Snapper", { W1, W2, W3 }),
-  fish(6299, "Sickly Looking Fish", { W1 }),
-  fish(6317, "Raw Loch Frenzy", { W2 }),
+  fish(6299, "Sickly Looking Fish", { W1 }, "Tirisfal Glades"),
+  fish(6317, "Raw Loch Frenzy", { W2 }, "Only in Loch Modan"),
   fish(6361, "Raw Rainbow Fin Albacore", { W2, W3 }),
   fish(6308, "Raw Bristle Whisker Catfish", { W2, W3, W4 }),
   fish(21071, "Raw Sagefish", { W2, W3 }),
-  fish(6522, "Deviate Fish", { W2 }),
-  fish(12238, "Darkshore Grouper", { W2 }),
+  fish(6522, "Deviate Fish", { W2 }, "The Barrens, in the pools near Wailing Caverns"),
+  fish(12238, "Darkshore Grouper", { W2 }, "Darkshore"),
   fish(6358, "Oily Blackmouth", { W3, W4, W5 }),
   fish(6359, "Firefin Snapper", { W3, W4, W5 }),
   fish(8365, "Raw Mithril Head Trout", { W4, W5, W6 }),
   fish(6362, "Raw Rockscale Cod", { W4, W5 }),
-  fish(21153, "Raw Greater Sagefish", { W4 }),
+  fish(21153, "Raw Greater Sagefish", { W4 }, "Alterac Mountains, Stranglethorn Vale"),
   fish(4603, "Raw Spotted Yellowtail", { W4, W5 }),
   fish(13754, "Raw Glossy Mightfish", { W4, W5 }),
   fish(13422, "Stonescale Eel", { W4, W5, W6 }),
   fish(13758, "Raw Redgill", { W5, W6 }),
-  fish(13759, "Raw Nightfin Snapper", { W5, W6 }),
-  fish(13760, "Raw Sunscale Salmon", { W5, W6 }),
-  fish(13893, "Large Raw Mightfish", { W5, W6 }),
-  fish(13888, "Darkclaw Lobster", { W5, W6 }),
+  fish(13759, "Raw Nightfin Snapper", { W5, W6 }, "Bites best at night"),
+  fish(13760, "Raw Sunscale Salmon", { W5, W6 }, "Bites best in the day"),
+  fish(13893, "Large Raw Mightfish", { W5, W6 }, "Azshara, Eastern Plaguelands"),
+  fish(13888, "Darkclaw Lobster", { W5, W6 }, "Azshara, Eastern Plaguelands"),
   fish(13757, "Lightning Eel", { W6 }),
   fish(13889, "Raw Whitescale Salmon", { W6 }),
   -- Nat Pagle's quest fish (4).
-  quest(16970, "Misty Reed Mahi Mahi", { W4 }),
-  quest(16968, "Sar'theris Striker", { W4 }),
-  quest(16969, "Savage Coast Blue Sailfin", { W4 }),
-  quest(16967, "Feralas Ahi", { W5 }),
+  quest(16970, "Misty Reed Mahi Mahi", { W4 }, "Swamp of Sorrows"),
+  quest(16968, "Sar'theris Striker", { W4 }, "Desolace"),
+  quest(16969, "Savage Coast Blue Sailfin", { W4 }, "Stranglethorn Vale"),
+  quest(16967, "Feralas Ahi", { W5 }, "Feralas"),
   -- Bloated fish (10).
   bloated(6643, "Bloated Brilliant Smallfish", { W1, W2 }),
   bloated(6645, "Bloated Mud Snapper", { W1, W2 }),
@@ -107,36 +114,36 @@ Catches.TYPES = {
   bloated(13881, "Bloated Redgill", { W5, W6 }),
   bloated(13891, "Bloated Whitescale Salmon", { W6 }),
   -- Fish sold by weight (7 families).
-  family("mudSnapper", "Mud Snapper (by weight)", { 6292, 6294, 6295 }, { W1, W2 }),
-  family("catfish", "Catfish (by weight)", { 6309, 6310, 6311, 6363, 6364 }, { W2, W3 }),
-  family("yellowtail", "Yellowtail (by weight)", { 13876, 13877, 13878, 13879, 13880 }, { W4, W5 }),
-  family("redgill", "Redgill (by weight)", { 13882, 13883, 13884, 13885, 13886, 13887 }, { W5, W6 }),
-  family("mightfish", "Mightfish (by weight)", { 13914, 13915, 13916, 13917 }, { W5, W6 }),
-  family("lobster", "Lobster (by weight)", { 13907, 13908, 13909, 13910, 13911, 13912, 13913 }, { W5, W6 }),
-  family("salmon", "Salmon (by weight)", { 13901, 13902, 13903, 13904, 13905, 13906 }, { W6 }),
+  family("mudSnapper", "Mud Snapper (by weight)", "Mud Snapper", { 6292, 6294, 6295 }, { W1, W2 }),
+  family("catfish", "Catfish (by weight)", "Catfish", { 6309, 6310, 6311, 6363, 6364 }, { W2, W3 }),
+  family("yellowtail", "Yellowtail (by weight)", "Yellowtail", { 13876, 13877, 13878, 13879, 13880 }, { W4, W5 }),
+  family("redgill", "Redgill (by weight)", "Redgill", { 13882, 13883, 13884, 13885, 13886, 13887 }, { W5, W6 }),
+  family("mightfish", "Mightfish (by weight)", "Mightfish", { 13914, 13915, 13916, 13917 }, { W5, W6 }),
+  family("lobster", "Lobster (by weight)", "Lobster", { 13907, 13908, 13909, 13910, 13911, 13912, 13913 }, { W5, W6 }),
+  family("salmon", "Salmon (by weight)", "Salmon", { 13901, 13902, 13903, 13904, 13905, 13906 }, { W6 }),
   -- Extras: seasonal, the Sunday fishing contest, and not confirmed on
   -- Forever yet.
-  fish(13756, "Raw Summer Bass", { W4, W5, W6 }, "season"),
-  fish(13755, "Raw Winter Squid", { W4, W5 }, "season"),
+  fish(13756, "Raw Summer Bass", { W4, W5, W6 }, "Only in summer", "season"),
+  fish(13755, "Raw Winter Squid", { W4, W5 }, "Only in winter", "season"),
   contest(19807, "Speckled Tastyfish"),
   contest(19805, "Keefer's Angelfish"),
   contest(19806, "Dezian Queenfish"),
   contest(19803, "Brownell's Blue Striped Racer"),
-  fish(251524, "Whimsyfin", { W2 }, "unconfirmed"),
-  fish(13890, "Raw Plated Armorfish", { NEW }, "unconfirmed"),
+  fish(251524, "Whimsyfin", { W2 }, "New on Forever. Reported in Redridge Mountains", "unconfirmed"),
+  fish(13890, "Raw Plated Armorfish", { NEW }, "Forever adds a recipe for it. No one knows yet where it bites", "unconfirmed"),
   treasure(6356, "Battered Chest", { W2, W3 }),
   treasure(6351, "Dented Crate", { W2, W3 }),
   treasure(6352, "Waterlogged Crate", { W2, W3 }),
-  treasure(6354, "Small Locked Chest", { W2, W3 }),
+  treasure(6354, "Small Locked Chest", { W2, W3 }, LOCKED),
   treasure(6357, "Sealed Crate", { W3, W4 }),
-  treasure(6355, "Sturdy Locked Chest", { W3, W4 }),
+  treasure(6355, "Sturdy Locked Chest", { W3, W4 }, LOCKED),
   treasure(13874, "Heavy Crate", { W4, W5 }),
-  treasure(13875, "Ironbound Locked Chest", { W4, W5 }),
+  treasure(13875, "Ironbound Locked Chest", { W4, W5 }, LOCKED),
   treasure(21150, "Iron Bound Trunk", { W4, W5 }),
   treasure(21113, "Watertight Trunk", { W4, W5 }),
   treasure(7973, "Big-mouth Clam", { W4, W5 }),
   treasure(6307, "Message in a Bottle", { W4, W5 }),
-  treasure(13918, "Reinforced Locked Chest", { W5, W6 }),
+  treasure(13918, "Reinforced Locked Chest", { W5, W6 }, LOCKED),
   treasure(21228, "Mithril Bound Trunk", { W5, W6 }),
   treasure(20708, "Tightly Sealed Trunk", { W5, W6 }),
 }
@@ -335,6 +342,7 @@ local function catcher(record, entry, ownId, now)
     subzone = entry.s,
     mapId = entry.m,
   }
+  first.who = first.own and "You" or first.displayName or "Someone"
   first.text = catchText(first)
   return first
 end
@@ -345,6 +353,25 @@ local function earlier(entry, record, best)
   return record.id < best.record.id
 end
 
+-- The other Members who caught something, after the first, in the order
+-- they first caught it: { memberId, displayName, own }.
+local function others(found, ownId)
+  local list = {}
+  if not found then return list end
+  local catchers = {}
+  for _, c in ipairs(found.catchers) do
+    if c.record ~= found.best.record then catchers[#catchers + 1] = c end
+  end
+  table.sort(catchers, function(a, b)
+    if a.entry.t ~= b.entry.t then return a.entry.t < b.entry.t end
+    return a.record.id < b.record.id
+  end)
+  for i, c in ipairs(catchers) do
+    list[i] = { memberId = c.record.id, displayName = c.record.displayName, own = c.record.id == ownId }
+  end
+  return list
+end
+
 -- The Crew's catches over the given records (ownId: your Member id, now:
 -- the time). See Core:catches().
 function Catches.collect(records, ownId, now)
@@ -353,10 +380,11 @@ function Catches.collect(records, ownId, now)
     for key, entry in valid(record) do
       local f = found[key]
       if not f then
-        f = { count = 0 }
+        f = { count = 0, catchers = {} }
         found[key] = f
       end
       f.count = f.count + entry.n
+      f.catchers[#f.catchers + 1] = { entry = entry, record = record }
       if earlier(entry, record, f.best) then f.best = { entry = entry, record = record } end
     end
   end
@@ -366,15 +394,16 @@ function Catches.collect(records, ownId, now)
     local f = found[t.id]
     view.types[i] = {
       id = t.id, itemId = t.itemId, items = t.items, name = t.name, kind = t.kind, waters = t.waters,
-      extra = t.extra, count = f and f.count or 0,
+      extra = t.extra, note = t.note, count = f and f.count or 0,
       first = f and catcher(f.best.record, f.best.entry, ownId, now) or nil,
+      others = others(f, ownId),
     }
     if f and not t.extra then view.caught = view.caught + 1 end
   end
   for key, f in pairs(found) do
     if not BY_ID[key] then
       view.unlisted[#view.unlisted + 1] = { itemId = key, count = f.count,
-        first = catcher(f.best.record, f.best.entry, ownId, now) }
+        first = catcher(f.best.record, f.best.entry, ownId, now), others = others(f, ownId) }
     end
   end
   table.sort(view.unlisted, function(a, b)
@@ -383,4 +412,289 @@ function Catches.collect(records, ownId, now)
   end)
   view.title = ("The Crew has caught %d of %d types."):format(view.caught, view.total)
   return view
+end
+
+-- The Catches tab ------------------------------------------------------
+
+-- The trophy steps: how many types the Crew has caught when a trophy
+-- comes, the last being every type.
+Catches.STEPS = { 10, 20, 30, 40, Catches.TOTAL }
+-- A first catch this recent is fresh: a gold line under its tile, and in
+-- the tab's Recent first catches.
+Catches.FRESH = 3 * 24 * 60 * 60
+local RECENT = 3
+
+-- The Group and Show menus' choices, in order. A tile's category is
+-- what Show's Fish and Rare catches pick.
+local GROUPS = { { id = "where", label = "Where to fish" }, { id = "type", label = "Type" } }
+local SHOWS = {
+  { id = "all", label = "All" },
+  { id = "fish", label = "Fish" },
+  { id = "rare", label = "Rare catches" },
+  { id = "extras", label = "Extras" },
+  { id = "missing", label = "Not caught yet" },
+}
+local CATEGORY = { fish = "fish", quest = "rare", bloated = "rare", family = "rare", contest = "rare" }
+local EXTRA_WHY = {
+  season = "only in one season",
+  contest = "only in the Sunday fishing contest",
+  unconfirmed = "not confirmed on Forever yet",
+}
+local UNLISTED_NOTE = "Not on BFF's list yet. Saved, so it can be added"
+local NAMES_LABEL = "Show names of fish not caught yet"
+
+local function pick(list, id)
+  for _, option in ipairs(list) do
+    if option.id == id then return option end
+  end
+  return list[1]
+end
+
+local WATER_NAME = {}
+for _, w in ipairs(Catches.WATERS) do WATER_NAME[w.id] = w.name end
+
+-- "Tor", "Tor and you", "Tor, Simba and you".
+local function names(list)
+  local words = {}
+  for i, who in ipairs(list) do words[i] = who.own and "you" or who.displayName or "someone" end
+  if #words <= 1 then return words[1] end
+  return table.concat(words, ", ", 1, #words - 1) .. " and " .. words[#words]
+end
+
+local function place(first)
+  local parts = {}
+  if first.zone then parts[#parts + 1] = first.zone end
+  if first.subzone and first.subzone ~= first.zone then parts[#parts + 1] = first.subzone end
+  if #parts == 0 then return first.since end
+  return first.since .. " · " .. table.concat(parts, ", ")
+end
+
+-- A tile's tooltip, under its name (which the game gives; unnamed when it
+-- can't show): note, extra, firstBy and first, when, crew and count, also, none, hint and where (each nil
+-- when there's nothing to say).
+local function tooltip(entry, named)
+  local tip = { unnamed = "???" }
+  if named then tip.note = entry.note end
+  if entry.extra then tip.extra = "Extra, not counted: " .. EXTRA_WHY[entry.extra] end
+  if entry.first then
+    tip.first = entry.first
+    tip.firstBy = "First caught by"
+    tip.when = place(entry.first)
+    tip.crew = "The Crew has caught"
+    tip.count = entry.count
+    if #entry.others > 0 then tip.also = "Also caught by " .. names(entry.others) end
+  else
+    tip.none = "No one in the Crew has caught this yet."
+    if not named then tip.hint = "To see its name: Show > " .. NAMES_LABEL end
+  end
+  if entry.waters then
+    local where = {}
+    for i, id in ipairs(entry.waters) do where[i] = WATER_NAME[id] end
+    tip.where = "Where: " .. table.concat(where, ", ")
+  end
+  return tip
+end
+
+local function tile(entry, opts)
+  local caught = entry.first ~= nil
+  local named = caught or opts.names
+  return {
+    id = entry.id or entry.itemId,
+    itemId = entry.itemId,
+    name = entry.name or ("Item %d"):format(entry.itemId),
+    caught = caught,
+    named = named,
+    fresh = caught and opts.now - entry.first.time < Catches.FRESH,
+    extra = entry.extra,
+    unlisted = entry.unlisted,
+    category = not entry.unlisted and CATEGORY[entry.kind] or nil,
+    first = entry.first,
+    tooltip = tooltip(entry, named),
+  }
+end
+
+-- Whether Show's choice shows a tile.
+local function shows(show, t)
+  if show == "all" then return true end
+  if show == "missing" then return not t.caught end
+  if show == "extras" then return t.extra ~= nil end
+  return t.category == show
+end
+
+-- The sections before Show picks from them: each { title, sub, tiles,
+-- extras, uncounted (its count is how many were caught) and always
+-- (shown under All even when empty) }.
+local function sectionsFor(group, tiles)
+  local sections = {}
+  if group == "type" then
+    local fishes = { title = "Fish", tiles = {} }
+    local rare = { title = "Rare catches", tiles = {} }
+    local unlisted = { title = "Not on the list yet", sub = "Not counted", tiles = {}, uncounted = true }
+    for _, t in ipairs(tiles) do
+      if t.unlisted then
+        unlisted.tiles[#unlisted.tiles + 1] = t
+      elseif not t.extra then
+        local s = t.category == "fish" and fishes or rare
+        s.tiles[#s.tiles + 1] = t
+      end
+    end
+    sections = { fishes, rare }
+    if #unlisted.tiles > 0 then sections[3] = unlisted end
+  else
+    local byWater = {}
+    for i, w in ipairs(Catches.WATERS) do
+      sections[i] = { title = w.name, sub = table.concat(w.zones, ", "), tiles = {}, always = w.id == NEW }
+      byWater[w.id] = sections[i]
+    end
+    for _, t in ipairs(tiles) do
+      if t.unlisted then
+        local s = byWater[NEW]
+        s.tiles[#s.tiles + 1] = t
+      elseif not t.extra then
+        local s = byWater[t.water]
+        s.tiles[#s.tiles + 1] = t
+      end
+    end
+  end
+  local extras = { title = "Extras", sub = "Not counted", tiles = {}, extras = true, uncounted = true }
+  for _, t in ipairs(tiles) do
+    if t.extra then extras.tiles[#extras.tiles + 1] = t end
+  end
+  sections[#sections + 1] = extras
+  return sections
+end
+
+-- A section's count on the right: "8 / 12" for counted types, "2 caught"
+-- for a section that isn't counted, nil when it has neither.
+local function counted(s)
+  local n, got, caught = 0, 0, 0
+  for _, t in ipairs(s.tiles) do
+    if t.caught then caught = caught + 1 end
+    if not t.extra and not t.unlisted then
+      n = n + 1
+      if t.caught then got = got + 1 end
+    end
+  end
+  if n > 0 then return ("%d / %d"):format(got, n), n, got end
+  if s.uncounted then return ("%d caught"):format(caught) end
+  return nil
+end
+
+local function levelWaters(level)
+  local found
+  for _, w in ipairs(Catches.WATERS) do
+    if w.low and level and level >= w.low then found = w end
+  end
+  return found
+end
+
+-- The Catches tab over the Crew's catches (collect()'s view). opts: group
+-- ("where" or "type"), show ("all", "fish", "rare", "extras" or
+-- "missing"), names (show names of types not caught yet), now and level
+-- (the Character you play, or nil). See Core:catchesTab().
+function Catches.tab(view, opts)
+  local group = pick(GROUPS, opts.group)
+  local show = pick(SHOWS, opts.show)
+  local tiles = {}
+  for i, entry in ipairs(view.types) do
+    local t = tile(entry, opts)
+    -- Each type shows once, in the lowest water it's found in.
+    t.water = entry.waters[1]
+    tiles[i] = t
+  end
+  local unlisted = {}
+  for _, entry in ipairs(view.unlisted) do
+    local t = tile({ itemId = entry.itemId, count = entry.count, first = entry.first, others = entry.others,
+      note = UNLISTED_NOTE, unlisted = true }, opts)
+    tiles[#tiles + 1] = t
+    unlisted[#unlisted + 1] = t
+  end
+
+  local tab = { caught = view.caught, total = view.total, done = view.caught >= view.total }
+  if tab.done then
+    tab.count = ("All %d types caught"):format(view.total)
+    tab.next = "Every type on the list. Extras and new finds still show up below."
+  else
+    tab.count = ("%d of %d types caught"):format(view.caught, view.total)
+    tab.countOf = ("of %d types caught"):format(view.total)
+    for _, step in ipairs(Catches.STEPS) do
+      if step > view.caught then
+        tab.next = ("Next trophy at %s: %d more to catch"):format(
+          step == view.total and "every type" or step .. " types", step - view.caught)
+        break
+      end
+    end
+  end
+  tab.fill = view.total > 0 and view.caught / view.total or 0
+  tab.ticks = {}
+  for i = 1, #Catches.STEPS - 1 do
+    if view.total > 0 then tab.ticks[i] = Catches.STEPS[i] / view.total end
+  end
+
+  local all = sectionsFor(group.id, tiles)
+  local function filtered(id)
+    local list = {}
+    for _, s in ipairs(all) do
+      local shown = {}
+      for _, t in ipairs(s.tiles) do
+        if (id ~= "extras" or s.extras) and shows(id, t) then shown[#shown + 1] = t end
+      end
+      if #shown > 0 or (s.always and id == "all") then
+        local count, n, got = counted(s)
+        list[#list + 1] = { title = s.title, sub = s.sub, count = count, counted = n, got = got,
+          done = n ~= nil and got == n, tiles = shown, none = #shown == 0 and "Nothing caught here yet" or nil }
+      end
+    end
+    return list
+  end
+  tab.sections = filtered(show.id)
+
+  tab.group = { title = "Group by", label = "Group: " .. group.label, options = {} }
+  for i, option in ipairs(GROUPS) do
+    tab.group.options[i] = { id = option.id, label = option.label, picked = option.id == group.id }
+  end
+  tab.show = { title = "Show", label = "Show: " .. show.label, options = {},
+    names = { label = NAMES_LABEL, value = opts.names and true or false } }
+  for i, option in ipairs(SHOWS) do
+    local count
+    if option.id ~= "all" then
+      count = 0
+      for _, s in ipairs(filtered(option.id)) do count = count + #s.tiles end
+    end
+    tab.show.options[i] = { id = option.id, label = option.label, count = count, picked = option.id == show.id }
+  end
+
+  local anyCaught = #unlisted > 0
+  for _, t in ipairs(tiles) do anyCaught = anyCaught or t.caught end
+  if not anyCaught then
+    local waters = levelWaters(opts.level)
+    tab.empty = {
+      title = "No catches yet",
+      text = "When anyone in the Crew catches a fish, it shows up here. Start in the waters for your level"
+        .. (waters and ": " .. waters.name .. "." or "."),
+    }
+  elseif #tab.sections == 0 then
+    tab.filtered = {
+      title = show.id == "missing" and "The Crew has caught every type." or "Nothing to show for this choice.",
+      text = 'Change "Show" to see more.',
+    }
+  end
+
+  local recent = {}
+  for _, t in ipairs(tiles) do
+    if t.fresh then recent[#recent + 1] = t end
+  end
+  table.sort(recent, function(a, b)
+    if a.first.time ~= b.first.time then return a.first.time > b.first.time end
+    return tostring(a.id) < tostring(b.id)
+  end)
+  tab.recentTitle = "RECENT FIRST CATCHES"
+  tab.recent = {}
+  for i = 1, math.min(RECENT, #recent) do
+    local t = recent[i]
+    local first = t.first
+    tab.recent[i] = { itemId = t.itemId, name = t.name, first = first, caught = "caught",
+      when = first.zone and (first.zone .. " · " .. first.since) or first.since }
+  end
+  return tab
 end

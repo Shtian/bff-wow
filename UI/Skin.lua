@@ -40,6 +40,8 @@ Skin.RANK_SHADES = {
 }
 Skin.TILE_CAPPED = { 1, 1, 1, 0.66 }
 Skin.TILE_NONE = { 1, 1, 1, 0.035 }
+-- A faint mark on the window: a bar's step ticks, a tile's "?".
+Skin.FAINT_MARK = { 1, 1, 1, 0.35 }
 
 Skin.HEADER_HEIGHT = 30
 
@@ -126,6 +128,18 @@ Skin.TROPHY_QUALITIES = {
   epic = { 0.71, 0.36, 0.96 },
   legendary = { 1, 0.5, 0 },
 }
+-- Item quality colours on items in Catches (DESIGN.md, the Catch Colours
+-- Rule): a caught tile's faded edge and an item's name, by the game's
+-- quality number. Common (1) has none: no edge, and its name in Ash Text.
+-- Uncommon to legendary are the same shades as the trophy tiers.
+Skin.ITEM_QUALITIES = {
+  [0] = { 0.62, 0.62, 0.62 },
+  [2] = { 0.12, 1, 0 },
+  [3] = { 0.23, 0.61, 1 },
+  [4] = { 0.71, 0.36, 0.96 },
+  [5] = { 1, 0.5, 0 },
+}
+Skin.ITEM_EDGE_ALPHA = EDGE_ALPHA
 -- Each track's icon, on its Working on tile, its medals (but Every
 -- profession's, which show the profession) and the cabinet.
 Skin.GOAL_ICONS = {
@@ -359,8 +373,10 @@ end
 
 -- Small flat icons, drawn from solid rectangles ({ x, y, width, height }
 -- from the icon's top left) since Arial Narrow has no such glyphs: filter
--- is three narrowing bars, a funnel; sort is an up arrow beside a down one.
+-- is three narrowing bars, a funnel; sort is an up arrow beside a down one;
+-- group is two rows of two squares.
 local ICONS = {
+  group = { width = 10, height = 9, rects = { { 0, 0, 4, 4 }, { 6, 0, 4, 4 }, { 0, 5, 4, 4 }, { 6, 5, 4, 4 } } },
   filter = { width = 10, height = 8, rects = { { 0, 0, 10, 2 }, { 2, 3, 6, 2 }, { 4, 6, 2, 2 } } },
   sort = { width = 11, height = 9, rects = {
     { 2, 0, 1, 1 }, { 1, 1, 3, 1 }, { 0, 2, 5, 1 }, { 2, 3, 1, 6 },
@@ -389,7 +405,7 @@ local function layOutIcon(icon)
   end
 end
 
--- An icon by kind ("filter" or "sort") in a colour; :SetColor recolours it.
+-- An icon by kind ("filter", "sort" or "group") in a colour; :SetColor recolours it.
 function Skin.icon(parent, kind, color)
   local icon = CreateFrame("Frame", nil, parent)
   icon.spec = ICONS[kind]

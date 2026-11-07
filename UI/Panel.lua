@@ -1,6 +1,6 @@
 -- Panel: the BFF window, in the Skin's flat look. Without a Crew it shows
 -- the setup view (display name, Start or Join); in one, a sidebar with
--- Roster, Feed, Goals, When, Spares, Professions, Together and Settings. The Roster has your own row pinned on top,
+-- Roster, Feed, Goals, When, Spares, Professions, Together, Catches and Settings. The Roster has your own row pinned on top,
 -- then a row per Member with expandable Alts, a sort menu, a tooltip and
 -- right-click menu per Character, and a footer with the hidden count,
 -- removed Members and the Crew code. The Feed is a timeline
@@ -14,7 +14,8 @@
 -- Withdraw. Professions is a grid of all twelve professions, a row per
 -- Member and a tile each with their best Character's skill, sortable by a
 -- profession. Together is a level line of friends and dungeons, drawn by
--- TogetherTab. A grip in the bottom right corner resizes the window, and
+-- TogetherTab. Catches is a field guide of the Crew's fishing catches,
+-- drawn by CatchesTab. A grip in the bottom right corner resizes the window, and
 -- Core keeps its size and position; views lay out to the current width
 -- and redraw when a resize ends. While Core has a Camp (camp()), its band
 -- runs across the window under the header, above the sidebar and every
@@ -37,6 +38,11 @@ local SIDEBAR = 124
 local GRIP = 12
 local HEADER = Skin.HEADER_HEIGHT
 local NAV_HEIGHT = 30
+-- The sidebar's first tab sits this far down, Settings this far up, and
+-- there are this many rows: every tab and Settings.
+local NAV_TOP = 8
+local NAV_BOTTOM = 22
+local NAV_ROWS = 9
 local NAV_CHIP_X = 6
 local NAV_CHIP_Y = 2
 local NAV_CHIP_RADIUS = 2
@@ -533,9 +539,10 @@ local function drawSection(count)
   section.line:SetPoint("RIGHT", count > 0 and section.spares or section.sort, "LEFT", -8, 0)
 end
 
--- The sidebar: Roster, Feed, Goals, When, Spares, Professions and Together on top, Settings and
--- the addon's version at the bottom, as plain labels. The selected one's
--- chip marks it.
+-- The sidebar: Roster, Feed, Goals, When, Spares, Professions, Together and Catches on top,
+-- Settings and the addon's version at the bottom, as plain labels. The
+-- selected one's chip marks it. In a short window (the Camp's band takes
+-- room) the tabs get shorter so Settings stays clear of them.
 local function navButton(label, onClick)
   local button = CreateFrame("Button", nil, frame.sidebar)
   button:SetHeight(NAV_HEIGHT)
@@ -564,8 +571,8 @@ local function createNav()
     end
   end
   nav.roster = navButton("Roster", open("roster"))
-  nav.roster:SetPoint("TOPLEFT", 0, -8)
-  nav.roster:SetPoint("TOPRIGHT", 0, -8)
+  nav.roster:SetPoint("TOPLEFT", 0, -NAV_TOP)
+  nav.roster:SetPoint("TOPRIGHT", 0, -NAV_TOP)
   nav.feed = navButton("Feed", open("feed"))
   nav.feed:SetPoint("TOPLEFT", nav.roster, "BOTTOMLEFT")
   nav.feed:SetPoint("TOPRIGHT", nav.roster, "BOTTOMRIGHT")
@@ -588,12 +595,15 @@ local function createNav()
   nav.together = navButton("Dungeons", open("together"))
   nav.together:SetPoint("TOPLEFT", nav.professions, "BOTTOMLEFT")
   nav.together:SetPoint("TOPRIGHT", nav.professions, "BOTTOMRIGHT")
+  nav.catches = navButton("Catches", open("catches"))
+  nav.catches:SetPoint("TOPLEFT", nav.together, "BOTTOMLEFT")
+  nav.catches:SetPoint("TOPRIGHT", nav.together, "BOTTOMRIGHT")
   -- The panel steps aside so it doesn't cover the settings.
   nav.settings = navButton("Settings", function()
     if ns.Settings.open() then frame:Hide() end
   end)
-  nav.settings:SetPoint("BOTTOMLEFT", 0, 22)
-  nav.settings:SetPoint("BOTTOMRIGHT", 0, 22)
+  nav.settings:SetPoint("BOTTOMLEFT", 0, NAV_BOTTOM)
+  nav.settings:SetPoint("BOTTOMRIGHT", 0, NAV_BOTTOM)
   nav.version = Skin.label(frame.sidebar, "tiny", DIM)
   nav.version:SetPoint("BOTTOMLEFT", NAV_CHIP_X + 10, 10)
   nav.version:SetText(ns.VERSION)
@@ -610,7 +620,16 @@ local function drawNav(unseen, sparesUnseen)
   setSelected(nav.spares, tab == "spares")
   setSelected(nav.professions, tab == "professions")
   setSelected(nav.together, tab == "together")
+  setSelected(nav.catches, tab == "catches")
   setSelected(nav.settings, false)
+  -- Every tab and Settings, the sidebar's top inset and Settings' room
+  -- under it.
+  local sidebarHeight = frame:GetHeight() - HEADER - campHeight - 1
+  local height = math.min(NAV_HEIGHT, math.floor((sidebarHeight - NAV_TOP - NAV_BOTTOM) / NAV_ROWS))
+  for _, button in ipairs({ nav.roster, nav.feed, nav.goals, nav.when, nav.spares, nav.professions, nav.together,
+    nav.catches, nav.settings }) do
+    button:SetHeight(height)
+  end
   nav.feed.badge:SetText(unseen)
   nav.feed.badge:SetShown(unseen > 0 and tab ~= "feed")
   nav.spares.badge:SetText(sparesUnseen)
@@ -1844,7 +1863,7 @@ local function drawFooter(crew, summary)
 end
 
 -- Hides every tab's view but the one named ("roster", "feed", "goals",
--- "when", "spares", "professions", "together"; nil hides them all). Each draw function shows
+-- "when", "spares", "professions", "together", "catches"; nil hides them all). Each draw function shows
 -- its own.
 local function hideViewsBut(name)
   if name ~= "roster" then
@@ -1860,6 +1879,7 @@ local function hideViewsBut(name)
   if name ~= "spares" and sparesView then sparesView:Hide() end
   if name ~= "professions" and professionsView then professionsView:Hide() end
   if name ~= "together" then ns.TogetherTab.hide() end
+  if name ~= "catches" then ns.CatchesTab.hide() end
 end
 
 local function drawRoster(crew, summary)
@@ -1944,6 +1964,8 @@ function Panel.refresh()
     drawProfessions()
   elseif tab == "together" then
     ns.TogetherTab.draw(frame.content, core)
+  elseif tab == "catches" then
+    ns.CatchesTab.draw(frame.content, core)
   else
     drawRoster(crew, summary)
   end
@@ -1969,7 +1991,7 @@ function Panel.toggle()
 end
 
 -- Opens the panel on a tab: "roster", "feed", "goals", "when", "spares",
--- "professions" or "together".
+-- "professions", "together" or "catches".
 function Panel.show(name)
   if not frame then create() end
   tab = name
