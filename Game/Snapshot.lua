@@ -3,7 +3,8 @@
 -- loses that session's deaths (see docs/design/code-structure.md), and
 -- reads its professions (on PLAYER_ENTERING_WORLD and SKILL_LINES_CHANGED),
 -- where the Character stands for Core's locate(), item info for Spares,
--- and a boss kill's payload with the party for Core's encounterEnded().
+-- a boss kill's payload with the party for Core's encounterEnded(), and
+-- a fishing catch from the loot window for Core's caught().
 
 local _, ns = ...
 
@@ -151,6 +152,27 @@ end
 function Snapshot.encounter(encounterID, _, _, _, success)
   local ok, result = pcall(encounter, encounterID, success)
   return ok and result or nil
+end
+
+-- The loot window, for Catches.read. Fishing's cast events can hide
+-- their spell from addons, and there are 12 Fishing spells, so a catch
+-- is told by IsFishingLoot() alone (docs/research/fishing-catches.md).
+local CATCH_API = {
+  isFishingLoot = IsFishingLoot,
+  getNumLootItems = GetNumLootItems,
+  getLootSlotLink = GetLootSlotLink,
+  getLootSlotInfo = GetLootSlotInfo,
+  zone = GetRealZoneText,
+  subzone = GetSubZoneText,
+  mapId = function() return C_Map.GetBestMapForUnit("player") end,
+  isSecret = issecretvalue,
+}
+
+-- What was fished, read on LOOT_READY: the loot for Core's caught(), or
+-- nil when the loot isn't from fishing (or the client has no such API).
+function Snapshot.catch()
+  if not (IsFishingLoot and GetNumLootItems and GetLootSlotLink and GetLootSlotInfo) then return nil end
+  return ns.Catches.read(CATCH_API)
 end
 
 -- Item info, through C_Item where the client has it.

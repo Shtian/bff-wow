@@ -121,6 +121,26 @@ _Avoid_: Total levels
 The base skill of every Profession of every Character in the Crew, Alts included, summed.
 _Avoid_: Total skill
 
+**Catch**:
+A fishing find a Member has caught, kept in their own record: per type, their first catch (when, where, on which Character) and how many they've caught. **Catches** is the Crew's collection: each type is filled in the first time any Member catches it, credited to whoever caught it earliest. Only what the loot window says came from fishing counts; what's inside a fished chest or clam doesn't.
+_Avoid_: Fish (when meaning any find), loot, collection item
+
+**Type (of Catch)**:
+One entry in BFF's shipped list of what can be fished: a fish, a Nat Pagle quest fish, a bloated fish, or a family of fish sold by weight, where every weight ("19 Pound Catfish") counts as the one type ("Catfish (by weight)"). The list is data, keyed by item ID. "23 of 46 types caught" counts types, never Extras.
+_Avoid_: Kind, species, entry
+
+**Extra (Catch)**:
+A type that's shown but never counted towards the types caught, because not everyone can catch it any time: seasonal fish, the Sunday fishing contest's fish, and anything not yet confirmed on Forever (treasure, Whimsyfin, Raw Plated Armorfish).
+_Avoid_: Bonus, optional, rare
+
+**Unlisted catch**:
+A fished item that isn't on BFF's list, kept in the record anyway (up to a cap) so the list can grow. Not counted, never an Extra; adding it to the list later is one row of data.
+_Avoid_: Unknown catch, other
+
+**Waters**:
+A zone-level band where types are found ("Level 30–45", "New on Forever"), with the zones it covers. Each type lists its waters, lowest first. Kept as data, so a new zone is one row.
+_Avoid_: Fishing spot, pool, zone (when meaning the band)
+
 **Competition**:
 A contest that ranks Members against each other. Unlike a Crew goal, it names who is ahead.
 _Avoid_: Race, leaderboard (when meaning the contest)

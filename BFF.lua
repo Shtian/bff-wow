@@ -198,6 +198,12 @@ eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 -- A boss died: Core decides whether it's a clear.
 eventFrame:RegisterEvent("ENCOUNTER_END")
+-- The loot window filled: Core keeps it if it was fished. With auto-loot
+-- the slots are still filled when LOOT_READY fires. It can fire more than
+-- once for one window, so a window's catch is kept once, until LOOT_CLOSED.
+eventFrame:RegisterEvent("LOOT_READY")
+eventFrame:RegisterEvent("LOOT_CLOSED")
+local lootRead = false
 -- The Camp's art pixel is a whole number of screen pixels: worked out
 -- again when the UI scale or the window changes.
 eventFrame:RegisterEvent("UI_SCALE_CHANGED")
@@ -211,6 +217,18 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     if ns.core then ns.core:bagsUpdated() end
   elseif event == "ENCOUNTER_END" then
     if ns.core then ns.core:encounterEnded(ns.Snapshot.encounter(...)) end
+  elseif event == "LOOT_READY" then
+    -- Marked read only once something fished is found, in case
+    -- IsFishingLoot() isn't true yet at the first LOOT_READY.
+    if ns.core and not lootRead then
+      local loot = ns.Snapshot.catch()
+      if loot then
+        lootRead = true
+        ns.core:caught(loot)
+      end
+    end
+  elseif event == "LOOT_CLOSED" then
+    lootRead = false
   elseif event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
     if ns.core then ns.Panel.refresh() end
   elseif event == "PLAYER_REGEN_ENABLED" then
@@ -304,6 +322,30 @@ function commands.professions()
   ns.Panel.show("professions")
 end
 
+-- An item's name as the game has it, or the list's English name until
+-- it's cached.
+local function itemName(itemId, fallback)
+  local getItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
+  return getItemInfo(itemId) or fallback or ("item " .. itemId)
+end
+
+-- /bff catches prints what the Crew has caught, until Catches has a tab.
+-- Only in a dev checkout, like /bff sim.
+function commands.catches()
+  if not ns.Sim then return say("/bff catches is only in a dev checkout.") end
+  local view = ns.core:catches()
+  say(view.title)
+  for _, t in ipairs(view.types) do
+    if t.first then
+      print(("  %s%s: %d, first by %s"):format(itemName(t.itemId, t.name), t.extra and " (Extra)" or "", t.count,
+        t.first.text))
+    end
+  end
+  for _, u in ipairs(view.unlisted) do
+    print(("  %s (unlisted, item %d): %d, first by %s"):format(itemName(u.itemId), u.itemId, u.count, u.first.text))
+  end
+end
+
 function commands.together()
   ns.Panel.show("together")
 end
@@ -321,7 +363,7 @@ function commands.leave()
   if ns.core:crew() then ns.confirmLeave() else say(MESSAGES.noCrew) end
 end
 
--- /bff sim, /bff sim ding and /bff sim stop, only in a dev checkout
+-- /bff sim, /bff sim ding, /bff sim fish and /bff sim stop, only in a dev checkout
 -- (Dev/ is left out of releases).
 function commands.sim(rest)
   if not ns.Sim then return say("/bff sim is only in a dev checkout.") end
@@ -331,10 +373,13 @@ function commands.sim(rest)
   elseif rest == "ding" then
     local name = ns.Sim.ding()
     say(name and name .. " dinged." or "/bff sim isn't running.")
+  elseif rest == "fish" then
+    local name, itemId = ns.Sim.fish()
+    say(name and ("%s caught item %d. See /bff catches."):format(name, itemId) or "/bff sim isn't running.")
   else
     local ok, reason = ns.Sim.start(ns.core)
     if ok then
-      say("three simulated Members joined. /bff sim ding, /bff sim stop.")
+      say("simulated Members joined. /bff sim ding, /bff sim fish, /bff sim stop.")
     elseif reason == "running" then
       say("/bff sim is already running.")
     else
