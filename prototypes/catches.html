@@ -1,11 +1,11 @@
 <!doctype html>
 <!--
-  PROTOTYPE, throwaway. Question: what should the Creel (a Crew-wide catch collection, filled in the
+  PROTOTYPE, throwaway. Question: what should Catches (a Crew-wide catch collection, filled in the
   first time any Member catches each kind of fish or fishing find) look like in the panel?
   Three structurally different variants, switchable with ?variant=A|B|C, the bottom bar or ← →:
     A · Field guide: a grid of tiles by category, uncaught ones as dim outlines. Collection-first.
     B · Ledger: a row per kind, who caught it first and when. Story-first, like the Feed.
-    C · Waters: a row per stretch of water (by level), its kinds as chips. Where-to-fish-first.
+    C · Waters: a row per stretch of water (by level), its types as chips. Where-to-fish-first.
   Toggles: counts (Crew total only vs per Member), uncaught names (??? vs shown), a new Crew vs a
   seasoned one, and the panel's minimum size (460×380) vs its default (640×520).
   Follows DESIGN.md: gold only for news (a fresh catch, under 3 days), rarity edges in the game's item
@@ -16,7 +16,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>PROTOTYPE · BFF Creel</title>
+<title>PROTOTYPE · BFF Catches</title>
 <style>
   :root {
     --gold:#ffd14a; --gold-rgb:255,209,74; --on-gold:#1a1400; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99;
@@ -157,7 +157,7 @@
 </style>
 </head>
 <body>
-<div class="note">PROTOTYPE · <b>The Creel</b>: the Crew's shared catch collection. Three layouts. Flip with the bar or ← →. Hover anything with an icon.
+<div class="note">PROTOTYPE · <b>Catches</b>: the Crew's shared catch collection. Three layouts. Flip with the bar or ← →. Hover anything with an icon.
   Fish names are illustrative; all data is fake.</div>
 <div class="stage">
   <div class="panel">
@@ -165,7 +165,7 @@
     <div class="body">
       <div class="side">
         <div>Roster</div><div>Feed</div><div>Goals</div><div>When</div><div>Spares</div><div>Professions</div><div>Together</div>
-        <div class="sel">Creel</div>
+        <div class="sel">Catches</div>
         <div class="grow"></div><div>Settings</div>
       </div>
       <div class="content" id="content"></div>
@@ -315,11 +315,11 @@ function icon(k, e, size) {
 function summary(view, extra) {
   const n = Object.keys(view).length, r = nextRung(n), last = [...RUNGS].reverse().find(x => x <= n) || 0;
   const ticks = RUNGS.slice(0, -1).map(x => `<i class="tick" style="left:${(x / KINDS.length) * 100}%"></i>`).join("");
-  return `<div class="summary"><div class="top"><div class="title">The Creel</div>` +
-    `<div class="count">${n} <small>of ${KINDS.length} kinds</small></div></div>` +
+  return `<div class="summary"><div class="top"><div class="title">Catches</div>` +
+    `<div class="count">${n} <small>of ${KINDS.length} types</small></div></div>` +
     `<div class="bar"><i style="width:${(n / KINDS.length) * 100}%"></i>${ticks}</div>` +
-    `<div class="next"><span>${r ? `${r - n} more for the ${r === KINDS.length ? "Every kind" : r + " kinds"} trophy` : "Every kind caught"}</span>` +
-    `<span>${last ? `Trophy: ${last} kinds` : "No Creel trophy yet"}</span></div>${extra || ""}</div>`;
+    `<div class="next"><span>${r ? `${r - n} more for the ${r === KINDS.length ? "All types" : r + " types"} trophy` : "All types caught"}</span>` +
+    `<span>${last ? `Trophy: ${last} types` : "No fishing trophy yet"}</span></div>${extra || ""}</div>`;
 }
 
 function freshList(view, max) {
@@ -395,7 +395,7 @@ function variantC(view) {
   }
   const n = Object.keys(view).length;
   html += `<div style="padding:6px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;flex:none">` +
-    `<span class="label">Waters</span><span class="label">${n} / ${KINDS.length} kinds · next trophy at ${nextRung(n) || "—"}</span></div>`;
+    `<span class="label">Waters</span><span class="label">${n} / ${KINDS.length} types · next trophy at ${nextRung(n) || "—"}</span></div>`;
   html += `<div class="scroll">`;
   WATERS.forEach(w => {
     const ks = KINDS.filter(k => k.water === w.id), got = ks.filter(k => view[k.id]).length, done = got === ks.length;
@@ -417,15 +417,15 @@ function context(view) {
   const medals = RUNGS.map((r, i) => {
     const got = n >= r, foot = ["var(--q2)","var(--q3)","var(--q4)","#ff8000"][i];
     return `<div class="medal${got ? "" : " open"}"><div class="m">${icon({ ...KIND[19], q:1 }, true, 40)}${got ? `<i class="foot" style="background:${foot}"></i>` : ""}</div>` +
-      `<div class="${got && i === 0 && state.crew === "seasoned" ? "gold" : ""}">${r === KINDS.length ? "Every kind" : r + " kinds"}</div><div class="d">${got ? ["3 Nov","5 Nov","",""][i] : `${n}/${r}`}</div></div>`;
+      `<div class="${got && i === 0 && state.crew === "seasoned" ? "gold" : ""}">${r === KINDS.length ? "All types" : r + " types"}</div><div class="d">${got ? ["3 Nov","5 Nov","",""][i] : `${n}/${r}`}</div></div>`;
   }).join("");
   document.getElementById("ctx").innerHTML =
     `<div><div class="cap">Feed entry (Cheer)</div><div class="card feedrow">${icon(k, true, 24)}<div class="tx">${line}<div class="tm">${ago(b.ago)}</div></div><button class="btn">Cheer</button></div></div>` +
     `<div><div class="cap">Toast (Live event)</div><div class="toast">${icon(k, true, 24)}<div class="tx">${line}</div><i class="timer"></i></div></div>` +
-    `<div><div class="cap">Goals tab: a Fishing track</div><div class="card track">${medals}</div></div>` +
+    `<div><div class="cap">Goals tab: a Fishing track (types caught)</div><div class="card track">${medals}</div></div>` +
     `<div><div class="cap">While you were away</div><div class="card" style="font-size:13px">` +
-      `<div class="label" style="margin-bottom:4px">The Creel</div>` +
-      `<div>+${freshList(view, 99).length} kinds since you left <span class="dim">(${[...new Set(freshList(view, 99).map(f => who(f.e.first)))].join(", ") || "none"})</span></div>` +
+      `<div class="label" style="margin-bottom:4px">Catches</div>` +
+      `<div>+${freshList(view, 99).length} new types since you left <span class="dim">(${[...new Set(freshList(view, 99).map(f => who(f.e.first)))].join(", ") || "none"})</span></div>` +
       (fresh ? `<div style="margin-top:3px">${line}</div>` : "") + `</div></div>`;
 }
 
