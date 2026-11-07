@@ -408,7 +408,7 @@ describe("While you were away, for Catches", function()
     assert.is_nil(summary and summary.catches[1])
   end)
 
-  it("leaves out types the Crew had before you logged out", function()
+  it("leaves out types you've already heard of", function()
     local net, clients = crew({ "Bob", "Ana" })
     local bob, ana = clients[1], clients[2]
     send(net, ana, SMALLFISH)
@@ -436,6 +436,142 @@ describe("While you were away, for Catches", function()
     assert.equal("1 new type caught (Ana 1)", summaryOf(bob).catches[1].text)
   end)
 
+  -- Logs the client in afresh and lets sync settle.
+  local function relog(net, client)
+    client:logout()
+    net:run(5)
+    client.events = {}
+    client:login()
+    net:run(40)
+    return summaryOf(client)
+  end
+
+  -- Ana fishes while Bob is offline and logs out before Bob is back, so
+  -- her record can't reach him.
+  local function fishedUnheard(net, bob, ana, ...)
+    bob:logout()
+    net:run(5)
+    ana.core:caught(catch(...))
+    ana:logout()
+    net:run(5)
+  end
+
+  it("counts a catch that reaches you after a session it couldn't reach", function()
+    local net, clients = crew({ "Bob", "Ana" })
+    local bob, ana = clients[1], clients[2]
+    fishedUnheard(net, bob, ana, SMALLFISH)
+    bob:login()
+    net:run(40)
+    bob:logout()
+    net:run(5)
+    bob.events = {}
+    bob:login()
+    ana:login()
+    net:run(40)
+    assert.equal("1 new type caught (Ana 1)", summaryOf(bob).catches[1].text)
+  end)
+
+  it("keeps a catch from while you were away that arrives after the summary for your next login", function()
+    local net, clients = crew({ "Bob", "Ana" })
+    local bob, ana = clients[1], clients[2]
+    fishedUnheard(net, bob, ana, SMALLFISH)
+    bob.events = {}
+    bob:login()
+    net:run(40)
+    assert.is_nil(summaryOf(bob))
+    ana:login()
+    net:run(40)
+    assert.equal("1 new type caught (Ana 1)", relog(net, bob).catches[1].text)
+  end)
+
+  it("tells you of a type once", function()
+    local net, clients = crew({ "Bob", "Ana" })
+    local bob, ana = clients[1], clients[2]
+    bob:logout()
+    net:run(5)
+    send(net, ana, SMALLFISH)
+    bob.events = {}
+    bob:login()
+    net:run(40)
+    assert.equal(1, #summaryOf(bob).catches)
+    local again = relog(net, bob)
+    assert.is_nil(again and again.catches[1])
+  end)
+
+  it("leaves out what was caught while you were both online", function()
+    local net, clients = crew({ "Bob", "Ana" })
+    send(net, clients[2], SMALLFISH)
+    local summary = relog(net, clients[1])
+    assert.is_nil(summary and summary.catches[1])
+  end)
+
+  it("leaves out a type you've caught too, even if a Member was first", function()
+    local net, clients = crew({ "Bob", "Ana" })
+    local bob, ana = clients[1], clients[2]
+    fishedUnheard(net, bob, ana, SMALLFISH)
+    bob:login()
+    net:run(40)
+    bob.core:caught(catch(SMALLFISH))
+    bob:logout()
+    net:run(5)
+    bob.events = {}
+    bob:login()
+    ana:login()
+    net:run(40)
+    local summary = summaryOf(bob)
+    assert.is_nil(summary and summary.catches[1])
+  end)
+
+  it("stays quiet about what the Crew has when this first ships, then counts from there", function()
+    local net, clients = crew({ "Bob", "Ana" })
+    local bob, ana = clients[1], clients[2]
+    send(net, ana, SMALLFISH)
+    bob:logout()
+    net:run(5)
+    bob.db.catchTypesTold = nil
+    send(net, ana, 6303)
+    bob.events = {}
+    bob:login()
+    net:run(40)
+    local summary = summaryOf(bob)
+    assert.is_nil(summary and summary.catches[1])
+    bob:logout()
+    net:run(5)
+    send(net, ana, 6289)
+    bob.events = {}
+    bob:login()
+    net:run(40)
+    assert.equal("1 new type caught (Ana 1)", summaryOf(bob).catches[1].text)
+  end)
+
+  it("forgets what it told you on leaving the Crew", function()
+    local net, clients = crew({ "Bob", "Ana" })
+    local bob, ana = clients[1], clients[2]
+    send(net, ana, SMALLFISH)
+    bob.core:leaveCrew()
+    net:run(5)
+    assert.is_nil(bob.db.catchTypesTold)
+  end)
+
+  it("counts catches from after a Member joined, at their first login back", function()
+    local ns = load()
+    local net = ns.FakeNet.new()
+    local ana = net:add("Ana"):login()
+    local code = ana:join()
+    net:run(40)
+    send(net, ana, SMALLFISH)
+    local bob = net:add("Bob"):login()
+    bob:join(code)
+    net:run(40)
+    bob:logout()
+    net:run(5)
+    send(net, ana, 6303)
+    bob.events = {}
+    bob:login()
+    net:run(40)
+    assert.equal("1 new type caught (Ana 1)", summaryOf(bob).catches[1].text)
+  end)
+
   it("gives a rare find you missed its own line, with a Cheer", function()
     local summary = away(function(net, ana) send(net, ana, TASTYFISH) end)
     local line = summary.catches[1]
@@ -450,7 +586,7 @@ describe("While you were away, for Catches", function()
     assert.equal("Ana caught Feralas Ahi", summary.catches[2].text)
   end)
 
-  it("shows nothing on a first login ever, with no logout to count from", function()
+  it("shows nothing on joining, whatever the Crew has", function()
     local ns = load()
     local net = ns.FakeNet.new()
     local ana = net:add("Ana"):login()

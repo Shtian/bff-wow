@@ -91,7 +91,7 @@ A small frame in the panel's style (#7), laid out as a scoreboard:
 - Columns for the **level** now, **levels gained** and **deaths**. Under the level, a bar from 0 to max level shows the jump: grey for where they started, green for what they gained, and a star beside the level when it reached max level. A new Character shows its level and "new" in green instead of levels gained. The level range goes from the lowest "before" to the highest "after" across that Character's unseen entries.
 - Joined shows in gold beside the Member's name and left in grey; a Member with nothing else gets just that row.
 - Profession news (picked up, milestones, maxed) isn't on the scoreboard: it has a **Professions** section above it, a line each with the profession's icon and a Cheer (`docs/design/professions.md`).
-- Rare finds and the count of new types have a **Catches** section after Professions: "4 new types caught (Tor 3, Mira 1)", then a line per rare find missed with its item's icon and a Cheer (`docs/design/catches.md`). The count is the one thing here that is a time window, since everyday catches make no entries: since you were last online (`db.lastOnline`). It alone is enough for the popup to show.
+- Rare finds and the count of new types have a **Catches** section after Professions: "4 new types caught (Tor 3, Mira 1)", then a line per rare find missed with its item's icon and a Cheer (`docs/design/catches.md`). Everyday catches make no entries, so the count has its own record of what you've been told (`db.catchTypesTold`). It alone is enough for the popup to show.
 - **Open Feed** and **Dismiss** buttons.
 
 The summary is marked as seen once Core has fired it.

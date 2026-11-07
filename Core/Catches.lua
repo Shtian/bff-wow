@@ -468,14 +468,24 @@ function Catches.collect(records, ownId, now)
   return view
 end
 
+-- Whether you've caught a type yourself (collect()'s view of it).
+local function caughtByYou(t)
+  if t.first.own then return true end
+  for _, other in ipairs(t.others) do
+    if other.own then return true end
+  end
+  return false
+end
+
 -- While you were away's line over the Crew's catches (collect()'s view):
--- the counted types others first caught after since, "4 new types caught
--- (Tor 3, Mira 1)", most first. Nil when there are none.
-function Catches.newTypesLine(view, since)
+-- the counted types not in told (a set of type ids) that others caught and
+-- you haven't, each under whoever was first, "4 new types caught (Tor 3,
+-- Mira 1)", most first. Nil when there are none.
+function Catches.newTypesLine(view, told)
   local byWho, names, total = {}, {}, 0
   for _, t in ipairs(view.types) do
     local first = t.first
-    if first and not t.extra and not first.own and first.time > since then
+    if first and not t.extra and not told[t.id] and not caughtByYou(t) then
       total = total + 1
       if not byWho[first.who] then names[#names + 1] = first.who end
       byWho[first.who] = (byWho[first.who] or 0) + 1
@@ -489,6 +499,15 @@ function Catches.newTypesLine(view, since)
   local parts = {}
   for i, name in ipairs(names) do parts[i] = ("%s %d"):format(name, byWho[name]) end
   return ("%d new %s caught (%s)"):format(total, total == 1 and "type" or "types", table.concat(parts, ", "))
+end
+
+-- Adds the counted types caught in view to told, and returns it. With
+-- since, only those first caught from then on.
+function Catches.markTold(told, view, since)
+  for _, t in ipairs(view.types) do
+    if t.first and not t.extra and (not since or t.first.time >= since) then told[t.id] = true end
+  end
+  return told
 end
 
 -- The Catches tab ------------------------------------------------------

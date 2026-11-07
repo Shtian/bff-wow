@@ -83,8 +83,9 @@ function Core.new(deps)
   local itemLink = type(deps.itemLink) == "function" and deps.itemLink or nil
   local itemLook = type(deps.itemLook) == "function" and deps.itemLook or nil
   self.log = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin, itemLink, itemLook)
-  -- When you were last online, for While you were away's new types.
-  self.awaySince = self.initialLogin and deps.db.lastOnline or nil
+  -- Catches from here on happen with you online, so they aren't news
+  -- for While you were away.
+  self.sessionStart = deps.now()
   -- The Spares module (self.spares is the method that reads its tab).
   self.spareLife = ns.Spares.new({
     db = deps.db,
@@ -548,7 +549,7 @@ end
 -- goals is the Crew goals reached ({ text, time }), and spares the
 -- Spare notices, then the Gives, each newest first: { kind
 -- ("claimed", "given" or "gave"), text, time }. catches is the line of
--- others' new types since you were last online ({ kind = "catches", text
+-- others' new types you haven't been told of ({ kind = "catches", text
 -- }, if any), then the rare finds missed, newest first ({ kind, text,
 -- time, icon, cheer }). With the Camp on, camp is
 -- the Camp at Core.CAMP_LAYOUT.awayColumns without the tent, each actor
@@ -556,7 +557,10 @@ end
 -- gained) and highlight (max level), and intro is in the Camp's voice.
 local function awaySummary(self)
   if not self:isAwayPopupOn() then return end
-  local newTypesLine = self.awaySince and ns.Catches.newTypesLine(self:catches(), self.awaySince)
+  local view, told = self:catches(), self.db.catchTypesTold
+  local newTypesLine = told and ns.Catches.newTypesLine(view, told)
+  -- With none saved yet (the first login with this), it's a silent baseline.
+  self.db.catchTypesTold = ns.Catches.markTold(told or {}, view)
   local summary = self.log:takeSummary(self.spareLife:takeNews(), newTypesLine)
   if not summary then return end
   if self:setting("camp") then
@@ -570,14 +574,16 @@ end
 
 -- Called once a second. Core decides what is due.
 function Core:tick()
-  -- Every second, since nothing tells Core of a logout.
-  self.db.lastOnline = self.now()
   -- Counts the second played.
   if self.playTracker:tick() then self.playTimesDue = true end
   sharePlayTimes(self)
   self.gossip:tick()
   if self.log:tick() then awaySummary(self) end
-  if self.db.crew and self.crewGoals:tick() then self.listener("changed") end
+  if self.db.crew and self.crewGoals:tick() then
+    -- A Crew's first sync: what it has isn't news to you, as for its goals.
+    self.db.catchTypesTold = self.db.catchTypesTold or ns.Catches.markTold({}, self:catches())
+    self.listener("changed")
+  end
   if self.db.crew then self.spareLife:tick() end
   checkOnline(self)
 end
@@ -1246,6 +1252,7 @@ local function enter(self, code, displayName, joining)
   self.ledger:writeOwn({ displayName = displayName, left = false, joinedAt = self.now() })
   sendOwnNow(self)
   self.crewGoals:clear()
+  self.db.catchTypesTold = nil
   self.db.crew = { code = code }
   if joining then self.log:ownJoined() end
   self.listener("crewChanged")
@@ -1358,6 +1365,7 @@ local function finishLeaving(self)
   self.spareLife:clear()
   self.log:clear()
   self.crewGoals:clear()
+  self.db.catchTypesTold = nil
   self.online = {}
   self.listener("crewChanged")
   self.listener("notice", "leftCrew")
@@ -1415,7 +1423,12 @@ local function dataReceived(self, records, from)
       self.gossip:recordSeen(record.id, record.version)
     end
   end
-  if changed then checkGoals(self) end
+  if changed then
+    checkGoals(self)
+    -- Caught with you online: nothing to tell you at your next login.
+    local told = self.db.catchTypesTold
+    if told then ns.Catches.markTold(told, self:catches(), self.sessionStart) end
+  end
   return changed
 end
 
