@@ -405,8 +405,8 @@ function render() {
   const sections = state.group === "where"
     ? WATERS.map(w => ({ title:w.name, where:w.where, water:w.id, ks: listed.filter(k => k.w[0] === w.id) }))
     : [{ title:"Fish", ks: core.filter(k => k.cat === "fish") }, { title:"Rare catches", ks: core.filter(k => k.cat === "rare") },
-       ...(unlisted.length ? [{ title:"Not on the list yet", where:"Caught by the Crew. Saved, so they can be added to the list.", ks:unlisted, uncounted:true }] : [])];
-  sections.push({ title:"Extras", where:"Not counted: only in one season, only in the Sunday fishing contest, or not confirmed on Forever yet.", ks:extras, uncounted:true, extras:true });
+       ...(unlisted.length ? [{ title:"Not on the list yet", where:"Not counted", ks:unlisted, uncounted:true }] : [])];
+  sections.push({ title:"Extras", where:"Not counted", ks:extras, uncounted:true, extras:true });
   let shownAny = false;
   sections.forEach(sec => {
     let shown;
@@ -422,7 +422,7 @@ function render() {
     html += `<div class="fg-sec"><div class="h"><span class="nm">${sec.title}</span><span class="pc${done ? " done" : ""}">${pc}</span></div>` +
       (sec.where ? `<div class="where">${sec.where}</div>` : `<div style="height:5px"></div>`) +
       `<div class="fg-grid">${shown.map(k => icon(k, view[k.id], 28)).join("")}</div>` +
-      (isNew ? `<div class="where" style="margin:2px 0 4px">No one knows yet which fish live here. Anything the Crew catches here is saved, so it can be added to the list.</div>` : "") + `</div>`;
+      (isNew && !shown.length ? `<div class="where" style="margin:-3px 0 4px">Nothing caught here yet</div>` : "") + `</div>`;
   });
   if (!shownAny && Object.keys(view).length) {
     const msg = state.filter === "missing" ? "The Crew has caught every type." : "Nothing to show for this filter.";
