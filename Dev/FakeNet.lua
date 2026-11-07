@@ -44,6 +44,7 @@ function FakeNet.new(options)
     clock = options.clock or 1000,
     maxLevel = options.maxLevel or 60,
     items = options.items or {},
+    looks = options.looks or {},
     finalBosses = options.finalBosses,
     clients = {},
     queue = {},
@@ -165,6 +166,7 @@ local function newCore(client, initialLogin)
     utcOffset = client.utcOffset,
     locate = function() return copy(client.location) end,
     itemLink = function(itemString) return net.items[itemString] end,
+    itemLook = function(itemId) return net.looks[itemId] end,
     finalBosses = net.finalBosses,
     findItem = function(itemGuid)
       client.bagReads = client.bagReads + 1

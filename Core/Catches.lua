@@ -315,6 +315,60 @@ local function valid(record)
   return pairs(list)
 end
 
+-- Kinds whose Crew-first catch is a rare find: Feed news.
+local RARE = { quest = true, contest = true }
+
+-- The rare types a record holds, as a set of type ids.
+function Catches.rareHeld(record)
+  local held = {}
+  for key in valid(record) do
+    if BY_ID[key] and RARE[BY_ID[key].kind] then held[key] = true end
+  end
+  return held
+end
+
+-- The rare finds in a record: rare types it holds that aren't in had (as
+-- rareHeld gives it) and that no other of the given records holds, so the
+-- Crew hasn't had them. Oldest first: { id, itemId, name, time, guid (the
+-- Character who caught it, nil when unknown) }.
+function Catches.rareFinds(had, record, records)
+  local taken = {}
+  for _, other in ipairs(records) do
+    if other.id ~= record.id then
+      for key in pairs(Catches.rareHeld(other)) do taken[key] = true end
+    end
+  end
+  local finds = {}
+  local entries = {}
+  for key, entry in valid(record) do entries[key] = entry end
+  for key in pairs(Catches.rareHeld(record)) do
+    if not had[key] and not taken[key] then
+      local t, entry = BY_ID[key], entries[key]
+      finds[#finds + 1] = { id = key, itemId = t.itemId, name = t.name, time = entry.t, guid = entry.c }
+    end
+  end
+  table.sort(finds, function(a, b)
+    if a.time ~= b.time then return a.time < b.time end
+    return a.id < b.id
+  end)
+  return finds
+end
+
+-- How many counted types anyone in the given records has caught.
+function Catches.typesCaught(records)
+  local caught, n = {}, 0
+  for _, record in ipairs(records) do
+    for key in valid(record) do
+      local t = BY_ID[key]
+      if t and not t.extra and not caught[key] then
+        caught[key] = true
+        n = n + 1
+      end
+    end
+  end
+  return n
+end
+
 -- Who caught something first and where, in words: "Bob (Bobby),
 -- Westfall, The Jansen Stead, 5m ago", or "You" for your own.
 local function catchText(first)
@@ -412,6 +466,29 @@ function Catches.collect(records, ownId, now)
   end)
   view.title = ("The Crew has caught %d of %d types."):format(view.caught, view.total)
   return view
+end
+
+-- While you were away's line over the Crew's catches (collect()'s view):
+-- the counted types others first caught after since, "4 new types caught
+-- (Tor 3, Mira 1)", most first. Nil when there are none.
+function Catches.newTypes(view, since)
+  local byWho, names, total = {}, {}, 0
+  for _, t in ipairs(view.types) do
+    local first = t.first
+    if first and not t.extra and not first.own and first.time > since then
+      total = total + 1
+      if not byWho[first.who] then names[#names + 1] = first.who end
+      byWho[first.who] = (byWho[first.who] or 0) + 1
+    end
+  end
+  if total == 0 then return nil end
+  table.sort(names, function(a, b)
+    if byWho[a] ~= byWho[b] then return byWho[a] > byWho[b] end
+    return a < b
+  end)
+  local parts = {}
+  for i, name in ipairs(names) do parts[i] = ("%s %d"):format(name, byWho[name]) end
+  return ("%d new %s caught (%s)"):format(total, total == 1 and "type" or "types", table.concat(parts, ", "))
 end
 
 -- The Catches tab ------------------------------------------------------

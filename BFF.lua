@@ -175,6 +175,7 @@ local function start(isInitialLogin)
     utcOffset = utcOffset(),
     locate = ns.Snapshot.locate,
     itemLink = ns.Snapshot.itemLink,
+    itemLook = ns.Skin.itemLook,
     findItem = ns.Bags.findItem,
   })
   ns.ChannelLink.start(ns.core, function(kind) say(MESSAGES[kind]) end)

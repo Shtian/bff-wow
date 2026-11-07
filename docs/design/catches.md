@@ -1,6 +1,6 @@
 # Catches
 
-Answers [Catches: record and share the Crew's fishing catches](https://github.com/Shtian/bff-wow/issues/137), the foundation of Catches, and [Catches: the Catches tab](https://github.com/Shtian/bff-wow/issues/138). The Feed news builds on it in a later ticket. Builds on owner-written records (`docs/adr/0001-owner-written-records-gossiped-by-server-time.md`), the way Clears are kept in each Member's own record (`docs/adr/0005-clears-kept-in-each-members-own-record.md`), and Gossip's send timing (`docs/design/code-structure.md`). Domain vocabulary from `CONTEXT.md` (**Catch**, **Type**, **Extra**, **Unlisted catch**, **Waters**). The list and the API findings come from `docs/research/fishing-catches.md`. The look comes from the prototype on branch `prototype/catches` (`prototypes/catches.html`, round 4).
+Answers [Catches: record and share the Crew's fishing catches](https://github.com/Shtian/bff-wow/issues/137), the foundation of Catches, [Catches: the Catches tab](https://github.com/Shtian/bff-wow/issues/138), and [Catches: a Goals track, rare finds in the Feed and While you were away](https://github.com/Shtian/bff-wow/issues/139). Builds on owner-written records (`docs/adr/0001-owner-written-records-gossiped-by-server-time.md`), the way Clears are kept in each Member's own record (`docs/adr/0005-clears-kept-in-each-members-own-record.md`), and Gossip's send timing (`docs/design/code-structure.md`). Domain vocabulary from `CONTEXT.md` (**Catch**, **Type**, **Extra**, **Unlisted catch**, **Rare find**, **Waters**). The list and the API findings come from `docs/research/fishing-catches.md`. The look comes from the prototype on branch `prototype/catches` (`prototypes/catches.html`, round 4).
 
 ## The idea in one line
 
@@ -35,7 +35,7 @@ The in-game check ticket may correct the list (research §5).
 
 - A Member-level field `catches`: `{ [key] = { t, n, z, s, m, c } }`. `key` is the type's id (an item ID or a family's key), or the item ID of an unlisted catch. `t` is the first catch's time, `z`, `s` and `m` its zone, subzone and map ID, `c` the GUID of the Character who caught it, and `n` how many have been caught (each slot's quantity added). Later catches only add to `n`. Short names, since it rides every DATA.
 - **Unlisted catches** are kept the same way, under their item ID, so the list can grow: once a later release lists the item, the same entry counts. At most `Catches.UNLISTED_CAP` (50) are kept; a new one past it is dropped, while listed types and later catches of ones held still go in.
-- **"Later" urgency**, like professions and gold: a catch waits for the next send or the 5-minute heartbeat.
+- **"Later" urgency**, like professions and gold: a catch waits for the next send or the 5-minute heartbeat. A rare find is Feed news, so it goes out now.
 
 ## Sharing and the shape check
 
@@ -71,10 +71,20 @@ The **Catches** tab, after Together (Dungeons) in the sidebar, or `/bff catches`
 - Item quality colours are allowed here by DESIGN.md's Catch Colours Rule (`Skin.ITEM_QUALITIES`).
 - The sidebar now has 8 tabs. In a short window (the panel's minimum height with the Camp's short band) its rows get shorter than 30px so Settings stays clear of them.
 
+## News
+
+**Only big moments are news.** An everyday first catch (the Crew's first Brilliant Smallfish) stays in the Catches tab and makes no Feed entry, and an unlisted catch is never news.
+
+- **Types caught**, a Crew goal track: steps at 10, 20, 30, 40 and every type, trophies in the cabinet, and a gold goal entry for each step (`docs/design/goals.md`).
+- **Rare finds:** the Crew's first catch of one of Nat Pagle's 4 quest fish or the 4 contest fish (`quest` and `contest` kinds) is a `rareFind` Feed entry with a Cheer and a Live event. It reads like a game item link: "Tor caught Feralas Ahi", "Tor's Alt Jaina caught Feralas Ahi", "You caught Feralas Ahi"; not gold, with the item's name in its quality colour and a faded quality edge on its icon (`docs/design/feed.md`).
+  - **The Crew's first** is decided per client, as a Member's record arrives: it newly holds a rare type, and no other Member held who hasn't left does. So one client makes one entry per type at most. Two Members catching the same fish before either hears of the other can each be credited on a different client, and the tab, which goes by the earliest catch, may then name the other one. Accepted as rare and harmless.
+  - The first sight of a Member stays silent, as for all Feed entries, and so do catches made outside a Crew.
+- **While you were away:** a Catches section. "4 new types caught (Tor 3, Mira 1)" counts the counted types first caught by **other** Members since you were last online, most first, never your own. Each rare find you missed has its own line with its Cheer. `db.lastOnline` is written every tick, so a crash leaves it right too, and a first login ever has no line.
+
 ## Dev
 
 - `/bff sim`: the first two simulated Members have a few days of past catches. The console's **Fish** button (and `/bff sim fish`, for a random online Member) catches something on the list in the Member's zone, or now and then an unlisted find.
 
 ## Not in this
 
-The Feed news and the Goals track (their own ticket), and the chat loot fallback (see above).
+The chat loot fallback (see above).

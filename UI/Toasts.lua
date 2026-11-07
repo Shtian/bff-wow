@@ -153,7 +153,7 @@ local function drawPicture(frame, entry)
   if entry.entryKey then
     frame.picture:SetPicture(Skin.REACTION_ICONS[entry.reaction], Skin.GOLD)
   else
-    frame.picture:SetKind(entry.kind, entry.icon)
+    frame.picture:SetKind(entry.kind, entry.icon, entry.edge)
   end
 end
 

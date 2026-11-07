@@ -137,6 +137,10 @@ _Avoid_: Bonus, optional, rare
 A fished item that isn't on BFF's list, kept in the record anyway (up to a cap) so the list can grow. Not counted, never an Extra; adding it to the list later is one row of data.
 _Avoid_: Unknown catch, other
 
+**Rare find**:
+The Crew's first catch of one of Nat Pagle's quest fish or a Sunday fishing contest fish. The one kind of Catch that's a Feed entry, with a Cheer; every other first catch stays in the Catches tab.
+_Avoid_: Rare catch (the Catches tab's wider group, which also has bloated fish and families), big catch
+
 **Waters**:
 A zone-level band where types are found ("Level 30–45", "New on Forever"), with the zones it covers. Each type lists its waters, lowest first. Kept as data, so a new zone is one row.
 _Avoid_: Fishing spot, pool, zone (when meaning the band)

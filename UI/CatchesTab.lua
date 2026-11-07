@@ -51,9 +51,6 @@ local EMPTY_PAD = 18
 local UNCAUGHT_ALPHA = 0.45
 local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
 
-local getItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
-local getItemIcon = C_Item and C_Item.GetItemIconByID or GetItemIcon
-
 local view
 local core
 -- Group and Show, as the UI remembers them; Core falls back to its
@@ -71,9 +68,8 @@ end
 -- common, or while not cached). Asking starts loading it, and the panel
 -- redraws when it arrives.
 local function item(itemId, fallback)
-  local name, _, quality = getItemInfo(itemId)
-  return name or fallback, getItemIcon(itemId) or QUESTION_MARK,
-    quality and Skin.ITEM_QUALITIES[quality]
+  local name, icon, quality = Skin.item(itemId)
+  return name or fallback, icon or QUESTION_MARK, quality
 end
 
 local function colored(text, color)

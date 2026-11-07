@@ -48,7 +48,10 @@ end
 -- time, for the Feed's days; default 0) and locate() (optional: where the
 -- Character being played stands, read just before own DATA goes out; see
 -- Snapshot.locate), itemLink(itemString) (optional: the game's link for
--- an item string, or nil while it isn't cached; texts say "an item" then)
+-- an item string, or nil while it isn't cached; texts say "an item" then),
+-- itemLook(itemId) (optional: how the game shows an item, for rare finds:
+-- { text (its name in its quality colour), icon, edge (its quality's
+-- colour) }, each nil while it isn't cached; texts use the English name then)
 -- findItem(itemGuid) (optional: whether the item is in the bags or
 -- bank, nil if the game can't say, and whether it's equipped; see
 -- Bags.findItem) and finalBosses (optional: encounter ID to instance name,
@@ -78,7 +81,10 @@ function Core.new(deps)
     linkUp = false,
   }, Core)
   local itemLink = type(deps.itemLink) == "function" and deps.itemLink or nil
-  self.log = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin, itemLink)
+  local itemLook = type(deps.itemLook) == "function" and deps.itemLook or nil
+  self.log = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin, itemLink, itemLook)
+  -- When you were last online, for While you were away's new types.
+  self.awaySince = self.initialLogin and deps.db.lastOnline or nil
   -- The Spares module (self.spares is the method that reads its tab).
   self.spareLife = ns.Spares.new({
     db = deps.db,
@@ -272,13 +278,18 @@ end
 -- with when and where, every catch adding to its count; an item not on
 -- the list is kept as an unlisted catch, up to Catches.UNLISTED_CAP. Kept
 -- outside a Crew too, and shared with the next send, as professions are.
--- Returns true if your record changed.
+-- In a Crew, the Crew's first catch of a rare type makes a Feed entry and
+-- goes out now, and types caught can reach a Crew goal step. Returns true
+-- if your record changed.
 function Core:caught(loot)
   if not self.ledger:own() then return false end
   local now, character = self.now(), self.ledger:playing()
+  local had = ns.Catches.rareHeld(self.ledger:own())
   local changed = self.ledger:changeOwn(function(record) return ns.Catches.add(record, loot, now, character) end)
   if changed then
-    self.gossip:ownChanged("later")
+    local entries = self.db.crew and self.log:ownCaught(had) or {}
+    self.gossip:ownChanged(#entries > 0 and "now" or "later")
+    checkGoals(self)
     self.listener("changed")
   end
   return changed
@@ -535,13 +546,17 @@ end
 -- first: { text, reaction, time } per own entry with unseen Reactions.
 -- goals is the Crew goals reached ({ text, time }), and spares the
 -- Spare notices, then the Gives, each newest first: { kind
--- ("claimed", "given" or "gave"), text, time }. With the Camp on, camp is
+-- ("claimed", "given" or "gave"), text, time }. catches is the line of
+-- others' new types since you were last online ({ kind = "catches", text
+-- }, if any), then the rare finds missed, newest first ({ kind, text,
+-- time, icon, cheer }). With the Camp on, camp is
 -- the Camp at Core.CAMP_LAYOUT.awayColumns without the tent, each actor
 -- with gained (its Main's, as the scoreboard words it, nil with nothing
 -- gained) and highlight (max level), and intro is in the Camp's voice.
 local function awaySummary(self)
   if not self:isAwayPopupOn() then return end
-  local summary = self.log:takeSummary(self.spareLife:takeNews())
+  local newTypes = self.awaySince and ns.Catches.newTypes(self:catches(), self.awaySince)
+  local summary = self.log:takeSummary(self.spareLife:takeNews(), newTypes)
   if not summary then return end
   if self:setting("camp") then
     local now = self.now()
@@ -554,6 +569,8 @@ end
 
 -- Called once a second. Core decides what is due.
 function Core:tick()
+  -- Written every second, so a crash leaves it right too.
+  self.db.lastOnline = self.now()
   -- Counts the second played.
   if self.playTracker:tick() then self.playTimesDue = true end
   sharePlayTimes(self)
@@ -610,7 +627,8 @@ end
 -- own not yet shown, and a day's title is "TODAY", "YESTERDAY" or "MONDAY
 -- 02 NOVEMBER", in local time. An entry has kind ("ding", "death",
 -- "newCharacter", "maxLevel", "joined", "left", "newProfession",
--- "professionSkill", "professionMaxed" or "goal": a Crew goal reached,
+-- "professionSkill", "professionMaxed", "rareFind" (the Crew's first catch
+-- of a rare type; icon and edge are the item's) or "goal": a Crew goal reached,
 -- with no memberId), time, memberId, guid (for Character events), text,
 -- from (the level before a ding or max level, or the skill before a
 -- profession milestone), level, count (deaths), skillLine, profession (its
