@@ -325,6 +325,13 @@ end
 
 -- The count, the pickers and, when they don't fit beside it, the pickers
 -- on a line of their own under it. Returns the summary's height.
+local function picked(menu)
+  for _, option in ipairs(menu.options) do
+    if option.picked then return option.label end
+  end
+  return menu.label
+end
+
 local function drawSummary(data, width)
   setPicker(view.group, data.group.label)
   setPicker(view.show, data.show.label)
@@ -336,6 +343,14 @@ local function drawSummary(data, width)
   local pickers = view.group:GetWidth() + PICKER_GAP + view.show:GetWidth()
   local inner = width - 2 * INSET
   local oneLine = countWidth + 8 + pickers <= inner
+  if not oneLine then
+    -- Narrow: the pickers' icons say which is which, so they show only
+    -- what's picked, and move under the count only if still too wide.
+    setPicker(view.group, picked(data.group))
+    setPicker(view.show, picked(data.show))
+    pickers = view.group:GetWidth() + PICKER_GAP + view.show:GetWidth()
+    oneLine = countWidth + 8 + pickers <= inner
+  end
   view.count:ClearAllPoints()
   view.count:SetPoint("TOPLEFT", INSET, -SUMMARY_PAD - 2)
   view.show:ClearAllPoints()
