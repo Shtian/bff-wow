@@ -322,28 +322,8 @@ function commands.professions()
   ns.Panel.show("professions")
 end
 
--- An item's name as the game has it, or the list's English name until
--- it's cached.
-local function itemName(itemId, fallback)
-  local getItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
-  return getItemInfo(itemId) or fallback or ("item " .. itemId)
-end
-
--- /bff catches prints what the Crew has caught, until Catches has a tab.
--- Only in a dev checkout, like /bff sim.
 function commands.catches()
-  if not ns.Sim then return say("/bff catches is only in a dev checkout.") end
-  local view = ns.core:catches()
-  say(view.title)
-  for _, t in ipairs(view.types) do
-    if t.first then
-      print(("  %s%s: %d, first by %s"):format(itemName(t.itemId, t.name), t.extra and " (Extra)" or "", t.count,
-        t.first.text))
-    end
-  end
-  for _, u in ipairs(view.unlisted) do
-    print(("  %s (unlisted, item %d): %d, first by %s"):format(itemName(u.itemId), u.itemId, u.count, u.first.text))
-  end
+  ns.Panel.show("catches")
 end
 
 function commands.together()
@@ -398,7 +378,7 @@ SlashCmdList.BFF = function(input)
   elseif commands[command] then
     commands[command](rest)
   else
-    say("/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff professions, /bff together, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
+    say("/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff professions, /bff together, /bff catches, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
   end
 end
 

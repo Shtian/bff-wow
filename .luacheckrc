@@ -77,6 +77,7 @@ stds.wow = {
     "LeaveChannelByName",
     "ListChannelByName",
     "LOCALIZED_CLASS_NAMES_MALE",
+    "MenuResponse",
     "MenuUtil",
     "NO",
     "NUM_BAG_SLOTS",

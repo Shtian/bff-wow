@@ -24,6 +24,7 @@ colors:
   feed-spare: "#c799ff"
   feed-left: "#9999a8"
   on-gold: "#1a1400"
+  quality-poor: "#9d9d9d"
   quality-uncommon: "#1eff00"
   quality-rare: "#3a9bff"
   quality-epic: "#b55cf5"
@@ -200,7 +201,7 @@ BFF has its own flat skin. It deliberately rejects Blizzard's parchment, stone f
 
 **Key Characteristics:**
 - Near-black windows (97% opaque) over the game, with 1px white hairlines at 7–10% for structure.
-- Ember Gold is the only accent in the game, and it means news. The Goals tab's trophy colours are the one deliberate exception, and even there gold is news. Gold and teal appear together only on brand surfaces and inside the icon.
+- Ember Gold is the only accent in the game, and it means news. The Goals tab's trophy colours are the one deliberate exception (and Catches shows items in their quality colours), and even there gold is news. Gold and teal appear together only on brand surfaces and inside the icon.
 - Friz Quadrata names things (titles, headings, labels) and Arial Narrow carries everything else in the game. Cinzel and Archivo Narrow stand in for them on the web.
 - Square corners in the game; rounding is faked with stepped pixels only where a chip needs it.
 - Full-colour game icons with a faded 1px edge in their kind's colour carry the meaning of each Feed entry.
@@ -230,7 +231,7 @@ A night palette: one warm accent glowing against cool, slightly violet near-blac
 - **Online Green** (online-green): online dots and map-pin rings, ding edges, levels gained (the bar's jump, "+N" and "new"). **Offline Grey** (offline-grey) for offline.
 - Feed kind edges: **feed-death** for deaths, **feed-crew** for new Characters and joining, **feed-spare** for Spares, **feed-left** for leaving.
 - Class colours come from the game (`RAID_CLASS_COLORS`) for Character names and map-pin dots. Don't redefine them.
-- Item quality, for trophy tiers only: **quality-uncommon**, **quality-rare** (lifted from the game's #0070dd so it reads on Night Window), **quality-epic** and **quality-legendary**.
+- Item quality, for trophy tiers (Trophy Colours Rule) and items in Catches (Catch Colours Rule) only: **quality-poor** (Catches only), **quality-uncommon**, **quality-rare** (lifted from the game's #0070dd so it reads on Night Window), **quality-epic** and **quality-legendary**. Common items have no quality colour: no edge, and their name in Ash Text.
 
 ### Named Rules
 **The One Ember Rule.** In the game, gold is the only accent. If everything glows, nothing happened. A window shows gold on its title, on what is genuinely news, and on at most one primary action. Progress, status and your own name are not news: open bars are neutral, "You" is Ash, a given Reaction has no gold edge, leaving is said in grey, a toast's timer line is faint, and a disabled button is never faded gold. The heatmap is the one place gold is a scale. The Goals tab adds colour on purpose, but not gold: see the Trophy Colours Rule.
@@ -240,6 +241,8 @@ A night palette: one warm accent glowing against cool, slightly violet near-blac
 - **Rung tiers** use WoW's item quality colours, by how many rungs the track has reached: the 1st and 2nd uncommon, 3rd and 4th rare, 5th and 6th epic, the 7th on legendary. Every profession's medals are all rare. A dungeon clear is epic, a raid clear legendary. Only as a medal's 1px edge and its 3px foot, and its value (or instance) in the medal's tooltip.
 - **Gold stays news:** the latest-win plate, and the value under a medal reached in the last 3 days, unless it was reached quietly (the silent baseline, or who counts changing). A complete goal's bar and its "Complete" are still gold. Nothing else on the tab is.
 Hues and tiers are `Skin.TROPHY_HUES` and `Skin.TROPHY_QUALITIES`; don't use them anywhere else.
+
+**The Catch Colours Rule.** The Catches tab (`docs/design/catches.md`) shows the game's items, and players read an item's worth by its quality colour, so items there keep it, in the quality colours above (`Skin.ITEM_QUALITIES`), and only on items: a caught tile's faded 1px edge (55%, as a Feed picture's; none for common), and an item's name, in a tile's tooltip and in Recent first catches. Common items' names stay Ash Text. Nothing else on the tab takes a quality colour: section counts, the bar and who caught what stay in the house colours, names in class colour and "You" in Ash Text. Gold stays news (One Ember): the 2px line under a tile first caught in the last 3 days, and the count and bar once every type is caught.
 
 **The Two Rings Rule.** Gold and teal appear together only where the icon does: brand surfaces, and the icon itself where the game shows it. The addon never uses teal as a UI colour.
 
@@ -272,7 +275,7 @@ The gallery has its own scale, sized for 1920×1080 images that are also seen as
 
 ## Layout
 
-The in-game windows are movable. The panel opens at 640×520 and resizes from a grip in its bottom right corner, down to 460×380 and up to 900×800, remembered account-wide; it has a 124px sidebar of 30px tabs and the content to its right. Its size never changes between tabs, rows stretch to its width, and long lists scroll inside it. Content is inset 12px (14px in the While you were away popup, which is 400 wide). Rows follow a steady rhythm: 44px Member rows with 20px alt rows under them, 38px Feed entries, 26px day and section headings, Goals as a gold latest-win plate (at least 60px), medals 52px wide on the shelf and 60px in the cabinet (40px icons, 72px high) that wrap, and 74px Working on tiles in two columns (one below 400px of content), split by 1px hairlines, Play times cells 11px wide by 18px tall, and 25px Professions rows of 18px tiles (a 2px bar under each). The Together tab's level line scrolls sideways at 24px a level, with 21px label rows above a 20px axis and 23px dungeon lanes (20px bars) below it, between a 32px toolbar on top and a 22px overview strip at the bottom; its type is a step larger than the rest of the panel. In While you were away, each section starts 12px below what's above it, its label takes 16px and each line 20px, so groups sit about 22px apart and lines within them about 6px. Tabs are top-aligned. An empty view is never a lone line in a corner: its content is composed and centred (see Empty state). Toasts are 300×40 and stack 6px apart, up or down from a movable anchor that starts 160px from the top of the screen.
+The in-game windows are movable. The panel opens at 640×520 and resizes from a grip in its bottom right corner, down to 460×380 and up to 900×800, remembered account-wide; it has a 124px sidebar of 30px tabs and the content to its right. Its size never changes between tabs, rows stretch to its width, and long lists scroll inside it. Content is inset 12px (14px in the While you were away popup, which is 400 wide). Rows follow a steady rhythm: 44px Member rows with 20px alt rows under them, 38px Feed entries, 26px day and section headings, Goals as a gold latest-win plate (at least 60px), medals 52px wide on the shelf and 60px in the cabinet (40px icons, 72px high) that wrap, and 74px Working on tiles in two columns (one below 400px of content), split by 1px hairlines, Play times cells 11px wide by 18px tall, and 25px Professions rows of 18px tiles (a 2px bar under each), and the Catches tab's 28px tiles, 4px apart across and 7px down (room for a fresh tile's 2px gold line), in sections under a Heading, with 22px Recent first catches rows at the bottom. The Together tab's level line scrolls sideways at 24px a level, with 21px label rows above a 20px axis and 23px dungeon lanes (20px bars) below it, between a 32px toolbar on top and a 22px overview strip at the bottom; its type is a step larger than the rest of the panel. In While you were away, each section starts 12px below what's above it, its label takes 16px and each line 20px, so groups sit about 22px apart and lines within them about 6px. Tabs are top-aligned. An empty view is never a lone line in a corner: its content is composed and centred (see Empty state). Toasts are 300×40 and stack 6px apart, up or down from a movable anchor that starts 160px from the top of the screen.
 
 Brand images are 1920×1080, plus a 1600×520 banner. Split layouts put a 640px text column on one side, an 80px gap and 110–120px outer margins, and the screenshot column (`minmax(0, 1fr)`, 880px high) on the other side; the side alternates from slide to slide. Frames are measured into their column, so a wide shot can't push the copy, and never enlarged past 1.4x, so game text stays sharp. A second shot (a toast) sits below the first on the side away from the copy, overlapping only its bottom 28px. Only the hero carries the name and icon, small, top left: CurseForge already shows them beside the gallery. The last slide is a numbered how-to for starting a crew.
 
@@ -333,7 +336,7 @@ A trophy for a Crew goal rung reached, on the Goals tab: the track's icon (a pro
 - **Checkbox:** a 14px square at 4% white with a 25% white border, an Ember Gold tick inset 3px, and a Small Smoke Muted label clickable to its right.
 
 ### Navigation
-- **Sidebar tabs:** 30px rows in a 124px sidebar at 25% black. Text labels only, Smoke Muted, or Ash Text on the selected tab's chip. The Feed and Spares tabs show a gold unseen-count badge at their right when another tab is open.
+- **Sidebar tabs:** 30px rows in a 124px sidebar at 25% black, shorter in a window too short for them all (the minimum size with the Camp's band), so Settings stays clear. Text labels only, Smoke Muted, or Ash Text on the selected tab's chip. The Feed and Spares tabs show a gold unseen-count badge at their right when another tab is open.
 
 ### Feed picture (signature)
 A square full-colour game icon on an opaque Night Window back, with a 1px edge in its kind's colour at 55% alpha: green for dings, gold for max level and goals, red for deaths, blue for Crew news, violet for Spares, grey for leaving. Used on the Feed's timeline, where the line runs through the pictures' centres, and on toasts.

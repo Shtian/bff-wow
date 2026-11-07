@@ -294,8 +294,11 @@ end
 -- cached), kind ("fish", "quest", "bloated", "family", "contest" or
 -- "treasure"), waters (water ids, lowest first), extra (nil when it
 -- counts, else why not: "season", "contest" or "unconfirmed"), count (the
--- Crew's catches of it) and first (nil until caught)) and unlisted (each
--- fished item not on the list, the earliest first: itemId, count, first).
+-- Crew's catches of it), note (a line for its tooltip, or nil), first
+-- (nil until caught) and others (every other Member who caught it, in
+-- the order they first did: memberId, displayName, own)) and unlisted
+-- (each fished item not on the list, the earliest first: itemId, count,
+-- first, others).
 -- first is the earliest catch across the Crew: memberId, displayName, own,
 -- character and classFilename (nil if the record no longer has the
 -- Character), time, since (in words: "5m ago"), zone, subzone, mapId and
@@ -307,6 +310,42 @@ function Core:catches()
     if not record.left then records[#records + 1] = record end
   end
   return ns.Catches.collect(records, self.ledger:memberId(), self.now())
+end
+
+-- The Catches tab, ready to render: the Crew's catches (catches()) as a
+-- field guide, grouped by group ("where", default, or "type") and
+-- filtered by show ("all", default, "fish", "rare", "extras" or
+-- "missing"), naming types not caught yet while the catchesNames
+-- setting is on. caught, total, done (every counted type caught), count
+-- ("25 of 46 types caught"), next (the next trophy step, in words), fill
+-- (0–1) and ticks (each trophy step but the last, 0–1 along the bar);
+-- group and show, the menus: title, label ("Show: All"), options ({ id,
+-- label, picked, and for show count: the tiles it shows }) and, on show,
+-- names ({ label, value }, the setting); sections, each { title, sub
+-- (the zones, or "Not counted"), count ("8 / 12", "2 caught" or nil),
+-- counted and got (the counted types and how many are caught; nil when
+-- it doesn't count), done, none ("Nothing caught here yet" for New on
+-- Forever with nothing in it) and tiles }; empty ({ title, text }, while
+-- the Crew has caught nothing), filtered ({ title, text }, when show
+-- leaves nothing); and recent (up to 3 first catches from the last 3
+-- days, newest first: itemId, name, first). A tile, a type or an
+-- unlisted catch: id, itemId, name (English, nil for unlisted), caught,
+-- named (its name may show), fresh (first caught in the last 3 days),
+-- extra, unlisted, first (as catches()) and tooltip: note, extra, first,
+-- when ("2 days ago · Feralas"), crew ("The Crew has caught") and count,
+-- also ("Also caught by Tor and you"), none, hint (how to show names)
+-- and where ("Where: Level 30–45, Level 40–55"), each nil when it
+-- doesn't apply. See docs/design/catches.md.
+function Core:catchesTab(group, show)
+  local own = self.ledger:own()
+  local playing = own and own.characters and own.characters[self.ledger:playing() or ""]
+  return ns.Catches.tab(self:catches(), {
+    group = group,
+    show = show,
+    names = self:setting("catchesNames"),
+    now = self.now(),
+    level = playing and playing.level,
+  })
 end
 
 -- The panel's rows, ready to render, sorted by order: "online" (default),
@@ -981,6 +1020,9 @@ local SETTINGS = {
   { key = "togetherNear", kind = "toggle", saved = onFlag("near", "together") },
   { key = "togetherAttunements", kind = "toggle", saved = offFlag("attunementsOff", "together") },
   { key = "togetherRaids", kind = "toggle", saved = onFlag("raids", "together") },
+  -- The Catches tab's names of types not caught yet (catchesTab()), saved
+  -- in db.catches.
+  { key = "catchesNames", kind = "toggle", saved = onFlag("names", "catches") },
 }
 
 local SETTING = {}
