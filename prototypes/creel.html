@@ -1,0 +1,492 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Question: what should the Creel (a Crew-wide catch collection, filled in the
+  first time any Member catches each kind of fish or fishing find) look like in the panel?
+  Three structurally different variants, switchable with ?variant=A|B|C, the bottom bar or ← →:
+    A · Field guide: a grid of tiles by category, uncaught ones as dim outlines. Collection-first.
+    B · Ledger: a row per kind, who caught it first and when. Story-first, like the Feed.
+    C · Waters: a row per stretch of water (by level), its kinds as chips. Where-to-fish-first.
+  Toggles: counts (Crew total only vs per Member), uncaught names (??? vs shown), a new Crew vs a
+  seasoned one, and the panel's minimum size (460×380) vs its default (640×520).
+  Follows DESIGN.md: gold only for news (a fresh catch, under 3 days), rarity edges in the game's item
+  quality colours (players already read those), no shadows, Friz for titles, Arial Narrow for text.
+  The fish list is illustrative (Classic-era names). Forever's real list is still to be researched.
+  All data is fake. Run: open the file in a browser.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE · BFF Creel</title>
+<style>
+  :root {
+    --gold:#ffd14a; --gold-rgb:255,209,74; --on-gold:#1a1400; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99;
+    --online:#70e370; --window:rgba(14,13,20,.97); --night:#0e0d14; --header:#1a1821; --raised:#1b1a23;
+    --line:rgba(255,255,255,.07); --border:rgba(255,255,255,.10);
+    --q1:#ffffff; --q2:#1eff00; --q3:#0070dd; --q4:#a335ee;
+  }
+  * { box-sizing:border-box; }
+  html { background: radial-gradient(ellipse at 40% 30%, #2a3a40 0%, #121a1d 55%, #07090a 100%) fixed #07090a; }
+  body { margin:0; padding:20px 16px 70px; font:14px/1.25 "Arial Narrow", "Archivo Narrow", "Roboto Condensed", Arial, sans-serif; color:var(--text); }
+  .note { max-width:820px; margin:0 auto 12px; color:var(--muted); font-size:13px; }
+  .note b { color:var(--gold); font-weight:normal; }
+  .stage { display:flex; justify-content:center; gap:22px; align-items:flex-start; flex-wrap:wrap; }
+
+  .panel { width:640px; height:520px; background:var(--window); border:1px solid var(--border); display:flex; flex-direction:column; }
+  body.min .panel { width:460px; height:380px; }
+  .head { height:30px; background:var(--header); display:flex; align-items:center; padding:0 10px 0 12px; border-bottom:1px solid var(--line); flex:none; }
+  .head .t { font-family:"Friz Quadrata TT", Cinzel, Georgia, serif; color:var(--gold); font-size:13px; flex:1; }
+  .head .on { color:var(--muted); font-size:12px; margin-right:12px; } .head .on::before { content:"●"; color:var(--online); margin-right:4px; font-size:8px; }
+  .head .x { color:var(--dim); font-size:12px; }
+  .body { flex:1; display:flex; min-height:0; }
+  .side { width:124px; border-right:1px solid var(--line); padding:6px; display:flex; flex-direction:column; flex:none; background:rgba(0,0,0,.25); }
+  .side div { height:30px; line-height:30px; padding:0 8px; color:var(--muted); font-size:14px; }
+  .side .sel { background:rgba(255,255,255,.08); color:var(--text); border-radius:2px; }
+  .side .grow { flex:1; }
+  .content { flex:1; display:flex; flex-direction:column; min-height:0; min-width:0; position:relative; }
+  .scroll { flex:1; overflow-y:auto; overflow-x:hidden; }
+  .scroll::-webkit-scrollbar { width:6px; } .scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15); }
+
+  .c-MAGE{color:#3FC7EB}.c-WARRIOR{color:#C69B6D}.c-ROGUE{color:#FFF468}.c-DRUID{color:#FF7C0A}.c-PRIEST{color:#fff}
+  .c-HUNTER{color:#AAD372}.c-WARLOCK{color:#8788EE}.c-PALADIN{color:#F48CBA}.c-SHAMAN{color:#0070DD}
+  .gold { color:var(--gold); } .muted { color:var(--muted); } .dim { color:var(--dim); }
+
+  /* Shared bits */
+  .summary { padding:10px 12px 8px; border-bottom:1px solid var(--line); flex:none; }
+  .summary .top { display:flex; align-items:baseline; gap:8px; }
+  .summary .title { font-family:"Friz Quadrata TT", Cinzel, Georgia, serif; font-size:13px; color:var(--text); flex:1; }
+  .summary .count { font-size:15px; } .summary .count small { color:var(--muted); font-size:12px; }
+  .bar { height:4px; background:rgba(255,255,255,.08); margin-top:6px; position:relative; }
+  .bar i { position:absolute; left:0; top:0; bottom:0; background:rgba(255,255,255,.30); }
+  .bar .tick { position:absolute; top:-2px; width:1px; height:8px; background:rgba(255,255,255,.35); }
+  .summary .next { font-size:12px; color:var(--dim); margin-top:4px; display:flex; justify-content:space-between; }
+  .label { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
+  .chips { display:flex; gap:4px; }
+  .chip { font-size:12px; padding:2px 8px; background:rgba(255,255,255,.06); color:var(--muted); cursor:pointer; border-radius:2px; }
+  .chip.on { background:rgba(255,255,255,.14); color:var(--text); }
+
+  .ic { position:relative; display:inline-block; overflow:hidden; background:#222; flex:none; }
+  .ic img { width:100%; height:100%; object-fit:cover; transform:scale(1.18); display:block; }
+  .ic .fb { position:absolute; inset:0; display:grid; place-items:center; font-size:11px; color:#000; background:#556; }
+  .ic.un { background:rgba(255,255,255,.035); box-shadow: inset 0 0 0 1px rgba(255,255,255,.10); }
+  .ic.un img, .ic.un .fb { filter:grayscale(1) brightness(.35); opacity:.35; }
+  .ic.unhide img, .ic.unhide .fb { display:none; }
+  .ic.unhide::after { content:"?"; position:absolute; inset:0; display:grid; place-items:center; color:rgba(255,255,255,.18); font-size:12px; }
+  .ic .edge { position:absolute; inset:0; pointer-events:none; }
+  .ic .fresh { position:absolute; right:1px; top:1px; width:5px; height:5px; background:var(--gold); }
+
+  .btn { font-size:12px; padding:2px 8px; background:rgba(255,255,255,.06); color:var(--text); border:0; cursor:pointer; font-family:inherit; }
+
+  /* A · Field guide */
+  .fg-sec { padding:8px 12px 2px; }
+  .fg-sec .h { display:flex; justify-content:space-between; margin-bottom:6px; }
+  .fg-grid { display:flex; flex-wrap:wrap; gap:4px; }
+  .fg-grid .ic { width:28px; height:28px; cursor:default; }
+  .fg-grid .ic.hot { outline:1px solid rgba(255,255,255,.4); }
+  .fg-fresh { border-top:1px solid var(--line); padding:6px 12px 8px; flex:none; }
+  .fg-fresh .r { display:flex; align-items:center; gap:6px; height:22px; font-size:13px; }
+  .fg-fresh .r .ic { width:16px; height:16px; }
+  .fg-fresh .r .t { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* B · Ledger */
+  .lg-tools { display:flex; align-items:center; gap:8px; padding:6px 12px; border-bottom:1px solid var(--line); flex:none; }
+  .lg-tools .grow { flex:1; }
+  .lg-group { display:flex; justify-content:space-between; padding:8px 12px 4px; }
+  .lg-row { display:flex; align-items:center; gap:8px; height:30px; padding:0 12px; border-top:1px solid var(--line); cursor:pointer; }
+  .lg-row:hover { background:rgba(255,255,255,.05); }
+  .lg-row .ic { width:20px; height:20px; }
+  .lg-row .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14px; }
+  .lg-row .by { font-size:13px; white-space:nowrap; text-align:right; }
+  .lg-row .when { font-size:12px; color:var(--dim); width:54px; text-align:right; white-space:nowrap; }
+  .lg-row.un .nm { color:var(--dim); }
+  .lg-more { padding:4px 12px 8px 40px; font-size:12px; color:var(--muted); background:rgba(255,255,255,.03); }
+  .lg-more div { display:flex; justify-content:space-between; height:17px; }
+
+  /* C · Waters */
+  .wt-hero { display:flex; gap:10px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); flex:none; }
+  .wt-hero .ic { width:40px; height:40px; }
+  .wt-hero .tx { flex:1; min-width:0; }
+  .wt-hero .l1 { font-size:14px; } .wt-hero .l2 { font-size:12px; color:var(--muted); margin-top:2px; }
+  .wt-water { padding:8px 12px 8px; border-top:1px solid var(--line); }
+  .wt-water:first-child { border-top:0; }
+  .wt-water .h { display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
+  .wt-water .h .n { font-family:"Friz Quadrata TT", Cinzel, Georgia, serif; font-size:12px; flex:1; }
+  .wt-water .h .lv { font-size:12px; color:var(--dim); }
+  .wt-water .h .pc { font-size:12px; color:var(--muted); width:34px; text-align:right; }
+  .wt-water .h .pc.done { color:var(--text); }
+  .wt-chips { display:flex; flex-wrap:wrap; gap:4px; }
+  .wt-chip { display:flex; align-items:center; gap:4px; height:22px; padding:0 6px 0 3px; background:rgba(255,255,255,.05); font-size:12px; }
+  .wt-chip .ic { width:16px; height:16px; }
+  .wt-chip.un { background:transparent; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); color:var(--dim); }
+  .wt-bar { height:2px; background:rgba(255,255,255,.08); margin-top:6px; position:relative; }
+  .wt-bar i { position:absolute; left:0; top:0; bottom:0; background:rgba(255,255,255,.30); }
+  .wt-bar.done i { background:var(--text); }
+
+  /* Context strip: the same Feed, toast and Goals bits for every variant. */
+  .ctx { width:320px; display:flex; flex-direction:column; gap:14px; }
+  .ctx .cap { font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .card { background:var(--window); border:1px solid var(--border); padding:8px 10px; }
+  .feedrow { display:flex; gap:8px; align-items:center; }
+  .feedrow .ic { width:24px; height:24px; }
+  .feedrow .tx { flex:1; font-size:13px; }
+  .feedrow .tm { font-size:11px; color:var(--dim); }
+  .toast { width:300px; height:40px; background:rgba(14,13,20,.88); display:flex; align-items:center; gap:8px; padding:0 8px; position:relative; border:1px solid var(--border); }
+  .toast .ic { width:24px; height:24px; }
+  .toast .tx { flex:1; font-size:13px; }
+  .toast .timer { position:absolute; left:0; bottom:0; height:2px; width:62%; background:rgba(255,255,255,.18); }
+  .track { display:flex; gap:10px; align-items:flex-end; }
+  .medal { width:52px; text-align:center; font-size:11px; }
+  .medal .m { width:40px; height:40px; margin:0 auto 3px; position:relative; background:#111; }
+  .medal .m .ic { width:40px; height:40px; }
+  .medal .m .foot { position:absolute; left:0; right:0; bottom:-3px; height:3px; }
+  .medal.open .m { opacity:.35; filter:grayscale(1); }
+  .medal .d { color:var(--dim); }
+
+  .tip { position:fixed; pointer-events:none; background:rgba(8,8,12,.94); border:1px solid rgba(255,255,255,.25); padding:7px 9px;
+    font-size:13px; z-index:50; min-width:200px; max-width:260px; display:none; }
+  .tip .l { display:flex; justify-content:space-between; gap:14px; }
+  .tip .t1 { font-size:14px; margin-bottom:2px; }
+  .tip .m { color:var(--muted); }
+  .tip hr { border:0; border-top:1px solid rgba(255,255,255,.12); margin:5px 0; }
+
+  .bar-ui { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); display:flex; gap:8px; align-items:center;
+    background:#f4f1ea; color:#111; padding:7px 12px; border-radius:22px; box-shadow:0 6px 24px #000a; font:13px system-ui, sans-serif; z-index:100; white-space:nowrap; }
+  .bar-ui button { border:0; background:#ddd8cc; border-radius:12px; padding:3px 9px; cursor:pointer; font:inherit; }
+  .bar-ui button.on { background:#111; color:#fff; }
+  .bar-ui .lab { font-weight:600; min-width:150px; text-align:center; }
+  .bar-ui .sep { width:1px; height:18px; background:#0003; }
+</style>
+</head>
+<body>
+<div class="note">PROTOTYPE · <b>The Creel</b>: the Crew's shared catch collection. Three layouts. Flip with the bar or ← →. Hover anything with an icon.
+  Fish names are illustrative; all data is fake.</div>
+<div class="stage">
+  <div class="panel">
+    <div class="head"><div class="t">Best Friends in Forever</div><div class="on">2 of 4 online</div><div class="x">✕</div></div>
+    <div class="body">
+      <div class="side">
+        <div>Roster</div><div>Feed</div><div>Goals</div><div>When</div><div>Spares</div><div>Professions</div><div>Together</div>
+        <div class="sel">Creel</div>
+        <div class="grow"></div><div>Settings</div>
+      </div>
+      <div class="content" id="content"></div>
+    </div>
+  </div>
+  <div class="ctx" id="ctx"></div>
+</div>
+<div class="tip" id="tip"></div>
+
+<div class="bar-ui">
+  <button id="prev">←</button><span class="lab" id="vlab"></span><button id="next">→</button>
+  <div class="sep"></div>
+  <button id="t-counts">per-Member counts</button>
+  <button id="t-names">show uncaught names</button>
+  <button id="t-crew">new Crew</button>
+  <button id="t-min">min size</button>
+</div>
+
+<script>
+const ICON = n => `https://wow.zamimg.com/images/wow/icons/medium/${n}.jpg`;
+const QC = { 1:"var(--q1)", 2:"var(--q2)", 3:"var(--q3)", 4:"var(--q4)" };
+
+// Waters: stretches of water by level, for variant C and for hints.
+const WATERS = [
+  { id:"start", name:"Home waters", lv:"1–15", where:"Starting zones, Westfall, the Barrens coast" },
+  { id:"lakes", name:"Lakes & rivers", lv:"15–30", where:"Loch Modan, Wetlands, Ashenvale, Hillsbrad" },
+  { id:"coast", name:"Warm coasts", lv:"30–45", where:"Stranglethorn, Desolace, Swamp of Sorrows" },
+  { id:"deep", name:"Deep waters", lv:"45–60", where:"Feralas, Azshara, Winterspring, Western Plaguelands" },
+  { id:"city", name:"City waters", lv:"any", where:"Ironforge, Orgrimmar" },
+];
+// cat: fish | rare | treasure. q: item quality. water: where to find it.
+const KINDS = [
+  { id:1,  name:"Raw Brilliant Smallfish", icon:"inv_misc_fish_02", cat:"fish", q:1, water:"start" },
+  { id:2,  name:"Raw Slitherskin Mackerel", icon:"inv_misc_fish_21", cat:"fish", q:1, water:"start" },
+  { id:3,  name:"Raw Longjaw Mud Snapper", icon:"inv_misc_fish_03", cat:"fish", q:1, water:"start" },
+  { id:4,  name:"Raw Rainbow Fin Albacore", icon:"inv_misc_fish_04", cat:"fish", q:1, water:"start" },
+  { id:5,  name:"Raw Loch Frenzy", icon:"inv_misc_fish_05", cat:"fish", q:1, water:"lakes" },
+  { id:6,  name:"Raw Bristle Whisker Catfish", icon:"inv_misc_fish_06", cat:"fish", q:1, water:"lakes" },
+  { id:7,  name:"Oily Blackmouth", icon:"inv_misc_fish_07", cat:"fish", q:1, water:"lakes" },
+  { id:8,  name:"Raw Sagefish", icon:"inv_misc_fish_20", cat:"fish", q:1, water:"lakes" },
+  { id:9,  name:"Deviate Fish", icon:"inv_misc_monsterhead_02", cat:"fish", q:1, water:"lakes" },
+  { id:10, name:"Raw Mithril Head Trout", icon:"inv_misc_fish_08", cat:"fish", q:1, water:"coast" },
+  { id:11, name:"Raw Rockscale Cod", icon:"inv_misc_fish_09", cat:"fish", q:1, water:"coast" },
+  { id:12, name:"Firefin Snapper", icon:"inv_misc_fish_16", cat:"fish", q:1, water:"coast" },
+  { id:13, name:"Raw Glossy Mightfish", icon:"inv_misc_fish_10", cat:"fish", q:1, water:"coast" },
+  { id:14, name:"Raw Redgill", icon:"inv_misc_fish_11", cat:"fish", q:1, water:"coast" },
+  { id:15, name:"Raw Spotted Yellowtail", icon:"inv_misc_fish_12", cat:"fish", q:1, water:"deep" },
+  { id:16, name:"Raw Whitescale Salmon", icon:"inv_misc_fish_13", cat:"fish", q:1, water:"deep" },
+  { id:17, name:"Raw Nightfin Snapper", icon:"inv_misc_fish_14", cat:"fish", q:1, water:"deep" },
+  { id:18, name:"Raw Sunscale Salmon", icon:"inv_misc_fish_15", cat:"fish", q:1, water:"deep" },
+  { id:19, name:"Stonescale Eel", icon:"inv_misc_fish_18", cat:"fish", q:1, water:"deep" },
+  { id:20, name:"Large Raw Mightfish", icon:"inv_misc_fish_19", cat:"fish", q:1, water:"deep" },
+  { id:21, name:"Winter Squid", icon:"inv_misc_fish_17", cat:"fish", q:1, water:"deep" },
+  { id:22, name:"Raw Summer Bass", icon:"inv_misc_fish_22", cat:"fish", q:1, water:"deep" },
+  { id:23, name:"Raw Greater Sagefish", icon:"inv_misc_fish_23", cat:"fish", q:1, water:"deep" },
+  { id:30, name:"Feralas Ahi", icon:"inv_misc_fish_24", cat:"rare", q:2, water:"deep" },
+  { id:31, name:"Misty Reed Mahi Mahi", icon:"inv_misc_fish_25", cat:"rare", q:2, water:"coast" },
+  { id:32, name:"Savage Coast Blue Sailfin", icon:"inv_misc_fish_26", cat:"rare", q:2, water:"coast" },
+  { id:33, name:"Sar'theris Striker", icon:"inv_misc_fish_27", cat:"rare", q:2, water:"coast" },
+  { id:34, name:"Keefer's Angelfish", icon:"inv_misc_fish_28", cat:"rare", q:3, water:"coast" },
+  { id:35, name:"Old Ironjaw", icon:"inv_misc_fish_31", cat:"rare", q:3, water:"city" },
+  { id:36, name:"Old Crafty", icon:"inv_misc_fish_30", cat:"rare", q:3, water:"city" },
+  { id:40, name:"Battered Chest", icon:"inv_box_01", cat:"treasure", q:1, water:"lakes" },
+  { id:41, name:"Big-mouth Clam", icon:"inv_misc_shell_03", cat:"treasure", q:1, water:"coast" },
+  { id:42, name:"Iron Bound Trunk", icon:"inv_box_02", cat:"treasure", q:2, water:"coast" },
+  { id:43, name:"Mithril Bound Trunk", icon:"inv_box_03", cat:"treasure", q:2, water:"deep" },
+  { id:44, name:"Nat's Lucky Coin", icon:"inv_misc_coin_02", cat:"treasure", q:4, water:"deep" },
+];
+const KIND = Object.fromEntries(KINDS.map(k => [k.id, k]));
+const CATS = [["fish","Fish"],["rare","Rare catches"],["treasure","Treasure & oddities"]];
+
+// Members. catches: { kindId: [daysAgo first, zone, count, character] }.
+const MEMBERS = [
+  { id:"me", display:"You", own:true, chars:{ Gahzuria:"MAGE" } },
+  { id:"mira", display:"Mira", chars:{ "Mira Vale":"PRIEST", Mirabolt:"SHAMAN" } },
+  { id:"tor", display:"Tor", chars:{ "Torvald Ash":"WARRIOR" } },
+  { id:"simba", display:"Simba", chars:{ Simba:"DRUID" } },
+];
+const SEASONED = {
+  me:   { 1:[21,"Elwynn Forest",48,"Gahzuria"], 2:[20,"Westfall",31,"Gahzuria"], 3:[18,"Westfall",22,"Gahzuria"], 5:[9,"Loch Modan",40,"Gahzuria"],
+          7:[8,"Wetlands",62,"Gahzuria"], 40:[8,"Wetlands",1,"Gahzuria"], 8:[0.4,"Ashenvale",3,"Gahzuria"] },
+  mira: { 1:[24,"Teldrassil",12,"Mira Vale"], 4:[19,"Darkshore",30,"Mira Vale"], 6:[14,"Ashenvale",25,"Mira Vale"], 9:[13,"Wailing Caverns",7,"Mirabolt"],
+          10:[6,"Arathi Highlands",18,"Mira Vale"], 11:[6,"Arathi Highlands",9,"Mira Vale"], 12:[5,"Stranglethorn Vale",21,"Mira Vale"],
+          14:[4,"Stranglethorn Vale",14,"Mira Vale"], 41:[4,"Stranglethorn Vale",3,"Mira Vale"], 32:[3,"Stranglethorn Vale",1,"Mira Vale"],
+          35:[0.08,"Ironforge",1,"Mira Vale"], 31:[1.5,"Swamp of Sorrows",1,"Mira Vale"] },
+  tor:  { 2:[23,"Durotar",15,"Torvald Ash"], 3:[22,"The Barrens",19,"Torvald Ash"], 6:[16,"Hillsbrad Foothills",11,"Torvald Ash"],
+          13:[7,"Desolace",8,"Torvald Ash"], 15:[3,"Feralas",44,"Torvald Ash"], 19:[0.9,"Swamp of Sorrows",148,"Torvald Ash"],
+          20:[2,"Feralas",12,"Torvald Ash"], 42:[2,"Feralas",1,"Torvald Ash"], 7:[15,"The Barrens",9,"Torvald Ash"] },
+  simba: null,
+};
+const NEW = {
+  me:   { 1:[1.2,"Elwynn Forest",6,"Gahzuria"], 2:[0.3,"Westfall",2,"Gahzuria"] },
+  mira: { 1:[2,"Teldrassil",4,"Mira Vale"] },
+  tor:  { 3:[0.6,"The Barrens",3,"Torvald Ash"] },
+  simba: null,
+};
+
+const RUNGS = [10, 25, 50, KINDS.length];
+const FRESH = 3; // days a catch is news
+
+const q = new URLSearchParams(location.search);
+const VARIANTS = [["A","Field guide"],["B","Ledger"],["C","Waters"]];
+const state = {
+  variant: VARIANTS.some(v => v[0] === q.get("variant")) ? q.get("variant") : "A",
+  counts: q.get("counts") === "member", names: q.get("names") === "show", crew: q.get("crew") === "new" ? "new" : "seasoned",
+  min: q.get("size") === "min", filter:"all", sort:"new", open:null,
+};
+function save() {
+  const p = new URLSearchParams({ variant: state.variant });
+  if (state.counts) p.set("counts","member");
+  if (state.names) p.set("names","show");
+  if (state.crew === "new") p.set("crew","new");
+  if (state.min) p.set("size","min");
+  try { history.replaceState(null, "", "?" + p); } catch (e) { /* inline preview */ }
+}
+
+// The Crew view: merge every Member's catches; the earliest first catch names who caught it first.
+function crewView() {
+  const src = state.crew === "new" ? NEW : SEASONED;
+  const out = {};
+  MEMBERS.forEach(m => {
+    const c = src[m.id]; if (!c) return;
+    Object.entries(c).forEach(([kid, [ago, zone, n, ch]]) => {
+      const e = out[kid] || (out[kid] = { total:0, by:[] });
+      e.total += n;
+      e.by.push({ m, ago, zone, n, ch });
+    });
+  });
+  Object.values(out).forEach(e => { e.by.sort((a, b) => b.ago - a.ago); e.first = e.by[0]; });
+  return out;
+}
+const ago = d => d < 1/24 ? "just now" : d < 1 ? `${Math.round(d * 24)}h ago` : d < 2 ? "yesterday" : `${Math.round(d)}d ago`;
+const isFresh = e => !!(e && e.first && e.first.ago < FRESH);
+const who = b => b.m.own ? "You" : b.m.display;
+const cls = b => b.m.chars[b.ch];
+const nextRung = n => RUNGS.find(r => r > n) || null;
+const hidden = (k, e) => !e && !state.names;
+const kname = (k, e) => hidden(k, e) ? "???" : k.name;
+
+function icon(k, e, size) {
+  const un = !e, edge = k.q > 1 ? `<i class="edge" style="box-shadow:inset 0 0 0 1px ${QC[k.q]}"></i>` : "";
+  return `<span class="ic${un ? " un" : ""}${hidden(k, e) ? " unhide" : ""}" data-k="${k.id}" style="width:${size}px;height:${size}px">` +
+    `<span class="fb">${k.name[k.name.startsWith("Raw ") ? 4 : 0]}</span><img src="${ICON(k.icon)}" onerror="this.remove()" alt="">${edge}` +
+    `${isFresh(e) ? `<i class="fresh"></i>` : ""}</span>`;
+}
+
+function summary(view, extra) {
+  const n = Object.keys(view).length, r = nextRung(n), last = [...RUNGS].reverse().find(x => x <= n) || 0;
+  const ticks = RUNGS.slice(0, -1).map(x => `<i class="tick" style="left:${(x / KINDS.length) * 100}%"></i>`).join("");
+  return `<div class="summary"><div class="top"><div class="title">The Creel</div>` +
+    `<div class="count">${n} <small>of ${KINDS.length} kinds</small></div></div>` +
+    `<div class="bar"><i style="width:${(n / KINDS.length) * 100}%"></i>${ticks}</div>` +
+    `<div class="next"><span>${r ? `${r - n} more for the ${r === KINDS.length ? "Every kind" : r + " kinds"} trophy` : "Every kind caught"}</span>` +
+    `<span>${last ? `Trophy: ${last} kinds` : "No Creel trophy yet"}</span></div>${extra || ""}</div>`;
+}
+
+function freshList(view, max) {
+  return Object.entries(view).filter(([, e]) => isFresh(e)).sort((a, b) => a[1].first.ago - b[1].first.ago).slice(0, max)
+    .map(([kid, e]) => ({ k: KIND[kid], e }));
+}
+
+// A · Field guide
+function variantA(view) {
+  const filters = [["all","All"],...CATS.map(c => [c[0], c[1].split(" ")[0]])];
+  let html = summary(view, `<div class="chips" style="margin-top:8px">${filters.map(([id, l]) =>
+    `<span class="chip${state.filter === id ? " on" : ""}" data-filter="${id}">${l}</span>`).join("")}</div>`);
+  html += `<div class="scroll">`;
+  CATS.forEach(([cat, label]) => {
+    if (state.filter !== "all" && state.filter !== cat) return;
+    const ks = KINDS.filter(k => k.cat === cat), got = ks.filter(k => view[k.id]).length;
+    html += `<div class="fg-sec"><div class="h"><span class="label">${label}</span><span class="label">${got} / ${ks.length}</span></div>` +
+      `<div class="fg-grid">${ks.map(k => icon(k, view[k.id], 28)).join("")}</div></div>`;
+  });
+  html += `</div>`;
+  const fresh = freshList(view, state.min ? 2 : 3);
+  if (fresh.length) html += `<div class="fg-fresh"><div class="label" style="margin-bottom:2px">Fresh</div>` + fresh.map(({ k, e }) =>
+    `<div class="r">${icon(k, e, 16)}<span class="t"><span class="c-${cls(e.first)}">${who(e.first)}</span> ` +
+    `<span class="gold">${k.cat === "rare" ? "caught " + k.name : "caught the first " + k.name.replace(/^Raw /, "")}</span></span><span class="dim">${ago(e.first.ago)}</span></div>`).join("") + `</div>`;
+  return html;
+}
+
+// B · Ledger
+function variantB(view) {
+  const sorts = [["new","Newest"],["az","A–Z"],["un","Not caught"]];
+  let html = summary(view);
+  html += `<div class="lg-tools"><span class="label">Sort</span><div class="chips">${sorts.map(([id, l]) =>
+    `<span class="chip${state.sort === id ? " on" : ""}" data-sort="${id}">${l}</span>`).join("")}</div><span class="grow"></span></div>`;
+  html += `<div class="scroll">`;
+  const row = k => {
+    const e = view[k.id], open = state.open === k.id;
+    let r = `<div class="lg-row${e ? "" : " un"}" data-open="${k.id}">${icon(k, e, 20)}` +
+      `<span class="nm" style="${k.q > 1 && e ? `color:${QC[k.q]}` : ""}">${kname(k, e)}</span>`;
+    if (e) r += `<span class="by"><span class="c-${cls(e.first)}">${who(e.first)}</span><span class="dim"> · ${e.first.zone}</span></span>` +
+      `<span class="when${isFresh(e) ? " gold" : ""}">${ago(e.first.ago)}</span>`;
+    else r += `<span class="by dim">${WATERS.find(w => w.id === k.water).name}</span><span class="when"></span>`;
+    r += `</div>`;
+    if (open && e) r += `<div class="lg-more">` + (state.counts
+      ? e.by.map(b => `<div><span><span class="c-${cls(b)}">${b.ch}</span> <span class="dim">${b.zone}</span></span><span>${b.n} caught</span></div>`).join("")
+      : `<div><span>The Crew has caught</span><span>${e.total}</span></div><div><span>Also caught by</span><span>${e.by.slice(1).map(who).join(", ") || "nobody yet"}</span></div>`) + `</div>`;
+    return r;
+  };
+  if (state.sort === "new") {
+    const caught = KINDS.filter(k => view[k.id]).sort((a, b) => view[a.id].first.ago - view[b.id].first.ago);
+    const rest = KINDS.filter(k => !view[k.id]);
+    html += `<div class="lg-group"><span class="label">Caught</span><span class="label">${caught.length}</span></div>` + caught.map(row).join("");
+    html += `<div class="lg-group"><span class="label">Not caught yet</span><span class="label">${rest.length}</span></div>` + rest.map(row).join("");
+  } else if (state.sort === "az") {
+    html += [...KINDS].sort((a, b) => a.name.replace(/^Raw /, "").localeCompare(b.name.replace(/^Raw /, ""))).map(row).join("");
+  } else {
+    CATS.forEach(([cat, label]) => {
+      const ks = KINDS.filter(k => k.cat === cat && !view[k.id]);
+      if (ks.length) html += `<div class="lg-group"><span class="label">${label}</span><span class="label">${ks.length} left</span></div>` + ks.map(row).join("");
+    });
+  }
+  return html + `</div>`;
+}
+
+// C · Waters
+function variantC(view) {
+  const fresh = freshList(view, 1)[0];
+  let html = "";
+  if (fresh) {
+    const { k, e } = fresh;
+    html += `<div class="wt-hero">${icon(k, e, 40)}<div class="tx"><div class="l1"><span class="c-${cls(e.first)}">${who(e.first)}</span> ` +
+      `<span class="gold">${k.cat === "rare" ? "caught " + k.name : "caught the Crew's first " + k.name}</span></div>` +
+      `<div class="l2">${e.first.zone} · ${ago(e.first.ago)}</div></div>${e.first.m.own ? "" : `<button class="btn">Cheer</button>`}</div>`;
+  }
+  const n = Object.keys(view).length;
+  html += `<div style="padding:6px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;flex:none">` +
+    `<span class="label">Waters</span><span class="label">${n} / ${KINDS.length} kinds · next trophy at ${nextRung(n) || "—"}</span></div>`;
+  html += `<div class="scroll">`;
+  WATERS.forEach(w => {
+    const ks = KINDS.filter(k => k.water === w.id), got = ks.filter(k => view[k.id]).length, done = got === ks.length;
+    html += `<div class="wt-water"><div class="h"><span class="n">${w.name}</span><span class="lv">${w.lv}</span><span class="pc${done ? " done" : ""}">${got}/${ks.length}</span></div>` +
+      `<div class="wt-chips">${ks.map(k => { const e = view[k.id];
+        return `<span class="wt-chip${e ? "" : " un"}" data-k="${k.id}">${icon(k, e, 16)}` +
+          `<span style="${e && k.q > 1 ? `color:${QC[k.q]}` : ""}">${kname(k, e).replace(/^Raw /, "")}</span></span>`; }).join("")}</div>` +
+      `<div class="wt-bar${done ? " done" : ""}"><i style="width:${(got / ks.length) * 100}%"></i></div></div>`;
+  });
+  return html + `</div>`;
+}
+
+// The same Feed, toast, Goals and While you were away bits for every variant.
+function context(view) {
+  const n = Object.keys(view).length, fresh = freshList(view, 1)[0];
+  const k = fresh ? fresh.k : KIND[35], e = fresh ? fresh.e : null, b = e ? e.first : { m:MEMBERS[1], ch:"Mira Vale", ago:0.08 };
+  const line = `<span class="c-${MEMBERS.find(m => m === b.m) ? b.m.chars[b.ch] : "PRIEST"}">${b.m.own ? "You" : b.m.display}</span> ` +
+    `<span class="gold">${k.cat === "rare" ? "caught " + k.name : "caught the Crew's first " + k.name}</span>`;
+  const medals = RUNGS.map((r, i) => {
+    const got = n >= r, foot = ["var(--q2)","var(--q3)","var(--q4)","#ff8000"][i];
+    return `<div class="medal${got ? "" : " open"}"><div class="m">${icon({ ...KIND[19], q:1 }, true, 40)}${got ? `<i class="foot" style="background:${foot}"></i>` : ""}</div>` +
+      `<div class="${got && i === 0 && state.crew === "seasoned" ? "gold" : ""}">${r === KINDS.length ? "Every kind" : r + " kinds"}</div><div class="d">${got ? ["3 Nov","5 Nov","",""][i] : `${n}/${r}`}</div></div>`;
+  }).join("");
+  document.getElementById("ctx").innerHTML =
+    `<div><div class="cap">Feed entry (Cheer)</div><div class="card feedrow">${icon(k, true, 24)}<div class="tx">${line}<div class="tm">${ago(b.ago)}</div></div><button class="btn">Cheer</button></div></div>` +
+    `<div><div class="cap">Toast (Live event)</div><div class="toast">${icon(k, true, 24)}<div class="tx">${line}</div><i class="timer"></i></div></div>` +
+    `<div><div class="cap">Goals tab: a Fishing track</div><div class="card track">${medals}</div></div>` +
+    `<div><div class="cap">While you were away</div><div class="card" style="font-size:13px">` +
+      `<div class="label" style="margin-bottom:4px">The Creel</div>` +
+      `<div>+${freshList(view, 99).length} kinds since you left <span class="dim">(${[...new Set(freshList(view, 99).map(f => who(f.e.first)))].join(", ") || "none"})</span></div>` +
+      (fresh ? `<div style="margin-top:3px">${line}</div>` : "") + `</div></div>`;
+}
+
+function render() {
+  document.body.classList.toggle("min", state.min);
+  const view = crewView();
+  window.__view = view;
+  const fn = { A:variantA, B:variantB, C:variantC }[state.variant];
+  document.getElementById("content").innerHTML = fn(view);
+  context(view);
+  const v = VARIANTS.find(v => v[0] === state.variant);
+  document.getElementById("vlab").textContent = `${v[0]} · ${v[1]}`;
+  document.getElementById("t-counts").classList.toggle("on", state.counts);
+  document.getElementById("t-names").classList.toggle("on", state.names);
+  document.getElementById("t-crew").classList.toggle("on", state.crew === "new");
+  document.getElementById("t-min").classList.toggle("on", state.min);
+  save();
+}
+
+// Tooltip for any icon or Waters chip.
+const tip = document.getElementById("tip");
+document.addEventListener("mouseover", e => {
+  document.querySelectorAll(".ic.hot").forEach(n => n.classList.remove("hot"));
+  const el = e.target.closest("[data-k]");
+  if (!el || !el.closest(".content")) { tip.style.display = "none"; return; }
+  const k = KIND[el.dataset.k], v = window.__view[k.id], w = WATERS.find(x => x.id === k.water);
+  if (el.classList.contains("ic")) el.classList.add("hot");
+  let html = `<div class="t1" style="color:${v || state.names ? QC[k.q] : "var(--dim)"}">${kname(k, v)}</div>`;
+  if (v) {
+    html += `<div>First caught by <span class="c-${cls(v.first)}">${who(v.first)}</span>${v.first.m.own ? "" : ` <span class="m">(${v.first.ch})</span>`}</div>` +
+      `<div class="m">${ago(v.first.ago)} · ${v.first.zone}</div><hr>`;
+    if (state.counts) v.by.forEach(b => html += `<div class="l"><span class="c-${cls(b)}">${b.ch}</span><span>${b.n}</span></div>`);
+    else html += `<div class="l"><span class="m">The Crew has caught</span><span>${v.total}</span></div>` +
+      (v.by.length > 1 ? `<div class="m">Also caught by ${v.by.slice(1).map(who).join(", ")}</div>` : "");
+  } else {
+    html += `<div class="m">Nobody in the Crew has caught this yet.</div><div class="m">Try: ${w.where} (${w.lv})</div>`;
+  }
+  tip.innerHTML = html;
+  const r = el.getBoundingClientRect();
+  tip.style.display = "block";
+  tip.style.left = Math.min(r.right + 6, innerWidth - 270) + "px"; tip.style.top = r.top - 4 + "px";
+});
+document.addEventListener("click", e => {
+  const f = e.target.closest("[data-filter]"), s = e.target.closest("[data-sort]"), o = e.target.closest("[data-open]");
+  if (f) { state.filter = f.dataset.filter; render(); }
+  if (s) { state.sort = s.dataset.sort; render(); }
+  if (o) { const id = +o.dataset.open; state.open = state.open === id ? null : id; render(); }
+});
+const cycle = d => { const i = VARIANTS.findIndex(v => v[0] === state.variant); state.variant = VARIANTS[(i + d + VARIANTS.length) % VARIANTS.length][0]; render(); };
+document.getElementById("prev").onclick = () => cycle(-1);
+document.getElementById("next").onclick = () => cycle(1);
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input, textarea, [contenteditable]")) return;
+  if (e.key === "ArrowLeft") cycle(-1);
+  if (e.key === "ArrowRight") cycle(1);
+});
+document.getElementById("t-counts").onclick = () => { state.counts = !state.counts; render(); };
+document.getElementById("t-names").onclick = () => { state.names = !state.names; render(); };
+document.getElementById("t-crew").onclick = () => { state.crew = state.crew === "new" ? "seasoned" : "new"; render(); };
+document.getElementById("t-min").onclick = () => { state.min = !state.min; render(); };
+render();
+</script>
+</body>
+</html>
