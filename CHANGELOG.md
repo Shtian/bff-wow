@@ -7,6 +7,21 @@
 
 
 
+
+## 1.1.0
+<sub>2026-11-07</sub>
+
+- *(minor)*
+  BFF now records your **fishing catches** and shares them with your Crew: the first time you catch each type of fish or fishing find (when and where), and how many you've caught.
+- *(minor)*
+  A new **Catches** tab in the panel (or `/bff catches`) shows the Crew's fishing catches as a field guide: every type of fish and fishing find, filled in by whoever caught it first. Group it by where to fish or by type, pick what to show, and hover a fish to see who caught it first, when and where, and how many the Crew has caught. The bar on top counts the types caught towards the next trophy step, and the newest first catches show at the bottom.
+- *(minor)*
+  Catches are now news. A new **Types caught** track on the Goals tab has steps at 10, 20, 30, 40 and every type, each a trophy, a gold Feed entry and a toast. The Crew's first catch of a Nat Pagle fish or a Sunday contest fish is a Feed entry you can Cheer, named in the item's colour. While you were away gets a Catches section: "4 new types caught (Tor 3, Mira 1)", and a line for any rare find you missed. Everyday first catches stay in the Catches tab.
+- *(patch)*
+  Renamed four tabs in the panel sidebar: Goals is now **Trophies**, When is now **Play Times**, Spares is now **Spare Items** and Together is now **Dungeons**.
+- *(patch)*
+  Reworded the popup for a claimed Spare whose item is gone. It used to ask "Did you mail it to …?", which the Give, Not now and Withdraw buttons didn't answer. It now asks what happened to the item, with **Sent it**, **Ask me later** and **Got rid of it**.
+
 ## 1.0.1
 <sub>2026-11-05</sub>
 
