@@ -301,9 +301,9 @@ end
 -- first, others).
 -- first is the earliest catch across the Crew: memberId, displayName, own,
 -- character and classFilename (nil if the record no longer has the
--- Character), time, since (in words: "5m ago"), zone, subzone, mapId and
--- text (who and where in words: "Bob (Bobby), Westfall, The Jansen
--- Stead, 5m ago", "You" for your own).
+-- Character), time, since (in words: "5m ago"), zone, subzone, mapId, who
+-- ("You" for your own, else the display name) and text (who and where in
+-- words: "Bob (Bobby), Westfall, The Jansen Stead, 5m ago").
 function Core:catches()
   local records = {}
   for _, record in self.ledger:records() do
@@ -317,7 +317,8 @@ end
 -- filtered by show ("all", default, "fish", "rare", "extras" or
 -- "missing"), naming types not caught yet while the catchesNames
 -- setting is on. caught, total, done (every counted type caught), count
--- ("25 of 46 types caught"), next (the next trophy step, in words), fill
+-- ("25 of 46 types caught"), countOf ("of 46 types caught", to go after
+-- the number; nil once done), next (the next trophy step, in words), fill
 -- (0–1) and ticks (each trophy step but the last, 0–1 along the bar);
 -- group and show, the menus: title, label ("Show: All"), options ({ id,
 -- label, picked, and for show count: the tiles it shows }) and, on show,
@@ -327,15 +328,19 @@ end
 -- it doesn't count), done, none ("Nothing caught here yet" for New on
 -- Forever with nothing in it) and tiles }; empty ({ title, text }, while
 -- the Crew has caught nothing), filtered ({ title, text }, when show
--- leaves nothing); and recent (up to 3 first catches from the last 3
--- days, newest first: itemId, name, first). A tile, a type or an
--- unlisted catch: id, itemId, name (English, nil for unlisted), caught,
+-- leaves nothing); recentTitle; and recent (up to 3 first catches from
+-- the last 3 days, newest first: itemId, name, first, caught ("caught",
+-- between who and the item) and when ("Feralas · 5h ago")). A tile, a
+-- type or an unlisted catch: id, itemId, name (English, or "Item 123"
+-- for an unlisted one, for while the game hasn't the item), caught,
 -- named (its name may show), fresh (first caught in the last 3 days),
--- extra, unlisted, first (as catches()) and tooltip: note, extra, first,
--- when ("2 days ago · Feralas"), crew ("The Crew has caught") and count,
--- also ("Also caught by Tor and you"), none, hint (how to show names)
--- and where ("Where: Level 30–45, Level 40–55"), each nil when it
--- doesn't apply. See docs/design/catches.md.
+-- extra, unlisted, first (as catches()) and tooltip: unnamed ("???", the
+-- name while it can't show), note, extra, firstBy ("First caught by") and
+-- first, when ("2 days ago · Feralas"), crew ("The Crew has caught") and
+-- count, also ("Also caught by Tor and you"), none, hint (how to show
+-- names) and where ("Where: Level 30–45, Level 40–55"), each nil when it
+-- doesn't apply. A section's count is over all its tiles, not only those
+-- Show leaves. See docs/design/catches.md.
 function Core:catchesTab(group, show)
   local own = self.ledger:own()
   local playing = own and own.characters and own.characters[self.ledger:playing() or ""]

@@ -49,9 +49,6 @@ local SCROLL_STEP = 40
 local EMPTY_PAD = 18
 -- A tile not caught: its icon faint and grey, or a "?".
 local UNCAUGHT_ALPHA = 0.45
-local UNCAUGHT_BORDER = { 1, 1, 1, 0.1 }
-local QUESTION = { 1, 1, 1, 0.35 }
-local TICK_COLOR = { 1, 1, 1, 0.35 }
 local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local getItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
@@ -69,13 +66,13 @@ local function hideFrom(list, from)
   for i = from, #list do list[i]:Hide() end
 end
 
--- An item as the game has it: name (or the list's English name, or
--- "Item 123" until it's cached), icon and quality colour (nil for
+-- An item as the game has it: name (or Core's fallback until it's
+-- cached), icon and quality colour (nil for
 -- common, or while not cached). Asking starts loading it, and the panel
 -- redraws when it arrives.
 local function item(itemId, fallback)
   local name, _, quality = getItemInfo(itemId)
-  return name or fallback or ("Item " .. itemId), getItemIcon(itemId) or QUESTION_MARK,
+  return name or fallback, getItemIcon(itemId) or QUESTION_MARK,
     quality and Skin.ITEM_QUALITIES[quality]
 end
 
@@ -86,9 +83,9 @@ end
 -- A Member as a catch names them: "You" in Ash Text, anyone else in their
 -- Character's class colour.
 local function who(first)
-  if first.own then return colored("You", TEXT) end
+  if first.own or not first.classFilename then return colored(first.who, TEXT) end
   local r, g, b = Skin.classColor(first.classFilename)
-  return colored(first.displayName or "Someone", first.classFilename and { r, g, b } or TEXT)
+  return colored(first.who, { r, g, b })
 end
 
 local function line(text, color, wrap)
@@ -104,13 +101,13 @@ local function tileTooltip(frame)
     local name, _, quality = item(t.itemId, t.name)
     line(name, quality or TEXT)
   else
-    line("???", DIM)
+    line(tip.unnamed, DIM)
   end
   if tip.note then line(tip.note, MUTED, true) end
   if tip.extra then line(tip.extra, MUTED, true) end
   if tip.first then
     local first = tip.first
-    local by = "First caught by " .. who(first)
+    local by = tip.firstBy .. " " .. who(first)
     if not first.own and first.character and first.character ~= first.displayName then
       by = by .. colored(" (" .. first.character .. ")", MUTED)
     end
@@ -137,9 +134,9 @@ local function picture(parent, size)
   local frame = Skin.feedPicture(parent, size)
   frame.border = {}
   for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
-    frame.border[#frame.border + 1] = Skin.edge(frame, side, UNCAUGHT_BORDER, "OVERLAY")
+    frame.border[#frame.border + 1] = Skin.edge(frame, side, Skin.BORDER, "OVERLAY")
   end
-  frame.question = Skin.label(frame, "small", QUESTION)
+  frame.question = Skin.label(frame, "small", Skin.FAINT_MARK)
   frame.question:SetPoint("CENTER", 0, 0)
   frame.question:SetText("?")
   function frame:Draw(t)
@@ -168,7 +165,7 @@ local function createTile()
   frame:EnableMouse(true)
   local hover = frame:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints()
-  hover:SetColorTexture(1, 1, 1, 0.12)
+  hover:SetColorTexture(Skin.HOVER[1], Skin.HOVER[2], Skin.HOVER[3], Skin.HOVER[4])
   frame.fresh = frame:CreateTexture(nil, "ARTWORK")
   frame.fresh:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 1)
   frame.fresh:SetHeight(FRESH_LINE)
@@ -237,8 +234,10 @@ local function showMenu(owner, menu, onPick)
     end
     if menu.names then
       root:CreateDivider()
-      root:CreateCheckbox(menu.names.label, function() return core:setting("catchesNames") end, function()
-        core:setSetting("catchesNames", not core:setting("catchesNames"))
+      -- view.data is redrawn after each click, so this reads the setting
+      -- as it is now.
+      root:CreateCheckbox(menu.names.label, function() return view.data.show.names.value end, function()
+        core:setSetting("catchesNames", not view.data.show.names.value)
         redraw()
         return MenuResponse and MenuResponse.Refresh
       end)
@@ -272,6 +271,8 @@ local function createView(parent)
   view.summary:SetPoint("TOPRIGHT")
   view.summary.line = Skin.edge(view.summary, "BOTTOM", Skin.LINE)
   view.count = Skin.label(view.summary, "body", TEXT)
+  view.countOf = Skin.label(view.summary, "small", MUTED)
+  view.countOf:SetPoint("BOTTOMLEFT", view.count, "BOTTOMRIGHT", 4, 1)
   view.show = picker("filter", function(self) showMenu(self, view.data.show, function(id) show = id end) end)
   view.group = picker("group", function(self) showMenu(self, view.data.group, function(id) group = id end) end)
   view.track = view.summary:CreateTexture(nil, "ARTWORK")
@@ -289,7 +290,6 @@ local function createView(parent)
   Skin.edge(view.recent, "TOP", Skin.LINE)
   view.recent.label = Skin.label(view.recent, "label", DIM)
   view.recent.label:SetPoint("TOPLEFT", INSET, -7)
-  view.recent.label:SetText("RECENT FIRST CATCHES")
 
   view.scroller = CreateFrame("ScrollFrame", nil, view)
   view.scroller:EnableMouseWheel(true)
@@ -316,7 +316,11 @@ local function createView(parent)
   view.message.text:SetJustifyH("CENTER")
   view.message.text:SetWordWrap(true)
 
-  view:SetScript("OnHide", hideTooltip)
+  -- Hiding the tab closes a tile's tooltip, not anyone else's.
+  view:SetScript("OnHide", function()
+    local owner = GameTooltip:GetOwner()
+    if owner and owner.tile then GameTooltip:Hide() end
+  end)
 end
 
 -- The count, the pickers and, when they don't fit beside it, the pickers
@@ -324,11 +328,14 @@ end
 local function drawSummary(data, width)
   setPicker(view.group, data.group.label)
   setPicker(view.show, data.show.label)
-  view.count:SetText(data.count)
+  -- "25" then "of 46 types caught" smaller, or "All 46 types caught".
+  view.count:SetText(data.countOf and tostring(data.caught) or data.count)
+  view.countOf:SetText(data.countOf or "")
   Skin.color(view.count, data.done and GOLD or TEXT)
+  local countWidth = view.count:GetStringWidth() + (data.countOf and 4 + view.countOf:GetStringWidth() or 0)
   local pickers = view.group:GetWidth() + PICKER_GAP + view.show:GetWidth()
   local inner = width - 2 * INSET
-  local oneLine = view.count:GetStringWidth() + 8 + pickers <= inner
+  local oneLine = countWidth + 8 + pickers <= inner
   view.count:ClearAllPoints()
   view.count:SetPoint("TOPLEFT", INSET, -SUMMARY_PAD - 2)
   view.show:ClearAllPoints()
@@ -349,7 +356,8 @@ local function drawSummary(data, width)
     local tick = view.ticks[i]
     if not tick then
       tick = view.summary:CreateTexture(nil, "ARTWORK", nil, 2)
-      tick:SetColorTexture(TICK_COLOR[1], TICK_COLOR[2], TICK_COLOR[3], TICK_COLOR[4])
+      local mark = Skin.FAINT_MARK
+      tick:SetColorTexture(mark[1], mark[2], mark[3], mark[4])
       tick:SetSize(1, TICK)
       view.ticks[i] = tick
     end
@@ -377,6 +385,7 @@ local function drawRecent(data, width, height)
     hideFrom(recentRows, 1)
     return 0
   end
+  view.recent.label:SetText(data.recentTitle)
   for i = 1, shown do
     local r = data.recent[i]
     local row = recentRows[i]
@@ -387,7 +396,7 @@ local function drawRecent(data, width, height)
       row.picture:SetPoint("LEFT", INSET, 0)
       row.when = Skin.label(row, "small", DIM)
       row.when:SetPoint("RIGHT", -INSET, 0)
-      row.text = Skin.label(row, "text", MUTED)
+      row.text = Skin.label(row, "text", TEXT)
       row.text:SetPoint("LEFT", row.picture, "RIGHT", 6, 0)
       row.text:SetPoint("RIGHT", row.when, "LEFT", -6, 0)
       row.text:SetWordWrap(false)
@@ -398,9 +407,8 @@ local function drawRecent(data, width, height)
     row:SetPoint("TOPRIGHT", 0, -7 - RECENT_LABEL - (i - 1) * RECENT_ROW)
     row.picture:Draw({ itemId = r.itemId, name = r.name, caught = true, named = true })
     local name, _, quality = item(r.itemId, r.name)
-    row.text:SetText(who(r.first) .. " caught " .. colored(name, quality or TEXT))
-    local zone = width >= RECENT_NARROW and r.first.zone
-    row.when:SetText(zone and (zone .. " · " .. r.first.since) or r.first.since)
+    row.text:SetText(who(r.first) .. " " .. r.caught .. " " .. colored(name, quality or TEXT))
+    row.when:SetText(width >= RECENT_NARROW and r.when or r.first.since)
     row:Show()
   end
   hideFrom(recentRows, shown + 1)

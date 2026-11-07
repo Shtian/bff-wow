@@ -40,6 +40,8 @@ Skin.RANK_SHADES = {
 }
 Skin.TILE_CAPPED = { 1, 1, 1, 0.66 }
 Skin.TILE_NONE = { 1, 1, 1, 0.035 }
+-- A faint mark on the window: a bar's step ticks, a tile's "?".
+Skin.FAINT_MARK = { 1, 1, 1, 0.35 }
 
 Skin.HEADER_HEIGHT = 30
 

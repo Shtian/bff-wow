@@ -342,6 +342,7 @@ local function catcher(record, entry, ownId, now)
     subzone = entry.s,
     mapId = entry.m,
   }
+  first.who = first.own and "You" or first.displayName or "Someone"
   first.text = catchText(first)
   return first
 end
@@ -468,22 +469,23 @@ local function place(first)
   return first.since .. " · " .. table.concat(parts, ", ")
 end
 
--- A tile's tooltip, under its name (which the game gives): note, extra,
--- first, when, crew and count, also, none, hint and where (each nil
+-- A tile's tooltip, under its name (which the game gives; unnamed when it
+-- can't show): note, extra, firstBy and first, when, crew and count, also, none, hint and where (each nil
 -- when there's nothing to say).
 local function tooltip(entry, named)
-  local tip = {}
+  local tip = { unnamed = "???" }
   if named then tip.note = entry.note end
   if entry.extra then tip.extra = "Extra, not counted: " .. EXTRA_WHY[entry.extra] end
   if entry.first then
     tip.first = entry.first
+    tip.firstBy = "First caught by"
     tip.when = place(entry.first)
     tip.crew = "The Crew has caught"
     tip.count = entry.count
     if #entry.others > 0 then tip.also = "Also caught by " .. names(entry.others) end
   else
     tip.none = "No one in the Crew has caught this yet."
-    if not named then tip.hint = "To see its name: Show ▸ " .. NAMES_LABEL end
+    if not named then tip.hint = "To see its name: Show > " .. NAMES_LABEL end
   end
   if entry.waters then
     local where = {}
@@ -499,7 +501,7 @@ local function tile(entry, opts)
   return {
     id = entry.id or entry.itemId,
     itemId = entry.itemId,
-    name = entry.name,
+    name = entry.name or ("Item %d"):format(entry.itemId),
     caught = caught,
     named = named,
     fresh = caught and opts.now - entry.first.time < Catches.FRESH,
@@ -614,6 +616,7 @@ function Catches.tab(view, opts)
     tab.next = "Every type on the list. Extras and new finds still show up below."
   else
     tab.count = ("%d of %d types caught"):format(view.caught, view.total)
+    tab.countOf = ("of %d types caught"):format(view.total)
     for _, step in ipairs(Catches.STEPS) do
       if step > view.caught then
         tab.next = ("Next trophy at %s: %d more to catch"):format(
@@ -624,7 +627,9 @@ function Catches.tab(view, opts)
   end
   tab.fill = view.total > 0 and view.caught / view.total or 0
   tab.ticks = {}
-  for i = 1, #Catches.STEPS - 1 do tab.ticks[i] = Catches.STEPS[i] / view.total end
+  for i = 1, #Catches.STEPS - 1 do
+    if view.total > 0 then tab.ticks[i] = Catches.STEPS[i] / view.total end
+  end
 
   local all = sectionsFor(group.id, tiles)
   local function filtered(id)
@@ -683,10 +688,13 @@ function Catches.tab(view, opts)
     if a.first.time ~= b.first.time then return a.first.time > b.first.time end
     return tostring(a.id) < tostring(b.id)
   end)
+  tab.recentTitle = "RECENT FIRST CATCHES"
   tab.recent = {}
   for i = 1, math.min(RECENT, #recent) do
     local t = recent[i]
-    tab.recent[i] = { itemId = t.itemId, name = t.name, first = t.first }
+    local first = t.first
+    tab.recent[i] = { itemId = t.itemId, name = t.name, first = first, caught = "caught",
+      when = first.zone and (first.zone .. " · " .. first.since) or first.since }
   end
   return tab
 end
