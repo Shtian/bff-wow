@@ -266,18 +266,17 @@ function Core:encounterEnded(encounter)
   return name
 end
 
--- Something was fished (LOOT_READY): the catch as Catches.read gives it
--- ({ items, zone, subzone, mapId }), nil when the loot isn't from
--- fishing. Each item goes into your record under its type (a fish
+-- Something was fished (LOOT_READY): the loot as Catches.read gives it
+-- ({ items, zone, subzone, mapId }), nil when it isn't from fishing. Each item goes into your record under its type (a fish
 -- family's every weight counts as the family), the first catch of a type
 -- with when and where, every catch adding to its count; an item not on
 -- the list is kept as an unlisted catch, up to Catches.UNLISTED_CAP. Kept
 -- outside a Crew too, and shared with the next send, as professions are.
 -- Returns true if your record changed.
-function Core:caught(catch)
+function Core:caught(loot)
   if not self.ledger:own() then return false end
   local now, character = self.now(), self.ledger:playing()
-  local changed = self.ledger:changeOwn(function(record) return ns.Catches.add(record, catch, now, character) end)
+  local changed = self.ledger:changeOwn(function(record) return ns.Catches.add(record, loot, now, character) end)
   if changed then
     self.gossip:ownChanged("later")
     self.listener("changed")
@@ -287,7 +286,8 @@ end
 
 -- The Crew's catches, over every Member held who hasn't left, you
 -- included: total (how many types count, Extras not among them), caught
--- (how many of those someone has caught), waters (Catches.WATERS: { id,
+-- (how many of those someone has caught), title ("The Crew has caught 3
+-- of 46 types."), waters (Catches.WATERS: { id,
 -- name, zones }, lowest first), types (every type in the list's order:
 -- id, itemId (the item whose name and icon the game shows), items (every
 -- item ID that counts as it), name (English, for when the item isn't
@@ -298,7 +298,9 @@ end
 -- fished item not on the list, the earliest first: itemId, count, first).
 -- first is the earliest catch across the Crew: memberId, displayName, own,
 -- character and classFilename (nil if the record no longer has the
--- Character), time, since (in words: "5m ago"), zone, subzone and mapId.
+-- Character), time, since (in words: "5m ago"), zone, subzone, mapId and
+-- text (who and where in words: "Bob (Bobby), Westfall, The Jansen
+-- Stead, 5m ago", "You" for your own).
 function Core:catches()
   local records = {}
   for _, record in self.ledger:records() do

@@ -200,7 +200,7 @@ eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 eventFrame:RegisterEvent("ENCOUNTER_END")
 -- The loot window filled: Core keeps it if it was fished. With auto-loot
 -- the slots are still filled when LOOT_READY fires. It can fire more than
--- once for one window, so each window is read once, until LOOT_CLOSED.
+-- once for one window, so a window's catch is kept once, until LOOT_CLOSED.
 eventFrame:RegisterEvent("LOOT_READY")
 eventFrame:RegisterEvent("LOOT_CLOSED")
 local lootRead = false
@@ -218,9 +218,14 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
   elseif event == "ENCOUNTER_END" then
     if ns.core then ns.core:encounterEnded(ns.Snapshot.encounter(...)) end
   elseif event == "LOOT_READY" then
+    -- Marked read only once something fished is found, in case
+    -- IsFishingLoot() isn't true yet at the first LOOT_READY.
     if ns.core and not lootRead then
-      lootRead = true
-      ns.core:caught(ns.Snapshot.catch())
+      local loot = ns.Snapshot.catch()
+      if loot then
+        lootRead = true
+        ns.core:caught(loot)
+      end
     end
   elseif event == "LOOT_CLOSED" then
     lootRead = false
@@ -324,27 +329,20 @@ local function itemName(itemId, fallback)
   return getItemInfo(itemId) or fallback or ("item " .. itemId)
 end
 
--- Who caught something first and where: "you, Westfall (The Jansen Stead)".
-local function firstCatch(first)
-  local who = first.own and "you" or (first.displayName or "?")
-  if first.character and first.character ~= first.displayName then who = who .. " (" .. first.character .. ")" end
-  local where = first.zone or "somewhere"
-  if first.subzone and first.subzone ~= first.zone then where = where .. ", " .. first.subzone end
-  return ("first by %s in %s, %s"):format(who, where, first.since)
-end
-
 -- /bff catches prints what the Crew has caught, until Catches has a tab.
+-- Only in a dev checkout, like /bff sim.
 function commands.catches()
+  if not ns.Sim then return say("/bff catches is only in a dev checkout.") end
   local view = ns.core:catches()
-  say(("the Crew has caught %d of %d types."):format(view.caught, view.total))
+  say(view.title)
   for _, t in ipairs(view.types) do
     if t.first then
-      print(("  %s%s: %d, %s"):format(itemName(t.itemId, t.name), t.extra and " (Extra)" or "", t.count,
-        firstCatch(t.first)))
+      print(("  %s%s: %d, first by %s"):format(itemName(t.itemId, t.name), t.extra and " (Extra)" or "", t.count,
+        t.first.text))
     end
   end
   for _, u in ipairs(view.unlisted) do
-    print(("  %s (unlisted, item %d): %d, %s"):format(itemName(u.itemId), u.itemId, u.count, firstCatch(u.first)))
+    print(("  %s (unlisted, item %d): %d, first by %s"):format(itemName(u.itemId), u.itemId, u.count, u.first.text))
   end
 end
 
@@ -400,7 +398,7 @@ SlashCmdList.BFF = function(input)
   elseif commands[command] then
     commands[command](rest)
   else
-    say("/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff professions, /bff catches, /bff together, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
+    say("/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff professions, /bff together, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
   end
 end
 

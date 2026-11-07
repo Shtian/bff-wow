@@ -43,7 +43,7 @@ Inputs:
 - `tick()`: once a second. Core decides what is due (reply delays, debounced sends, heartbeat, online timeouts, pruning), and counts the second towards Play times.
 - `received(string)`, `up()`, `down()` and `gone(name)`: the incoming half of the link port.
 - `bagsUpdated()`: on each `BAG_UPDATE_DELAYED`, never before the first of a session. Core checks where each own Spare's item is (ADR 0004).
-- `caught(catch)`: on `LOOT_READY` (once per loot window), from `Snapshot.catch`: `{ items, zone, subzone, mapId }`, or nil when the loot isn't from fishing. Each item goes into the own record as a Catch, shared with the next send (`docs/design/catches.md`).
+- `caught(loot)`: on `LOOT_READY` (a loot window's catch once), from `Snapshot.catch`: `{ items, zone, subzone, mapId }`, or nil when the loot isn't from fishing. Each item goes into the own record as a Catch, shared with the next send (`docs/design/catches.md`).
 - `encounterEnded(encounter)`: on `ENCOUNTER_END`, from `Snapshot.encounter`: `{ encounterId, success, instanceType, party }`. A known final boss killed in a party or raid instance, in a Crew, is a Clear in the own record (ADR 0005); returns the instance's name, or nil and why not (`docs/design/trophies.md`).
 - Commands: start, join and leave a Crew, change the display name, Set as Main, Remove and re-add a Member, Pause sharing, and settings (see `docs/design/joining-a-crew.md`). Spares: post (with the item's GUID, kept locally, and its binding: an item that can't be traded is refused), withdraw and Give one, and make and withdraw a Claim (`docs/design/spares.md`).
 
@@ -149,7 +149,7 @@ Not embedded: AceDB (Core owns plain SavedVariables), AceConsole and AceEvent (a
 BFF.toc
 BFF.lua
 Bindings.xml                         -- key binding to open the panel
-Core/  Core.lua  Text.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  SpareRules.lua  Spares.lua  Feed.lua  Roster.lua  Together.lua  Camp.lua  Clears.lua  Goals.lua  PlayTimes.lua  Professions.lua  CrewCode.lua  Codec.lua
+Core/  Core.lua  Text.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  SpareRules.lua  Spares.lua  Feed.lua  Roster.lua  Together.lua  Camp.lua  Clears.lua  Goals.lua  PlayTimes.lua  Professions.lua  Catches.lua  CrewCode.lua  Codec.lua
 Game/  Snapshot.lua  Bags.lua  ChannelLink.lua
 UI/    Skin.lua  CampSheet.lua  CampScene.lua  Panel.lua  TogetherTab.lua  GoalsTab.lua  Minimap.lua  MapPins.lua  Away.lua  ToastQueue.lua  Toasts.lua  Settings.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases

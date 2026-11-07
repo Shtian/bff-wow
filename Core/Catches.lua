@@ -1,6 +1,6 @@
 -- Catches: the pure parts of the Crew's fishing catches. The list of types
--- (data: a new type or zone is one row), reading a catch from the loot
--- window (handed the API, so offline tests can fake it), how catches are
+-- (data: a new type or zone is one row), reading what was fished from
+-- the loot window (handed the API, so offline tests can fake it), how catches are
 -- kept in a Member's own record, and the Crew's catches over every record:
 -- per type, the earliest catch and the Crew's count. Stateless, tested
 -- through Core. See docs/design/catches.md and
@@ -31,7 +31,11 @@ Catches.WATERS = {
 }
 
 -- Water ids, lowest first, for the list below.
-local W1, W2, W3, W4, W5, W6, NEW = "1-10", "10-25", "20-35", "30-45", "40-55", "50-60", "new"
+local W1, W2, W3, W4, W5, W6, NEW = (function()
+  local ids = {}
+  for i, w in ipairs(Catches.WATERS) do ids[i] = w.id end
+  return unpack(ids)
+end)()
 
 -- The types, in the list's order. id is the item ID, or a family's key
 -- for fish sold by weight (any of its items counts as it). name is the
@@ -201,13 +205,13 @@ end
 -- isFishingLoot (IsFishingLoot), getNumLootItems, getLootSlotLink and
 -- getLootSlotInfo (the globals of those names), zone (GetRealZoneText),
 -- subzone (GetSubZoneText), mapId (C_Map.GetBestMapForUnit("player")) and
--- isSecret (issecretvalue, optional). A catch: { items, a { itemId,
+-- isSecret (issecretvalue, optional). The fished loot: { items, a { itemId,
 -- quantity } per item slot (not coin or currency), zone, subzone, mapId
 -- (each nil when unknown) }. Nil when the loot isn't from fishing, holds
 -- no item, a value reads secret, or the read errors.
 function Catches.read(api)
-  local ok, catch = pcall(readAll, api)
-  if ok then return catch end
+  local ok, loot = pcall(readAll, api)
+  if ok then return loot end
   return nil
 end
 
@@ -225,16 +229,16 @@ local function unlistedCount(catches)
   return n
 end
 
--- Adds a catch (as read() gives it) to the own record, caught at time by
+-- Adds fished loot (as read() gives it) to the own record, caught at time by
 -- the Character with GUID character. Its catches are { [key] = { t, n, z,
 -- s, m, c } }: key the type's id, or the item ID of an unlisted catch; t
 -- the first catch's time, z, s and m its zone, subzone and map ID, c the
 -- Character's GUID, and n how many caught. Unlisted catches past
 -- UNLISTED_CAP are dropped. Returns true if the record changed.
-function Catches.add(record, catch, time, character)
-  if type(catch) ~= "table" or type(catch.items) ~= "table" then return false end
+function Catches.add(record, loot, time, character)
+  if type(loot) ~= "table" or type(loot.items) ~= "table" then return false end
   local changed = false
-  for _, item in ipairs(catch.items) do
+  for _, item in ipairs(loot.items) do
     if type(item) == "table" and isItemId(item.itemId) then
       local quantity = isItemId(item.quantity) and item.quantity or 1
       local key = keyOf(item.itemId)
@@ -245,8 +249,8 @@ function Catches.add(record, catch, time, character)
         changed = true
       elseif BY_ID[key] or unlistedCount(record.catches) < Catches.UNLISTED_CAP then
         record.catches[key] = {
-          t = time, n = quantity, z = text(catch.zone), s = text(catch.subzone),
-          m = isItemId(catch.mapId) and catch.mapId or nil, c = text(character),
+          t = time, n = quantity, z = text(loot.zone), s = text(loot.subzone),
+          m = isItemId(loot.mapId) and loot.mapId or nil, c = text(character),
         }
         changed = true
       end
@@ -270,7 +274,8 @@ end
 -- isn't shape-checked for them): for key, entry in valid(record), with
 -- key a listed type's id or the item ID of an unlisted catch. A
 -- family's item kept under its own ID (by an older list) counts as the
--- family; a key this list doesn't know as a family is skipped.
+-- family; a key this list doesn't know as a family is skipped. Unlisted
+-- catches past UNLISTED_CAP (the earliest kept) are skipped too.
 local function valid(record)
   local list = {}
   local catches = record.catches
@@ -291,13 +296,34 @@ local function valid(record)
       end
     end
   end
+  local unlisted = {}
+  for id, entry in pairs(list) do
+    if not BY_ID[id] then unlisted[#unlisted + 1] = { id = id, t = entry.t } end
+  end
+  table.sort(unlisted, function(a, b)
+    if a.t ~= b.t then return a.t < b.t end
+    return a.id < b.id
+  end)
+  for i = Catches.UNLISTED_CAP + 1, #unlisted do list[unlisted[i].id] = nil end
   return pairs(list)
+end
+
+-- Who caught something first and where, in words: "Bob (Bobby),
+-- Westfall, The Jansen Stead, 5m ago", or "You" for your own.
+local function catchText(first)
+  local who = first.own and "You" or first.displayName or "Someone"
+  if first.character and first.character ~= first.displayName then who = who .. " (" .. first.character .. ")" end
+  local parts = { who }
+  if first.zone then parts[#parts + 1] = first.zone end
+  if first.subzone and first.subzone ~= first.zone then parts[#parts + 1] = first.subzone end
+  parts[#parts + 1] = first.since
+  return table.concat(parts, ", ")
 end
 
 -- Who caught something first, for the read.
 local function catcher(record, entry, ownId, now)
   local character = entry.c and type(record.characters) == "table" and record.characters[entry.c]
-  return {
+  local first = {
     memberId = record.id,
     displayName = record.displayName,
     own = record.id == ownId,
@@ -309,6 +335,8 @@ local function catcher(record, entry, ownId, now)
     subzone = entry.s,
     mapId = entry.m,
   }
+  first.text = catchText(first)
+  return first
 end
 
 local function earlier(entry, record, best)
@@ -353,5 +381,6 @@ function Catches.collect(records, ownId, now)
     if a.first.time ~= b.first.time then return a.first.time < b.first.time end
     return a.itemId < b.itemId
   end)
+  view.title = ("The Crew has caught %d of %d types."):format(view.caught, view.total)
   return view
 end

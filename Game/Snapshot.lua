@@ -168,7 +168,7 @@ local CATCH_API = {
   isSecret = issecretvalue,
 }
 
--- What was fished, read on LOOT_READY: the catch for Core's caught(), or
+-- What was fished, read on LOOT_READY: the loot for Core's caught(), or
 -- nil when the loot isn't from fishing (or the client has no such API).
 function Snapshot.catch()
   if not (IsFishingLoot and GetNumLootItems and GetLootSlotLink and GetLootSlotInfo) then return nil end

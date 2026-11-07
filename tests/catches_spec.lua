@@ -143,6 +143,8 @@ describe("Catches", function()
       assert.equal(4, t.count)
       assert.equal(first, t.first.time)
       assert.equal("1m ago", t.first.since)
+      assert.equal("You, Westfall, The Jansen Stead, 1m ago", t.first.text)
+      assert.equal("The Crew has caught 1 of 46 types.", view.title)
       assert.equal("Westfall", t.first.zone)
       assert.equal("The Jansen Stead", t.first.subzone)
       assert.equal(1436, t.first.mapId)
@@ -255,6 +257,9 @@ describe("Catches", function()
         assert.equal(2, view.caught)
         assert.equal(1, #view.unlisted)
         assert.equal("Cleo", view.unlisted[1].first.displayName)
+        if client ~= b then
+          assert.equal("Bob, Westfall, The Jansen Stead, 0m ago", smallfish.first.text)
+        end
       end
     end)
 
@@ -298,6 +303,15 @@ describe("Catches", function()
       assert.is_nil(typeOf(view, SMALLFISH).first)
       assert.equal(0, #view.unlisted)
       assert.equal(20, a:rowFor({ memberId = "junkfield" }).level)
+
+      -- Unlisted catches past the cap from another client: the earliest kept.
+      local many = {}
+      for i = 1, ns.Catches.UNLISTED_CAP + 10 do many[900000 + i] = { t = 100 + i, n = 1 } end
+      send("toomanyu", many)
+      view = a.core:catches()
+      assert.equal(ns.Catches.UNLISTED_CAP, #view.unlisted)
+      assert.equal(900001, view.unlisted[1].itemId)
+      assert.equal(900000 + ns.Catches.UNLISTED_CAP, view.unlisted[#view.unlisted].itemId)
       assert.equal(20, a:rowFor({ memberId = "badentry" }).level)
     end)
   end)
