@@ -1,25 +1,24 @@
 <!doctype html>
 <!--
-  PROTOTYPE, throwaway. Question: what should Catches (a Crew-wide catch collection, filled in the
-  first time any Member catches each kind of fish or fishing find) look like in the panel?
-  Three structurally different variants, switchable with ?variant=A|B|C, the bottom bar or ← →:
-    A · Field guide: a grid of tiles, uncaught ones as dim outlines. Collection-first.
-        Round 2 (picked): a Show filter picker and a Group picker (Where to fish, the default, or Type),
-        both the app's 20px picker opening the game's context menu, as the Roster's Sort.
-    B · Ledger: a row per kind, who caught it first and when. Story-first, like the Feed.
-    C · Waters: a row per stretch of water (by level), its types as chips. Where-to-fish-first.
-  Toggles: counts (Crew total only vs per Member), uncaught names (??? vs shown), a new Crew vs a
-  seasoned one, and the panel's minimum size (460×380) vs its default (640×520).
-  Follows DESIGN.md: gold only for news (a fresh catch, under 3 days), rarity edges in the game's item
-  quality colours (players already read those), no shadows, Friz for titles, Arial Narrow for text.
-  The fish list is illustrative (Classic-era names). Forever's real list is still to be researched.
-  All data is fake. Run: open the file in a browser.
+  PROTOTYPE, throwaway. Question: what should Catches (a Crew-wide catch collection, filled in the first
+  time any Member catches each type of fish or fishing find) look like in the panel?
+  Round 1 tried three layouts (field guide, ledger, waters); round 2 picked the field guide with a Group
+  picker (Where to fish / Type) and a Show filter picker. Both are in this branch's history.
+  Round 3: the real WoW: Forever list from docs/research/fishing-catches.md: fish, special catches (Nat
+  Pagle's quest fish, bloated fish, one type per trophy-fish family), the Extravaganza, treasure (not yet
+  confirmed as fished on Forever; toggle it off to see the list without it), Forever's uncharted new
+  waters, and "unlisted" catches (fished items not on the list, logged so the list can grow).
+  A fish in several waters shows in each. Toggles: unconfirmed treasure, per-Member counts, uncaught
+  names, a new Crew, the panel's minimum size. Who caught what is fake; icons are stand-ins.
+  Follows DESIGN.md: gold only for news (a catch under 3 days old), quality-colour edges for non-common
+  items, no shadows. Run: open the file in a browser.
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>PROTOTYPE · BFF Catches</title>
 <style>
+
   :root {
     --gold:#ffd14a; --gold-rgb:255,209,74; --on-gold:#1a1400; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99;
     --online:#70e370; --window:rgba(14,13,20,.97); --night:#0e0d14; --header:#1a1821; --raised:#1b1a23;
@@ -109,40 +108,6 @@
   .fg-fresh .r .ic { width:16px; height:16px; }
   .fg-fresh .r .t { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-  /* B · Ledger */
-  .lg-tools { display:flex; align-items:center; gap:8px; padding:6px 12px; border-bottom:1px solid var(--line); flex:none; }
-  .lg-tools .grow { flex:1; }
-  .lg-group { display:flex; justify-content:space-between; padding:8px 12px 4px; }
-  .lg-row { display:flex; align-items:center; gap:8px; height:30px; padding:0 12px; border-top:1px solid var(--line); cursor:pointer; }
-  .lg-row:hover { background:rgba(255,255,255,.05); }
-  .lg-row .ic { width:20px; height:20px; }
-  .lg-row .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14px; }
-  .lg-row .by { font-size:13px; white-space:nowrap; text-align:right; }
-  .lg-row .when { font-size:12px; color:var(--dim); width:54px; text-align:right; white-space:nowrap; }
-  .lg-row.un .nm { color:var(--dim); }
-  .lg-more { padding:4px 12px 8px 40px; font-size:12px; color:var(--muted); background:rgba(255,255,255,.03); }
-  .lg-more div { display:flex; justify-content:space-between; height:17px; }
-
-  /* C · Waters */
-  .wt-hero { display:flex; gap:10px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); flex:none; }
-  .wt-hero .ic { width:40px; height:40px; }
-  .wt-hero .tx { flex:1; min-width:0; }
-  .wt-hero .l1 { font-size:14px; } .wt-hero .l2 { font-size:12px; color:var(--muted); margin-top:2px; }
-  .wt-water { padding:8px 12px 8px; border-top:1px solid var(--line); }
-  .wt-water:first-child { border-top:0; }
-  .wt-water .h { display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
-  .wt-water .h .n { font-family:"Friz Quadrata TT", Cinzel, Georgia, serif; font-size:12px; flex:1; }
-  .wt-water .h .lv { font-size:12px; color:var(--dim); }
-  .wt-water .h .pc { font-size:12px; color:var(--muted); width:34px; text-align:right; }
-  .wt-water .h .pc.done { color:var(--text); }
-  .wt-chips { display:flex; flex-wrap:wrap; gap:4px; }
-  .wt-chip { display:flex; align-items:center; gap:4px; height:22px; padding:0 6px 0 3px; background:rgba(255,255,255,.05); font-size:12px; }
-  .wt-chip .ic { width:16px; height:16px; }
-  .wt-chip.un { background:transparent; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); color:var(--dim); }
-  .wt-bar { height:2px; background:rgba(255,255,255,.08); margin-top:6px; position:relative; }
-  .wt-bar i { position:absolute; left:0; top:0; bottom:0; background:rgba(255,255,255,.30); }
-  .wt-bar.done i { background:var(--text); }
-
   /* Context strip: the same Feed, toast and Goals bits for every variant. */
   .ctx { width:320px; display:flex; flex-direction:column; gap:14px; }
   .ctx .cap { font-size:12px; color:var(--muted); margin-bottom:4px; }
@@ -176,11 +141,13 @@
   .bar-ui button.on { background:#111; color:#fff; }
   .bar-ui .lab { font-weight:600; min-width:150px; text-align:center; }
   .bar-ui .sep { width:1px; height:18px; background:#0003; }
+  .ic.unconf { box-shadow: inset 0 0 0 1px rgba(255,255,255,.10); outline:1px dashed rgba(255,255,255,.12); outline-offset:-1px; }
+  code { font-size:12px; color:var(--text); }
 </style>
 </head>
 <body>
-<div class="note">PROTOTYPE · <b>Catches</b>: the Crew's shared catch collection. Three layouts. Flip with the bar or ← →. Hover anything with an icon.
-  Fish names are illustrative; all data is fake.</div>
+<div class="note">PROTOTYPE · <b>Catches</b>, round 3: the real WoW: Forever list from <code>docs/research/fishing-catches.md</code>, grouped by where to fish.
+  Hover a tile. Who caught what is fake; icons are stand-ins.</div>
 <div class="stage">
   <div class="panel">
     <div class="head"><div class="t">Best Friends in Forever</div><div class="on">2 of 4 online</div><div class="x">✕</div></div>
@@ -198,8 +165,9 @@
 <div class="tip" id="tip"></div>
 
 <div class="bar-ui">
-  <button id="prev">←</button><span class="lab" id="vlab"></span><button id="next">→</button>
+  <span class="lab">Catches · round 3</span>
   <div class="sep"></div>
+  <button id="t-unconf">unconfirmed treasure</button>
   <button id="t-counts">per-Member counts</button>
   <button id="t-names">show uncaught names</button>
   <button id="t-crew">new Crew</button>
@@ -208,177 +176,239 @@
 
 <script>
 const ICON = n => `https://wow.zamimg.com/images/wow/icons/medium/${n}.jpg`;
-const QC = { 1:"var(--q1)", 2:"var(--q2)", 3:"var(--q3)", 4:"var(--q4)" };
+const QC = { 0:"#9d9d9d", 1:"var(--q1)", 2:"var(--q2)", 3:"var(--q3)", 4:"var(--q4)" };
 
-// Waters: stretches of water by level, for variant C and for hints.
+// Waters by zone level (research §2). Data, not code: a new zone is one row.
 const WATERS = [
-  { id:"start", name:"Home waters", lv:"1–15", where:"Starting zones, Westfall, the Barrens coast" },
-  { id:"lakes", name:"Lakes & rivers", lv:"15–30", where:"Loch Modan, Wetlands, Ashenvale, Hillsbrad" },
-  { id:"coast", name:"Warm coasts", lv:"30–45", where:"Stranglethorn, Desolace, Swamp of Sorrows" },
-  { id:"deep", name:"Deep waters", lv:"45–60", where:"Feralas, Azshara, Winterspring, Western Plaguelands" },
-  { id:"city", name:"City waters", lv:"any", where:"Ironforge, Orgrimmar" },
+  { id:"home", name:"Home waters", lv:"1–10", where:"Elwynn, Dun Morogh, Teldrassil, Durotar, Mulgore, Tirisfal, the capitals" },
+  { id:"lakes", name:"Lakes and shores", lv:"10–25", where:"Westfall, Loch Modan, Darkshore, Silverpine, the Barrens, Redridge" },
+  { id:"rivers", name:"Rivers and marsh", lv:"20–35", where:"Ashenvale, Duskwood, Hillsbrad, Wetlands, Stonetalon, Thousand Needles" },
+  { id:"warm", name:"Warm coasts", lv:"30–45", where:"Stranglethorn, Arathi, Alterac, Desolace, Dustwallow, Swamp of Sorrows" },
+  { id:"far", name:"Far coasts", lv:"40–55", where:"Tanaris, Feralas, the Hinterlands, Azshara, Felwood, Un'Goro" },
+  { id:"cold", name:"Cold and deep", lv:"50–60", where:"the Plaguelands, Winterspring, Burning Steppes, Silithus, Moonglade, Deadwind" },
+  { id:"event", name:"The Extravaganza", lv:"Sundays", where:"Stranglethorn coast, during the Fishing Extravaganza" },
+  { id:"new", name:"New on Forever", lv:"not charted", where:"Riverglades, Gilneas, Shen'dralas, Mount Hyjal, Shark-Infested Waters" },
 ];
-// cat: fish | rare | treasure. q: item quality. water: where to find it.
+// cat: fish | special | event | treasure. q: Forever's item quality. w: waters it's found in.
+// note: shown in the tooltip. unconf: on the list but not confirmed as fished on Forever yet.
+const F = (id, name, icon, w, note) => ({ id, name, icon, cat:"fish", q:1, w, note });
 const KINDS = [
-  { id:1,  name:"Raw Brilliant Smallfish", icon:"inv_misc_fish_02", cat:"fish", q:1, water:"start" },
-  { id:2,  name:"Raw Slitherskin Mackerel", icon:"inv_misc_fish_21", cat:"fish", q:1, water:"start" },
-  { id:3,  name:"Raw Longjaw Mud Snapper", icon:"inv_misc_fish_03", cat:"fish", q:1, water:"start" },
-  { id:4,  name:"Raw Rainbow Fin Albacore", icon:"inv_misc_fish_04", cat:"fish", q:1, water:"start" },
-  { id:5,  name:"Raw Loch Frenzy", icon:"inv_misc_fish_05", cat:"fish", q:1, water:"lakes" },
-  { id:6,  name:"Raw Bristle Whisker Catfish", icon:"inv_misc_fish_06", cat:"fish", q:1, water:"lakes" },
-  { id:7,  name:"Oily Blackmouth", icon:"inv_misc_fish_07", cat:"fish", q:1, water:"lakes" },
-  { id:8,  name:"Raw Sagefish", icon:"inv_misc_fish_20", cat:"fish", q:1, water:"lakes" },
-  { id:9,  name:"Deviate Fish", icon:"inv_misc_monsterhead_02", cat:"fish", q:1, water:"lakes" },
-  { id:10, name:"Raw Mithril Head Trout", icon:"inv_misc_fish_08", cat:"fish", q:1, water:"coast" },
-  { id:11, name:"Raw Rockscale Cod", icon:"inv_misc_fish_09", cat:"fish", q:1, water:"coast" },
-  { id:12, name:"Firefin Snapper", icon:"inv_misc_fish_16", cat:"fish", q:1, water:"coast" },
-  { id:13, name:"Raw Glossy Mightfish", icon:"inv_misc_fish_10", cat:"fish", q:1, water:"coast" },
-  { id:14, name:"Raw Redgill", icon:"inv_misc_fish_11", cat:"fish", q:1, water:"coast" },
-  { id:15, name:"Raw Spotted Yellowtail", icon:"inv_misc_fish_12", cat:"fish", q:1, water:"deep" },
-  { id:16, name:"Raw Whitescale Salmon", icon:"inv_misc_fish_13", cat:"fish", q:1, water:"deep" },
-  { id:17, name:"Raw Nightfin Snapper", icon:"inv_misc_fish_14", cat:"fish", q:1, water:"deep" },
-  { id:18, name:"Raw Sunscale Salmon", icon:"inv_misc_fish_15", cat:"fish", q:1, water:"deep" },
-  { id:19, name:"Stonescale Eel", icon:"inv_misc_fish_18", cat:"fish", q:1, water:"deep" },
-  { id:20, name:"Large Raw Mightfish", icon:"inv_misc_fish_19", cat:"fish", q:1, water:"deep" },
-  { id:21, name:"Winter Squid", icon:"inv_misc_fish_17", cat:"fish", q:1, water:"deep" },
-  { id:22, name:"Raw Summer Bass", icon:"inv_misc_fish_22", cat:"fish", q:1, water:"deep" },
-  { id:23, name:"Raw Greater Sagefish", icon:"inv_misc_fish_23", cat:"fish", q:1, water:"deep" },
-  { id:30, name:"Feralas Ahi", icon:"inv_misc_fish_24", cat:"rare", q:2, water:"deep" },
-  { id:31, name:"Misty Reed Mahi Mahi", icon:"inv_misc_fish_25", cat:"rare", q:2, water:"coast" },
-  { id:32, name:"Savage Coast Blue Sailfin", icon:"inv_misc_fish_26", cat:"rare", q:2, water:"coast" },
-  { id:33, name:"Sar'theris Striker", icon:"inv_misc_fish_27", cat:"rare", q:2, water:"coast" },
-  { id:34, name:"Keefer's Angelfish", icon:"inv_misc_fish_28", cat:"rare", q:3, water:"coast" },
-  { id:35, name:"Old Ironjaw", icon:"inv_misc_fish_31", cat:"rare", q:3, water:"city" },
-  { id:36, name:"Old Crafty", icon:"inv_misc_fish_30", cat:"rare", q:3, water:"city" },
-  { id:40, name:"Battered Chest", icon:"inv_box_01", cat:"treasure", q:1, water:"lakes" },
-  { id:41, name:"Big-mouth Clam", icon:"inv_misc_shell_03", cat:"treasure", q:1, water:"coast" },
-  { id:42, name:"Iron Bound Trunk", icon:"inv_box_02", cat:"treasure", q:2, water:"coast" },
-  { id:43, name:"Mithril Bound Trunk", icon:"inv_box_03", cat:"treasure", q:2, water:"deep" },
-  { id:44, name:"Nat's Lucky Coin", icon:"inv_misc_coin_02", cat:"treasure", q:4, water:"deep" },
+  F(6291, "Raw Brilliant Smallfish", "inv_misc_fish_02", ["home","lakes","rivers"]),
+  F(6303, "Raw Slitherskin Mackerel", "inv_misc_fish_21", ["home","lakes"]),
+  F(6289, "Raw Longjaw Mud Snapper", "inv_misc_fish_03", ["home","lakes","rivers"]),
+  F(6299, "Sickly Looking Fish", "inv_misc_fish_19", ["home"], "Tirisfal Glades"),
+  F(6317, "Raw Loch Frenzy", "inv_misc_fish_05", ["lakes"], "Loch Modan only"),
+  F(6361, "Raw Rainbow Fin Albacore", "inv_misc_fish_04", ["lakes","rivers"]),
+  F(6308, "Raw Bristle Whisker Catfish", "inv_misc_fish_06", ["lakes","rivers","warm"]),
+  F(21071, "Raw Sagefish", "inv_misc_fish_20", ["lakes","rivers"]),
+  F(6522, "Deviate Fish", "inv_misc_monsterhead_02", ["lakes"], "The Barrens, the Wailing Caverns oases"),
+  F(12238, "Darkshore Grouper", "inv_misc_fish_12", ["lakes"], "Darkshore"),
+  { ...F(251524, "Whimsyfin", "inv_misc_fish_31", ["lakes"], "New on Forever. Reported in Redridge"), unconf:true },
+  F(6358, "Oily Blackmouth", "inv_misc_fish_07", ["rivers","warm","far"]),
+  F(6359, "Firefin Snapper", "inv_misc_fish_16", ["rivers","warm","far"]),
+  F(8365, "Raw Mithril Head Trout", "inv_misc_fish_08", ["warm","far","cold"]),
+  F(6362, "Raw Rockscale Cod", "inv_misc_fish_09", ["warm","far"]),
+  F(21153, "Raw Greater Sagefish", "inv_misc_fish_23", ["warm"], "Alterac Mountains, Stranglethorn"),
+  F(4603, "Raw Spotted Yellowtail", "inv_misc_fish_10", ["warm","far"]),
+  F(13754, "Raw Glossy Mightfish", "inv_misc_fish_11", ["warm","far"]),
+  F(13756, "Raw Summer Bass", "inv_misc_fish_22", ["warm","far","cold"], "Summer only"),
+  F(13755, "Raw Winter Squid", "inv_misc_fish_13", ["warm","far"], "Winter only"),
+  F(13422, "Stonescale Eel", "inv_misc_fish_18", ["warm","far","cold"]),
+  F(13758, "Raw Redgill", "inv_misc_fish_14", ["far","cold"]),
+  F(13759, "Raw Nightfin Snapper", "inv_misc_fish_15", ["far","cold"], "At night"),
+  F(13760, "Raw Sunscale Salmon", "inv_misc_fish_17", ["far","cold"], "In daytime"),
+  F(13893, "Large Raw Mightfish", "inv_misc_fish_24", ["far","cold"], "Azshara, Eastern Plaguelands"),
+  F(13888, "Darkclaw Lobster", "inv_misc_fish_25", ["far","cold"], "Azshara, Eastern Plaguelands"),
+  F(13757, "Lightning Eel", "inv_misc_fish_26", ["cold"]),
+  F(13889, "Raw Whitescale Salmon", "inv_misc_fish_27", ["cold"]),
+  { ...F(13890, "Raw Plated Armorfish", "inv_misc_fish_28", ["new"], "Forever adds a recipe for it. Where it's caught is unknown"), unconf:true },
 ];
+const S = (id, name, icon, q, w, note) => ({ id, name, icon, cat:"special", q, w, note });
+KINDS.push(
+  S(16970, "Misty Reed Mahi Mahi", "inv_misc_fish_29", 1, ["warm"], "Nat Pagle's quest fish. Swamp of Sorrows"),
+  S(16968, "Sar'theris Striker", "inv_misc_fish_30", 1, ["warm"], "Nat Pagle's quest fish. Desolace"),
+  S(16969, "Savage Coast Blue Sailfin", "inv_misc_fish_32", 1, ["warm"], "Nat Pagle's quest fish. Stranglethorn"),
+  S(16967, "Feralas Ahi", "inv_misc_fish_33", 1, ["far"], "Nat Pagle's quest fish. Feralas"),
+  S(6643, "Bloated Brilliant Smallfish", "inv_misc_fish_02", 2, ["home","lakes"], "Open it with a right-click"),
+  S(6645, "Bloated Mud Snapper", "inv_misc_fish_03", 2, ["home","lakes"], "Open it with a right-click"),
+  S(6647, "Bloated Bristle Whisker Catfish", "inv_misc_fish_06", 2, ["lakes","rivers"], "Open it with a right-click"),
+  S(21162, "Bloated Oily Blackmouth", "inv_misc_fish_07", 2, ["rivers","warm"], "Open it with a right-click"),
+  S(21163, "Bloated Firefin Snapper", "inv_misc_fish_16", 2, ["rivers","warm"], "Open it with a right-click"),
+  S(8366, "Bloated Mithril Head Trout", "inv_misc_fish_08", 2, ["warm"], "Open it with a right-click"),
+  S(21164, "Bloated Rockscale Cod", "inv_misc_fish_09", 2, ["warm","far"], "Open it with a right-click"),
+  S(21243, "Bloated Glossy Mightfish", "inv_misc_fish_11", 2, ["far"], "Open it with a right-click"),
+  S(13881, "Bloated Redgill", "inv_misc_fish_14", 2, ["far","cold"], "Open it with a right-click"),
+  S(13891, "Bloated Whitescale Salmon", "inv_misc_fish_27", 2, ["cold"], "Open it with a right-click"),
+  S("t-snap", "Trophy Mud Snapper", "inv_misc_fish_03", 1, ["home","lakes"], "Any weight counts. Sells by the pound"),
+  S("t-cat", "Trophy Catfish", "inv_misc_fish_06", 1, ["lakes","rivers"], "Any weight counts. Sells by the pound"),
+  S("t-yell", "Trophy Yellowtail", "inv_misc_fish_10", 1, ["warm","far"], "Any weight counts. Sells by the pound"),
+  S("t-red", "Trophy Redgill", "inv_misc_fish_14", 1, ["far","cold"], "Any weight counts. Sells by the pound"),
+  S("t-might", "Trophy Mightfish", "inv_misc_fish_11", 1, ["far","cold"], "Any weight counts. Sells by the pound"),
+  S("t-lob", "Trophy Lobster", "inv_misc_fish_25", 1, ["far","cold"], "Any weight counts. Sells by the pound"),
+  S("t-salm", "Trophy Salmon", "inv_misc_fish_27", 1, ["cold"], "Any weight counts. Sells by the pound"),
+);
+const E = (id, name, icon, q) => ({ id, name, icon, cat:"event", q, w:["event"], note:"Only during the Stranglethorn Fishing Extravaganza (Sundays)" });
+KINDS.push(E(19807, "Speckled Tastyfish", "inv_misc_fish_34", 1), E(19805, "Keefer's Angelfish", "inv_misc_fish_35", 2),
+  E(19806, "Dezian Queenfish", "inv_misc_fish_36", 2), E(19803, "Brownell's Blue Striped Racer", "inv_misc_fish_37", 2));
+const T = (id, name, icon, w, note) => ({ id, name, icon, cat:"treasure", q:1, w, unconf:true, note });
+KINDS.push(
+  T(6356, "Battered Chest", "inv_box_01", ["lakes","rivers"]),
+  T(6351, "Dented Crate", "inv_crate_01", ["lakes","rivers"]),
+  T(6352, "Waterlogged Crate", "inv_crate_02", ["lakes","rivers"]),
+  T(6354, "Small Locked Chest", "inv_box_02", ["lakes","rivers"], "Needs lockpicking"),
+  T(6357, "Sealed Crate", "inv_crate_03", ["rivers","warm"]),
+  T(6355, "Sturdy Locked Chest", "inv_box_02", ["rivers","warm"], "Needs lockpicking"),
+  T(13874, "Heavy Crate", "inv_crate_04", ["warm","far"]),
+  T(13875, "Ironbound Locked Chest", "inv_box_03", ["warm","far"], "Needs lockpicking"),
+  T(21150, "Iron Bound Trunk", "inv_box_03", ["warm","far"]),
+  T(21113, "Watertight Trunk", "inv_box_04", ["warm","far"]),
+  T(7973, "Big-mouth Clam", "inv_misc_shell_03", ["warm","far"]),
+  T(6307, "Message in a Bottle", "inv_drink_09", ["warm","far"]),
+  T(13918, "Reinforced Locked Chest", "inv_box_04", ["far","cold"], "Needs lockpicking"),
+  T(21228, "Mithril Bound Trunk", "inv_box_01", ["far","cold"]),
+  T(20708, "Tightly Sealed Trunk", "inv_box_02", ["far","cold"]),
+);
 const KIND = Object.fromEntries(KINDS.map(k => [k.id, k]));
-const CATS = [["fish","Fish"],["rare","Rare catches"],["treasure","Treasure & oddities"]];
+// Fished items not on BFF's list: logged so the list can grow, and shown under their water.
+const UNLISTED = {
+  251523: { id:251523, name:"The Friends We Made Along the Way", icon:"inv_misc_toy_10", cat:"unlisted", q:0, w:["new"],
+            note:"Not on BFF's list yet. Logged so it can be added" },
+};
+const CATS = [["fish","Fish"],["special","Special catches"],["event","The Extravaganza"],["treasure","Treasure"],["unlisted","Unlisted catches"]];
 
-// Members. catches: { kindId: [daysAgo first, zone, count, character] }.
 const MEMBERS = [
   { id:"me", display:"You", own:true, chars:{ Gahzuria:"MAGE" } },
   { id:"mira", display:"Mira", chars:{ "Mira Vale":"PRIEST", Mirabolt:"SHAMAN" } },
   { id:"tor", display:"Tor", chars:{ "Torvald Ash":"WARRIOR" } },
   { id:"simba", display:"Simba", chars:{ Simba:"DRUID" } },
 ];
+// catches: { id: [daysAgo first, zone, count, character] }
 const SEASONED = {
-  me:   { 1:[21,"Elwynn Forest",48,"Gahzuria"], 2:[20,"Westfall",31,"Gahzuria"], 3:[18,"Westfall",22,"Gahzuria"], 5:[9,"Loch Modan",40,"Gahzuria"],
-          7:[8,"Wetlands",62,"Gahzuria"], 40:[8,"Wetlands",1,"Gahzuria"], 8:[0.4,"Ashenvale",3,"Gahzuria"] },
-  mira: { 1:[24,"Teldrassil",12,"Mira Vale"], 4:[19,"Darkshore",30,"Mira Vale"], 6:[14,"Ashenvale",25,"Mira Vale"], 9:[13,"Wailing Caverns",7,"Mirabolt"],
-          10:[6,"Arathi Highlands",18,"Mira Vale"], 11:[6,"Arathi Highlands",9,"Mira Vale"], 12:[5,"Stranglethorn Vale",21,"Mira Vale"],
-          14:[4,"Stranglethorn Vale",14,"Mira Vale"], 41:[4,"Stranglethorn Vale",3,"Mira Vale"], 32:[3,"Stranglethorn Vale",1,"Mira Vale"],
-          35:[0.08,"Ironforge",1,"Mira Vale"], 31:[1.5,"Swamp of Sorrows",1,"Mira Vale"] },
-  tor:  { 2:[23,"Durotar",15,"Torvald Ash"], 3:[22,"The Barrens",19,"Torvald Ash"], 6:[16,"Hillsbrad Foothills",11,"Torvald Ash"],
-          13:[7,"Desolace",8,"Torvald Ash"], 15:[3,"Feralas",44,"Torvald Ash"], 19:[0.9,"Swamp of Sorrows",148,"Torvald Ash"],
-          20:[2,"Feralas",12,"Torvald Ash"], 42:[2,"Feralas",1,"Torvald Ash"], 7:[15,"The Barrens",9,"Torvald Ash"] },
+  me:   { 6291:[21,"Elwynn Forest",48,"Gahzuria"], 6303:[20,"Westfall",31,"Gahzuria"], 6289:[18,"Westfall",22,"Gahzuria"], 6317:[9,"Loch Modan",40,"Gahzuria"],
+          6361:[12,"Westfall",17,"Gahzuria"], 6356:[8,"Westfall",1,"Gahzuria"], 6643:[11,"Elwynn Forest",1,"Gahzuria"], "t-snap":[10,"Redridge Mountains",3,"Gahzuria"],
+          251524:[0.4,"Redridge Mountains",2,"Gahzuria"], 21071:[2.5,"Loch Modan",6,"Gahzuria"] },
+  mira: { 6291:[24,"Teldrassil",12,"Mira Vale"], 12238:[19,"Darkshore",30,"Mira Vale"], 6308:[14,"Ashenvale",25,"Mira Vale"], 6522:[13,"The Barrens",7,"Mirabolt"],
+          6358:[7,"Wetlands",40,"Mira Vale"], 6359:[6,"Wetlands",22,"Mira Vale"], 8365:[6,"Arathi Highlands",18,"Mira Vale"], 6362:[5,"Stranglethorn Vale",21,"Mira Vale"],
+          4603:[4,"Stranglethorn Vale",14,"Mira Vale"], 7973:[4,"Stranglethorn Vale",3,"Mira Vale"], 16969:[3,"Stranglethorn Vale",1,"Mira Vale"],
+          16970:[1.5,"Swamp of Sorrows",1,"Mira Vale"], 21162:[6.5,"Wetlands",1,"Mira Vale"], 19807:[6,"Stranglethorn Vale",9,"Mira Vale"],
+          19805:[6,"Stranglethorn Vale",1,"Mira Vale"], 251523:[0.1,"Shark-Infested Waters",1,"Mira Vale"] },
+  tor:  { 6303:[23,"Durotar",15,"Torvald Ash"], 6289:[22,"The Barrens",19,"Torvald Ash"], 6299:[22,"Tirisfal Glades",4,"Torvald Ash"], 6308:[16,"Hillsbrad Foothills",11,"Torvald Ash"],
+          13754:[7,"Tanaris",8,"Torvald Ash"], 13755:[3,"Feralas",44,"Torvald Ash"], 13422:[0.9,"Feralas",148,"Torvald Ash"],
+          13893:[2,"Azshara",12,"Torvald Ash"], 21150:[2,"Feralas",1,"Torvald Ash"], 6358:[15,"Desolace",9,"Torvald Ash"], 16967:[0.2,"Feralas",1,"Torvald Ash"],
+          "t-yell":[3,"Tanaris",2,"Torvald Ash"] },
   simba: null,
 };
 const NEW = {
-  me:   { 1:[1.2,"Elwynn Forest",6,"Gahzuria"], 2:[0.3,"Westfall",2,"Gahzuria"] },
-  mira: { 1:[2,"Teldrassil",4,"Mira Vale"] },
-  tor:  { 3:[0.6,"The Barrens",3,"Torvald Ash"] },
+  me:   { 6291:[1.2,"Elwynn Forest",6,"Gahzuria"], 6303:[0.3,"Westfall",2,"Gahzuria"] },
+  mira: { 6291:[2,"Teldrassil",4,"Mira Vale"] },
+  tor:  { 6289:[0.6,"The Barrens",3,"Torvald Ash"] },
   simba: null,
 };
-
-const RUNGS = [10, 25, 50, KINDS.length];
-const FRESH = 3; // days a catch is news
+const FRESH = 3;
 
 const q = new URLSearchParams(location.search);
-const VARIANTS = [["A","Field guide"],["B","Ledger"],["C","Waters"]];
 const state = {
-  variant: VARIANTS.some(v => v[0] === q.get("variant")) ? q.get("variant") : "A",
   counts: q.get("counts") === "member", names: q.get("names") === "show", crew: q.get("crew") === "new" ? "new" : "seasoned",
-  min: q.get("size") === "min", filter:"all", group: q.get("group") === "type" ? "type" : "where", menu:null, sort:"new", open:null,
+  min: q.get("size") === "min", unconf: q.get("unconfirmed") !== "hide",
+  filter:"all", group: q.get("group") === "type" ? "type" : "where", menu:null,
 };
 function save() {
-  const p = new URLSearchParams({ variant: state.variant });
+  const p = new URLSearchParams();
   if (state.counts) p.set("counts","member");
   if (state.names) p.set("names","show");
   if (state.crew === "new") p.set("crew","new");
   if (state.min) p.set("size","min");
+  if (!state.unconf) p.set("unconfirmed","hide");
   if (state.group === "type") p.set("group","type");
   try { history.replaceState(null, "", "?" + p); } catch (e) { /* inline preview */ }
 }
+const listed = () => KINDS.filter(k => state.unconf || !k.unconf);
+const total = () => listed().length;
+const rungs = () => [10, 25, 50, total()];
+const kindOf = id => KIND[id] || UNLISTED[id];
 
-// The Crew view: merge every Member's catches; the earliest first catch names who caught it first.
 function crewView() {
-  const src = state.crew === "new" ? NEW : SEASONED;
-  const out = {};
+  const src = state.crew === "new" ? NEW : SEASONED, out = {};
   MEMBERS.forEach(m => {
     const c = src[m.id]; if (!c) return;
     Object.entries(c).forEach(([kid, [ago, zone, n, ch]]) => {
       const e = out[kid] || (out[kid] = { total:0, by:[] });
-      e.total += n;
-      e.by.push({ m, ago, zone, n, ch });
+      e.total += n; e.by.push({ m, ago, zone, n, ch });
     });
   });
   Object.values(out).forEach(e => { e.by.sort((a, b) => b.ago - a.ago); e.first = e.by[0]; });
   return out;
 }
+// Only listed types count towards "N of M types". An unconfirmed one counts once caught (it's confirmed then).
+const caughtCount = view => listed().filter(k => view[k.id]).length + (state.unconf ? 0 : KINDS.filter(k => k.unconf && view[k.id]).length);
 const ago = d => d < 1/24 ? "just now" : d < 1 ? `${Math.round(d * 24)}h ago` : d < 2 ? "yesterday" : `${Math.round(d)}d ago`;
 const isFresh = e => !!(e && e.first && e.first.ago < FRESH);
 const who = b => b.m.own ? "You" : b.m.display;
 const cls = b => b.m.chars[b.ch];
-const nextRung = n => RUNGS.find(r => r > n) || null;
 const hidden = (k, e) => !e && !state.names;
 const kname = (k, e) => hidden(k, e) ? "???" : k.name;
+const short = n => n.replace(/^Raw /, "");
 
 function icon(k, e, size) {
-  const un = !e, edge = k.q > 1 ? `<i class="edge" style="box-shadow:inset 0 0 0 1px ${QC[k.q]}"></i>` : "";
-  return `<span class="ic${un ? " un" : ""}${hidden(k, e) ? " unhide" : ""}" data-k="${k.id}" style="width:${size}px;height:${size}px">` +
-    `<span class="fb">${k.name[k.name.startsWith("Raw ") ? 4 : 0]}</span><img src="${ICON(k.icon)}" onerror="this.remove()" alt="">${edge}` +
+  const edge = k.q !== 1 ? `<i class="edge" style="box-shadow:inset 0 0 0 1px ${QC[k.q]}"></i>` : "";
+  return `<span class="ic${e ? "" : " un"}${hidden(k, e) ? " unhide" : ""}${!e && k.unconf ? " unconf" : ""}" data-k="${k.id}" style="width:${size}px;height:${size}px">` +
+    `<span class="fb">${short(k.name)[0]}</span><img src="${ICON(k.icon)}" onerror="this.remove()" alt="">${edge}` +
     `${isFresh(e) ? `<i class="fresh"></i>` : ""}</span>`;
 }
 
 function summary(view, extra) {
-  const n = Object.keys(view).length, r = nextRung(n), last = [...RUNGS].reverse().find(x => x <= n) || 0;
-  const ticks = RUNGS.slice(0, -1).map(x => `<i class="tick" style="left:${(x / KINDS.length) * 100}%"></i>`).join("");
+  const n = caughtCount(view), N = total(), R = rungs(), r = R.find(x => x > n), last = [...R].reverse().find(x => x <= n) || 0;
+  const ticks = R.slice(0, -1).map(x => `<i class="tick" style="left:${(x / N) * 100}%"></i>`).join("");
   return `<div class="summary"><div class="top"><div class="title">Catches</div>` +
-    `<div class="count">${n} <small>of ${KINDS.length} types</small></div></div>` +
-    `<div class="bar"><i style="width:${(n / KINDS.length) * 100}%"></i>${ticks}</div>` +
-    `<div class="next"><span>${r ? `${r - n} more for the ${r === KINDS.length ? "All types" : r + " types"} trophy` : "All types caught"}</span>` +
+    `<div class="count">${n} <small>of ${N} types</small></div></div>` +
+    `<div class="bar"><i style="width:${(n / N) * 100}%"></i>${ticks}</div>` +
+    `<div class="next"><span>${r ? `${r - n} more for the ${r === N ? "All types" : r + " types"} trophy` : "All types caught"}</span>` +
     `<span>${last ? `Trophy: ${last} types` : "No fishing trophy yet"}</span></div>${extra || ""}</div>`;
 }
-
+const caughtLine = k => k.cat === "special" || k.cat === "event" ? "caught a " + short(k.name) : k.cat === "unlisted" ? "fished up " + k.name : "caught the Crew's first " + short(k.name);
 function freshList(view, max) {
   return Object.entries(view).filter(([, e]) => isFresh(e)).sort((a, b) => a[1].first.ago - b[1].first.ago).slice(0, max)
-    .map(([kid, e]) => ({ k: KIND[kid], e }));
+    .map(([kid, e]) => ({ k: kindOf(kid), e }));
 }
 
-// A · Field guide, with a Show filter and a Group picker (by where you fish, or by type).
-const FILTERS = [["all","All"],["fish","Fish"],["rare","Rare catches"],["treasure","Treasure"],["missing","Not caught yet"]];
+const FILTERS = [["all","All"],["fish","Fish"],["special","Special catches"],["event","The Extravaganza"],["treasure","Treasure"],["missing","Not caught yet"]];
 const GROUPS = [["where","Where to fish"],["type","Type"]];
 const FUNNEL = `<svg width="10" height="8" viewBox="0 0 10 8" fill="currentColor"><rect x="0" y="0" width="10" height="2"/><rect x="2" y="3" width="6" height="2"/><rect x="4" y="6" width="2" height="2"/></svg>`;
 const SORTICON = `<svg width="11" height="9" viewBox="0 0 11 9" fill="currentColor"><rect x="2" y="0" width="1" height="1"/><rect x="1" y="1" width="3" height="1"/><rect x="0" y="2" width="5" height="1"/><rect x="2" y="3" width="1" height="6"/><rect x="8" y="0" width="1" height="6"/><rect x="6" y="6" width="5" height="1"/><rect x="7" y="7" width="3" height="1"/><rect x="8" y="8" width="1" height="1"/></svg>`;
 const passes = (k, view) => state.filter === "all" ? true : state.filter === "missing" ? !view[k.id] : k.cat === state.filter;
-function variantA(view) {
+
+function render() {
+  document.body.classList.toggle("min", state.min);
+  const view = crewView();
+  window.__view = view;
   const fl = FILTERS.find(f => f[0] === state.filter)[1], gl = GROUPS.find(g => g[0] === state.group)[1];
   let html = summary(view, `<div class="pickers">` +
     `<span class="picker" data-menu="group">${SORTICON}Group: ${gl}</span>` +
     `<span class="picker" data-menu="filter">${FUNNEL}Show: ${fl}</span></div>`);
   html += `<div class="scroll">`;
+  const unlisted = Object.keys(view).filter(id => UNLISTED[id]).map(id => UNLISTED[id]);
+  const all = listed().concat(unlisted);
   const sections = state.group === "where"
-    ? WATERS.map(w => ({ water:w, ks: KINDS.filter(k => k.water === w.id) }))
-    : CATS.map(([cat, label]) => ({ label, ks: KINDS.filter(k => k.cat === cat) }));
+    ? WATERS.map(w => ({ water:w, ks: all.filter(k => k.w.includes(w.id)) }))
+    : CATS.map(([cat, label]) => ({ label, ks: all.filter(k => k.cat === cat) }));
   let any = false;
   sections.forEach(sec => {
     const shown = sec.ks.filter(k => passes(k, view));
-    if (!shown.length) return;
+    const isNew = sec.water && sec.water.id === "new";
+    if (!shown.length && !(isNew && state.filter === "all")) return;
     any = true;
-    const got = sec.ks.filter(k => view[k.id]).length, done = got === sec.ks.length;
+    const counted = sec.ks.filter(k => !UNLISTED[k.id]);
+    const got = counted.filter(k => view[k.id]).length, done = counted.length && got === counted.length;
+    const tiles = shown.map(k => icon(k, view[k.id], 28)).join("");
     if (sec.water) {
       const w = sec.water;
       html += `<div class="fg-sec water"><div class="h"><span><span class="nm">${w.name}</span><span class="lv">${w.lv}</span></span>` +
-        `<span class="pc${done ? " done" : ""}">${got} / ${sec.ks.length}</span></div><div class="where">${w.where}</div>` +
-        `<div class="fg-grid">${shown.map(k => icon(k, view[k.id], 28)).join("")}</div></div>`;
+        `<span class="pc${done ? " done" : ""}">${counted.length ? `${got} / ${counted.length}` : ""}</span></div><div class="where">${w.where}</div>` +
+        `<div class="fg-grid">${tiles}</div>` +
+        (isNew ? `<div class="where" style="margin:6px 0 4px">Nobody knows yet what bites here. Anything a Member fishes up here is logged, and can join the list.</div>` : "") + `</div>`;
     } else {
-      html += `<div class="fg-sec"><div class="h"><span class="label">${sec.label}</span><span class="label">${got} / ${sec.ks.length}</span></div>` +
-        `<div class="fg-grid">${shown.map(k => icon(k, view[k.id], 28)).join("")}</div></div>`;
+      html += `<div class="fg-sec"><div class="h"><span class="label">${sec.label}</span><span class="label">${counted.length ? `${got} / ${counted.length}` : unlisted.length}</span></div>` +
+        `<div class="fg-grid">${tiles}</div></div>`;
     }
   });
   if (!any) html += `<div style="padding:16px 12px" class="muted">Nothing to show. The Crew has caught every type.</div>`;
@@ -386,20 +416,43 @@ function variantA(view) {
   const fresh = freshList(view, state.min ? 2 : 3);
   if (fresh.length) html += `<div class="fg-fresh"><div class="label" style="margin-bottom:2px">Fresh</div>` + fresh.map(({ k, e }) =>
     `<div class="r">${icon(k, e, 16)}<span class="t"><span class="c-${cls(e.first)}">${who(e.first)}</span> ` +
-    `<span class="gold">${k.cat === "rare" ? "caught " + k.name : "caught the first " + k.name.replace(/^Raw /, "")}</span></span><span class="dim">${e.first.zone} · ${ago(e.first.ago)}</span></div>`).join("") + `</div>`;
-  return html;
+    `<span class="gold">${caughtLine(k)}</span></span><span class="dim">${e.first.zone} · ${ago(e.first.ago)}</span></div>`).join("") + `</div>`;
+  document.getElementById("content").innerHTML = html;
+  context(view);
+  for (const [id, on] of [["t-counts", state.counts], ["t-names", state.names], ["t-crew", state.crew === "new"], ["t-min", state.min], ["t-unconf", state.unconf]])
+    document.getElementById(id).classList.toggle("on", on);
+  save();
 }
 
-// The picker's menu: the game's context menu, a title and radio items (as the Roster's Sort by).
+function context(view) {
+  const n = caughtCount(view), fresh = freshList(view, 1)[0], R = rungs();
+  const k = fresh ? fresh.k : KIND[16967], e = fresh ? fresh.e : null, b = e ? e.first : { m:MEMBERS[2], ch:"Torvald Ash", ago:0.2 };
+  const line = `<span class="c-${b.m.chars[b.ch]}">${who(b)}</span> <span class="gold">${caughtLine(k)}</span>`;
+  const medals = R.map((r, i) => {
+    const got = n >= r, foot = ["var(--q2)","var(--q3)","var(--q4)","#ff8000"][i];
+    return `<div class="medal${got ? "" : " open"}"><div class="m">${icon(KIND[13422], true, 40)}${got ? `<i class="foot" style="background:${foot}"></i>` : ""}</div>` +
+      `<div>${r === total() ? "All types" : r + " types"}</div><div class="d">${got ? ["3 Nov","5 Nov","",""][i] : `${n}/${r}`}</div></div>`;
+  }).join("");
+  const fl = freshList(view, 99);
+  document.getElementById("ctx").innerHTML =
+    `<div><div class="cap">Feed entry (Cheer)</div><div class="card feedrow">${icon(k, true, 24)}<div class="tx">${line}<div class="tm">${ago(b.ago)}</div></div>${b.m.own ? "" : `<button class="btn">Cheer</button>`}</div></div>` +
+    `<div><div class="cap">Toast (Live event)</div><div class="toast">${icon(k, true, 24)}<div class="tx">${line}</div><i class="timer"></i></div></div>` +
+    `<div><div class="cap">Goals tab: a Fishing track (types caught)</div><div class="card track">${medals}</div></div>` +
+    `<div><div class="cap">While you were away</div><div class="card" style="font-size:13px">` +
+      `<div class="label" style="margin-bottom:4px">Catches</div>` +
+      `<div>+${fl.length} new types since you left <span class="dim">(${[...new Set(fl.map(f => who(f.e.first)))].join(", ") || "none"})</span></div>` +
+      (fresh ? `<div style="margin-top:3px">${line}</div>` : "") + `</div></div>`;
+}
+
 function openMenu(kind, el) {
   closeMenu();
-  const view = window.__view;
+  const view = window.__view, all = listed();
   const items = kind === "filter"
-    ? FILTERS.map(([id, l]) => [id, l, id === "all" ? KINDS.length : KINDS.filter(k => id === "missing" ? !view[k.id] : k.cat === id).length])
+    ? FILTERS.map(([id, l]) => [id, l, id === "all" ? all.length : all.filter(k => id === "missing" ? !view[k.id] : k.cat === id).length])
     : GROUPS.map(([id, l]) => [id, l, null]);
   const cur = kind === "filter" ? state.filter : state.group;
   const m = document.createElement("div");
-  m.className = "menu";
+  m.className = "menu"; m.dataset.for = kind;
   m.innerHTML = `<div class="mt">${kind === "filter" ? "Show" : "Group by"}</div>` + items.map(([id, l, n]) =>
     `<div class="mi${id === cur ? " on" : ""}" data-pick="${kind}:${id}"><span class="dot"></span>${l}${n != null ? `<span class="n">${n}</span>` : ""}</div>`).join("");
   document.body.appendChild(m);
@@ -409,121 +462,25 @@ function openMenu(kind, el) {
 }
 function closeMenu() { if (state.menu) { state.menu.remove(); state.menu = null; } }
 
-// B · Ledger
-function variantB(view) {
-  const sorts = [["new","Newest"],["az","A–Z"],["un","Not caught"]];
-  let html = summary(view);
-  html += `<div class="lg-tools"><span class="label">Sort</span><div class="chips">${sorts.map(([id, l]) =>
-    `<span class="chip${state.sort === id ? " on" : ""}" data-sort="${id}">${l}</span>`).join("")}</div><span class="grow"></span></div>`;
-  html += `<div class="scroll">`;
-  const row = k => {
-    const e = view[k.id], open = state.open === k.id;
-    let r = `<div class="lg-row${e ? "" : " un"}" data-open="${k.id}">${icon(k, e, 20)}` +
-      `<span class="nm" style="${k.q > 1 && e ? `color:${QC[k.q]}` : ""}">${kname(k, e)}</span>`;
-    if (e) r += `<span class="by"><span class="c-${cls(e.first)}">${who(e.first)}</span><span class="dim"> · ${e.first.zone}</span></span>` +
-      `<span class="when${isFresh(e) ? " gold" : ""}">${ago(e.first.ago)}</span>`;
-    else r += `<span class="by dim">${WATERS.find(w => w.id === k.water).name}</span><span class="when"></span>`;
-    r += `</div>`;
-    if (open && e) r += `<div class="lg-more">` + (state.counts
-      ? e.by.map(b => `<div><span><span class="c-${cls(b)}">${b.ch}</span> <span class="dim">${b.zone}</span></span><span>${b.n} caught</span></div>`).join("")
-      : `<div><span>The Crew has caught</span><span>${e.total}</span></div><div><span>Also caught by</span><span>${e.by.slice(1).map(who).join(", ") || "nobody yet"}</span></div>`) + `</div>`;
-    return r;
-  };
-  if (state.sort === "new") {
-    const caught = KINDS.filter(k => view[k.id]).sort((a, b) => view[a.id].first.ago - view[b.id].first.ago);
-    const rest = KINDS.filter(k => !view[k.id]);
-    html += `<div class="lg-group"><span class="label">Caught</span><span class="label">${caught.length}</span></div>` + caught.map(row).join("");
-    html += `<div class="lg-group"><span class="label">Not caught yet</span><span class="label">${rest.length}</span></div>` + rest.map(row).join("");
-  } else if (state.sort === "az") {
-    html += [...KINDS].sort((a, b) => a.name.replace(/^Raw /, "").localeCompare(b.name.replace(/^Raw /, ""))).map(row).join("");
-  } else {
-    CATS.forEach(([cat, label]) => {
-      const ks = KINDS.filter(k => k.cat === cat && !view[k.id]);
-      if (ks.length) html += `<div class="lg-group"><span class="label">${label}</span><span class="label">${ks.length} left</span></div>` + ks.map(row).join("");
-    });
-  }
-  return html + `</div>`;
-}
-
-// C · Waters
-function variantC(view) {
-  const fresh = freshList(view, 1)[0];
-  let html = "";
-  if (fresh) {
-    const { k, e } = fresh;
-    html += `<div class="wt-hero">${icon(k, e, 40)}<div class="tx"><div class="l1"><span class="c-${cls(e.first)}">${who(e.first)}</span> ` +
-      `<span class="gold">${k.cat === "rare" ? "caught " + k.name : "caught the Crew's first " + k.name}</span></div>` +
-      `<div class="l2">${e.first.zone} · ${ago(e.first.ago)}</div></div>${e.first.m.own ? "" : `<button class="btn">Cheer</button>`}</div>`;
-  }
-  const n = Object.keys(view).length;
-  html += `<div style="padding:6px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;flex:none">` +
-    `<span class="label">Waters</span><span class="label">${n} / ${KINDS.length} types · next trophy at ${nextRung(n) || "—"}</span></div>`;
-  html += `<div class="scroll">`;
-  WATERS.forEach(w => {
-    const ks = KINDS.filter(k => k.water === w.id), got = ks.filter(k => view[k.id]).length, done = got === ks.length;
-    html += `<div class="wt-water"><div class="h"><span class="n">${w.name}</span><span class="lv">${w.lv}</span><span class="pc${done ? " done" : ""}">${got}/${ks.length}</span></div>` +
-      `<div class="wt-chips">${ks.map(k => { const e = view[k.id];
-        return `<span class="wt-chip${e ? "" : " un"}" data-k="${k.id}">${icon(k, e, 16)}` +
-          `<span style="${e && k.q > 1 ? `color:${QC[k.q]}` : ""}">${kname(k, e).replace(/^Raw /, "")}</span></span>`; }).join("")}</div>` +
-      `<div class="wt-bar${done ? " done" : ""}"><i style="width:${(got / ks.length) * 100}%"></i></div></div>`;
-  });
-  return html + `</div>`;
-}
-
-// The same Feed, toast, Goals and While you were away bits for every variant.
-function context(view) {
-  const n = Object.keys(view).length, fresh = freshList(view, 1)[0];
-  const k = fresh ? fresh.k : KIND[35], e = fresh ? fresh.e : null, b = e ? e.first : { m:MEMBERS[1], ch:"Mira Vale", ago:0.08 };
-  const line = `<span class="c-${MEMBERS.find(m => m === b.m) ? b.m.chars[b.ch] : "PRIEST"}">${b.m.own ? "You" : b.m.display}</span> ` +
-    `<span class="gold">${k.cat === "rare" ? "caught " + k.name : "caught the Crew's first " + k.name}</span>`;
-  const medals = RUNGS.map((r, i) => {
-    const got = n >= r, foot = ["var(--q2)","var(--q3)","var(--q4)","#ff8000"][i];
-    return `<div class="medal${got ? "" : " open"}"><div class="m">${icon({ ...KIND[19], q:1 }, true, 40)}${got ? `<i class="foot" style="background:${foot}"></i>` : ""}</div>` +
-      `<div class="${got && i === 0 && state.crew === "seasoned" ? "gold" : ""}">${r === KINDS.length ? "All types" : r + " types"}</div><div class="d">${got ? ["3 Nov","5 Nov","",""][i] : `${n}/${r}`}</div></div>`;
-  }).join("");
-  document.getElementById("ctx").innerHTML =
-    `<div><div class="cap">Feed entry (Cheer)</div><div class="card feedrow">${icon(k, true, 24)}<div class="tx">${line}<div class="tm">${ago(b.ago)}</div></div><button class="btn">Cheer</button></div></div>` +
-    `<div><div class="cap">Toast (Live event)</div><div class="toast">${icon(k, true, 24)}<div class="tx">${line}</div><i class="timer"></i></div></div>` +
-    `<div><div class="cap">Goals tab: a Fishing track (types caught)</div><div class="card track">${medals}</div></div>` +
-    `<div><div class="cap">While you were away</div><div class="card" style="font-size:13px">` +
-      `<div class="label" style="margin-bottom:4px">Catches</div>` +
-      `<div>+${freshList(view, 99).length} new types since you left <span class="dim">(${[...new Set(freshList(view, 99).map(f => who(f.e.first)))].join(", ") || "none"})</span></div>` +
-      (fresh ? `<div style="margin-top:3px">${line}</div>` : "") + `</div></div>`;
-}
-
-function render() {
-  document.body.classList.toggle("min", state.min);
-  const view = crewView();
-  window.__view = view;
-  const fn = { A:variantA, B:variantB, C:variantC }[state.variant];
-  document.getElementById("content").innerHTML = fn(view);
-  context(view);
-  const v = VARIANTS.find(v => v[0] === state.variant);
-  document.getElementById("vlab").textContent = `${v[0]} · ${v[1]}`;
-  document.getElementById("t-counts").classList.toggle("on", state.counts);
-  document.getElementById("t-names").classList.toggle("on", state.names);
-  document.getElementById("t-crew").classList.toggle("on", state.crew === "new");
-  document.getElementById("t-min").classList.toggle("on", state.min);
-  save();
-}
-
-// Tooltip for any icon or Waters chip.
 const tip = document.getElementById("tip");
 document.addEventListener("mouseover", e => {
   document.querySelectorAll(".ic.hot").forEach(n => n.classList.remove("hot"));
   const el = e.target.closest("[data-k]");
   if (!el || !el.closest(".content")) { tip.style.display = "none"; return; }
-  const k = KIND[el.dataset.k], v = window.__view[k.id], w = WATERS.find(x => x.id === k.water);
+  const k = kindOf(el.dataset.k), v = window.__view[k.id];
   if (el.classList.contains("ic")) el.classList.add("hot");
   let html = `<div class="t1" style="color:${v || state.names ? QC[k.q] : "var(--dim)"}">${kname(k, v)}</div>`;
+  if (k.note && (v || state.names || k.cat === "event")) html += `<div class="m">${k.note}</div>`;
   if (v) {
-    html += `<div>First caught by <span class="c-${cls(v.first)}">${who(v.first)}</span>${v.first.m.own ? "" : ` <span class="m">(${v.first.ch})</span>`}</div>` +
+    html += `<hr><div>First caught by <span class="c-${cls(v.first)}">${who(v.first)}</span>${v.first.m.own ? "" : ` <span class="m">(${v.first.ch})</span>`}</div>` +
       `<div class="m">${ago(v.first.ago)} · ${v.first.zone}</div><hr>`;
     if (state.counts) v.by.forEach(b => html += `<div class="l"><span class="c-${cls(b)}">${b.ch}</span><span>${b.n}</span></div>`);
     else html += `<div class="l"><span class="m">The Crew has caught</span><span>${v.total}</span></div>` +
       (v.by.length > 1 ? `<div class="m">Also caught by ${v.by.slice(1).map(who).join(", ")}</div>` : "");
   } else {
-    html += `<div class="m">Nobody in the Crew has caught this yet.</div><div class="m">Try: ${w.where} (${w.lv})</div>`;
+    const ws = k.w.map(id => WATERS.find(w => w.id === id));
+    html += `<div class="m">Nobody in the Crew has caught this yet.</div><div class="m">Try: ${ws.map(w => `${w.name} (${w.lv})`).join(", ")}</div>`;
+    if (k.unconf) html += `<div class="m" style="margin-top:3px">Not confirmed on Forever yet.</div>`;
   }
   tip.innerHTML = html;
   const r = el.getBoundingClientRect();
@@ -533,26 +490,15 @@ document.addEventListener("mouseover", e => {
 document.addEventListener("click", e => {
   const pk = e.target.closest("[data-pick]"), mn = e.target.closest("[data-menu]");
   if (pk) { const [kind, id] = pk.dataset.pick.split(":"); state[kind === "filter" ? "filter" : "group"] = id; closeMenu(); render(); return; }
-  if (mn) { const open = state.menu && state.menu.dataset.for === mn.dataset.menu; closeMenu(); if (!open) { openMenu(mn.dataset.menu, mn); state.menu.dataset.for = mn.dataset.menu; } return; }
+  if (mn) { const open = state.menu && state.menu.dataset.for === mn.dataset.menu; closeMenu(); if (!open) openMenu(mn.dataset.menu, mn); return; }
   if (!e.target.closest(".menu")) closeMenu();
-  const f = e.target.closest("[data-filter]"), s = e.target.closest("[data-sort]"), o = e.target.closest("[data-open]");
-  if (f) { state.filter = f.dataset.filter; render(); }
-  if (s) { state.sort = s.dataset.sort; render(); }
-  if (o) { const id = +o.dataset.open; state.open = state.open === id ? null : id; render(); }
 });
-const cycle = d => { closeMenu(); const i = VARIANTS.findIndex(v => v[0] === state.variant); state.variant = VARIANTS[(i + d + VARIANTS.length) % VARIANTS.length][0]; render(); };
-document.getElementById("prev").onclick = () => cycle(-1);
-document.getElementById("next").onclick = () => cycle(1);
-document.addEventListener("keydown", e => {
-  if (e.target.closest("input, textarea, [contenteditable]")) return;
-  if (e.key === "Escape") closeMenu();
-  if (e.key === "ArrowLeft") cycle(-1);
-  if (e.key === "ArrowRight") cycle(1);
-});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenu(); });
 document.getElementById("t-counts").onclick = () => { state.counts = !state.counts; render(); };
 document.getElementById("t-names").onclick = () => { state.names = !state.names; render(); };
 document.getElementById("t-crew").onclick = () => { state.crew = state.crew === "new" ? "seasoned" : "new"; render(); };
 document.getElementById("t-min").onclick = () => { state.min = !state.min; render(); };
+document.getElementById("t-unconf").onclick = () => { state.unconf = !state.unconf; render(); };
 render();
 </script>
 </body>
