@@ -41,7 +41,7 @@ Only the owner's client checks, and only the Spares the Character being played p
 `Spares.itemCheck(isOpen, hasClaim, inInventory, isEquipped, isNextLogin)` decides:
 
 - **During the session** a gone item is only noted: your row says "This item has left your bags". A sold item can be bought back with the same GUID, which clears the note. So does a `/reload`, as buyback survives it; the next check notes it again.
-- **At the first check after a real login** (not a `/reload`), a gone one with no Claim is withdrawn as if you had, and a chat line says so. One with a Claim asks: "<item> left your bags. Did you mail it to <Character>?" **Give** Gives it to that winner, **Withdraw** withdraws it, and **Not now** (or Escape) leaves it open until the next login asks again. Several are asked one after another.
+- **At the first check after a real login** (not a `/reload`), a gone one with no Claim is withdrawn as if you had, and a chat line says so. One with a Claim asks: "<item> is no longer in your bags or bank. <Character> claimed it. What happened to it?" **Sent it** Gives it to that winner, **Got rid of it** withdraws it, and **Ask me later** (or Escape) leaves it open until the next login asks again. Several are asked one after another.
 
 ### The trimmed item string
 

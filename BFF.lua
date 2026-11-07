@@ -81,10 +81,10 @@ local function askNextGone()
 end
 
 StaticPopupDialogs.BFF_SPARE_GONE = {
-  text = "%s left your bags. Did you mail it to %s?",
-  button1 = "Give",
-  button2 = "Not now",
-  button3 = "Withdraw",
+  text = "%s is no longer in your bags or bank. %s claimed it.\n\nWhat happened to it?",
+  button1 = "Sent it",
+  button2 = "Ask me later",
+  button3 = "Got rid of it",
   OnAccept = function(_, ask)
     local ok, reason = ns.core:giveSpare(ask.id, ask.winner and ask.winner.memberId)
     if not ok then say(MESSAGES[reason]) end
