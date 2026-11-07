@@ -1,6 +1,7 @@
 -- Feed: turns a record as it was and as it is now into Feed entries (ding,
--- death, new Character, max level, joined and left the Crew, and gave: a
--- Spare Given, matched by owner and id), adds the
+-- death, new Character, max level, joined and left the Crew, gave: a
+-- Spare Given, matched by owner and id, and rare finds: the Crew's first
+-- catch of a rare type), adds the
 -- Crew-wide entries for Crew goals reached, and keeps the
 -- account-wide log with its seen flags. A jump over skipped versions makes
 -- at most one entry of each kind per Character, and the first sight of a
@@ -9,7 +10,7 @@
 -- at, each with a seen flag on your own entries, and knows when sync has
 -- settled after an initial login.
 -- See docs/design/feed.md, docs/design/reactions.md and
--- docs/design/spares.md.
+-- docs/design/spares.md and docs/design/catches.md.
 
 local _, ns = ...
 
@@ -40,8 +41,10 @@ end
 -- and `feedJoins` (the joinedAt last seen per Member, so re-adding a
 -- Member doesn't announce their join again). Only an initial login waits
 -- for sync to settle. itemLink(itemString) is the game's link for an item,
--- or nil while it isn't cached, for gave entries.
-function Feed.new(db, ledger, now, maxLevel, initialLogin, itemLink)
+-- or nil while it isn't cached, for gave entries. itemLook(itemId) is how
+-- the game shows an item ({ text, icon, edge }, each nil while it isn't
+-- cached), or nil, for rare finds.
+function Feed.new(db, ledger, now, maxLevel, initialLogin, itemLink, itemLook)
   db.feed = db.feed or {}
   db.feedJoins = db.feedJoins or {}
   return setmetatable({
@@ -50,6 +53,7 @@ function Feed.new(db, ledger, now, maxLevel, initialLogin, itemLink)
     now = now,
     maxLevel = maxLevel,
     itemLink = itemLink or Spares.NO_LINK,
+    itemLook = itemLook or function() return nil end,
     settle = ns.Settle.new(now, not initialLogin),
   }, Feed)
 end
@@ -248,6 +252,30 @@ local function gaveEntries(self, before, after, list)
   end
 end
 
+-- "Tor caught Feralas Ahi".
+local function caughtText(who, item)
+  return ("%s caught %s"):format(who, item)
+end
+
+-- The rare finds in a record that held the rare types in had, as entries
+-- added to list. The time is the catch's, so every client agrees on it.
+local function rareEntries(self, had, record, own, list)
+  local records = {}
+  for _, held in self.ledger:records() do
+    if not held.left then records[#records + 1] = held end
+  end
+  for _, rare in ipairs(ns.Catches.rareFinds(had, record, records)) do
+    local character = rare.guid and record.characters[rare.guid]
+    local who = character and subject(self, record, character, own)
+      or own and "You" or memberName(self, record)
+    local entry = newEntry("rareFind", record, own, caughtText(who, rare.name), character)
+    entry.time = rare.time
+    -- The type keys Reactions (docs/adr/0002).
+    entry.catch, entry.itemId, entry.fish, entry.who = rare.id, rare.itemId, rare.name, who
+    list[#list + 1] = entry
+  end
+end
+
 -- Someone else's record was kept: before is the copy held until now (nil
 -- on first sight) and after the new one. Returns the new entries, and the
 -- new Reactions to your own entries as { entry, reaction }.
@@ -270,6 +298,7 @@ function Feed:recordChanged(before, after)
       characterEntries(self, after, before.characters[guid], character, false, list)
     end
     gaveEntries(self, before, after, list)
+    rareEntries(self, ns.Catches.rareHeld(before), after, false, list)
   end
   return insert(self, list), reactionsChanged(self, before, after)
 end
@@ -298,6 +327,14 @@ end
 function Feed:ownGave(spare)
   if hasGave(self, self.ledger:memberId(), spare.id) then return {} end
   return insert(self, { gaveEntry(self, self.ledger:own(), true, spare) })
+end
+
+-- You caught something, your record having held the rare types in had
+-- (Catches.rareHeld) before: your own rare finds. Returns the new entries.
+function Feed:ownCaught(had)
+  local list = {}
+  rareEntries(self, had, self.ledger:own(), true, list)
+  return insert(self, list)
 end
 
 -- Crew goals were reached: one Crew-wide entry each ({ track, rung, text }
@@ -403,9 +440,18 @@ local function gaveText(self, entry)
   return ("%s gave %s %s"):format(giver, recipient, Spares.linkText(self.itemLink, entry.item))
 end
 
--- An entry's text: stored, except a gave entry's, worked out as shown.
+-- How the game shows a rare find's item, as Feed.new's itemLook: empty for
+-- any other entry, or while the game can't say.
+local function lookOf(self, entry)
+  return entry.kind == "rareFind" and self.itemLook(entry.itemId) or {}
+end
+
+-- An entry's text: stored, except a gave entry's, worked out as shown, and
+-- a rare find's, which shows the item as the game has it once it can.
 local function textOf(self, entry)
   if entry.kind == "gave" then return gaveText(self, entry) end
+  local look = lookOf(self, entry)
+  if look.text then return caughtText(entry.who, look.text) end
   return entry.text
 end
 
@@ -666,16 +712,18 @@ end
 -- While you were away: the unseen entries from other Members, one block
 -- per Member, most recent activity first, the Crew goals reached, newest
 -- first ({ text, time }), profession news, newest first ({ kind, text,
--- time, icon, cheer, highlight }), the unseen Reactions to your own, and
+-- time, icon, cheer, highlight }), the unseen Reactions to your own,
 -- spares: the Spare notices given (Spares:takeNews), then the
--- Gives, newest first ({ kind = "gave", text, time }), as { members,
--- goals, spares, professions, count, intro, maxLevel, noticed }, intro
+-- Gives, newest first ({ kind = "gave", text, time }), and catches: the
+-- line of new types given (Catches.newTypesLine, { kind = "catches", text }),
+-- then the rare finds, newest first ({ kind, text, time, icon, cheer }), as { members,
+-- goals, spares, professions, catches, count, intro, maxLevel, noticed }, intro
 -- being the scoreboard's "N things happened while you were away." and
 -- maxLevel the top of its level bars. Marks them seen. Nil when there are
 -- none.
-function Feed:takeSummary(spares)
+function Feed:takeSummary(spares, newTypesLine)
   spares = spares or {}
-  local byMember, ids, goals, gives, professions, count = {}, {}, {}, {}, {}, 0
+  local byMember, ids, goals, gives, professions, catches, count = {}, {}, {}, {}, {}, {}, 0
   for _, entry in ipairs(self.db.feed) do
     -- Profession entries show as lines of their own, not on the scoreboard.
     if not entry.seen and ns.Professions.KINDS[entry.kind] then
@@ -684,6 +732,13 @@ function Feed:takeSummary(spares)
       table.insert(professions, 1, {
         kind = entry.kind, text = entry.text, time = entry.time, icon = entry.icon, cheer = button(self, entry),
         highlight = HIGHLIGHTED[entry.kind] == true,
+      })
+    elseif not entry.seen and entry.kind == "rareFind" then
+      entry.seen = true
+      count = count + 1
+      table.insert(catches, 1, {
+        kind = entry.kind, text = textOf(self, entry), time = entry.time, icon = lookOf(self, entry).icon,
+        cheer = button(self, entry),
       })
     elseif not entry.seen and entry.kind == "goal" then
       entry.seen = true
@@ -705,6 +760,10 @@ function Feed:takeSummary(spares)
       memberEntries[#memberEntries + 1] = entry
     end
   end
+  if newTypesLine then
+    count = count + 1
+    table.insert(catches, 1, { kind = "catches", text = newTypesLine })
+  end
   local noticed = takeNoticed(self)
   if count == 0 and #noticed == 0 and #spares == 0 then return nil end
   for _, give in ipairs(gives) do spares[#spares + 1] = give end
@@ -716,7 +775,8 @@ function Feed:takeSummary(spares)
     return a.memberId < b.memberId
   end)
   return {
-    members = members, goals = goals, spares = spares, professions = professions, count = count, noticed = noticed,
+    members = members, goals = goals, spares = spares, professions = professions, catches = catches, count = count,
+    noticed = noticed,
     intro = count == 1 and "1 thing happened while you were away."
       or ("%d things happened while you were away."):format(count),
     maxLevel = self.maxLevel,
@@ -728,7 +788,8 @@ end
 -- is New in the open Feed visit. reaction is the one that applies, key
 -- what react() takes, reactors who reacted ({ memberId, name, you }, name
 -- being "You" for you), reacted whether you have, and canReact whether
--- you can at all.
+-- you can at all. A rare find's icon and edge (its picture's colour) are
+-- the item's, nil while the game can't say.
 function Feed:describe(entry)
   local me = self.ledger:memberId()
   local reactors = {}
@@ -737,6 +798,7 @@ function Feed:describe(entry)
     reactors[i] = { memberId = id, name = you and "You" or reactorName(self, id), you = you }
   end
   local key = Reactions.keyOf(entry)
+  local look = lookOf(self, entry)
   return {
     kind = entry.kind,
     time = entry.time,
@@ -749,7 +811,8 @@ function Feed:describe(entry)
     skillLine = entry.skillLine,
     profession = entry.profession,
     milestone = entry.milestone,
-    icon = entry.icon,
+    icon = look.icon or entry.icon,
+    edge = look.edge,
     own = entry.own == true,
     seen = entry.seen == true and #unseenReactions(self, entry) == 0,
     highlight = HIGHLIGHTED[entry.kind] == true,

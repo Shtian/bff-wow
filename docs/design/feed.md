@@ -22,6 +22,9 @@ Feed entries are worked out by comparing the copy of a record you held with the 
 | **new profession** | A Character has a profession it didn't have before (`docs/design/professions.md`) | "Ana picked up Tailoring" |
 | **profession skill** | A profession's base skill reached 75, 150 or 225 | "Ana reached 225 Alchemy" |
 | **profession maxed** | A profession's base skill reached 300, the cap on Forever | "Ana maxed Alchemy" |
+| **rare find** | The Crew's first catch of a Nat Pagle quest fish or a contest fish (`docs/design/catches.md`) | "Tor caught Feralas Ahi" |
+
+Everyday first catches and unlisted catches make no entries: they stay in the Catches tab.
 
 Zone changes and Main changes make no entries: zones change too often and the panel already shows them, and a new Main is shown by the panel too.
 
@@ -33,7 +36,7 @@ Ledger hands Feed a before/after pair whenever a received copy wins (and when yo
 - **Max level replaces the ding.** A jump that reaches max level makes only the max level entry.
 - **Professions collapse too.** A jump in skill makes one entry per Character and profession, for the highest milestone crossed (remembering the skill it started at); reaching 300 makes only the maxed entry. A new Character's professions make only the new Character entry, and the first time a Character's professions are shared at all is a silent baseline.
 - **Odd jumps make nothing.** A skill that drops, or a profession unlearned, makes no entry. A death count that goes down (a crash lost that session's count, see #9) makes no entry, and a level above your own `maxLevel` (you're behind on a patch) makes no ding or max level entry.
-- **Time** is the after record's version, which is the owner's `GetServerTime()` at the write. It's close to when the event happened, and every client orders entries the same way. For collapsed jumps the time is approximate.
+- **Time** is the after record's version (a rare find's is the catch's own), which is the owner's `GetServerTime()` at the write. It's close to when the event happened, and every client orders entries the same way. For collapsed jumps the time is approximate.
 
 ### First sight of a Member
 
@@ -53,6 +56,8 @@ Your own Characters' events go into the log too, so the Feed tab reads as the Cr
 
 Core (Feed) builds each entry's text, so the popup, the Feed tab and the chat line all show the same string. Entries name the Member by Display name and add the Character's name when it's an Alt: "Ana dinged 24", "Ana's Alt Jaina dinged 12". Each entry also carries its kind, so UI can pick an icon or a highlight.
 
+A rare find reads like a game item link, not gold: `itemLook` (Core's creation option, `Skin.itemLook` in game) gives the item's name in its quality colour, its icon and its quality colour for the picture's faded edge. Until the game has the item cached, the text uses the English name and the picture a fish.
+
 ## Storage
 
 - One log in `db`, account-wide, so switching to an Alt shows the same log and the same seen flags.
@@ -64,7 +69,7 @@ Core (Feed) builds each entry's text, so the popup, the Feed tab and the chat li
 
 ### What goes in
 
-The unseen entries from other Members. "Away" is not a time window: an entry is unseen until it has been shown to you by the chat line, the popup or the Feed tab. So events that happened while you were online but reached you late (lockdown, or a Member who logged in after you) are neither missed nor shown twice.
+The unseen entries from other Members, and one line that isn't an entry (Catches, below). "Away" is not a time window: an entry is unseen until it has been shown to you by the chat line, the popup or the Feed tab. So events that happened while you were online but reached you late (lockdown, or a Member who logged in after you) are neither missed nor shown twice.
 
 ### When it appears
 
@@ -86,6 +91,7 @@ A small frame in the panel's style (#7), laid out as a scoreboard:
 - Columns for the **level** now, **levels gained** and **deaths**. Under the level, a bar from 0 to max level shows the jump: grey for where they started, green for what they gained, and a star beside the level when it reached max level. A new Character shows its level and "new" in green instead of levels gained. The level range goes from the lowest "before" to the highest "after" across that Character's unseen entries.
 - Joined shows in gold beside the Member's name and left in grey; a Member with nothing else gets just that row.
 - Profession news (picked up, milestones, maxed) isn't on the scoreboard: it has a **Professions** section above it, a line each with the profession's icon and a Cheer (`docs/design/professions.md`).
+- Rare finds and the count of new types have a **Catches** section after Professions: "4 new types caught (Tor 3, Mira 1)", then a line per rare find missed with its item's icon and a Cheer (`docs/design/catches.md`). Everyday catches make no entries, so the count has its own record of what you've been told (`db.catchTypesTold`). It alone is enough for the popup to show.
 - **Open Feed** and **Dismiss** buttons.
 
 The summary is marked as seen once Core has fired it.

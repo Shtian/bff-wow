@@ -3,8 +3,9 @@
 -- yours others reacted to, then Crew goals reached, in gold, then
 -- Spares: Claims on yours, what was sent to you and Gives, then
 -- Professions: a line per profession picked up, milestone or maxed, with
--- the profession's icon and a Cheer. Then Core's
--- summary as a scoreboard, Members by
+-- the profession's icon and a Cheer, then Catches: the new types others
+-- caught, and a line per rare find with its item's icon and a Cheer. Then
+-- Core's summary as a scoreboard, Members by
 -- most recent activity: a row per Character with its level now, a bar for
 -- the jump (gold when it reached max level), levels gained, deaths, and
 -- Cheer and Respects buttons. The Member's name sits on their first row,
@@ -61,6 +62,7 @@ local lines = {}
 local goalLines = {}
 local spareLines = {}
 local professionLines = {}
+local catchLines = {}
 
 local hex = Skin.hex
 
@@ -97,6 +99,8 @@ local function create()
   frame.spares:SetText("SPARES")
   frame.professions = Skin.label(frame, "label", Skin.DIM)
   frame.professions:SetText("PROFESSIONS")
+  frame.catches = Skin.label(frame, "label", Skin.DIM)
+  frame.catches:SetText("CATCHES")
   frame.intro = Skin.label(frame, "small", Skin.MUTED)
 
   frame.headings = {}
@@ -315,10 +319,10 @@ local function drawSpares(notices, y)
   return drawSection(frame.spares, texts, spareLines, y)
 end
 
--- A Professions line: the profession's icon and the text, gold when
--- maxed, and a Cheer at the right.
-local function professionLine(index)
-  local item = professionLines[index]
+-- A Professions or Catches line: its icon and the text, gold when
+-- highlighted, and a Cheer at the right.
+local function cheerLine(pool, index)
+  local item = pool[index]
   if item then return item end
   item = CreateFrame("Frame", nil, frame)
   item:SetHeight(NOTICED_LINE)
@@ -328,19 +332,20 @@ local function professionLine(index)
   item.text:SetPoint("RIGHT", -(REACT + 8), 0)
   item.cheer = Skin.reactionButton(item, REACT, react)
   item.cheer:SetPoint("RIGHT", 0, 0)
-  professionLines[index] = item
+  pool[index] = item
   return item
 end
 
-local function drawProfessions(news, y)
-  frame.professions:SetShown(#news > 0)
-  for i = #news + 1, #professionLines do professionLines[i]:Hide() end
+-- A section of cheerLines under a title, from y down. Returns the y below it.
+local function drawCheerLines(title, news, pool, y)
+  title:SetShown(#news > 0)
+  for i = #news + 1, #pool do pool[i]:Hide() end
   if #news == 0 then return y end
   y = y - SECTION_TOP
-  frame.professions:SetPoint("TOPLEFT", INSET, y)
+  title:SetPoint("TOPLEFT", INSET, y)
   y = y - NOTICED_TITLE
   for i, item in ipairs(news) do
-    local entry = professionLine(i)
+    local entry = cheerLine(pool, i)
     entry:ClearAllPoints()
     entry:SetPoint("TOPLEFT", INSET, y)
     entry:SetPoint("TOPRIGHT", -INSET, y)
@@ -355,8 +360,8 @@ local function drawProfessions(news, y)
 end
 
 -- Shows the summary from Core's awaySummary: { members, goals,
--- spares, professions, count, intro, maxLevel, noticed }. With no Member news, only Your
--- Crew noticed, Crew goals, Spares and Professions show.
+-- spares, professions, catches, count, intro, maxLevel, noticed }. With no Member news, only Your
+-- Crew noticed, Crew goals, Spares, Professions and Catches show.
 function Away.show(summary)
   if not frame then create() end
   local top = -Skin.HEADER_HEIGHT
@@ -370,7 +375,8 @@ function Away.show(summary)
   local y = drawNoticed(summary.noticed or {}, top)
   y = drawGoals(summary.goals or {}, y)
   y = drawSpares(summary.spares or {}, y)
-  y = drawProfessions(summary.professions or {}, y)
+  y = drawCheerLines(frame.professions, summary.professions or {}, professionLines, y)
+  y = drawCheerLines(frame.catches, summary.catches or {}, catchLines, y)
 
   local scoreboard = #summary.members > 0
   frame.intro:SetShown(scoreboard)

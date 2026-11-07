@@ -18,6 +18,7 @@ One per entry kind, so there's never a picker:
 | new profession | **Cheer** | "Bob cheered you picking up Tailoring" |
 | profession skill | **Cheer** | "Bob cheered your 225 Alchemy" |
 | profession maxed | **Cheer** | "Bob cheered you maxing Alchemy" |
+| rare find | **Cheer** | "Bob cheered your Feralas Ahi" |
 | death | **Respects** | "Bob paid respects (Jaina died)" |
 | joined the Crew | **Welcome** | "Bob welcomed you" |
 | left the Crew | none | |
@@ -41,6 +42,7 @@ The entry's time can't be used, because the version it comes from differs betwee
 | new profession | owner Member id + Character GUID + skill line ID |
 | profession skill | owner Member id + Character GUID + skill line ID + milestone reached (75, 150 or 225) |
 | profession maxed | owner Member id + Character GUID + skill line ID |
+| rare find | owner Member id + Character GUID + the type's item ID |
 
 A collapsed entry matches every key in its range: "dinged 24 (from 22)" shows Reactions keyed to 23 or 24, and "died 2 times" going from 3 to 5 shows those keyed to 4 or 5. A Reaction made on a collapsed entry, or on a While you were away row, is keyed to the top of the range. The owner's own entries never collapse, so each Reaction lands on exactly one of them.
 

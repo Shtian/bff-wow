@@ -1,15 +1,17 @@
--- Goals: the built-in Crew goals. Six tracks: Crew levels (each Member's
+-- Goals: the built-in Crew goals. Seven tracks: Crew levels (each Member's
 -- highest Character, summed), Everyone at level N (every Member has a
 -- Character at N), Crew deaths (every Character's deaths, summed), Every
 -- profession in the Crew (the twelve, each had by some Character), Crew
--- skill (every profession's base skill, summed) and Everyone a Journeyman
--- (every Member has a profession at a rank's skill on some Character).
+-- skill (every profession's base skill, summed), Everyone a Journeyman
+-- (every Member has a profession at a rank's skill on some Character) and
+-- Types caught (the counted types of Catch anyone has caught).
 -- All but Every profession are a ladder of rungs; its rungs are the
 -- professions. Progress is worked out from the Ledger's records of the
 -- Members your Roster shows (not Left; Removed ones aren't held), so it is
 -- per client. Reached rungs are kept with when they were reached and stay
 -- reached if progress drops. Rungs passed when the first sync in a Crew
--- has settled are a silent baseline. Nothing here names a Member.
+-- has settled are a silent baseline, and a track added after that takes
+-- its own. Nothing here names a Member.
 -- Also the Crew's dungeon and raid clears (from the records, by Clears),
 -- kept as trophies the same way: each instance's first clear, which does
 -- name its party. See docs/design/goals.md and docs/design/trophies.md.
@@ -20,7 +22,7 @@ local Goals = {}
 Goals.__index = Goals
 ns.Goals = Goals
 
-Goals.TRACKS = { "crewLevels", "everyone", "deaths", "professions", "crewSkill", "everyoneRank" }
+Goals.TRACKS = { "crewLevels", "everyone", "deaths", "professions", "crewSkill", "everyoneRank", "catches" }
 
 local CREW_LEVELS_STEP = 50
 local EVERYONE_STEP = 10
@@ -147,6 +149,25 @@ local TRACK = {
     label = function(rung) return ns.Professions.rank(rung) end,
     bar = membersAt("best"),
   },
+  catches = {
+    name = "Types caught",
+    -- Catches.STEPS: the last is every type.
+    next = function(after)
+      for _, step in ipairs(ns.Catches.STEPS) do
+        if step > after then return step end
+      end
+      return nil
+    end,
+    value = function(progress) return progress.catches end,
+    title = function() return "Types of fish caught" end,
+    text = function(rung, top)
+      if top then return "The Crew has caught every type of fish" end
+      return ("The Crew has caught %d types of fish"):format(rung)
+    end,
+    label = function(rung)
+      return rung >= ns.Catches.TOTAL and "Every type" or ("%d types"):format(rung)
+    end,
+  },
 }
 
 -- The first rung of a track above `after`, or nil past the last one.
@@ -171,13 +192,15 @@ end
 -- covered (skill line to { name, icon } for each one some Character has),
 -- skill (base skill over every profession of every Character), lowestBest
 -- (the lowest of the Members' best skills, 0 with none) and best (each
--- Member's best skill, in highest's order). A Character whose professions
--- are unknown adds nothing, so a Member none of whose are known has a best
--- of 0: Everyone a Journeyman waits for everyone.
+-- Member's best skill, in highest's order), and catches (how many counted
+-- types someone has caught). A Character whose professions are unknown
+-- adds nothing, so a Member none of whose are known has a best of 0:
+-- Everyone a Journeyman waits for everyone.
 function Goals.progress(records)
   local progress = {
     crewLevels = 0, deaths = 0, members = 0, lowest = 0, highest = {},
     covered = {}, skill = 0, lowestBest = 0, best = {},
+    catches = ns.Catches.typesCaught(records),
   }
   for _, record in ipairs(records) do
     local top, best = nil, 0
@@ -227,7 +250,8 @@ end
 -- rung to when it was reached), quiet (per track, the rungs reached
 -- without news: the baseline's, or by who counts changing), clears (per
 -- instance name, the Crew's clear: { time (the first), members (a set of
--- Member ids credited), quiet, seen (when it was first kept here) }), baselined (the silent baseline is done)
+-- Member ids credited), quiet, seen (when it was first kept here) }), baselined (the silent baseline is done),
+-- late (the tracks added after it, still waiting for their own: a set)
 -- and seen (when the Goals tab was last opened).
 function Goals.new(db, ledger, now, maxLevel)
   local self = setmetatable({ db = db, ledger = ledger, now = now, maxLevel = maxLevel }, Goals)
@@ -242,11 +266,17 @@ function Goals:load()
   saved.quiet = saved.quiet or {}
   saved.clears = saved.clears or {}
   for _, track in ipairs(Goals.TRACKS) do
+    -- New since the baseline: what the Crew already has isn't news either.
+    if saved.baselined and not saved.reached[track] then
+      saved.late = saved.late or {}
+      saved.late[track] = true
+    end
     saved.reached[track] = saved.reached[track] or {}
     saved.quiet[track] = saved.quiet[track] or {}
   end
   self.db.goals = saved
   self.settle = ns.Settle.new(self.now, saved.baselined)
+  self.lateSettle = ns.Settle.new(self.now, saved.late == nil)
 end
 
 -- Leaving or joining a Crew: a new Crew starts with its own baseline.
@@ -379,14 +409,18 @@ end
 
 -- Records every rung progress has passed, and every clear. Returns the
 -- newest per track, then the new clears, as { track, rung, text } (text:
--- the Feed entry's), unless quiet.
+-- the Feed entry's), unless quiet. A track waiting for its late baseline
+-- is left for it.
 local function record(self, quiet)
   local records = counted(self)
   local progress = Goals.progress(records)
+  local late = self.db.goals.late or {}
   local reached = {}
   for _, track in ipairs(Goals.TRACKS) do
-    local entry = (TRACK[track].record or recordLadder)(self, track, progress, quiet)
-    if entry and not quiet then reached[#reached + 1] = entry end
+    if not late[track] then
+      local entry = (TRACK[track].record or recordLadder)(self, track, progress, quiet)
+      if entry and not quiet then reached[#reached + 1] = entry end
+    end
   end
   for _, entry in ipairs(recordClears(self, records, quiet)) do reached[#reached + 1] = entry end
   return reached
@@ -406,19 +440,33 @@ end
 
 function Goals:linkUp()
   self.settle:up()
+  self.lateSettle:up()
 end
 
 function Goals:linkDown()
   self.settle:down()
+  self.lateSettle:down()
 end
 
 function Goals:dataMerged()
   self.settle:data()
+  self.lateSettle:data()
+end
+
+-- Sync has settled with tracks waiting: what they've passed is quiet, as
+-- in the baseline.
+local function baselineLate(self)
+  local progress = Goals.progress(counted(self))
+  for track in pairs(self.db.goals.late) do
+    (TRACK[track].record or recordLadder)(self, track, progress, true)
+  end
+  self.db.goals.late = nil
 end
 
 -- Called once a second, in a Crew. Returns true on the tick the baseline
 -- is taken.
 function Goals:tick()
+  if self.lateSettle:tick() then baselineLate(self) end
   if not self.settle:tick() then return false end
   record(self, true)
   self.db.goals.baselined = true

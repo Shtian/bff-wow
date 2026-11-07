@@ -25,19 +25,20 @@ local FOR_KIND = {
   newProfession = "cheer",
   professionSkill = "cheer",
   professionMaxed = "cheer",
+  rareFind = "cheer",
 }
 
 -- Kinds as stored in a record, kept short since records go over the wire.
 local CODES = {
   ding = "d", maxLevel = "m", newCharacter = "c", death = "x", joined = "j",
-  newProfession = "p", professionSkill = "s", professionMaxed = "a",
+  newProfession = "p", professionSkill = "s", professionMaxed = "a", rareFind = "r",
 }
 local KINDS = {}
 for kind, code in pairs(CODES) do KINDS[code] = kind end
 
 -- Kinds whose key has a number: the level, death total, joinedAt or
--- profession skill reached.
-local NUMBERED = { ding = true, death = true, joined = true, professionSkill = true }
+-- profession skill reached, or the type of Catch.
+local NUMBERED = { ding = true, death = true, joined = true, professionSkill = true, rareFind = true }
 -- Kinds whose key also names the profession, by skill line ID.
 local PROFESSION = ns.Professions.KINDS
 
@@ -61,6 +62,8 @@ function Reactions.keyOf(entry)
     n = entry.joinedAt
   elseif kind == "professionSkill" then
     n = entry.milestone
+  elseif kind == "rareFind" then
+    n = entry.catch
   end
   if NUMBERED[kind] and type(n) ~= "number" then return nil end
   if kind ~= "joined" and type(entry.guid) ~= "string" then return nil end
@@ -86,6 +89,8 @@ function Reactions.matches(entry, key)
     return entry.joinedAt == n
   elseif key.kind == "professionSkill" then
     return entry.from ~= nil and entry.milestone ~= nil and n > entry.from and n <= entry.milestone
+  elseif key.kind == "rareFind" then
+    return entry.catch == n
   end
   return true
 end
@@ -197,6 +202,9 @@ function Reactions.phrase(entry, character, alt)
   elseif kind == "professionMaxed" then
     return alt and ("cheered your Alt %s maxing %s"):format(name, entry.profession)
       or ("cheered you maxing %s"):format(entry.profession)
+  elseif kind == "rareFind" then
+    return alt and ("cheered your Alt %s's %s"):format(name, entry.fish)
+      or ("cheered your %s"):format(entry.fish)
   end
   return "welcomed you"
 end

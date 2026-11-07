@@ -78,6 +78,10 @@ Skin.FEED_PICTURES = {
   gave = "Interface\\Icons\\INV_Misc_Bag_08",
   claimed = "Interface\\Icons\\INV_Misc_Bag_08",
   given = "Interface\\Icons\\INV_Letter_15",
+  -- A rare find draws its item's icon; this is until the game has it. The
+  -- Catches line in While you were away has no item of its own.
+  rareFind = "Interface\\Icons\\INV_Misc_Fish_18",
+  catches = "Interface\\Icons\\INV_Misc_Fish_18",
   -- Profession entries draw the profession's own icon; this is for one
   -- whose icon wasn't shared.
   newProfession = "Interface\\Icons\\INV_Misc_Book_11",
@@ -102,6 +106,8 @@ Skin.FEED_EDGES = {
   newProfession = PROFESSION,
   professionSkill = PROFESSION,
   professionMaxed = Skin.GOLD,
+  -- A rare find's edge is its item's quality: none for common.
+  rareFind = false,
 }
 local EDGE_ALPHA = 0.55
 -- A given Reaction's edge: a quiet frame, not gold, so the Feed's gold stays
@@ -118,6 +124,7 @@ Skin.TROPHY_HUES = {
   professions = SPARE,
   crewSkill = SPARE,
   everyoneRank = SPARE,
+  catches = CREW,
 }
 -- A trophy's tier, in WoW's item quality colours (Core says which): on a
 -- medal's edge and foot. Rare is lifted from the game's #0070dd so it
@@ -140,6 +147,26 @@ Skin.ITEM_QUALITIES = {
   [5] = { 1, 0.5, 0 },
 }
 Skin.ITEM_EDGE_ALPHA = EDGE_ALPHA
+
+local getItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
+local getItemIcon = C_Item and C_Item.GetItemIconByID or GetItemIcon
+
+-- An item as the game has it: its name, icon and quality colour (nil for
+-- common), each nil while it isn't cached. Asking starts loading it, and
+-- GET_ITEM_INFO_RECEIVED says when it has.
+function Skin.item(itemId)
+  local name, _, quality = getItemInfo(itemId)
+  return name, getItemIcon(itemId), quality and Skin.ITEM_QUALITIES[quality]
+end
+
+-- How a rare find shows its item, for Core: { text (the name in its
+-- quality colour), icon, edge (the quality colour) }.
+function Skin.itemLook(itemId)
+  local name, icon, quality = Skin.item(itemId)
+  local text = name
+  if name and quality then text = Skin.hex(quality) .. name .. "|r" end
+  return { text = text, icon = icon, edge = quality }
+end
 -- Each track's icon, on its Working on tile, its medals (but Every
 -- profession's, which show the profession) and the cabinet.
 Skin.GOAL_ICONS = {
@@ -149,6 +176,7 @@ Skin.GOAL_ICONS = {
   professions = "Interface\\Icons\\INV_Misc_Book_11",
   crewSkill = "Interface\\Icons\\INV_Pick_02",
   everyoneRank = "Interface\\Icons\\INV_Misc_Note_06",
+  catches = "Interface\\Icons\\INV_Misc_Fish_18",
 }
 
 -- A clear's medal icon, by kind: a dungeon's and a raid's (DESIGN.md,
@@ -160,8 +188,10 @@ Skin.CLEAR_ICONS = {
 
 -- A square picture `size` wide: an opaque back (so a line behind it is
 -- covered), the edge, and the icon inset 1px with its own bevel cropped.
--- :SetKind(kind, icon) draws a Feed kind, with the entry's own icon if it
--- has one (a profession's); :SetPicture(texture, edgeColor) any icon.
+-- :SetKind(kind, icon, edge) draws a Feed kind, with the entry's own icon
+-- and edge if it has them (a profession's icon, a rare find's item);
+-- :SetPicture(texture, edgeColor) any icon, with no edge when edgeColor is
+-- false.
 function Skin.feedPicture(parent, size)
   local frame = CreateFrame("Frame", nil, parent)
   frame:SetSize(size, size)
@@ -177,10 +207,11 @@ function Skin.feedPicture(parent, size)
   function frame:SetPicture(texture, edgeColor)
     local color = edgeColor or Skin.FEED_ICON_COLOR
     self.edge:SetColorTexture(color[1], color[2], color[3], EDGE_ALPHA)
+    self.edge:SetShown(edgeColor ~= false)
     self.picture:SetTexture(texture)
   end
-  function frame:SetKind(kind, icon)
-    self:SetPicture(icon or Skin.FEED_PICTURES[kind] or Skin.FEED_PICTURES.ding, Skin.FEED_EDGES[kind])
+  function frame:SetKind(kind, icon, edge)
+    self:SetPicture(icon or Skin.FEED_PICTURES[kind] or Skin.FEED_PICTURES.ding, edge or Skin.FEED_EDGES[kind])
   end
   return frame
 end
