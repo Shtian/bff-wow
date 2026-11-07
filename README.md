@@ -41,6 +41,7 @@ A World of Warcraft: Forever addon for friends who don't always play at the same
 |---|---|
 | `/bff` | Open or close the panel (also a key binding and the minimap button) |
 | `/bff feed`, `/bff goals`, `/bff when`, `/bff spares`, `/bff professions`, `/bff together` | Open the panel on that tab |
+| `/bff catches` | List the fish and fishing finds your crew has caught |
 | `/bff spares add <item>` | Offer an item from your bags: shift-click it in after `add` |
 | `/bff start`, `/bff join <code>`, `/bff leave` | Start, join or leave a crew |
 | `/bff code` | Show your crew code |

@@ -198,6 +198,12 @@ eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 -- A boss died: Core decides whether it's a clear.
 eventFrame:RegisterEvent("ENCOUNTER_END")
+-- The loot window filled: Core keeps it if it was fished. With auto-loot
+-- the slots are still filled when LOOT_READY fires. It can fire more than
+-- once for one window, so each window is read once, until LOOT_CLOSED.
+eventFrame:RegisterEvent("LOOT_READY")
+eventFrame:RegisterEvent("LOOT_CLOSED")
+local lootRead = false
 -- The Camp's art pixel is a whole number of screen pixels: worked out
 -- again when the UI scale or the window changes.
 eventFrame:RegisterEvent("UI_SCALE_CHANGED")
@@ -211,6 +217,13 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     if ns.core then ns.core:bagsUpdated() end
   elseif event == "ENCOUNTER_END" then
     if ns.core then ns.core:encounterEnded(ns.Snapshot.encounter(...)) end
+  elseif event == "LOOT_READY" then
+    if ns.core and not lootRead then
+      lootRead = true
+      ns.core:caught(ns.Snapshot.catch())
+    end
+  elseif event == "LOOT_CLOSED" then
+    lootRead = false
   elseif event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
     if ns.core then ns.Panel.refresh() end
   elseif event == "PLAYER_REGEN_ENABLED" then
@@ -304,6 +317,37 @@ function commands.professions()
   ns.Panel.show("professions")
 end
 
+-- An item's name as the game has it, or the list's English name until
+-- it's cached.
+local function itemName(itemId, fallback)
+  local getItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
+  return getItemInfo(itemId) or fallback or ("item " .. itemId)
+end
+
+-- Who caught something first and where: "you, Westfall (The Jansen Stead)".
+local function firstCatch(first)
+  local who = first.own and "you" or (first.displayName or "?")
+  if first.character and first.character ~= first.displayName then who = who .. " (" .. first.character .. ")" end
+  local where = first.zone or "somewhere"
+  if first.subzone and first.subzone ~= first.zone then where = where .. ", " .. first.subzone end
+  return ("first by %s in %s, %s"):format(who, where, first.since)
+end
+
+-- /bff catches prints what the Crew has caught, until Catches has a tab.
+function commands.catches()
+  local view = ns.core:catches()
+  say(("the Crew has caught %d of %d types."):format(view.caught, view.total))
+  for _, t in ipairs(view.types) do
+    if t.first then
+      print(("  %s%s: %d, %s"):format(itemName(t.itemId, t.name), t.extra and " (Extra)" or "", t.count,
+        firstCatch(t.first)))
+    end
+  end
+  for _, u in ipairs(view.unlisted) do
+    print(("  %s (unlisted, item %d): %d, %s"):format(itemName(u.itemId), u.itemId, u.count, firstCatch(u.first)))
+  end
+end
+
 function commands.together()
   ns.Panel.show("together")
 end
@@ -321,7 +365,7 @@ function commands.leave()
   if ns.core:crew() then ns.confirmLeave() else say(MESSAGES.noCrew) end
 end
 
--- /bff sim, /bff sim ding and /bff sim stop, only in a dev checkout
+-- /bff sim, /bff sim ding, /bff sim fish and /bff sim stop, only in a dev checkout
 -- (Dev/ is left out of releases).
 function commands.sim(rest)
   if not ns.Sim then return say("/bff sim is only in a dev checkout.") end
@@ -331,10 +375,13 @@ function commands.sim(rest)
   elseif rest == "ding" then
     local name = ns.Sim.ding()
     say(name and name .. " dinged." or "/bff sim isn't running.")
+  elseif rest == "fish" then
+    local name, itemId = ns.Sim.fish()
+    say(name and ("%s caught item %d. See /bff catches."):format(name, itemId) or "/bff sim isn't running.")
   else
     local ok, reason = ns.Sim.start(ns.core)
     if ok then
-      say("three simulated Members joined. /bff sim ding, /bff sim stop.")
+      say("simulated Members joined. /bff sim ding, /bff sim fish, /bff sim stop.")
     elseif reason == "running" then
       say("/bff sim is already running.")
     else
@@ -353,7 +400,7 @@ SlashCmdList.BFF = function(input)
   elseif commands[command] then
     commands[command](rest)
   else
-    say("/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff professions, /bff together, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
+    say("/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff professions, /bff catches, /bff together, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
   end
 end
 

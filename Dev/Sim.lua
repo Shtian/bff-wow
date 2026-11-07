@@ -5,7 +5,8 @@
 -- Camp: two sit by the fire, two fall asleep, one with a fresh max level,
 -- and one by the fire leaves two graves. Also the dev
 -- console (/bffdev, opened by /bff sim too): buttons that make each
--- simulated Member ding, die, move, react to your newest entry, offer a
+-- simulated Member ding, die, move, fish (a Catch, or now and then an
+-- unlisted one), react to your newest entry, offer a
 -- test Spare, Claim your newest one or log out,
 -- one that plays out a stretch of you being away so While you were away
 -- shows (with Reactions to your entries), one that reaches the next Crew
@@ -233,6 +234,40 @@ local function playTimesHistory(i, now)
   return { since = now - 30 * 24 * 60 * 60, weeks = weeks }
 end
 
+-- Fished items that aren't on Catches' list, so unlisted catches show.
+local UNLISTED = { 271647, 271648 }
+
+-- The client fishes in the zone it's in, as Snapshot.catch would read it:
+-- mostly something on the list, now and then an unlisted find. Returns
+-- the item ID.
+local function fishUp(client)
+  local itemId
+  if math.random() < 0.1 then
+    itemId = UNLISTED[math.random(#UNLISTED)]
+  else
+    local types = ns.Catches.TYPES
+    local t = types[math.random(#types)]
+    itemId = t.items[math.random(#t.items)]
+  end
+  client.core:caught({
+    items = { { itemId = itemId, quantity = 1 } },
+    zone = client.character.zone,
+    mapId = client.location and client.location.mapId,
+  })
+  return itemId
+end
+
+-- A few days of past catches for the first two Members, so /bff catches
+-- has something in it from the start.
+local function fishHistory(client, i, now)
+  if i > 2 then return end
+  for day = 6, 1, -1 do
+    net.clock = now - day * DAY + i * 3600
+    fishUp(client)
+  end
+  net.clock = now
+end
+
 -- Starts the simulated Members. Returns true, or nil and "running" or
 -- "notAlone".
 function Sim.start(core)
@@ -267,6 +302,7 @@ function Sim.start(core)
     local client = net:add(spec.name, { db = { playTimes = playTimesHistory(i, now) } })
     client.characters = {}
     playHistory(client, i, spec, yourLevel, now)
+    fishHistory(client, i, now)
     client:join(crew.code)
     members[i] = client
     if spec.offline then
@@ -300,6 +336,19 @@ function Sim.ding()
   local client = online[math.random(#online)]
   client:play({ level = client.character.level + 1, xp = 0 })
   return client.character.name
+end
+
+-- One online simulated Member catches something. Returns their
+-- Character's name and the item ID, or nil.
+function Sim.fish()
+  if not net then return nil end
+  local online = {}
+  for _, client in ipairs(members) do
+    if client.core then online[#online + 1] = client end
+  end
+  if #online == 0 then return nil end
+  local client = online[math.random(#online)]
+  return client.character.name, fishUp(client)
 end
 
 function Sim.isRunning()
@@ -408,6 +457,7 @@ local ACTIONS = {
     client:play()
   end,
   react = function(client) reactToYou(client, yourId) end,
+  fish = fishUp,
   offer = function(client, i) offer(client, i) end,
   claim = function(client) claimYours(client, yourId) end,
   online = function(client)
@@ -614,7 +664,7 @@ ns.Console = Console
 
 local Skin = ns.Skin
 
-local WIDTH = 814
+local WIDTH = 868
 local HEIGHT = 480
 local INSET = 12
 local ROW_HEIGHT = 28
@@ -630,7 +680,7 @@ local DIM = "8c8a99"
 -- The console buttons on each simulated Member's row, left to right.
 local BUTTONS = {
   { "ding", "Ding" }, { "xp", "XP" }, { "die", "Die" }, { "zone", "Zone" },
-  { "alt", "Alt" }, { "max", "Max" }, { "skill", "Skill" }, { "react", "React" }, { "offer", "Offer" },
+  { "alt", "Alt" }, { "max", "Max" }, { "skill", "Skill" }, { "fish", "Fish" }, { "react", "React" }, { "offer", "Offer" },
   { "claim", "Claim" }, { "online", "Log out" },
 }
 
