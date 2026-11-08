@@ -47,6 +47,8 @@ A World of Warcraft: Forever addon for friends who don't always play at the same
 | `/bff name <name>` | Set the name your friends see |
 | `/bff settings` | Open Settings |
 | `/bff minimap` | Bring back a hidden minimap button |
+| `/bff debug sync` | Turn the sync trace on or off: a line in chat for each message sent and received, and for the link going up or down. Off again after a reload |
+| `/bff help` | List the commands |
 
 ## Install
 

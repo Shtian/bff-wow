@@ -43,6 +43,64 @@ function Core.goldText(money)
   return "Gold: " .. ns.Text.grouped(math.floor(money / 10000))
 end
 
+-- The sync trace (/bff debug sync): trace(line) gets a line of text for
+-- each message sent and received, without a timestamp. Nil turns it off,
+-- and then no line is ever built.
+function Core:setTrace(trace)
+  self.trace = type(trace) == "function" and trace or nil
+end
+
+-- A Member's name for the trace: the display name, else the id.
+local function traceName(self, id, displayName)
+  if id == self.ledger:memberId() then return self:displayName() or id end
+  local record = self.ledger:record(id)
+  return displayName or (record and record.displayName) or tostring(id)
+end
+
+-- A record in the trace: "Ann (k3j2h1) v1731000000".
+local function traceRecord(self, record)
+  if type(record) ~= "table" then return "?" end
+  return ("%s (%s) v%s"):format(traceName(self, record.id, record.displayName),
+    tostring(record.id), tostring(record.version))
+end
+
+-- A DIGEST's versions in the trace: "Ann v1731000000, Bob v1731000003",
+-- sorted by name.
+local function traceVersions(self, versions)
+  local items = {}
+  for id, version in pairs(versions) do
+    items[#items + 1] = ("%s v%s"):format(traceName(self, id), tostring(version))
+  end
+  table.sort(items)
+  return table.concat(items, ", ")
+end
+
+-- The trace's line for a message going out, `size` bytes encoded.
+local function sentLine(self, message, size)
+  if message.type == "DIGEST" and type(message.versions) == "table" then
+    local count = 0
+    for _ in pairs(message.versions) do count = count + 1 end
+    return ("send DIGEST · %d versions · %d B · %s"):format(count, size, traceVersions(self, message.versions))
+  end
+  local records = {}
+  for i, record in ipairs(type(message.records) == "table" and message.records or {}) do
+    records[i] = traceRecord(self, record)
+  end
+  return ("send %s · %d B · %s"):format(tostring(message.type), size, table.concat(records, ", "))
+end
+
+-- The trace's line for a DATA record received: whether it was merged (not
+-- when it isn't newer, is malformed or is from a removed Member), and
+-- how late it arrived (the time since its version, the server time it was
+-- written at).
+local function traceReceived(self, record, kept)
+  local line = traceRecord(self, record) .. (kept and " · merged" or " · not merged")
+  if type(record) == "table" and type(record.version) == "number" then
+    line = line .. (" · late %ds"):format(math.max(0, self.now() - record.version))
+  end
+  return line
+end
+
 -- deps: db, now(), random(), link (with send(string)), listener(event, ...),
 -- initialLogin, maxLevel, utcOffset (seconds local time is ahead of server
 -- time, for the Feed's days; default 0) and locate() (optional: where the
@@ -103,7 +161,9 @@ function Core.new(deps)
   local locate = type(deps.locate) == "function" and deps.locate or nil
   self.gossip = ns.Gossip.new(self.ledger, deps.now, deps.random, function(message)
     message.from = self.ledger:memberId()
-    self.link.send(ns.Codec.encode(message))
+    local encoded = ns.Codec.encode(message)
+    if self.trace then self.trace(sentLine(self, message, #encoded)) end
+    self.link.send(encoded)
   end, locate and function() self.ledger:locate(locate()) end)
   self.gossip:setPaused(self:isPaused())
   self.playTracker = ns.PlayTimes.new(deps.db, deps.now)
@@ -1409,6 +1469,10 @@ local function dataReceived(self, records, from)
   local changed = false
   for _, record in ipairs(records) do
     local kept, before = self.ledger:merge(record, from)
+    if self.trace then
+      self.trace(("receive DATA from %s · ok · %s"):format(traceName(self, from),
+        traceReceived(self, record, kept)))
+    end
     if kept then
       changed = true
       self.log:dataMerged()
@@ -1437,6 +1501,9 @@ end
 function Core:received(message)
   if type(message) ~= "string" or not self.db.crew then return end
   local decoded, reason = ns.Codec.decode(message)
+  if self.trace and reason then
+    self.trace(("receive · %s · %d B"):format(reason, #message))
+  end
   if reason == "newer" then
     if not self.toldOutOfDate then
       self.toldOutOfDate = true
@@ -1444,17 +1511,27 @@ function Core:received(message)
     end
     return
   end
-  if type(decoded) ~= "table" or type(decoded.from) ~= "string"
-      or decoded.from == self.ledger:memberId() then
+  if type(decoded) ~= "table" or type(decoded.from) ~= "string" then
+    if self.trace and not reason then self.trace(("receive · invalid (no sender) · %d B"):format(#message)) end
+    return
+  end
+  if decoded.from == self.ledger:memberId() then
+    if self.trace then self.trace(("receive %s from you · ignored"):format(tostring(decoded.type))) end
     return
   end
 
   self.ledger:heard(decoded.from)
   local changed = false
   if decoded.type == "DIGEST" and type(decoded.versions) == "table" then
+    if self.trace then
+      self.trace(("receive DIGEST from %s · ok · %s"):format(traceName(self, decoded.from),
+        traceVersions(self, decoded.versions)))
+    end
     self.gossip:digestReceived(decoded.versions)
   elseif decoded.type == "DATA" and type(decoded.records) == "table" then
     changed = dataReceived(self, decoded.records, decoded.from)
+  elseif self.trace then
+    self.trace(("receive %s from %s · ignored (unknown)"):format(tostring(decoded.type), traceName(self, decoded.from)))
   end
   if onlineChanged(self) or changed then self.listener("changed") end
 end
