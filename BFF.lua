@@ -369,6 +369,30 @@ function commands.sim(rest)
   end
 end
 
+-- The sync trace (/bff debug sync): off at every login and reload. Each
+-- line from Core and the channel link gets the time of day and GetTime().
+local syncTrace = false
+local function traceLine(text)
+  print(("|cff33ff99BFF|r |cff888888%s %.3f|r %s"):format(date("%H:%M:%S"), GetTime(), text))
+end
+
+function commands.debug(rest)
+  if rest:lower() ~= "sync" then return say("/bff debug sync turns the sync trace on or off.") end
+  syncTrace = not syncTrace
+  local trace = syncTrace and traceLine or nil
+  ns.core:setTrace(trace)
+  ns.ChannelLink.setTrace(trace)
+  say(syncTrace and "sync trace on. /bff debug sync turns it off." or "sync trace off.")
+end
+
+local HELP = "/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff professions, "
+  .. "/bff together, /bff catches, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, "
+  .. "/bff minimap, /bff leave, /bff debug sync, /bff help"
+
+function commands.help()
+  say(HELP)
+end
+
 SLASH_BFF1 = "/bff"
 SlashCmdList.BFF = function(input)
   if not ns.core then return end
@@ -379,7 +403,7 @@ SlashCmdList.BFF = function(input)
   elseif commands[command] then
     commands[command](rest)
   else
-    say("/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff professions, /bff together, /bff catches, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, /bff minimap, /bff leave")
+    commands.help()
   end
 end
 

@@ -51,6 +51,8 @@ local FILTERED_EVENTS = {
 
 local core
 local onNotice
+-- The sync trace (/bff debug sync): trace(line), or nil while it's off.
+local trace
 local target          -- the Crew's channel and password, from Core
 local joining = false
 local joined = false
@@ -111,12 +113,24 @@ local function isSelf(name)
   return readable(me) and peerKey(name) == me:lower()
 end
 
+-- Why the link is down, for the trace.
+local function downReason()
+  if not target then return "no Crew" end
+  if not joined then return "not in the channel" end
+  if not listed then return "waiting for the member list" end
+  if lockdown() then return "lockdown" end
+  if refused then return "refused send" end
+  return "?"
+end
+
 -- Tells Core whenever the link goes up or down. isUp is set first, since
--- Core may react by changing the Crew, which comes back here.
-local function update()
+-- Core may react by changing the Crew, which comes back here. cause says
+-- what brought it up, for the trace.
+local function update(cause)
   local up = target ~= nil and joined and listed and not lockdown() and not refused
   if up == isUp then return end
   isUp = up
+  if trace then trace(up and ("link up (%s)"):format(cause or "ready") or ("link down (%s)"):format(downReason())) end
   if up then core:up() else core:down() end
 end
 
@@ -143,24 +157,30 @@ local function deliver(key)
   local waiting = strangers[key]
   strangers[key] = nil
   if not waiting then return end
+  if trace then trace(("  delivering %d held whispers from %s"):format(#waiting.messages, peers[key])) end
   for _, message in ipairs(waiting.messages) do core:received(message) end
 end
 
--- Returns true if the name is new.
-local function addPeer(name)
+-- Returns true if the name is new. why is for the trace.
+local function addPeer(name, why)
   if not readable(name) or name == "" or isSelf(name) then return false end
   local key = peerKey(name)
   if peers[key] then return false end
   peers[key] = name
+  if trace then trace(("peer added: %s (%s)"):format(name, why)) end
   deliver(key)
   return true
 end
 
-local function removePeer(name)
-  if readable(name) and name ~= "" then peers[peerKey(name)] = nil end
+local function removePeer(name, why)
+  if not readable(name) or name == "" then return end
+  local key = peerKey(name)
+  if trace and peers[key] then trace(("peer removed: %s (%s)"):format(peers[key], why)) end
+  peers[key] = nil
 end
 
-local function forgetPeers()
+local function forgetPeers(why)
+  if trace and next(peers) then trace(("peers cleared (%s)"):format(why)) end
   generation = generation + 1
   peers, strangers, missed = {}, {}, {}
   listed = false
@@ -170,17 +190,17 @@ local function onJoined()
   joining = false
   joined = true
   hide(target.channel)
-  forgetPeers()
+  forgetPeers("joined the channel")
   askList()
   -- No reply (a channel of one may send none): come up anyway.
   local current = generation
   C_Timer.After(LIST_WAIT, function()
     if generation == current and joined and not listed then
       listed = true
-      update()
+      update("no member list after " .. LIST_WAIT .. " s")
     end
   end)
-  update()
+  update("joined the channel")
 end
 
 local function fail(kind)
@@ -300,6 +320,11 @@ local function systemFilter(_, _, text)
   return notFound(text) ~= nil
 end
 
+-- What the game says after a whisper to a Character who is offline,
+-- according to the wiki. Which text Forever prints is unverified (see
+-- docs/research/addon-message-reliability.md), so this is only traced.
+local OFFLINE_TEXT = "Player is offline."
+
 -- "You can only be in %d channels at a time."
 local tooManyPattern = patternFor(ERR_TOO_MANY_CHAT_CHANNELS)
 
@@ -326,6 +351,7 @@ function events.CHAT_MSG_CHANNEL_NOTICE(kind, ...)
   if kind == "WRONG_PASSWORD" then
     fail("wrongPassword")
   elseif kind == "YOU_LEFT" or kind == "SUSPENDED" then
+    if trace then trace("channel notice: " .. kind) end
     joined = false
     update()
   end
@@ -336,9 +362,16 @@ function events.CHAT_MSG_SYSTEM(text)
   -- Logged out, and the leave notice hasn't come (or won't).
   local name = notFound(text)
   local key = name and peerKey(name)
+  if trace then
+    if name then
+      trace(("notice: No player named %s%s"):format(name, key and peers[key] and "" or " (already gone)"))
+    elseif readable(text) and text == OFFLINE_TEXT then
+      trace("notice: " .. OFFLINE_TEXT)
+    end
+  end
   if key and peers[key] then
     missed[key] = GetTime()
-    removePeer(name)
+    removePeer(name, "No player named")
     core:gone(Ambiguate(name, "none"))
   end
 end
@@ -353,21 +386,22 @@ function events.CHAT_MSG_CHANNEL_LIST(text, _, _, arg4, _, _, _, _, arg9)
   local found = false
   for entry in text:gmatch("[^,]+") do
     local name = entry:gsub("^%s*[%*@%+]*", ""):gsub("%s+$", "")
-    if addPeer(name) then found = true end
+    if addPeer(name, "member list") then found = true end
   end
   if not listed then
     listed = true
-    update()
+    update("member list")
   elseif found and isUp then
     -- Straight to Core, leaving isUp as it is: the link itself never went
     -- down. Neither call changes the Crew, so nothing comes back here.
+    if trace then trace("link down and up (new in member list)") end
     core:down()
     core:up()
   end
 end
 
 function events.CHAT_MSG_CHANNEL_JOIN(_, sender, ...)
-  if joined and isTarget((select(7, ...))) then addPeer(sender) end
+  if joined and isTarget((select(7, ...))) then addPeer(sender, "joined the channel") end
 end
 
 function events.UI_ERROR_MESSAGE(_, text)
@@ -378,13 +412,14 @@ end
 -- before any goodbye could be sent.
 function events.CHAT_MSG_CHANNEL_LEAVE(_, sender, ...)
   if not isTarget((select(7, ...))) or not readable(sender) then return end
-  removePeer(sender)
+  removePeer(sender, "left the channel")
   core:gone(Ambiguate(sender, "none"))
 end
 
 -- Whoever joined or left during lockdown: ask again once it lifts.
-function events.ADDON_RESTRICTION_STATE_CHANGED()
-  update()
+function events.ADDON_RESTRICTION_STATE_CHANGED(kind, state)
+  if trace then trace(("chat restriction: type %s, state %s"):format(tostring(kind), tostring(state))) end
+  update("lockdown over")
   tryJoin()
   askList()
 end
@@ -398,15 +433,20 @@ local function onRefused()
   update()
   C_Timer.After(REFUSED_PAUSE, function()
     refused = false
-    update()
+    update("refusal pause over")
   end)
 end
 
--- AceComm's callback, once per chunk. Through AceComm, ChatThrottleLib's
--- didSend arrives fourth: false for a general error. ChatThrottleLib queues
--- a throttled send again itself, so that one never gets here. Handled on
--- the next frame, since it can run inside Core's own send.
-local function onSent(_, _, _, didSend)
+-- AceComm's callback, once per chunk, with the name whispered to, the
+-- bytes sent so far and in all. Through AceComm, ChatThrottleLib's didSend
+-- arrives fourth: false for a general error. ChatThrottleLib queues a
+-- throttled send again itself, so that one never gets here. Handled on the
+-- next frame, since it can run inside Core's own send.
+local function onSent(name, sent, total, didSend)
+  if trace then
+    trace(("  chunk to %s: %s/%s B %s"):format(tostring(name), tostring(sent), tostring(total),
+      didSend == false and "failed" or "sent"))
+  end
   if didSend == false then C_Timer.After(0, onRefused) end
 end
 
@@ -430,13 +470,24 @@ local function onComm(_, message, distribution, sender)
   if not waiting then
     waiting = { messages = {} }
     strangers[key] = waiting
+    if trace then trace(("holding whispers from %s: not in the member list yet"):format(sender)) end
     local current = generation
     C_Timer.After(STRANGER_WAIT, function()
-      if generation == current and strangers[key] == waiting then strangers[key] = nil end
+      if generation == current and strangers[key] == waiting then
+        strangers[key] = nil
+        if trace then
+          trace(("dropped %d whispers from %s: not in the member list after %d s"):format(
+            #waiting.messages, sender, STRANGER_WAIT))
+        end
+      end
     end)
     askList()
   end
-  if #waiting.messages < STRANGER_MAX then waiting.messages[#waiting.messages + 1] = message end
+  if #waiting.messages < STRANGER_MAX then
+    waiting.messages[#waiting.messages + 1] = message
+  elseif trace then
+    trace(("dropped a whisper from %s: %d already held"):format(sender, STRANGER_MAX))
+  end
 end
 
 -- Starts the link. core gets up(), down(), gone(name) and received(message); notice
@@ -470,20 +521,38 @@ function ChannelLink.setCrew(crew)
     leave(target.channel)
   end
   target = crew and { channel = crew.channel, password = crew.password }
-  forgetPeers()
+  forgetPeers("Crew changed")
   failed = false
   if name then ours[name:upper()] = true end
   update()
   tryJoin()
 end
 
+-- How many chunks AceComm splits a message into: one up to 255 bytes,
+-- else 254 bytes each (one goes to the part marker).
+local function chunks(size)
+  if size <= 255 then return 1 end
+  return math.ceil(size / 254)
+end
+
+-- Turns the sync trace on (trace(line), lines without a timestamp) or off
+-- (nil).
+function ChannelLink.setTrace(fn)
+  trace = fn
+end
+
 -- Best-effort: dropped while the link is down, and reaches only the
 -- Characters known to be in the channel. ChannelLink.onSend, if set, also
 -- gets every message sent (for /bff sim).
 function ChannelLink.send(message)
-  if not isUp then return end
+  if not isUp then
+    if trace then trace(("  not sent: link down (%s)"):format(downReason())) end
+    return
+  end
   if ChannelLink.onSend then ChannelLink.onSend(message) end
+  if trace and not next(peers) then trace("  not sent: no one else in the channel") end
   for _, name in pairs(peers) do
-    ChannelLink:SendCommMessage(PREFIX, message, "WHISPER", name, nil, onSent)
+    if trace then trace(("  to %s · %d B · %d chunks"):format(name, #message, chunks(#message))) end
+    ChannelLink:SendCommMessage(PREFIX, message, "WHISPER", name, nil, onSent, name)
   end
 end
