@@ -10,8 +10,9 @@ BFF is for a small group of friends who don't always play at the same time. It s
 - **Gather round the fire:** the Camp, a small pixel campsite at the top of the panel and in While you were away. Friends who are online sit by the fire and the rest sleep in bedrolls. A recent death leaves a grave, respects put a flower on it, and a fresh max level gets a spark. You can switch it off in Settings.
 - **Your whole crew:** every friend's characters, levels and whereabouts, and when each was last seen. Alts are grouped under the person who plays them.
 - **Cheer every ding:** one click sends a cheer for a ding, respects for a death, or a welcome for someone new. Toasts can play an optional sound.
-- **Level up together:** goals the whole crew works towards, like everyone reaching level 60, and trophies for what you do together, like clearing a dungeon or a raid. Nobody is ranked.
+- **Level up together:** goals the whole crew works towards, like everyone reaching level 60, and trophies for what you do together, like clearing a dungeon or a raid, or catching every type of fish. Nobody is ranked.
 - **Who crafts what:** every friend's professions and skill in one grid, so you know who to ask for a craft. Hover a tile to see which characters have that profession. You also get feed entries when friends pick up a profession, reach a new rank or max it.
+- **Fish together:** a field guide of the crew's fishing catches. Every type of fish and fishing find is filled in by whoever caught it first, with when and where. Group it by where to fish or by type, and see what the crew still hasn't caught. Rare finds, like Nat Pagle's fish, are news you can cheer.
 - **Pass on spare gear:** offer an item to your friends. Whoever claims it first gets it by in-game mail.
 - **When everyone plays:** a heatmap of the hours each friend usually plays, in your own time zone.
 - **Dungeons together:** see which friends are close to your level, and the dungeons you can run together. Click a friend to see the dungeons that fit you both.
@@ -28,20 +29,22 @@ BFF is for a small group of friends who don't always play at the same time. It s
 | Command | What it does |
 |---|---|
 | `/bff` | Open or close the panel (also a key binding and the minimap button) |
-| `/bff feed`, `/bff goals`, `/bff when`, `/bff spares`, `/bff professions`, `/bff together` | Open the panel on that tab |
+| `/bff feed`, `/bff goals`, `/bff when`, `/bff spares`, `/bff professions`, `/bff catches`, `/bff together` | Open the panel on that tab: Feed, Trophies, Play Times, Spare Items, Professions, Catches or Dungeons |
 | `/bff spares add <item>` | Offer an item from your bags: shift-click it in after `add` |
 | `/bff start`, `/bff join <code>`, `/bff leave` | Start, join or leave a crew |
 | `/bff code` | Show your crew code |
 | `/bff name <name>` | Set the name your friends see |
 | `/bff settings` | Open Settings |
 | `/bff minimap` | Bring back a hidden minimap button |
+| `/bff debug sync` | Turn the sync trace on or off: a line in chat for each message sent and received. Handy when reporting a sync bug. Off again after a reload |
+| `/bff help` | List the commands |
 
 ## How it works, and its limits
 
-BFF has no server. Each player's addon keeps their own data and passes it to the other crew members' addons in game, over a hidden chat channel. That keeps it simple and private, but it comes with limits:
+BFF has no server. Each player's addon keeps their own data and passes it to the other crew members' addons in game: they find each other in a hidden chat channel and whisper updates directly. That keeps it simple and private, but it comes with limits:
 
 - **Someone has to be online to pass news on.** Updates travel only between players who are online at the same time. When anyone who has your news is online alongside a friend, that friend gets it, even if you are offline. A crew whose members are never online at the same time won't see each other's news.
-- **Same realm and same faction.** WoW's chat channels don't cross factions or reach other realms. Whether connected realms work hasn't been tested.
+- **Same realm and same faction.** WoW's chat channels and whispers don't cross factions or reach other realms. Whether connected realms work hasn't been tested.
 - **Paused in combat and instances.** WoW blocks addon messages there. Your news goes out as soon as you leave, and nothing is lost.
 - **Delivery is best effort.** A message can occasionally get lost. The next sync fills in the gap, so data catches up but isn't instant.
 - **One crew at a time.** BFF uses one of your character's custom chat channels, and there's a cap of about 10. If you're at the cap, leave a channel and `/reload`.
