@@ -48,6 +48,20 @@ local function fail(whisper)
 end
 
 describe("The channel link", function()
+  it("never whispers to your own Character when it has a last name", function()
+    local game = wow()
+    game.player = { "Moorwyn", "Stormgaard" }
+    local link = game.load("Game/ChannelLink.lua", {}).ChannelLink
+    local core = fakeCore()
+    link.start(core, function() end)
+    link.setCrew({ channel = CHANNEL, password = "pw" })
+    game.advance(11)
+    game.fire("CHAT_MSG_CHANNEL_LIST", "*Moorwyn Stormgaard, Gawd Zillah", nil, nil, "5. " .. CHANNEL,
+      nil, nil, nil, nil, CHANNEL)
+    link.send("1|short")
+    assert.same({ "Gawd Zillah" }, targets(game))
+  end)
+
   it("whispers a message to every peer, or to one", function()
     local game, link = linked()
     link.send("1|short")

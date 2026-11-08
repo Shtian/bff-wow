@@ -144,6 +144,17 @@ describe("Roster", function()
       assert.equal(net:now() - row.lastSeen, row.sinceSeen)
     end)
 
+    -- Forever Characters have a last name: the channel says "Ann Smith"
+    -- left, while the record holds UnitName's first name, "Ann".
+    it("shows a Member offline when their Character leaves by first and last name", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      a:logout(true)
+      net.queue[#net.queue + 1] = { from = a, gone = "Ann Smith" }
+      net:run(2)
+      assert.is_false(b:rowFor(a).online)
+    end)
+
     it("words Last seen: online, or how long ago, and nothing on your own row", function()
       local net, clients = crew({ "Ann", "Bob" })
       local a, b = clients[1], clients[2]

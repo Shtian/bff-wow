@@ -13,6 +13,9 @@ return function()
     frames = {},
     lockdown = false,
     channels = {},
+    -- What UnitName("player") returns. On Forever a Character's last name
+    -- comes second, where retail puts the realm.
+    player = { "Me" },
   }
 
   local function schedule(delay, fn, interval)
@@ -79,7 +82,7 @@ return function()
     RemoveChatWindowChannel = function() end,
     NUM_CHAT_WINDOWS = 0,
     Ambiguate = function(name) return (name:gsub("%-.*$", "")) end,
-    UnitName = function() return "Me" end,
+    UnitName = function() return unpack(game.player) end,
     ERR_CHAT_PLAYER_NOT_FOUND_S = "No player named '%s' is currently playing.",
     ERR_TOO_MANY_CHAT_CHANNELS = "You can only be in %d channels at a time.",
     ChatFrame_AddMessageEventFilter = function(event, fn)

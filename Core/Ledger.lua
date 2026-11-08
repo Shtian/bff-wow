@@ -440,13 +440,18 @@ function Ledger:lastHeard(id)
 end
 
 -- Forgets having heard the Members owning a Character of this name, and
--- returns whether there were any.
+-- returns whether there were any. On Forever the channel names a Character
+-- "First Last" while records hold only the first name (UnitName's first
+-- value), so the first name matches too. Two Characters sharing one may
+-- both go offline until the other's next message.
 function Ledger:wentAway(name)
   local any = false
   local lower = name:lower()
+  local first = lower:match("^(%S+)%s") or lower
   for id, record in pairs(self.db.records) do
     for _, character in pairs(record.characters) do
-      if character.name:lower() == lower and self.db.heard[id] then
+      local own = character.name:lower()
+      if (own == lower or own == first) and self.db.heard[id] then
         self.db.heard[id] = nil
         any = true
       end
