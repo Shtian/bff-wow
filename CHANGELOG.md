@@ -8,6 +8,15 @@
 
 
 
+
+## 1.2.0
+<sub>2026-11-08</sub>
+
+- *(minor)*
+  Added `/bff debug sync`, a sync trace in chat: a timestamped line for each message sent and received (with its size, chunks and how late it arrived), the link going up or down and why, and Characters joining and leaving the Crew channel. Off by default, and off again after a reload. `/bff help` lists the commands.
+- *(minor)*
+  Fixed Crew updates lost on the way arriving up to 5 minutes late: a lost ding now comes back within about a minute, XP and gold reach friends within a minute, a failed send to one friend no longer stalls sync for everyone, and Crews of more than 10 Members compare every record over time.
+
 ## 1.1.0
 <sub>2026-11-07</sub>
 
