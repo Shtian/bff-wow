@@ -113,9 +113,14 @@ local function peerKey(name)
   return Ambiguate(name, "none"):lower()
 end
 
+-- On Forever UnitName gives a Character's last name second (where retail
+-- gives the realm), and the member list and whispers use "First Last".
 local function isSelf(name)
-  local me = UnitName("player")
-  return readable(me) and peerKey(name) == me:lower()
+  local first, last = UnitName("player")
+  if not readable(first) then return false end
+  local key = peerKey(name)
+  if key == first:lower() then return true end
+  return readable(last) and last ~= "" and key == (first .. " " .. last):lower()
 end
 
 -- Why the link is down, or nil while it can be up.
