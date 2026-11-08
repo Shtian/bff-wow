@@ -369,9 +369,10 @@ end
 -- name, zones }, lowest first), types (every type in the list's order:
 -- id, itemId (the item whose name and icon the game shows), items (every
 -- item ID that counts as it), name (English, for when the item isn't
--- cached), kind ("fish", "quest", "bloated", "family", "contest" or
--- "treasure"), waters (water ids, lowest first), extra (nil when it
--- counts, else why not: "season", "contest" or "unconfirmed"), count (the
+-- cached), kind ("fish", "quest", "bloated", "family", "contest",
+-- "treasure" or "notFish"), waters (water ids, lowest first), extra (nil
+-- when it counts, else why not: "season", "contest", "unconfirmed",
+-- "questItem" or "notFish"), count (the
 -- Crew's catches of it), note (a line for its tooltip, or nil), first
 -- (nil until caught) and others (every other Member who caught it, in
 -- the order they first did: memberId, displayName, own)) and unlisted

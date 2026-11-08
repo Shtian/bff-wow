@@ -182,7 +182,6 @@ local function createSection()
   frame.sub = Skin.label(frame, "small", DIM)
   frame.sub:SetPoint("TOPLEFT", INSET, -SECTION_PAD - HEADING)
   frame.sub:SetWordWrap(true)
-  frame.none = Skin.label(frame, "small", DIM)
   return frame
 end
 
@@ -485,15 +484,6 @@ local function drawSections(data, width)
     end
     local rows = math.ceil(#s.tiles / columns)
     local height = top + rows * (TILE + GAP_Y) + 4
-    if s.none then
-      frame.none:ClearAllPoints()
-      frame.none:SetPoint("TOPLEFT", INSET, -top + 2)
-      frame.none:SetText(s.none)
-      frame.none:Show()
-      height = top + frame.none:GetStringHeight() + 8
-    else
-      frame.none:Hide()
-    end
     frame:SetHeight(height)
     frame:Show()
     y = y - height

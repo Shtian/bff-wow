@@ -215,12 +215,17 @@ describe("Catches", function()
     it("never count Extras towards the types caught", function()
       local _, clients = crew({ "Ann" })
       local a = clients[1]
-      a.core:caught(catch(SUMMER_BASS, TASTYFISH))
+      -- Spotted Sunfish, Stranglekelp and Rumsey Rum Light: fished, but not fish.
+      a.core:caught(catch(SUMMER_BASS, TASTYFISH, 1467, 3820, 20709))
       local view = a.core:catches()
       assert.equal(0, view.caught)
+      assert.equal(0, #view.unlisted)
       assert.equal(1, typeOf(view, SUMMER_BASS).count)
       assert.equal("season", typeOf(view, SUMMER_BASS).extra)
       assert.equal("contest", typeOf(view, TASTYFISH).extra)
+      assert.equal("questItem", typeOf(view, 1467).extra)
+      assert.equal("notFish", typeOf(view, 3820).extra)
+      assert.equal("notFish", typeOf(view, 20709).extra)
     end)
 
     it("go out with the next send rather than right away", function()
