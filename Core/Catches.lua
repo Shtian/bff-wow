@@ -137,7 +137,7 @@ Catches.TYPES = {
   notFish(3820, "Stranglekelp", { W2, W3, W4, W5 }, "A herb, for Alchemy"),
   notFish(20709, "Rumsey Rum Light", { W2 }),
   notFish(21114, "Rumsey Rum Dark", { W3 }),
-  notFish(21151, "Rumsey Rum Black Label", { W4, W5 }),
+  notFish(21151, "Rumsey Rum Black Label", { W2, W4, W5 }),
   fish(251524, "Whimsyfin", { W2 }, "New on Forever. Reported in Redridge Mountains", "unconfirmed"),
   fish(13890, "Raw Plated Armorfish", { NEW }, "Forever adds a recipe for it. No one knows yet where it bites", "unconfirmed"),
   treasure(6356, "Battered Chest", { W2, W3 }),

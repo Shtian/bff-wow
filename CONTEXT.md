@@ -130,7 +130,7 @@ One entry in BFF's shipped list of what can be fished: a fish, a Nat Pagle quest
 _Avoid_: Kind, species, entry
 
 **Extra (Catch)**:
-A type that's shown but never counted towards the types caught, because not everyone can catch it any time: seasonal fish, the Sunday fishing contest's fish, quest items (Spotted Sunfish), what's fished but isn't a fish (Stranglekelp, rum), and anything not yet confirmed on Forever (treasure, Whimsyfin, Raw Plated Armorfish).
+A type that's shown but never counted towards the types caught, because not everyone can catch it any time: seasonal fish, the Sunday fishing contest's fish, fish that drop only for a quest outside Nat Pagle's (Spotted Sunfish), what's fished but isn't a fish (Stranglekelp, rum), and anything not yet confirmed on Forever (treasure, Whimsyfin, Raw Plated Armorfish).
 _Avoid_: Bonus, optional, rare
 
 **Unlisted catch**:

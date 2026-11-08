@@ -215,8 +215,8 @@ describe("Catches", function()
     it("never count Extras towards the types caught", function()
       local _, clients = crew({ "Ann" })
       local a = clients[1]
-      -- Spotted Sunfish, Stranglekelp and Rumsey Rum Light: fished, but not fish.
-      a.core:caught(catch(SUMMER_BASS, TASTYFISH, 1467, 3820, 20709))
+      -- Spotted Sunfish (a quest item), Stranglekelp and the three rums.
+      a.core:caught(catch(SUMMER_BASS, TASTYFISH, 1467, 3820, 20709, 21114, 21151))
       local view = a.core:catches()
       assert.equal(0, view.caught)
       assert.equal(0, #view.unlisted)
@@ -226,6 +226,8 @@ describe("Catches", function()
       assert.equal("questItem", typeOf(view, 1467).extra)
       assert.equal("notFish", typeOf(view, 3820).extra)
       assert.equal("notFish", typeOf(view, 20709).extra)
+      assert.equal("notFish", typeOf(view, 21114).extra)
+      assert.equal("notFish", typeOf(view, 21151).extra)
     end)
 
     it("go out with the next send rather than right away", function()
