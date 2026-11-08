@@ -119,6 +119,8 @@ Possible Forever oddities, all **to confirm**:
 - Poor-quality items with no known source, such as 271646 "How to Make Friend", 271647 "Once Used Shoe", 271648 "Ogre Tooth Cleaner" and 251523 "The Friends We Made Along the Way". Nothing ties them to fishing. Log them if they show up.
 - Fishing in wreckage and schools gives cloth and leather ([Warcraft Tavern](https://www.warcrafttavern.com/forever/guides/fishing/), *third party*). The exact items aren't known.
 
+**Seen on Forever (2026-11-08, first in-game fishing):** Spotted Sunfish (1467, a quest item; Wowhead Forever: fished in Redridge Mountains), Stranglekelp (3820, a herb) and Rumsey Rum Light (20709) came up as unlisted catches. Wowhead's Forever pages list where each is fished: Rumsey Rum Light in The Barrens, Loch Modan, Westfall, Darkshore and Silverpine Forest; Rumsey Rum Dark (21114) in Wetlands, Hillsbrad, Stonetalon and Ashenvale; Rumsey Rum Black Label (21151) in Stranglethorn, Tanaris, Azshara, Dustwallow, Feralas, Alterac, Desolace, Arathi and The Barrens; Stranglekelp in 17 zones from Loch Modan to Azshara. All five are now Extras.
+
 **Junk:** no source names a fishing junk item on Forever. Classic's open-water failure was "Your fish got away", not a junk item (**expected**).
 
 ### Not on Forever: fix in the prototype

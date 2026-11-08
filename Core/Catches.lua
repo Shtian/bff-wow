@@ -42,9 +42,10 @@ end)()
 -- for fish sold by weight (any of its items counts as it). name is the
 -- English name, for when the game hasn't the item cached; the game's name
 -- and icon come from the item ID. kind: "fish", "quest" (Nat Pagle's),
--- "bloated", "family", "contest" or "treasure". waters: lowest first.
--- extra: shown but never counted, and why: "season", "contest" or
--- "unconfirmed" (not confirmed on Forever yet). note: a line for the
+-- "bloated", "family", "contest", "treasure" or "notFish" (fished, but not
+-- a fish). waters: lowest first. extra: shown but never counted, and why:
+-- "season", "contest", "unconfirmed" (not confirmed on Forever yet),
+-- "questItem" (only while on its quest) or "notFish". note: a line for the
 -- tooltip, where there's something to know (where it bites, how to open it).
 local OPEN = "Right-click it to open it"
 local LOCKED = "Needs lockpicking"
@@ -68,6 +69,9 @@ local function contest(id, name)
 end
 local function treasure(id, name, waters, note)
   return { id = id, name = name, kind = "treasure", waters = waters, note = note, extra = "unconfirmed" }
+end
+local function notFish(id, name, waters, note)
+  return { id = id, name = name, kind = "notFish", waters = waters, note = note, extra = "notFish" }
 end
 
 Catches.TYPES = {
@@ -121,14 +125,19 @@ Catches.TYPES = {
   family("mightfish", "Mightfish (by weight)", "Mightfish", { 13914, 13915, 13916, 13917 }, { W5, W6 }),
   family("lobster", "Lobster (by weight)", "Lobster", { 13907, 13908, 13909, 13910, 13911, 13912, 13913 }, { W5, W6 }),
   family("salmon", "Salmon (by weight)", "Salmon", { 13901, 13902, 13903, 13904, 13905, 13906 }, { W6 }),
-  -- Extras: seasonal, the Sunday fishing contest, and not confirmed on
-  -- Forever yet.
+  -- Extras: seasonal, the Sunday fishing contest, a quest item, not a fish,
+  -- and not confirmed on Forever yet.
   fish(13756, "Raw Summer Bass", { W4, W5, W6 }, "Only in summer", "season"),
   fish(13755, "Raw Winter Squid", { W4, W5 }, "Only in winter", "season"),
   contest(19807, "Speckled Tastyfish"),
   contest(19805, "Keefer's Angelfish"),
   contest(19806, "Dezian Queenfish"),
   contest(19803, "Brownell's Blue Striped Racer"),
+  fish(1467, "Spotted Sunfish", { W2 }, "For a quest in Redridge Mountains", "questItem"),
+  notFish(3820, "Stranglekelp", { W2, W3, W4, W5 }, "A herb, for Alchemy"),
+  notFish(20709, "Rumsey Rum Light", { W2 }),
+  notFish(21114, "Rumsey Rum Dark", { W3 }),
+  notFish(21151, "Rumsey Rum Black Label", { W2, W4, W5 }),
   fish(251524, "Whimsyfin", { W2 }, "New on Forever. Reported in Redridge Mountains", "unconfirmed"),
   fish(13890, "Raw Plated Armorfish", { NEW }, "Forever adds a recipe for it. No one knows yet where it bites", "unconfirmed"),
   treasure(6356, "Battered Chest", { W2, W3 }),
@@ -535,6 +544,8 @@ local EXTRA_WHY = {
   season = "only in one season",
   contest = "only in the Sunday fishing contest",
   unconfirmed = "not confirmed on Forever yet",
+  questItem = "a quest item, only caught while on its quest",
+  notFish = "not a fish",
 }
 local UNLISTED_NOTE = "Not on BFF's list yet. Saved, so it can be added"
 local NAMES_LABEL = "Show names of fish not caught yet"
@@ -618,40 +629,39 @@ local function shows(show, t)
 end
 
 -- The sections before Show picks from them: each { title, sub, tiles,
--- extras, uncounted (its count is how many were caught) and always
--- (shown under All even when empty) }.
+-- extras and uncounted (its count is how many were caught) }.
 local function sectionsFor(group, tiles)
   local sections = {}
   if group == "type" then
     local fishes = { title = "Fish", tiles = {} }
     local rare = { title = "Rare catches", tiles = {} }
-    local unlisted = { title = "Not on the list yet", sub = "Not counted", tiles = {}, uncounted = true }
     for _, t in ipairs(tiles) do
-      if t.unlisted then
-        unlisted.tiles[#unlisted.tiles + 1] = t
-      elseif not t.extra then
+      if not t.unlisted and not t.extra then
         local s = t.category == "fish" and fishes or rare
         s.tiles[#s.tiles + 1] = t
       end
     end
     sections = { fishes, rare }
-    if #unlisted.tiles > 0 then sections[3] = unlisted end
   else
     local byWater = {}
     for i, w in ipairs(Catches.WATERS) do
-      sections[i] = { title = w.name, sub = table.concat(w.zones, ", "), tiles = {}, always = w.id == NEW }
+      sections[i] = { title = w.name, sub = table.concat(w.zones, ", "), tiles = {} }
       byWater[w.id] = sections[i]
     end
     for _, t in ipairs(tiles) do
-      if t.unlisted then
-        local s = byWater[NEW]
-        s.tiles[#s.tiles + 1] = t
-      elseif not t.extra then
+      if not t.unlisted and not t.extra then
         local s = byWater[t.water]
         s.tiles[#s.tiles + 1] = t
       end
     end
   end
+  -- Unlisted catches aren't placed in any water, since the list doesn't
+  -- know where they bite.
+  local unlisted = { title = "Not on the list yet", sub = "Not counted", tiles = {}, uncounted = true }
+  for _, t in ipairs(tiles) do
+    if t.unlisted then unlisted.tiles[#unlisted.tiles + 1] = t end
+  end
+  if #unlisted.tiles > 0 then sections[#sections + 1] = unlisted end
   local extras = { title = "Extras", sub = "Not counted", tiles = {}, extras = true, uncounted = true }
   for _, t in ipairs(tiles) do
     if t.extra then extras.tiles[#extras.tiles + 1] = t end
@@ -735,10 +745,10 @@ function Catches.tab(view, opts)
       for _, t in ipairs(s.tiles) do
         if (id ~= "extras" or s.extras) and shows(id, t) then shown[#shown + 1] = t end
       end
-      if #shown > 0 or (s.always and id == "all") then
+      if #shown > 0 then
         local count, n, got = counted(s)
         list[#list + 1] = { title = s.title, sub = s.sub, count = count, counted = n, got = got,
-          done = n ~= nil and got == n, tiles = shown, none = #shown == 0 and "Nothing caught here yet" or nil }
+          done = n ~= nil and got == n, tiles = shown }
       end
     end
     return list
