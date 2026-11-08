@@ -97,7 +97,7 @@ local function post(net, client, link, level)
 end
 
 -- Claims while the claimer's messages are lost, so the Claim reaches the
--- others only once it resends (refused()).
+-- others only once it resends (relink()).
 local function claimUnheard(net, client, owner, id)
   net.drop = function(_, from, to) return from == client.name and to ~= client.name end
   assert(client.core:claimSpare(owner.memberId, id))
@@ -106,7 +106,7 @@ local function claimUnheard(net, client, owner, id)
 end
 
 local function resend(net, client)
-  client:refused()
+  client:relink()
   net:run(10)
 end
 
@@ -542,12 +542,12 @@ describe("Spares", function()
       return (from == "Ann" and to == "Cid") or (from == "Cid" and to == "Ann")
     end
     local id = post(net, a)
-    b:refused()
+    b:relink()
     net:run(10)
     assert.is_table(crewRow(c, a, id))
     c.core:claimSpare(a.memberId, id)
     net:run(10)
-    b:refused()
+    b:relink()
     net:run(10)
     assert.equal(c.memberId, yourRow(a, id).winner.memberId)
   end)

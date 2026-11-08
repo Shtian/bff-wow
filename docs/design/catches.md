@@ -35,7 +35,7 @@ The in-game check ticket may correct the list (research §5).
 
 - A Member-level field `catches`: `{ [key] = { t, n, z, s, m, c } }`. `key` is the type's id (an item ID or a family's key), or the item ID of an unlisted catch. `t` is the first catch's time, `z`, `s` and `m` its zone, subzone and map ID, `c` the GUID of the Character who caught it, and `n` how many have been caught (each slot's quantity added). Later catches only add to `n`. Short names, since it rides every DATA.
 - **Unlisted catches** are kept the same way, under their item ID, so the list can grow: once a later release lists the item, the same entry counts. At most `Catches.UNLISTED_CAP` (50) are kept; a new one past it is dropped, while listed types and later catches of ones held still go in.
-- **"Later" urgency**, like professions and gold: a catch waits for the next send or the 5-minute heartbeat. A rare find is Feed news, so it goes out now.
+- **"Later" urgency**, like professions and gold: a catch rides the next send, at most a minute away. A rare find is Feed news, so it goes out now.
 
 ## Sharing and the shape check
 

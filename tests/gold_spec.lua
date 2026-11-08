@@ -21,17 +21,8 @@ local function feedSize(client)
   return n
 end
 
--- The messages `name` put on the wire since `from` (an index into net.wire).
-local function sentBy(net, from, name)
-  local messages = {}
-  for i = from + 1, #net.wire do
-    if net.wire[i].from == name then messages[#messages + 1] = net.wire[i] end
-  end
-  return messages
-end
-
 describe("Gold", function()
-  it("sends a gold-only change only along with the next send", function()
+  it("sends a gold-only change along with the next send, within a minute", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     a:play({ money = 5 * GOLD, level = 11 })
@@ -41,13 +32,18 @@ describe("Gold", function()
     a:play({ money = 6 * GOLD })
     assert.is_true(a:count("changed") > events)
     net:run(30)
-    assert.same({}, sentBy(net, mark, "Ann"))
+    assert.same({}, net:sent(mark, "Ann", "DATA"))
     assert.equal(5 * GOLD, b:rowFor(a).money)
 
     -- It rides along with the next send.
     a:play({ deaths = 1 })
     net:run(2)
     assert.equal(6 * GOLD, b:rowFor(a).money)
+
+    -- Or goes out on its own within a minute, without the heartbeat.
+    a:play({ money = 7 * GOLD })
+    net:run(61)
+    assert.equal(7 * GOLD, b:rowFor(a).money)
   end)
 
   it("reaches the rest of the Crew on the right Character, shown and Alt", function()

@@ -35,14 +35,6 @@ local function feedSize(client)
   return n
 end
 
-local function sentBy(net, from, name)
-  local messages = {}
-  for i = from + 1, #net.wire do
-    if net.wire[i].from == name then messages[#messages + 1] = net.wire[i] end
-  end
-  return messages
-end
-
 -- Each profession's name and skill/max, in order.
 local function summary(list)
   if list == nil then return nil end
@@ -189,7 +181,7 @@ describe("Professions", function()
       a:play({ professions = better })
       assert.is_true(a:count("changed") > events)
       net:run(30)
-      assert.same({}, sentBy(net, mark, "Ann"))
+      assert.same({}, net:sent(mark, "Ann", "DATA"))
       assert.equal(287, b:rowFor(a).professions[1].skill)
 
       a:play({ deaths = 1 })
