@@ -1542,7 +1542,7 @@ function Core:received(message)
       self.trace(("receive DIGEST from %s · ok%s · %s"):format(traceName(self, decoded.from),
         partial and " (more in turn)" or "", traceVersions(self, decoded.versions)))
     end
-    self.gossip:digestReceived(decoded.versions, partial)
+    self.gossip:digestReceived(decoded.versions, partial, decoded.turns == true)
   elseif decoded.type == "DATA" and type(decoded.records) == "table" then
     changed = dataReceived(self, decoded.records, decoded.from)
   elseif self.trace then

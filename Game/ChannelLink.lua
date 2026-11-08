@@ -24,8 +24,8 @@ local JOIN_TIMEOUT = 10
 -- longest wait.
 local LEAVE_DELAY = 3
 local LEAVE_MAX = 15
--- A "Player is offline." within this long of a failed send to a Character
--- (either way round) is about them.
+-- A "Player is offline." within this long after a failed send to one
+-- Character is about them.
 local OFFLINE_WINDOW = 3
 -- The channel's member list: how long to wait for the first reply before
 -- coming up anyway, how often to ask again, and how long a reply we asked
@@ -75,9 +75,10 @@ local strangers = {}
 -- "No player named ..." for them.
 local missed = {}
 -- Peers a send to failed: key -> GetTime() of the last failed chunk. And
--- when the last "Player is offline." came.
+-- when a "Player is offline." was last put down to one of them, so the
+-- chat filter hides it whether it runs before or after the event.
 local failedAt = {}
-local offlineAt
+local offlineMatched
 -- Upper-cased names of channels BFF is in or leaving, for the chat filter.
 local ours = {}
 
@@ -187,7 +188,6 @@ local function forgetPeers(why)
   if trace and next(peers) then trace(("peers cleared (%s)"):format(why)) end
   generation = generation + 1
   peers, strangers, missed, failedAt = {}, {}, {}, {}
-  offlineAt = nil
   listed = false
 end
 
@@ -322,26 +322,32 @@ local function notFound(text)
 end
 
 -- What the game says after a whisper to a Character who is offline,
--- according to the wiki. It doesn't name them: it's taken to be about a
--- peer a send failed to just before or after. Which text Forever prints is
--- unverified (see docs/research/addon-message-reliability.md).
+-- according to the wiki. Which text Forever prints is unverified (see
+-- docs/research/addon-message-reliability.md).
 local OFFLINE_TEXT = "Player is offline."
 
-local function recent(time)
-  return time ~= nil and GetTime() - time < OFFLINE_WINDOW
+local function isOffline(text)
+  return readable(text) and text == OFFLINE_TEXT
 end
 
--- "Player is offline." after a failed send of ours.
-local function isOurOffline(text)
-  if not readable(text) or text ~= OFFLINE_TEXT then return false end
-  for _, time in pairs(failedAt) do
-    if recent(time) then return true end
+-- The peer a "Player is offline." is about: it names no one, so only the
+-- one peer a send failed to just before, or nil if none or several (an
+-- account that can't send fails to everyone).
+local function offlinePeer()
+  local found
+  for key, time in pairs(failedAt) do
+    if GetTime() - time < OFFLINE_WINDOW and peers[key] then
+      if found then return nil end
+      found = key
+    end
   end
-  return false
+  return found
 end
 
 local function systemFilter(_, _, text)
-  return notFound(text) ~= nil or isOurOffline(text)
+  if notFound(text) ~= nil then return true end
+  return isOffline(text) and (offlinePeer() ~= nil
+    or (offlineMatched ~= nil and GetTime() - offlineMatched < OFFLINE_WINDOW))
 end
 
 -- "You can only be in %d channels at a time."
@@ -385,18 +391,15 @@ local function dropGone(key, why)
   core:gone(Ambiguate(name, "none"))
 end
 
-local function onOffline()
-  offlineAt = GetTime()
-  for key, time in pairs(failedAt) do
-    if recent(time) then dropGone(key, OFFLINE_TEXT) end
-  end
-end
-
 function events.CHAT_MSG_SYSTEM(text)
   onError(text)
-  if readable(text) and text == OFFLINE_TEXT then
-    if trace then trace("notice: " .. OFFLINE_TEXT) end
-    onOffline()
+  if isOffline(text) then
+    local key = offlinePeer()
+    if trace then trace(("notice: %s (%s)"):format(OFFLINE_TEXT, key and peers[key] or "not ours, or not clear whose")) end
+    if key then
+      offlineMatched = GetTime()
+      dropGone(key, OFFLINE_TEXT)
+    end
     return
   end
   -- Logged out, and the leave notice hasn't come (or won't).
@@ -461,16 +464,9 @@ end
 
 -- A send to one peer failed (a general error, a logout, lockdown, or an
 -- account that can't send addon messages): only they may have missed it,
--- so the link stays up and Core sends them a DIGEST of their own soon. If
--- "Player is offline." came just before, they logged out.
+-- so the link stays up and Core sends them a DIGEST of their own soon.
 local function onFailed(name)
-  local key = peerKey(name)
-  if not peers[key] then return end
-  if recent(offlineAt) then
-    dropGone(key, OFFLINE_TEXT)
-    return
-  end
-  core:sendFailed(Ambiguate(name, "none"))
+  if peers[peerKey(name)] then core:sendFailed(Ambiguate(name, "none")) end
 end
 
 -- AceComm's callback, once per chunk, with the name whispered to, the

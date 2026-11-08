@@ -14,5 +14,5 @@ We recover lost messages with DIGESTs, not per-message ACKs. 20–30 s after own
 
 - A lost update arrives within about 40 s while the link stays up, and anything else that differs is found within a minute.
 - More traffic when nothing is lost: about one DIGEST per friend per minute, plus one after each own DATA. In a Crew of 6 the busiest Member sends about 25 whispers a minute while grinding, well under the throttle (`docs/design/code-structure.md`, Sync).
-- No protocol bump: `partial` is a new optional field. Older clients ignore it, and a DIGEST without it means what it did before. Older clients still owe records missing from a full DIGEST, which only costs extra DATA.
+- No protocol bump: `partial` and `turns` are new optional fields. Older clients ignore them, and a DIGEST without them means what it did before. Older clients still owe every record a full DIGEST leaves out, so in a Crew of more than 10 each DIGEST costs a burst of DATA from each of them. While one is around, the every-minute DIGEST is skipped.
 - A record that just went out to everyone isn't owed to a DIGEST that crossed it, for 2 s. If it really was lost, the next DIGEST catches it.

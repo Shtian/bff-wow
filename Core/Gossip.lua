@@ -36,6 +36,10 @@ local RESYNC_GAP = 60
 -- way to whoever sent a DIGEST showing an older version, so it isn't owed
 -- to them again (a later DIGEST catches a loss).
 local IN_FLIGHT = 2
+-- An older BFF owes every record a DIGEST leaves out, so while one was
+-- heard this recently and the Crew has more records than a DIGEST holds,
+-- the every-minute DIGEST is skipped.
+local OLDER_MEMORY = 15 * 60
 -- Ten entries of id and version always fit one 255-byte message.
 local DIGEST_SIZE = 10
 
@@ -71,6 +75,8 @@ function Gossip.new(ledger, now, random, send, beforeOwnSend)
     everyDue = nil,
     -- The last id a DIGEST listed in turn.
     turn = nil,
+    -- When a DIGEST from an older BFF (no turns flag) last came.
+    olderHeard = nil,
     -- DIGESTs to single friends after a failed send: name -> when due, and
     -- name -> when the last one went out.
     resync = {},
@@ -105,7 +111,8 @@ end
 local function digest(self)
   local versions, partial, turn = self.ledger:digest(DIGEST_SIZE, self.turn, self.wanted)
   self.turn = turn
-  return { type = "DIGEST", versions = versions, partial = partial or nil }
+  -- turns marks a DIGEST from a BFF that knows partial.
+  return { type = "DIGEST", versions = versions, partial = partial or nil, turns = true }
 end
 
 local function sendDigest(self)
@@ -208,9 +215,11 @@ end
 
 -- A DIGEST from someone else: owe DATA for what we hold newer, and a DIGEST
 -- of our own if they hold something newer or unknown to us. partial says
--- their DIGEST left records out, so one it doesn't list isn't owed.
-function Gossip:digestReceived(versions, partial)
+-- their DIGEST left records out, so one it doesn't list isn't owed; turns
+-- says it came from a BFF that knows that (an older one never sends it).
+function Gossip:digestReceived(versions, partial, turns)
   local ledger = self.ledger
+  if not turns then self.olderHeard = self.now() end
   -- Their DIGEST fetches whatever ours was going to.
   if self.wanted then
     local covered = true
@@ -288,6 +297,15 @@ function Gossip:peerGone(name)
   if type(name) == "string" then self.resync[name] = nil end
 end
 
+-- Whether an older BFF is around and a DIGEST would leave records out,
+-- which it would answer with DATA for all of them.
+local function olderWouldFlood(self)
+  if not self.olderHeard or self.now() - self.olderHeard >= OLDER_MEMORY then return false end
+  local count = 0
+  for _ in self.ledger:records() do count = count + 1 end
+  return count > DIGEST_SIZE
+end
+
 -- Called once a second: sends whatever is due.
 function Gossip:tick()
   if not self.open then return end
@@ -298,6 +316,9 @@ function Gossip:tick()
       self.resynced[name] = now
       self.send(digest(self), name)
     end
+  end
+  if self.everyDue and now >= self.everyDue and olderWouldFlood(self) then
+    self.everyDue = now + between(self, EVERY_MIN, EVERY_MAX)
   end
   if (self.digestDue and now >= self.digestDue) or (self.confirmDue and now >= self.confirmDue)
       or (self.everyDue and now >= self.everyDue) then

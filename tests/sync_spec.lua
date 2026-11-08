@@ -613,4 +613,20 @@ describe("A Crew with a Member on an older BFF", function()
       assert.equal(40, clients[i]:rowFor(late).level, clients[i].name)
     end
   end)
+
+  it("keeps traffic under the throttle in a Crew of more than ten", function()
+    local old = legacyGossip()
+    local net, clients = bigCrew(14, { Member13 = { gossip = old }, Member14 = { gossip = old } })
+    net:run(140)
+    local mark = #net.wire
+    net:run(10 * 60)
+    for _, client in ipairs(clients) do
+      local whispers = 0
+      for _, message in ipairs(net:sent(mark, client.name)) do
+        local chunks = message.size <= 255 and 1 or math.ceil(message.size / 254)
+        whispers = whispers + chunks * (message.to and 1 or 13)
+      end
+      assert.is_true(whispers / 10 < 30, ("%s: %.1f whispers a minute"):format(client.name, whispers / 10))
+    end
+  end)
 end)
