@@ -59,7 +59,9 @@ describe("The sync trace", function()
     local sends = starting(lines, "send DIGEST")
     assert.equal(1, #sends)
     assert.truthy(sends[1]:find("· 2 versions ·", 1, true))
-    assert.truthy(sends[1]:find("%d+ B$"))
+    assert.truthy(sends[1]:find("%d+ B · "))
+    assert.truthy(sends[1]:find("Ann v%d+"))
+    assert.truthy(sends[1]:find("Bob v%d+"))
   end)
 
   it("reports a DATA received with its sender, result, versions and how late it is", function()
@@ -82,7 +84,7 @@ describe("The sync trace", function()
     assert.is_true(late >= 60 and late <= 62, line)
   end)
 
-  it("reports a DATA already held as not newer", function()
+  it("reports a DATA already held as not merged", function()
     local net, a, b = crew()
     local lines = trace(b)
 
@@ -99,7 +101,7 @@ describe("The sync trace", function()
 
     local merged = starting(lines, "receive DATA from Ann · ok")
     assert.truthy(merged[1]:find("merged", 1, true))
-    for i = 2, #merged do assert.truthy(merged[i]:find("not newer", 1, true), merged[i]) end
+    for i = 2, #merged do assert.truthy(merged[i]:find("not merged", 1, true), merged[i]) end
   end)
 
   it("reports a DIGEST received with the versions in it", function()

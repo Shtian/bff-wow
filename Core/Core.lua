@@ -80,7 +80,7 @@ local function sentLine(self, message, size)
   if message.type == "DIGEST" and type(message.versions) == "table" then
     local count = 0
     for _ in pairs(message.versions) do count = count + 1 end
-    return ("send DIGEST · %d versions · %d B"):format(count, size)
+    return ("send DIGEST · %d versions · %d B · %s"):format(count, size, traceVersions(self, message.versions))
   end
   local records = {}
   for i, record in ipairs(type(message.records) == "table" and message.records or {}) do
@@ -89,11 +89,12 @@ local function sentLine(self, message, size)
   return ("send %s · %d B · %s"):format(tostring(message.type), size, table.concat(records, ", "))
 end
 
--- The trace's line for a DATA record received: whether it was merged, and
+-- The trace's line for a DATA record received: whether it was merged (not
+-- when it isn't newer, is malformed or is from a removed Member), and
 -- how late it arrived (the time since its version, the server time it was
 -- written at).
 local function traceReceived(self, record, kept)
-  local line = traceRecord(self, record) .. (kept and " · merged" or " · not newer")
+  local line = traceRecord(self, record) .. (kept and " · merged" or " · not merged")
   if type(record) == "table" and type(record.version) == "number" then
     line = line .. (" · late %ds"):format(math.max(0, self.now() - record.version))
   end
@@ -1510,7 +1511,10 @@ function Core:received(message)
     end
     return
   end
-  if type(decoded) ~= "table" or type(decoded.from) ~= "string" then return end
+  if type(decoded) ~= "table" or type(decoded.from) ~= "string" then
+    if self.trace and not reason then self.trace(("receive · invalid (no sender) · %d B"):format(#message)) end
+    return
+  end
   if decoded.from == self.ledger:memberId() then
     if self.trace then self.trace(("receive %s from you · ignored"):format(tostring(decoded.type))) end
     return
@@ -1526,6 +1530,8 @@ function Core:received(message)
     self.gossip:digestReceived(decoded.versions)
   elseif decoded.type == "DATA" and type(decoded.records) == "table" then
     changed = dataReceived(self, decoded.records, decoded.from)
+  elseif self.trace then
+    self.trace(("receive %s from %s · ignored (unknown)"):format(tostring(decoded.type), traceName(self, decoded.from)))
   end
   if onlineChanged(self) or changed then self.listener("changed") end
 end

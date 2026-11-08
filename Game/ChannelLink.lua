@@ -113,24 +113,25 @@ local function isSelf(name)
   return readable(me) and peerKey(name) == me:lower()
 end
 
--- Why the link is down, for the trace.
+-- Why the link is down, or nil while it can be up.
 local function downReason()
   if not target then return "no Crew" end
   if not joined then return "not in the channel" end
   if not listed then return "waiting for the member list" end
   if lockdown() then return "lockdown" end
   if refused then return "refused send" end
-  return "?"
+  return nil
 end
 
 -- Tells Core whenever the link goes up or down. isUp is set first, since
 -- Core may react by changing the Crew, which comes back here. cause says
 -- what brought it up, for the trace.
 local function update(cause)
-  local up = target ~= nil and joined and listed and not lockdown() and not refused
+  local reason = downReason()
+  local up = reason == nil
   if up == isUp then return end
   isUp = up
-  if trace then trace(up and ("link up (%s)"):format(cause or "ready") or ("link down (%s)"):format(downReason())) end
+  if trace then trace(up and ("link up (%s)"):format(cause or "ready") or ("link down (%s)"):format(reason)) end
   if up then core:up() else core:down() end
 end
 
@@ -419,7 +420,7 @@ end
 -- Whoever joined or left during lockdown: ask again once it lifts.
 function events.ADDON_RESTRICTION_STATE_CHANGED(kind, state)
   if trace then trace(("chat restriction: type %s, state %s"):format(tostring(kind), tostring(state))) end
-  update("lockdown over")
+  update("chat restriction changed")
   tryJoin()
   askList()
 end
@@ -456,6 +457,7 @@ end
 -- in the channel yet, usually a Character who just joined, waits for a
 -- member list that shows them.
 local function onComm(_, message, distribution, sender)
+  if trace then trace(("%s from %s · %d B"):format(distribution, tostring(sender), #message)) end
   if distribution == "CHANNEL" then
     core:received(message)
     return
