@@ -74,7 +74,7 @@ luarocks --lua-version 5.1 --lua-dir "$(brew --prefix luajit)" --local install l
 scripts/check.sh    # luacheck, then busted; CI runs the same
 ```
 
-Design notes: [`docs/design/architecture.html`](docs/design/architecture.html).
+Design notes: [`docs/design/code-structure.md`](docs/design/code-structure.md) and the rest of `docs/design/`. [`docs/design/architecture.html`](docs/design/architecture.html) is the original draft, kept for history.
 
 ### Gallery images
 

@@ -22,7 +22,7 @@ How sure each answer is:
 1. Does `ENCOUNTER_END` fire for **dungeon** bosses? For **raid** bosses? For every boss, or only some?
 2. Are its values readable, or secret (`issecretvalue`)? `encounterID` and `success` are the ones BFF needs. Are `GetInstanceInfo()`'s instance type and ID readable at that moment?
 3. Can the party's `UnitGUID` and `UnitName` be read then? BFF matches party members to Members by GUID, then by name.
-4. What does `UnitName` return for a Forever Character with a last name?
+4. What does `UnitName` return for a Forever Character with a last name? **Answered 2026-11-08** for `"player"`: two values, `"Moorwyn", "Stormgaard"`, with the last name where retail puts the realm (`docs/research/addon-message-reliability.md`, Findings in game). BFF stores and compares the first value. Party units are not checked yet.
 5. The encounter ID, name and order of every boss in each instance, with the final one marked.
 6. Dire Maul's three wings and Stratholme's two sides: one instance in BFF's dungeon table each. Which kill should count as the clear (see below)?
 
