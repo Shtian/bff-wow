@@ -371,17 +371,29 @@ end
 
 -- The sync trace (/bff debug sync): off at every login and reload. Each
 -- line from Core and the channel link gets the time of day and GetTime().
+-- In a dev checkout the /bffdev console sets ns.traceSink(stamp, text): it
+-- shows the line in its log and returns true, else the line goes to chat.
 local syncTrace = false
 local function traceLine(text)
-  print(("|cff33ff99BFF|r |cff888888%s %.3f|r %s"):format(date("%H:%M:%S"), GetTime(), text))
+  local stamp = ("%s %.3f"):format(date("%H:%M:%S"), GetTime())
+  if ns.traceSink and ns.traceSink(stamp, text) then return end
+  print(("|cff33ff99BFF|r |cff888888%s|r %s"):format(stamp, text))
+end
+
+function ns.setSyncTrace(on)
+  syncTrace = on and true or false
+  local trace = syncTrace and traceLine or nil
+  ns.core:setTrace(trace)
+  ns.ChannelLink.setTrace(trace)
+end
+
+function ns.isSyncTraceOn()
+  return syncTrace
 end
 
 function commands.debug(rest)
   if rest:lower() ~= "sync" then return say("/bff debug sync turns the sync trace on or off.") end
-  syncTrace = not syncTrace
-  local trace = syncTrace and traceLine or nil
-  ns.core:setTrace(trace)
-  ns.ChannelLink.setTrace(trace)
+  ns.setSyncTrace(not syncTrace)
   say(syncTrace and "sync trace on. /bff debug sync turns it off." or "sync trace off.")
 end
 

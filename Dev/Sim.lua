@@ -11,7 +11,8 @@
 -- one that plays out a stretch of you being away so While you were away
 -- shows (with Reactions to your entries), one that reaches the next Crew
 -- deaths goal, one where simulated Members clear the next dungeon, and a
--- live log of what your Core sends, receives and fires. /bffdev toast [n]
+-- live log of what your Core sends, receives and fires (and the sync
+-- trace, with its Sync trace box). /bffdev toast [n]
 -- shows sample toasts. Also the encounter logger: every ENCOUNTER_END is
 -- printed and saved with what the game and BFF made of it, for
 -- docs/research/boss-kills.md (/bffdev encounters). Left out of releases;
@@ -669,13 +670,15 @@ local HEIGHT = 480
 local INSET = 12
 local ROW_HEIGHT = 28
 local BUTTON_WIDTH = 50
-local MAX_LINES = 1000
+-- Enough for an evening of the sync trace.
+local MAX_LINES = 5000
 
 local SENT = "ffd14a"
 local RECEIVED = "70e370"
 local EVENT = "8fb6ff"
 local LINK = "c0a0ff"
 local DIM = "8c8a99"
+local TRACE = "e0a070"
 
 -- The console buttons on each simulated Member's row, left to right.
 local BUTTONS = {
@@ -695,6 +698,14 @@ end
 local function log(text)
   if not frame then return end
   frame.log:AddMessage(color(DIM, date("%H:%M:%S")) .. "  " .. text)
+end
+
+-- The sync trace (/bff debug sync, or the console's Sync trace box) shows
+-- here instead of chat once the console has been opened, hidden or not.
+ns.traceSink = function(stamp, text)
+  if not frame then return false end
+  frame.log:AddMessage(color(DIM, stamp) .. "  " .. color(TRACE, "trace  ") .. text)
+  return true
 end
 
 -- A Member id as a name: you, a simulated Member, or whoever the panel
@@ -911,6 +922,11 @@ local function create()
     showChanged = self:GetChecked()
   end)
   changed:SetPoint("LEFT", frame.dungeon, "RIGHT", 12, 0)
+  frame.trace = Skin.checkbox(frame, "Sync trace", function(self)
+    ns.setSyncTrace(self:GetChecked())
+    log(color(DIM, ns.isSyncTraceOn() and "sync trace on" or "sync trace off"))
+  end)
+  frame.trace:SetPoint("LEFT", changed.label, "RIGHT", 12, 0)
 
   frame.empty = Skin.label(frame, "small", Skin.MUTED)
   frame.empty:SetPoint("TOPLEFT", INSET, top - 38)
@@ -946,6 +962,7 @@ local function create()
     if elapsedSince >= 0.5 then
       elapsedSince = 0
       refreshMembers()
+      frame.trace:SetChecked(ns.isSyncTraceOn())
     end
   end)
 end
@@ -955,6 +972,7 @@ function Console.open(core)
   if not frame then create() end
   watch(core)
   refreshMembers()
+  frame.trace:SetChecked(ns.isSyncTraceOn())
   frame:Show()
 end
 
