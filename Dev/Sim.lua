@@ -293,8 +293,8 @@ function Sim.start(core)
     local current = core:crew()
     return current ~= nil and current.code == code
   end
-  ns.ChannelLink.onSend = function(message)
-    if inSimCrew() then net:broadcast(you, message) end
+  ns.ChannelLink.onSend = function(message, to)
+    if inSimCrew() then net:broadcast(you, message, to) end
   end
   members = {}
   local current = members
@@ -762,9 +762,9 @@ local function watch(core)
 
   local link = core.link
   core.link = {
-    send = function(message)
-      log(color(SENT, "-> sent  ") .. (describe(message)))
-      return link.send(message)
+    send = function(message, to)
+      log(color(SENT, "-> sent  ") .. (describe(message)) .. (to and (" to " .. to) or ""))
+      return link.send(message, to)
     end,
   }
 

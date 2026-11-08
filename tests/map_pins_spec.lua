@@ -46,15 +46,6 @@ local function pinFor(client, other)
   return nil
 end
 
--- How many messages the client put on the wire since `from`.
-local function sentBy(net, client, from)
-  local n = 0
-  for i = from + 1, #net.wire do
-    if net.wire[i].from == client.name then n = n + 1 end
-  end
-  return n
-end
-
 describe("Map pins", function()
   it("show where another Member was last seen, and never yourself", function()
     local _, clients = crew({ "Ann", "Bob" })
@@ -91,14 +82,14 @@ describe("Map pins", function()
     assert.same({ 0, 1 }, { pin.x, pin.y })
   end)
 
-  it("don't send anything when a Member only moves; the move rides the heartbeat", function()
+  it("don't send DATA when a Member only moves; the move rides the heartbeat", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
 
     local mark = #net.wire
     b:move({ mapId = 1429, x = 0.5, y = 0.5 })
     net:run(HEARTBEAT - 30)
-    assert.equal(0, sentBy(net, b, mark))
+    assert.same({}, net:sent(mark, b.name, "DATA"))
     assert.equal(0.412, pinFor(a, b).x)
 
     net:run(60)

@@ -27,7 +27,7 @@ Core is created with:
 
 - `db`: the whole `BFF_DB` table. Core owns its layout, defaults and migrations, settings included.
 - `now()` and `random()`: the clock (`GetServerTime` in game) and randomness, so tests are deterministic.
-- `link`: the outgoing half of the link port (`send(string)`).
+- `link`: the outgoing half of the link port (`send(string, to)`).
 - `listener`: receives Core's events.
 - `initialLogin`: `isInitialLogin` from `PLAYER_ENTERING_WORLD`, so Core can tell a login from a reload (see `docs/design/feed.md`).
 - `maxLevel`: from `GetMaxLevelForPlayerExpansion()`, for max level Feed entries.
@@ -37,12 +37,13 @@ Core is created with:
 - `itemLook(itemId)` (optional): how the game shows an item, as `Skin.itemLook` reads it: `{ text, icon, edge }`, the name in its quality colour, the icon and the quality colour, each nil while it isn't cached. Rare finds use the English name until then (`docs/design/feed.md`).
 - `findItem(itemGuid)` (optional): where a posted item is now, as `Bags.findItem` reads it: whether it's in the bags or bank (nil if the game can't say), and whether it's equipped.
 - `finalBosses` (optional): encounter ID to instance name, the kills that are Clears. Defaults to `Core.FINAL_BOSSES`, from the dungeon table's `finals`; tests and the dev sim pass their own while Forever's IDs aren't known.
+- `gossip` (optional): the Gossip module to use. Only FakeNet passes one, for a client that syncs like an older BFF (`tests/fixtures/legacy_gossip.lua`).
 
 Inputs:
 
 - `updateOwn(character)`: the current state of the Character being played, from Snapshot.
 - `tick()`: once a second. Core decides what is due (reply delays, debounced sends, heartbeat, online timeouts, pruning), and counts the second towards Play times.
-- `received(string)`, `up()`, `down()` and `gone(name)`: the incoming half of the link port.
+- `received(string)`, `up()`, `down()`, `gone(name)` and `sendFailed(name)`: the incoming half of the link port.
 - `bagsUpdated()`: on each `BAG_UPDATE_DELAYED`, never before the first of a session. Core checks where each own Spare's item is (ADR 0004).
 - `caught(loot)`: on `LOOT_READY` (a loot window's catch once), from `Snapshot.catch`: `{ items, zone, subzone, mapId }`, or nil when the loot isn't from fishing. Each item goes into the own record as a Catch, shared with the next send, or now for a rare find, which makes a Feed entry. Types caught can reach a Crew goal step (`docs/design/catches.md`).
 - `encounterEnded(encounter)`: on `ENCOUNTER_END`, from `Snapshot.encounter`: `{ encounterId, success, instanceType, party }`. A known final boss killed in a party or raid instance, in a Crew, is a Clear in the own record (ADR 0005); returns the instance's name, or nil and why not (`docs/design/trophies.md`).
@@ -73,7 +74,7 @@ Outputs:
 These are internal seams: separate files for locality, tested only through Core's interface, with nothing swappable behind them.
 
 - **Ledger** (`Core/Ledger.lua`): what we know. Holds the own record and copies of everyone else's, the merge rule (a higher version wins), the Remove list, the "left" flag, last-heard times, and 180-day pruning. It stores and writes records (versions, the bump, what Gossip sends) and prunes on every own write, but never reads the Spares layout: the Spares module writes its part of the own record through `changeOwn`, and prunes it through the pruner it hands over with `pruneWith` at setup, since only Spares knows which Spares and Claims have ended. Removing a Member deletes their record and drops future copies. Re-adding takes them off the list and sends a DIGEST, and peers reply with DATA.
-- **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, XP piggyback, 5-minute heartbeat), the "record changed" and "reply owed" flags, and Pause.
+- **Gossip** (`Core/Gossip.lua`): when to talk. Owns the DIGEST and DATA rules, 1–4 s reply delays and suppression, send timing (immediate, 10 s zone debounce, "later" changes such as XP within 60 s, 5-minute heartbeat), the DIGESTs that recover lost messages (see Sync below), the "record changed" and "reply owed" flags, and Pause.
 - **Feed** (`Core/Feed.lua`): turns a before/after record pair from Ledger into Feed entries, including skipped versions such as 22 → 24. For others' "gave" entries it asks Spares (`Spares.newlyGiven`) what was newly Given between the two; your own come from Spares when you Give. Feed owns how a "gave" entry looks. Also owns the capped log, seen flags, and when While you were away is ready. See `docs/design/feed.md`.
 - **Reactions** (`Core/Reactions.lua`): the pure parts of Reactions: which Reaction each entry kind has, the key a Reaction points at an entry by, how keys are stored in a record and pruned, and the wording the owner sees. Feed attaches Reactions to its entries. See `docs/design/reactions.md`.
 - **Spares** (`Core/Spares.lua`, with `Core/SpareRules.lua`): the whole Spare lifecycle, and the only Spare interface Core uses. Owns posting, withdrawing and Giving, making and withdrawing Claims, expiry, who wins (ADR 0003), the item-gone state and bag check (ADR 0004), the item GUIDs of own Spares (local only), the Spares tab's rows, the Roster's count and the notices with their seen flags. Core's Spares commands only delegate to it. Behind it, SpareRules is a private file of stateless helpers: the trimmed item string, whether an item can be traded, how Spares and Claims are stored in records, the caps and pruning, the item-gone decision and the winner's tie-break. See `docs/design/spares.md`.
@@ -94,13 +95,25 @@ These are internal seams: separate files for locality, tested only through Core'
 
 This is the only real seam in v1. Its adapters are the channel link and the fake link. The retail spike (`docs/research/channel-spike.md`) showed the channel carrying addon messages, but on WoW: Forever they are accepted and never delivered, so the channel link sends over a whisper mesh: the channel says who is online, and each message is whispered to each of them.
 
-- Core → link: `send(string)`. **Best-effort**: a message can be lost silently, including messages ChatThrottleLib had queued when lockdown began.
+- Core → link: `send(string, to)`: to every other Character in the channel, or with `to` (a bare Character name) only to that one. **Best-effort**: a message can be lost silently, including messages ChatThrottleLib had queued when lockdown began. The channel link sends a one-chunk message (every DIGEST) at `ALERT` priority and anything longer at `NORMAL`, so chunks of two multi-chunk messages to the same friend never interleave.
 - Link → Core: `received(string)`, `up()`, `down()` and `gone(name)`. The sender's name is never passed with a message; identity travels inside the payload. Core drops messages carrying its own Member id (the fake link echoes your own messages back; whispers don't).
 - `gone(name)`: a Character left the channel, i.e. logged out (a real logout leaves the channel before any goodbye could be sent, so there is none). The name is bare (`Ambiguate(sender, "none")`). Core marks the Member owning a Character of that name offline right away; the 12-minute timeout stays as the fallback. It is only a presence hint, never used to identify data.
-- A send the game refuses (`AddonMessageThrottle`, `GeneralError`) makes the channel link call `down()`, and `up()` again 5 s later, so the rule below recovers it. The pause keeps a refusal that repeats (such as sends during a logout) from becoming a send loop.
+- `sendFailed(name)`: a chunk to that Character failed (anything but a throttle, which ChatThrottleLib retries itself: a general error, a logout, lockdown, or a Trial or Veteran account, which can't send addon messages since Forever 1.60.1). Only that friend may have missed something, so the link stays up, replies owed to others stay owed, and Core sends that friend a DIGEST of their own 5 s later (at most one a minute per friend, since an account that can't send fails every time). If "No player named …" or "Player is offline." follows (within 3 s, either way round, for the latter, which names no one), the channel link drops them from its peers and calls `gone(name)`.
 - Each adapter decides what "down" means. For the channel link it is `C_ChatInfo.InChatMessagingLockdown()`, or not yet in the Crew channel, or having left it, or the channel's first member list not in yet (at most 5 s). A Character found in the channel later (the list is asked for again every minute) makes it go `down()` and straight back `up()`, so they get a fresh DIGEST. A whisper from someone not yet known to be in the channel waits for a member list that shows them, and is dropped after 10 s otherwise.
-- On every `up()`, Core sends a fresh DIGEST, plus its own DATA if its record changed while the link was down. This one rule covers first join, rejoin, lockdown clearing, and lost sends.
-- Lockdown and Pause never appear in the port. Lockdown is the adapter's reason for being down. Pause is Core policy. Trial accounts send like any other (`docs/research/channel-spike.md`); don't gate sending on `AreOutgoingAddonChatMessagesRestricted()`, which the spike saw return true on accounts that sent fine.
+- On every `up()`, Core sends a fresh DIGEST, plus its own DATA if its record changed while the link was down. This rule covers first join, rejoin and lockdown clearing; the DIGESTs below cover messages lost while it is up.
+- Lockdown and Pause never appear in the port. Lockdown is the adapter's reason for being down. Pause is Core policy. Don't gate sending on `AreOutgoingAddonChatMessagesRestricted()`, which the spike saw return true on accounts that sent fine; a Trial or Veteran account's failed sends only cost it a DIGEST a minute per friend.
+
+## Sync: recovering lost messages
+
+A message is lost without anyone knowing: a lost chunk loses the whole DATA, and nothing tells the sender (`docs/research/addon-message-reliability.md`). There are no ACKs (ADR 0006). Instead DIGESTs go out on their own, and a friend who missed something sees it in one and asks:
+
+- **Confirming DIGEST:** 20–30 s after own DATA goes out, a DIGEST follows it. A friend who missed the DATA sees a newer version and replies with their own DIGEST, which makes the sender owe it. A lost ding arrives within about 40 s.
+- **Every minute:** while the link is up, a DIGEST goes out 55–65 s after the last one (any DIGEST to everyone restarts the wait, the confirming one included).
+- **After a failed send:** that friend gets a DIGEST of their own (`sendFailed`, above).
+- **"Later" changes** (XP, gold, Play times, professions, catches) go out within 60 s instead of waiting for the heartbeat.
+- **Taking turns:** a DIGEST holds 10 entries (one 255-byte message): the own record, then any ids a reply DIGEST is meant to fetch (with the version held, 0 if none, so whoever holds them replies), then the other records in turn by id, carrying on from where the last DIGEST stopped. In a Crew of more than 10 Members every record is listed within `ceil((Members − 1) / 9)` DIGESTs. One that left records out says `partial = true`, and a record it doesn't list isn't owed. Older clients ignore the flag (and owe whatever is missing, as before), and a DIGEST without it means what it always did, so mixed versions sync with no protocol bump.
+- **In flight:** a record that went out to everyone (sent, or heard as DATA) in the last 2 s isn't owed to a DIGEST showing an older version: that DIGEST most likely crossed it on the way. A later DIGEST catches a real loss.
+- **Traffic** (FakeNet, whispers sent a minute per Member, each chunk to each friend counted once; `BFF_TRAFFIC=1 busted tests/sync_spec.lua` prints them): a Crew of 4 idle, the busiest Member 4.5 (before this change 0.6); one Member grinding, 11.4 (2.1). A Crew of 6 idle, 7.5 (1.0); grinding, 25.0 (3.5). That is under one whisper every 2 s, against the server's allowance of about one addon message a second per prefix (which whispers outside instances may not even count) and ChatThrottleLib's 800 B/s.
 
 ## Loading pure code in game and in tests
 
@@ -115,18 +128,23 @@ Every file starts with `local _, ns = ...` and attaches itself to `ns`, the addo
   - One shared virtual clock and scheduler, so every run plays out the same way.
   - Each simulated client is a real Core with a fake link and its own `db`.
   - Per client: online or offline (link up or down), lockdown (link down while still online), Pause, reload (a new Core over the same `db`), and crash (a new Core over a copy of `db` taken at the last logout or reload).
-  - Delivery is a broadcast to every client whose link is up, after a small delay, with optional drops to test the best-effort contract.
+  - Delivery is a broadcast to every client whose link is up (or, with `to`, a whisper to one), after a small delay, with optional drops (`drop`: lost, no one told) and failed sends (`fail`: the sender hears `sendFailed`) to test the best-effort contract.
   Delivery includes the sender itself, as the real channel does. A client going offline fires `gone(name)` on the others; a crash can skip it.
   - Messages go through the real Codec.
 - **Scenarios** include:
   - C logs in after missing A's ding, learns it from B, and D stays quiet.
   - A crashes and its next version still wins.
   - Changes made during lockdown go out after one DIGEST when it clears.
-  - A lost message is recovered at the next `up()`.
+  - A lost message is recovered at the next `up()`, and a lost ding within a minute while it stays up.
+  - A failed send to one friend leaves the link up for the others and sends that friend a DIGEST of their own.
+  - XP and gold reach friends within a minute.
+  - In a Crew of 14, every record is listed in a DIGEST within two rounds, and records left out make no one send DATA.
+  - A Member on an older BFF (`tests/fixtures/legacy_gossip.lua`) syncs both ways, in a Crew of 3 and of 13.
+  - Traffic stays well under the throttle in a Crew of 4 and of 6.
   - A removed Member is never shown or relayed.
   - Someone going quiet flips to offline after 12 minutes.
   - Ten Members with three Characters each: the DIGEST fits one message.
-- **WoW stand-ins** (`tests/wow_stubs.lua`): only for Snapshot and the channel link. UI frames aren't tested offline.
+- **WoW stand-ins** (`tests/wow_stubs.lua`): only for the channel link (`channel_link_spec`: targeted sends, priorities, failed sends and "Player is offline."). The file is loaded with the stand-ins as its globals. UI frames aren't tested offline.
 - **In game:** `/bff sim` reuses FakeNet to attach a few simulated Members to your real Core, so the panel and Feed can be tested without a friend online. Their records are kept and relayed like real ones, so it only runs in a Crew where no one else is known yet. `/bff sim ding` makes one ding, `/bff sim stop` logs them out. The `.toc` lists `Dev/` inside `#@do-not-package@`, so releases don't load it. Echo mode on the channel link loops your own messages back to you.
 - **GitHub Actions** (`test.yml`) on every push and PR: `leafo/gh-actions-lua` (LuaJIT) and `leafo/gh-actions-luarocks`, `luarocks install busted luacheck`, fetch libraries, then `scripts/check.sh` (`luacheck`, then `busted`), the same command you run locally.
 

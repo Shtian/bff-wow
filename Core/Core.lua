@@ -75,12 +75,14 @@ local function traceVersions(self, versions)
   return table.concat(items, ", ")
 end
 
--- The trace's line for a message going out, `size` bytes encoded.
-local function sentLine(self, message, size)
+-- The trace's line for a message going out, `size` bytes encoded, to
+-- everyone or only the Character named `to`.
+local function sentLine(self, message, size, to)
   if message.type == "DIGEST" and type(message.versions) == "table" then
     local count = 0
     for _ in pairs(message.versions) do count = count + 1 end
-    return ("send DIGEST · %d versions · %d B · %s"):format(count, size, traceVersions(self, message.versions))
+    return ("send DIGEST%s · %d versions%s · %d B · %s"):format(to and (" to " .. to) or "", count,
+      message.partial and " (more in turn)" or "", size, traceVersions(self, message.versions))
   end
   local records = {}
   for i, record in ipairs(type(message.records) == "table" and message.records or {}) do
@@ -101,7 +103,8 @@ local function traceReceived(self, record, kept)
   return line
 end
 
--- deps: db, now(), random(), link (with send(string)), listener(event, ...),
+-- deps: db, now(), random(), link (with send(string, to): to everyone, or
+-- only the Character named to), listener(event, ...),
 -- initialLogin, maxLevel, utcOffset (seconds local time is ahead of server
 -- time, for the Feed's days; default 0) and locate() (optional: where the
 -- Character being played stands, read just before own DATA goes out; see
@@ -114,7 +117,8 @@ end
 -- bank, nil if the game can't say, and whether it's equipped; see
 -- Bags.findItem) and finalBosses (optional: encounter ID to instance name,
 -- default Core.FINAL_BOSSES; for tests and the dev sim, while Forever's
--- IDs aren't known).
+-- IDs aren't known) and gossip (optional: the Gossip module to use; for
+-- tests with a client that syncs like an older BFF).
 function Core.new(deps)
   for name, kind in pairs(required) do
     if type(deps[name]) ~= kind then
@@ -159,11 +163,12 @@ function Core.new(deps)
   -- Every message carries the sender's Member id. Where you stand is only
   -- read when own DATA goes out, so moving alone never sends anything.
   local locate = type(deps.locate) == "function" and deps.locate or nil
-  self.gossip = ns.Gossip.new(self.ledger, deps.now, deps.random, function(message)
+  local Gossip = type(deps.gossip) == "table" and deps.gossip or ns.Gossip
+  self.gossip = Gossip.new(self.ledger, deps.now, deps.random, function(message, to)
     message.from = self.ledger:memberId()
     local encoded = ns.Codec.encode(message)
-    if self.trace then self.trace(sentLine(self, message, #encoded)) end
-    self.link.send(encoded)
+    if self.trace then self.trace(sentLine(self, message, #encoded, to)) end
+    self.link.send(encoded, to)
   end, locate and function() self.ledger:locate(locate()) end)
   self.gossip:setPaused(self:isPaused())
   self.playTracker = ns.PlayTimes.new(deps.db, deps.now)
@@ -1462,7 +1467,16 @@ end
 -- A Character of this name left the channel, i.e. logged out: its Member
 -- shows offline right away.
 function Core:gone(name)
-  if type(name) == "string" and self.ledger:wentAway(name) then checkOnline(self) end
+  if type(name) ~= "string" then return end
+  self.gossip:peerGone(name)
+  if self.ledger:wentAway(name) then checkOnline(self) end
+end
+
+-- A send to the Character of this name failed: they may have missed it, so
+-- they get a DIGEST of their own shortly after. Sync with everyone else
+-- carries on.
+function Core:sendFailed(name)
+  if type(name) == "string" then self.gossip:sendFailed(name) end
 end
 
 local function dataReceived(self, records, from)
@@ -1523,11 +1537,12 @@ function Core:received(message)
   self.ledger:heard(decoded.from)
   local changed = false
   if decoded.type == "DIGEST" and type(decoded.versions) == "table" then
+    local partial = decoded.partial == true
     if self.trace then
-      self.trace(("receive DIGEST from %s · ok · %s"):format(traceName(self, decoded.from),
-        traceVersions(self, decoded.versions)))
+      self.trace(("receive DIGEST from %s · ok%s · %s"):format(traceName(self, decoded.from),
+        partial and " (more in turn)" or "", traceVersions(self, decoded.versions)))
     end
-    self.gossip:digestReceived(decoded.versions)
+    self.gossip:digestReceived(decoded.versions, partial)
   elseif decoded.type == "DATA" and type(decoded.records) == "table" then
     changed = dataReceived(self, decoded.records, decoded.from)
   elseif self.trace then

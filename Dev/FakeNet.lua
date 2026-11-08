@@ -48,10 +48,16 @@ function FakeNet.new(options)
     finalBosses = options.finalBosses,
     clients = {},
     queue = {},
-    -- Every message put on the wire: { from = name, message = string, time }.
+    -- Every message put on the wire: { from = name, message = string, time,
+    -- to = the Character name it was sent to, nil for everyone }.
     wire = {},
-    -- drop(message, from, to) returns true to lose a message on its way.
+    -- drop(message, from, to) returns true to lose a message on its way,
+    -- with no one told.
     drop = nil,
+    -- fail(message, from, to) returns true for a send the game fails: it
+    -- doesn't arrive, and the sender's Core hears sendFailed(to's
+    -- Character name), as from the channel link.
+    fail = nil,
   }, FakeNet)
 end
 
@@ -59,15 +65,36 @@ function FakeNet:now()
   return self.clock
 end
 
+-- The messages on the wire since `mark` (an index into wire), decoded, each
+-- with sender (the client's name), to and size (bytes encoded). Only those
+-- sent by the client named `name` and of type `kind`, if given.
+function FakeNet:sent(mark, name, kind)
+  local messages = {}
+  for i = mark + 1, #self.wire do
+    local item = self.wire[i]
+    local decoded = ns.Codec.decode(item.message)
+    if type(decoded) == "table" and (name == nil or item.from == name) and (kind == nil or decoded.type == kind) then
+      decoded.sender, decoded.to, decoded.size = item.from, item.to, #item.message
+      messages[#messages + 1] = decoded
+    end
+  end
+  return messages
+end
+
 -- Puts a message on the wire; it reaches every client whose link is up at
--- the next step, the sender included, as on the real channel.
-function FakeNet:broadcast(from, message)
-  self.wire[#self.wire + 1] = { from = from.name, message = message, time = self.clock }
-  self.queue[#self.queue + 1] = { from = from, message = message }
+-- the next step, the sender included, as on the real channel. With `to` (a
+-- Character name) it reaches only that client, as a whisper.
+function FakeNet:broadcast(from, message, to)
+  self.wire[#self.wire + 1] = { from = from.name, message = message, time = self.clock, to = to }
+  self.queue[#self.queue + 1] = { from = from, message = message, to = to }
 end
 
 local function isListening(client)
   return client.core ~= nil and client.linkUp
+end
+
+local function characterName(client)
+  return client.character and client.character.name or client.name
 end
 
 local function deliver(self, item)
@@ -75,8 +102,12 @@ local function deliver(self, item)
     if isListening(client) then
       if item.gone then
         if client ~= item.from then client.core:gone(item.gone) end
-      elseif not (self.drop and self.drop(item.message, item.from.name, client.name)) then
-        client.core:received(item.message)
+      elseif item.to == nil or characterName(client) == item.to then
+        if client ~= item.from and self.fail and self.fail(item.message, item.from.name, client.name) then
+          if item.from.core then item.from.core:sendFailed(characterName(client)) end
+        elseif not (self.drop and self.drop(item.message, item.from.name, client.name)) then
+          client.core:received(item.message)
+        end
       end
     end
   end
@@ -106,7 +137,8 @@ end
 -- or instance; default nowhere known) and utcOffset (seconds its local time
 -- is ahead of server time, default 0) and bags (where each item GUID is,
 -- as Bags.findItem reads it: "bags" for the bags or bank, "equipped", or
--- nil when it has left; default empty).
+-- nil when it has left; default empty) and gossip (the Gossip module its
+-- Core uses, for a client that syncs like an older BFF; default Core's).
 function FakeNet:add(name, options)
   options = options or {}
   local client = setmetatable({
@@ -117,6 +149,7 @@ function FakeNet:add(name, options)
     utcOffset = options.utcOffset,
     location = copy(options.location),
     bags = copy(options.bags) or {},
+    gossip = options.gossip,
     bagReads = 0,
     character = copy(options.character) or {
       guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
@@ -156,10 +189,11 @@ local function newCore(client, initialLogin)
     now = function() return net.clock end,
     random = client.random,
     link = {
-      send = function(message)
-        if client.core and client.linkUp then net:broadcast(client, message) end
+      send = function(message, to)
+        if client.core and client.linkUp then net:broadcast(client, message, to) end
       end,
     },
+    gossip = client.gossip,
     listener = function(...) client.events[#client.events + 1] = { ... } end,
     initialLogin = initialLogin,
     maxLevel = net.maxLevel,
@@ -239,8 +273,9 @@ function Client:lockdown(on)
   return self
 end
 
--- A send the game refused: the link goes down and straight back up.
-function Client:refused()
+-- The link goes down and straight back up, as when the channel link finds
+-- a new Character in the member list: a fresh DIGEST goes out.
+function Client:relink()
   self.linkUp = false
   self.core:down()
   bringUp(self)

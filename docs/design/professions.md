@@ -15,7 +15,7 @@ Each Character's own client shares its professions and skill in its record, like
 ## Sharing
 
 - A per-Character field `professions` in the record: a list of up to 5 `{ id, n, i, k, m, s }` (skill line ID, name, icon, skill, max skill, `s = true` for a secondary). Short names, since it rides every DATA. An empty list means the Character has none; no field means its client never shared them.
-- **"Later" urgency**, like gold and XP: a professions-only change waits for the next send or the 5-minute heartbeat. Reading the same list again isn't a change.
+- **"Later" urgency**, like gold and XP: a professions-only change rides the next send, at most a minute away. Reading the same list again isn't a change.
 - **Shape check:** a malformed list (not a list, more than 5 entries, or any entry with a missing or wrong field) is ignored for that Character, which then shows as unknown. The record itself isn't checked for it, so the rest is kept, and the list is relayed unchanged, as older clients relay a field they don't know.
 - A professions-only change that crosses a milestone, or picks up a profession, makes a Feed entry and goes out right away instead (#99, see Feed entries below).
 

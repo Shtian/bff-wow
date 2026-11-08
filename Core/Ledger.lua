@@ -315,25 +315,49 @@ function Ledger:records()
   return pairs(self.db.records)
 end
 
--- Up to `limit` Member ids and versions: the own one first, then the most
--- recently written.
-function Ledger:digest(limit)
+-- Up to `limit` Member ids and versions: the own one first, then each id in
+-- `ask` (a set of ids, listed with the version held, 0 if none, so whoever
+-- holds them newer replies), then the other records in turn by id, starting
+-- after the id `after`. Returns the versions, whether any record was left
+-- out, and the last id listed in turn (`after` again if none was), to pass
+-- as `after` next time, so every record is listed within a few DIGESTs.
+function Ledger:digest(limit, after, ask)
   local own = self:own()
-  local others = {}
-  for _, record in pairs(self.db.records) do
-    if record ~= own then others[#others + 1] = record end
+  local versions, count = {}, 0
+  local function add(id, version)
+    if count < limit and versions[id] == nil then
+      versions[id] = version
+      count = count + 1
+    end
   end
-  table.sort(others, function(a, b)
-    if a.version ~= b.version then return a.version > b.version end
-    return a.id < b.id
-  end)
-  local versions = {}
-  if own then
-    versions[own.id] = own.version
-    limit = limit - 1
+  if own then add(own.id, own.version) end
+  local asked = {}
+  for id in pairs(ask or {}) do asked[#asked + 1] = id end
+  table.sort(asked)
+  for _, id in ipairs(asked) do add(id, self:version(id)) end
+
+  local ids = {}
+  for id, record in pairs(self.db.records) do
+    if record ~= own then ids[#ids + 1] = id end
   end
-  for i = 1, math.min(limit, #others) do versions[others[i].id] = others[i].version end
-  return versions
+  table.sort(ids)
+  local start = 1
+  if after then
+    while start <= #ids and ids[start] <= after do start = start + 1 end
+  end
+  local last, partial = after, false
+  for i = 0, #ids - 1 do
+    local id = ids[(start - 1 + i) % #ids + 1]
+    if versions[id] == nil then
+      if count >= limit then
+        partial = true
+        break
+      end
+      add(id, self.db.records[id].version)
+      last = id
+    end
+  end
+  return versions, partial, last
 end
 
 local function isText(value) return type(value) == "string" end

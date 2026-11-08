@@ -171,7 +171,7 @@ describe("Reactions", function()
     assert.equal("You joined the Crew", entries(c)[1].text)
 
     net.drop = nil
-    c:refused()
+    c:relink()
     net:run(10)
     assert.same({ "Bob" }, reactors(c, "Ann dinged 11"))
   end)
