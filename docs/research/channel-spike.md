@@ -34,6 +34,6 @@ Applied in `docs/design/code-structure.md`:
 2. The "left channel" notice is an instant offline signal; the 12-minute timeout stays as the fallback.
 3. The channel link filters the Crew channel's system notices out of chat.
 4. Core ignores messages carrying its own Member id; echo mode is the link not dropping them.
-5. A send refused with `AddonMessageThrottle` or `GeneralError` makes the link go `down()` and straight back `up()`, so Core's usual "on `up()`, send a fresh DIGEST and own DATA if changed" rule recovers it.
-6. No receive-only mode: Trial accounts send like any other. (BFF first made Trial and Veteran accounts receive-only, from a misread of this spike; removed once the Trial account was confirmed.)
+5. A send refused with `AddonMessageThrottle` or `GeneralError` makes the link go `down()` and straight back `up()`, so Core's usual "on `up()`, send a fresh DIGEST and own DATA if changed" rule recovers it. **Superseded in v1.2.0 (#146):** a failed send no longer takes the link down. Only that friend gets a DIGEST (`docs/design/code-structure.md`, the link port).
+6. No receive-only mode: Trial accounts send like any other. (BFF first made Trial and Veteran accounts receive-only, from a misread of this spike; removed once the Trial account was confirmed.) **Possibly outdated:** the wiki's patch history says Forever 1.60.1 (2026-11-04) stopped Trial and Veteran accounts sending addon messages. Not checked in game.
 7. On retail a Crew needs one faction and one realm (connected realms untested). Forever's rulesets need re-checking at launch.

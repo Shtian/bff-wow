@@ -77,7 +77,7 @@ Slash commands do the same without the panel:
 
 The default display name for slash commands is the current Character's name, as in the setup view. It can also be changed in Settings. Changing it writes your own record, so it spreads like any other change.
 
-**Trial accounts** start and join like any other. Since Forever 1.60.1 (2026-11-04) Trial and Veteran accounts can't send addon messages, so they only receive: their failed sends never take the link down for anyone, and cost at most a DIGEST a minute per friend (`docs/design/code-structure.md`, the link port). (#8 first made them receive-only on purpose; the channel spike's Trial account sent fine before 1.60.1.)
+**Trial accounts** start and join like any other. Since Forever 1.60.1 (2026-11-04) Trial and Veteran accounts can't send addon messages (per the wiki's patch history; not checked in game), so they only receive: their failed sends never take the link down for anyone, and cost at most a DIGEST a minute per friend (`docs/design/code-structure.md`, the link port). (#8 first made them receive-only on purpose; the channel spike's Trial account sent fine before 1.60.1.)
 
 ## Leaving
 
