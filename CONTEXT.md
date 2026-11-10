@@ -84,7 +84,7 @@ A small on-screen notice for a Live event, with an optional sound. Shows the sam
 _Avoid_: Popup, alert, notification (when meaning a toast)
 
 **Tip**:
-A one-time card at the top of the panel offering a feature that's off by default, with a button to turn it on and one to dismiss it. Once answered, it never shows again on any Character of the account.
+A one-time offer of a feature that's off by default, with a button to turn it on and one to dismiss it: a small window the first time, and a card at the top of the panel until it's answered. Once answered, it never shows again on any Character of the account.
 _Avoid_: Toast (for a Tip), notice, announcement, what's new
 
 **Play times**:

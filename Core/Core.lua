@@ -736,6 +736,18 @@ local function awaySummary(self)
   self.listener("changed")
 end
 
+-- Offers the Tip there is, the first time there is one: the tip event,
+-- with tip()'s Tip, for a window of its own. Once per Tip on the account,
+-- answered or not; after that it only shows in the panel.
+local function offerTip(self)
+  local tip = self:tip()
+  local offered = self.db.tipsOffered
+  if not tip or (offered and offered[tip.key]) then return end
+  self.db.tipsOffered = offered or {}
+  self.db.tipsOffered[tip.key] = true
+  self.listener("tip", tip)
+end
+
 -- Called once a second. Core decides what is due.
 function Core:tick()
   -- Counts the second played.
@@ -749,6 +761,7 @@ function Core:tick()
     self.listener("changed")
   end
   if self.db.crew then self.spareLife:tick() end
+  offerTip(self)
   -- A fishing spell ended: the Pocket Camp redraws.
   if fishingEnded(self) and pocketCampOn(self) then self.listener("changed") end
   checkOnline(self)
@@ -1276,12 +1289,15 @@ end
 
 -- Tips: one-time cards at the top of the panel, each offering a feature
 -- that's off by default. In order; the panel shows the first unanswered
--- one. key names it in the saved answers, text is the card's, setting is
--- the on/off setting Turn on turns on, and needs (optional) a setting that
--- must be on for the Tip to show. Adding the next one is an entry here.
+-- one, and the first time there is one it's also offered in a window of
+-- its own (the tip event). key names it in the saved answers, title is the
+-- window's, text is the card's and the window's, setting is the on/off
+-- setting Turn on turns on, and needs (optional) a setting that must be on
+-- for the Tip to show. Adding the next one is an entry here.
 local TIPS = {
   {
     key = "pocketCamp", setting = "pocketCamp", needs = "camp",
+    title = "New: the Pocket Camp",
     text = "Keep your Crew on screen. The Pocket Camp shows the fire and who's by it while you play. "
       .. "You can turn it on or off any time in Settings.",
   },
@@ -1326,8 +1342,8 @@ function Core:setSetting(key, value)
 end
 
 -- The Tip to show at the top of the panel: the first unanswered one,
--- ready to render ({ key, text, accept, dismiss }: the card's text and its
--- two buttons' labels), or nil when there's none, or outside a Crew. A Tip
+-- ready to render ({ key, title, text, accept, dismiss }: the window's
+-- title, the text and the two buttons' labels), or nil when there's none, or outside a Crew. A Tip
 -- is answered by acceptTip() or dismissTip(), or by its feature having
 -- been turned on in Settings, and then never shows again on the account.
 function Core:tip()
@@ -1335,11 +1351,12 @@ function Core:tip()
   local answered = self.db.tipsAnswered or {}
   for _, tip in ipairs(TIPS) do
     if not answered[tip.key] and not self:setting(tip.setting) and (not tip.needs or self:setting(tip.needs)) then
-      return { key = tip.key, text = tip.text, accept = "Turn on", dismiss = "No thanks" }
+      return { key = tip.key, title = tip.title, text = tip.text, accept = "Turn on", dismiss = "No thanks" }
     end
   end
   return nil
 end
+
 
 -- Turn on: answers the Tip and turns its feature on. Returns true, or
 -- false for a key that isn't a Tip.

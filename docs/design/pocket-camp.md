@@ -93,17 +93,18 @@ All account-wide. With `camp` off the Pocket Camp never shows, whatever its own 
 
 ## Tips
 
-A **Tip** is a one-time card at the top of the panel offering a feature that's off by default. Core holds an ordered list, `TIPS` in `Core/Core.lua`, each `{ key, text, setting, needs }`: `setting` is the on/off setting Turn on turns on, and `needs` (optional) a setting that must be on for the Tip to show. Adding the next opt-in feature is one entry.
+A **Tip** is a one-time offer of a feature that's off by default: a small window the first time, then a card at the top of the panel until it's answered. Core holds an ordered list, `TIPS` in `Core/Core.lua`, each `{ key, title, text, setting, needs }`: `setting` is the on/off setting Turn on turns on, and `needs` (optional) a setting that must be on for the Tip to show. Adding the next opt-in feature is one entry.
 
-- `tip()` returns the first unanswered Tip ready to render, `{ key, text, accept = "Turn on", dismiss = "No thanks" }`, or nil when there's none or outside a Crew. Only one shows at a time.
+- `tip()` returns the first unanswered Tip ready to render, `{ key, title, text, accept = "Turn on", dismiss = "No thanks" }`, or nil when there's none or outside a Crew. Only one shows at a time.
 - `acceptTip(key)` answers the Tip and turns its setting on (`settingChanged`, then `changed`). `dismissTip(key)` only answers it (`changed`). Both return false for a key that isn't a Tip.
 - Answered keys are saved account-wide in `tipsAnswered`, so the card never comes back after a `/reload` or on another Character.
 - A feature turned on in Settings answers its Tip too (in `setSetting`), so it never shows, even if the feature is turned off again later.
+- **The window.** On the first `tick()` where `tip()` has a Tip that hasn't been offered, Core fires the listener event `tip(tip)` and saves the key in `tipsOffered`, account-wide. So it fires once per Tip: at the first login or `/reload` after the update, or later, once the player is in a Crew. App shows it with `UI/TipDialog.lua` (after combat, if in combat): a small Skin window near the top of the screen titled "New: the Pocket Camp", with the text and the same two buttons. Closing it with the X or Escape answers nothing, so the card stays in the panel, and the window never comes back. It closes by itself if the Tip is answered elsewhere.
 - The Pocket Camp's Tip needs `camp` on, since the Pocket Camp can't show without it. It waits rather than being answered.
 
 The one Tip so far: "Keep your Crew on screen. The Pocket Camp shows the fire and who's by it while you play. You can turn it on or off any time in Settings."
 
-Panel draws it as a card across the window under the Camp band, above the sidebar and every tab (`drawTip` in `UI/Panel.lua`): the text on the left, **Turn on** and **No thanks** on the right, as high as its text. It's not a Toast or a chat line, plays no sound, and only exists while the panel is open. There is no control to show Tips again.
+Panel draws it as a card across the window under the Camp band, above the sidebar and every tab (`drawTip` in `UI/Panel.lua`): the text on the left, **Turn on** and **No thanks** on the right, as high as its text. A Tip is not a Toast or a chat line and plays no sound. (#161 asked for the card only; the window was added so players notice the feature without opening the panel.) There is no control to show Tips again.
 
 ## Tests
 
@@ -121,4 +122,5 @@ None of the rendering has run in a client, and the new sprites were authored as 
 - Each pose and animation reads at size: the rod towards the fire on both sides, the sword, star, fish, smoke, burst and flare. The star and fish sit where the name is for a moment.
 - No measurable CPU cost while it's hidden.
 - The Tip card at the panel's narrowest (460) and with the short Camp band.
+- The Tip window at first login: its place next to While you were away, which opens a little later, and that it waits for combat to end.
 - The Settings slider's thumb and track on Forever's Settings page.

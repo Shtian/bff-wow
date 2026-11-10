@@ -81,7 +81,7 @@ Display name isn't in the list: it's part of your Member record and spreads to t
 
 The panel's size and position (`panelPlace`, #109) is saved through Core, not the game's window-layout cache, which is applied before the panel is created. `setPanelPlace(width, height, left, top)` saves where a move or resize left it, `resetPanelPlace()` goes back to the default, and `panelPlace(screenWidth, screenHeight)` says where it opens on this screen: shrunk to fit and moved onto it, with nil `left` and `top` for centred. The grip in the panel's bottom right corner resizes it (double-click resets), and the Settings page has Reset BFF window under Notifications and display, greyed out while the panel is at its default.
 
-Answered **Tips** (`docs/design/pocket-camp.md`) are saved beside the settings, as `tipsAnswered = { [key] = true }`, account-wide. There is no control to show them again.
+Answered **Tips** (`docs/design/pocket-camp.md`) are saved beside the settings, as `tipsAnswered = { [key] = true }`, account-wide, and those already offered in a window as `tipsOffered`. There is no control to show them again.
 
 Core also decides where each Live event goes: `feedEntry`, `reaction` and `spare` carry `outlets = { chat, toast }` from the chat-line and toast settings, and App shows them as told. With both off nothing is announced or marked seen, so they wait for While you were away.
 

@@ -396,7 +396,41 @@ describe("Tips", function()
 
   it("offers the Pocket Camp once, worded, with its two buttons", function()
     local a = inCrew()
-    assert.same({ key = "pocketCamp", text = TEXT, accept = "Turn on", dismiss = "No thanks" }, a.core:tip())
+    assert.same({ key = "pocketCamp", title = "New: the Pocket Camp", text = TEXT, accept = "Turn on",
+      dismiss = "No thanks" }, a.core:tip())
+  end)
+
+  it("offers it in a window once on the account, the first time there is one", function()
+    local net = load().FakeNet.new()
+    local a = net:add("Ann"):login()
+    net:run(5)
+    -- Outside a Crew there's no Tip to offer yet.
+    assert.equal(0, a:count("tip"))
+    a:join()
+    net:run(5)
+    assert.equal(1, a:count("tip"))
+    local offered
+    for _, event in ipairs(a.events) do
+      if event[1] == "tip" then offered = event[2] end
+    end
+    assert.same(a.core:tip(), offered)
+    -- Left unanswered, it stays in the panel but isn't offered again.
+    a:reload()
+    net:run(5)
+    a:logout()
+    a:login()
+    net:run(5)
+    assert.equal(1, a:count("tip"))
+    assert.equal("pocketCamp", a.core:tip().key)
+  end)
+
+  it("offers nothing once the Pocket Camp is already on", function()
+    local net = load().FakeNet.new()
+    local a = net:add("Ann"):login()
+    a.core:setSetting("pocketCamp", true)
+    a:join()
+    net:run(5)
+    assert.equal(0, a:count("tip"))
   end)
 
   it("shows no Tip outside a Crew", function()
