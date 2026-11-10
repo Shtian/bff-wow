@@ -246,4 +246,33 @@ describe("The channel link", function()
     game.fire("ADDON_RESTRICTION_STATE_CHANGED", 1, 1)
     assert.same({ up = false, reason = "lockdown", peers = 2, instance = "party", lockdown = true }, link.state())
   end)
+
+  -- Channel notice arguments: text, sender, language, arg 4 (channel name),
+  -- ..., arg 8 (channel index), arg 9 (base name).
+  local function notice(sender, arg4, index, base)
+    return "", sender, "", arg4, sender, "", 0, index, base
+  end
+
+  it("traces every join and leave notice with its channel arguments, for any channel", function()
+    local game, link = linked()
+    local lines = {}
+    link.setTrace(function(line) lines[#lines + 1] = line end)
+    game.fire("CHAT_MSG_CHANNEL_LEAVE", notice("Bob", "7. Friends", 7, "Friends"))
+    game.fire("CHAT_MSG_CHANNEL_JOIN", notice("Dan", "5", 5, ""))
+    game.fire("CHAT_MSG_CHANNEL_LEAVE", notice("Cat-Realm", "5. " .. CHANNEL, 5, CHANNEL))
+    assert.same({
+      'channel leave: Bob · arg 4 "7. Friends" · arg 8 7 · arg 9 "Friends" (other channel)',
+      'channel join: Dan · arg 4 "5" · arg 8 5 · arg 9 "" (other channel)',
+      'channel leave: Cat-Realm · arg 4 "5. ' .. CHANNEL .. '" · arg 8 5 · arg 9 "' .. CHANNEL .. '" (Crew channel)',
+      "peer removed: Cat-Realm (left the channel)",
+    }, lines)
+  end)
+
+  it("traces secret channel arguments without reading them", function()
+    local game, link = linked()
+    local lines = {}
+    link.setTrace(function(line) lines[#lines + 1] = line end)
+    game.fire("CHAT_MSG_CHANNEL_LEAVE", notice(game.secret(), game.secret(), game.secret(), nil))
+    assert.same({ "channel leave: secret · arg 4 secret · arg 8 secret · arg 9 nil (other channel)" }, lines)
+  end)
 end)
