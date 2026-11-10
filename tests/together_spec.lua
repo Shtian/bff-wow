@@ -227,14 +227,17 @@ describe("Together", function()
     it("show a dot per Member who fits, their Character closest to your level", function()
       local net, clients = crew({ { "Gahz", 24 }, { "Simba", 25 }, { "Simbad", 29 }, { "Simone", 41 } })
       playAlt(net, clients[3], "Simbalt", 23)
+      clients[2]:play({ lastName = "Stormgaard" })
+      -- A last name alone goes out with the next unhurried DATA.
+      net:run(70)
       local bar = barFor(clients[1].core:together(), "Shadowfang Keep")
       assert.equal(2, #bar.dots)
       local fitters = {}
       for i, fitter in ipairs(bar.tooltip.fitters) do
-        fitters[i] = ("%s %s %d"):format(fitter.member, fitter.name, fitter.level)
+        fitters[i] = ("%s %s %d"):format(fitter.member, fitter.fullName, fitter.level)
       end
       table.sort(fitters)
-      assert.same({ "Simba Simba 25", "Simbad Simbalt 23" }, fitters)
+      assert.same({ "Simba Simba Stormgaard 25", "Simbad Simbalt 23" }, fitters)
     end)
 
     it("say who fits but is far from you, and who is almost there", function()

@@ -156,6 +156,27 @@ describe("Your own Character", function()
     assert.same({ { name = "Thrallbane", classFilename = "WARRIOR", level = 5 } }, alts(rows[1]))
   end)
 
+  it("names a Character by first and last name, and by the first alone without one", function()
+    local deps = newDeps()
+    local core = load().Core.new(deps)
+    core:updateOwn(character())
+    assert.equal("Thrallbane", core:rows()[1].fullName)
+
+    core:updateOwn(character({ lastName = "Stormgaard" }))
+    assert.equal("Thrallbane", core:rows()[1].name)
+    assert.equal("Thrallbane Stormgaard", core:rows()[1].fullName)
+  end)
+
+  it("keeps the last name when a read misses it", function()
+    local deps = newDeps()
+    local core = load().Core.new(deps)
+    core:updateOwn(character({ lastName = "Stormgaard" }))
+    local sent = #deps.sent
+    core:updateOwn(character())
+    assert.equal("Thrallbane Stormgaard", core:rows()[1].fullName)
+    assert.equal(sent, #deps.sent)
+  end)
+
   it("shows the Character just switched to, even if nothing about it changed", function()
     local db = {}
     local deps = newDeps(db)

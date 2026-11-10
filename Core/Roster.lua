@@ -68,6 +68,7 @@ local function describeCharacter(character, main, yourLevel, now)
   return {
     guid = character.guid,
     name = character.name,
+    fullName = character.lastName and character.name .. " " .. character.lastName or character.name,
     classFilename = character.classFilename,
     level = character.level,
     xp = character.xp,

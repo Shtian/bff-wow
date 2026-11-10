@@ -440,7 +440,8 @@ end
 -- altsCanPlay, via (display name of the Member whose message brought their
 -- record, if not their own) and alts, plus the shown Character: the one
 -- being played while online, else the Main. A Character, shown or alt, has
--- guid, name, classFilename, level, xp, maxXp, zone, deaths, money (copper,
+-- guid, name (the first name), fullName ("First Last" on Forever, else
+-- name), classFilename, level, xp, maxXp, zone, deaths, money (copper,
 -- nil if its client never shared it), professions (nil if its client never
 -- shared them, else up to 5 { skillLine, name, icon, skill, max, secondary,
 -- rank ("Apprentice" to "Artisan", from max), full (skill at max), capped
@@ -467,7 +468,7 @@ end
 -- own, displayName, known (false if none of their Characters' clients ever
 -- shared professions) and cells: per profession, false for none, or the
 -- best skill among their Characters (skill, max, rank, full, capped) and
--- characters, each Character who has it (name, classFilename, alt, skill,
+-- characters, each Character who has it (name, fullName, classFilename, alt, skill,
 -- max, rank, full, capped), best first.
 function Core:professions(order, sortBy)
   return ns.Professions.tab(ns.Roster.rows(self.ledger, self.now(), order), sortBy)
@@ -492,14 +493,14 @@ end
 -- classFilename, count, more, row (1 nearest the axis, nil when only the
 -- dot shows), labelX, labelWidth, memberIds (the other Members a click
 -- picks), faded, and characters: memberId, member ("You" for yours), name,
--- classFilename, level, alt, online, own, canPlay and apart), bars (a
+-- fullName, classFilename, level, alt, online, own, canPlay and apart), bars (a
 -- dungeon each, or the raids' one: name, kind ("dungeon",
 -- "attunement" or "raids"), forever (new in WoW: Forever), from, to,
 -- fits, count, dots (class of each Member who fits, up to 4), moreDots, x,
 -- width, lane (1 nearest the axis; every bar has one), shared, faded and
 -- tooltip: title,
 -- detail, forever, raids (name, detail, forever), you, fits, fitters
--- (memberId, member, name, classFilename, level, online, far), none and
+-- (memberId, member, name, fullName, classFilename, level, online, far), none and
 -- almost), and lanes (how many lanes the bars take).
 function Core:together(measure, selected)
   return ns.Together.view(ns.Roster.rows(self.ledger, self.now()), measure, {
@@ -522,7 +523,7 @@ Core.selectTogether = ns.Together.select
 
 -- The world map's pins: one per other Member the panel shows whose shown
 -- Character (being played while online, else the Main) has a known spot,
--- unsorted. A pin has memberId, displayName, name, classFilename, level,
+-- unsorted. A pin has memberId, displayName, name, fullName, classFilename, level,
 -- mapId, x and y (0–1 on that map), zone, instance (the instance's name
 -- while inside one, the spot then being the last one outside), online,
 -- sinceSeen (seconds since the Member was last seen) and lastSeenText (as
@@ -535,6 +536,7 @@ function Core:mapPins()
         memberId = row.memberId,
         displayName = row.displayName,
         name = row.name,
+        fullName = row.fullName,
         classFilename = row.classFilename,
         level = row.level,
         mapId = row.mapId,

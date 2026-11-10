@@ -14,9 +14,11 @@ ns.Ledger = Ledger
 local ID_LENGTH = 8
 local ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
 
--- The fields Snapshot reports for a Character.
+-- The fields Snapshot reports for a Character. name is the first name, the
+-- one names are matched on; lastName is Forever's last name (nil where
+-- there is none), for showing and for whispering "First Last".
 local CHARACTER_FIELDS = {
-  "name", "classFilename", "level", "xp", "maxXp", "zone", "deaths", "money", "professions",
+  "name", "lastName", "classFilename", "level", "xp", "maxXp", "zone", "deaths", "money", "professions",
 }
 -- Where a Character was last seen, from locate(): written only by
 -- Ledger:locate, and kept when Snapshot reports the Character.
@@ -25,9 +27,10 @@ local LOCATION_FIELDS = { "mapId", "x", "y", "instance" }
 -- Reported fields the record keeps in another form: store(reported)
 -- gives it (nil keeps what the record has), same(a, b) compares two.
 -- Professions keep short field names, and the last list when none could
--- be read.
+-- be read. A last name doesn't go away when one read misses it.
 local STORED_AS = {
   professions = { store = ns.Professions.store, same = ns.Professions.same, keep = true },
+  lastName = { store = function(value) return value end, same = function(a, b) return a == b end, keep = true },
 }
 
 local function stored(character, field, saved)
@@ -381,6 +384,7 @@ local RECORD_SHAPE = {
 local CHARACTER_SHAPE = {
   guid = isText,
   name = isText,
+  lastName = isOptional(isText),
   classFilename = isOptional(isText),
   level = isNumber,
   xp = isOptional(isNumber),
@@ -441,8 +445,8 @@ end
 
 -- Forgets having heard the Members owning a Character of this name, and
 -- returns whether there were any. On Forever the channel names a Character
--- "First Last" while records hold only the first name (UnitName's first
--- value), so the first name matches too. Two Characters sharing one may
+-- "First Last" while records match on the first name (UnitName's first
+-- value; older clients never share the last), so the first name matches too. Two Characters sharing one may
 -- both go offline until the other's next message.
 function Ledger:wentAway(name)
   local any = false

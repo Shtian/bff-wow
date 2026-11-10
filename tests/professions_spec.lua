@@ -347,9 +347,9 @@ describe("Professions", function()
       assert.is_false(bob.own)
       local mining = bob.cells[column(view, "Mining")]
       assert.same({ skill = 75, max = 75, rank = "Apprentice", full = true, capped = false, characters = {
-        { name = "Bob", classFilename = "WARRIOR", alt = false, skill = 75, max = 75, rank = "Apprentice",
+        { name = "Bob", fullName = "Bob", classFilename = "WARRIOR", alt = false, skill = 75, max = 75, rank = "Apprentice",
           full = true, capped = false },
-        { name = "Bobalt", classFilename = "WARRIOR", alt = true, skill = 20, max = 75, rank = "Apprentice",
+        { name = "Bobalt", fullName = "Bobalt", classFilename = "WARRIOR", alt = true, skill = 20, max = 75, rank = "Apprentice",
           full = false, capped = false },
       } }, mining)
       local cooking = bob.cells[column(view, "Cooking")]

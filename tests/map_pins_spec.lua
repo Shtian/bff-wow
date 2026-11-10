@@ -56,6 +56,7 @@ describe("Map pins", function()
       memberId = b.memberId,
       displayName = "Bob",
       name = "Bob",
+      fullName = "Bob",
       classFilename = "WARRIOR",
       level = 10,
       mapId = 1429,
@@ -68,6 +69,19 @@ describe("Map pins", function()
     }, pin)
     assert.is_nil(pinFor(a, a))
     assert.equal(1, #a.core:mapPins())
+  end)
+
+  it("name a Character by first and last name once a last name is shared", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b:play({ lastName = "Stormgaard" })
+    -- A last name alone goes out with the next unhurried DATA.
+    net:run(70)
+
+    local pin = pinFor(a, b)
+    assert.equal("Bob", pin.name)
+    assert.equal("Bob Stormgaard", pin.fullName)
+    assert.equal("Bob Stormgaard", a:rowFor(b).fullName)
   end)
 
   it("round the position to 0.1%, inside the map", function()
