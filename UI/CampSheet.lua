@@ -30,6 +30,15 @@ ns.CampSheet = {
     ember = { 91, 16, 1, 1 },
     emberCool = { 94, 16, 1, 1 },
     tent = { 1, 30, 33, 22 },
+    rod = { 36, 30, 7, 10 },
+    sword = { 45, 30, 3, 7 },
+    star = { 50, 30, 5, 5 },
+    fish = { 57, 30, 8, 4 },
+    smoke1 = { 67, 30, 7, 5 },
+    smoke2 = { 76, 30, 7, 5 },
+    flare1 = { 85, 30, 11, 20 },
+    flare2 = { 98, 30, 11, 20 },
+    flare3 = { 111, 30, 11, 20 },
   },
   -- The backdrop's file, its size in texels, and the column the fire's
   -- centre sits on.

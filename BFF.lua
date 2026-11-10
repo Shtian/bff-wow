@@ -115,6 +115,7 @@ end
 local function onCoreEvent(event, arg, more)
   if event == "changed" then
     ns.Panel.refresh()
+    ns.PocketCamp.refresh()
     ns.Minimap.refresh()
     ns.MapPins.refresh()
     ns.Settings.refresh()
@@ -122,12 +123,14 @@ local function onCoreEvent(event, arg, more)
     -- arg is the key, more the new value; each module ignores keys it
     -- doesn't use.
     ns.Panel.settingChanged(arg, more)
+    ns.PocketCamp.settingChanged(arg, more)
     ns.Minimap.settingChanged(arg, more)
     ns.Toasts.settingChanged(arg, more)
     ns.Settings.settingChanged(arg, more)
   elseif event == "crewChanged" then
     ns.ChannelLink.setCrew(ns.core:crew())
     ns.Panel.refresh()
+    ns.PocketCamp.refresh()
     ns.Minimap.refresh()
     ns.MapPins.refresh()
     ns.Settings.refresh()
@@ -137,6 +140,8 @@ local function onCoreEvent(event, arg, more)
     -- Core says where each Live event goes: more is its outlets.
     if more.chat then chatLine(arg) end
     if more.toast then ns.Toasts.show(arg) end
+  elseif event == "pocketCampAnimation" then
+    ns.PocketCamp.animate(arg)
   elseif event == "awaySummary" then
     showAway(arg)
   elseif event == "spareGone" then
@@ -181,6 +186,7 @@ local function start(isInitialLogin)
   ns.ChannelLink.start(ns.core, function(kind) say(MESSAGES[kind]) end)
   ns.ChannelLink.setCrew(ns.core:crew())
   ns.Panel.start(ns.core)
+  ns.PocketCamp.start(ns.core)
   ns.Minimap.start(ns.core)
   ns.MapPins.start(ns.core)
   ns.Toasts.start(ns.core)
@@ -231,7 +237,10 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
   elseif event == "LOOT_CLOSED" then
     lootRead = false
   elseif event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
-    if ns.core then ns.Panel.refresh() end
+    if ns.core then
+      ns.Panel.refresh()
+      ns.PocketCamp.refresh()
+    end
   elseif event == "PLAYER_REGEN_ENABLED" then
     eventFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
     local summary = pendingAway

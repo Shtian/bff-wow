@@ -757,6 +757,8 @@ local function onEvent(event, arg)
     log(color(EVENT, "reaction  ") .. arg.text)
   elseif event == "spare" then
     log(color(EVENT, "spare  ") .. arg.text)
+  elseif event == "pocketCampAnimation" then
+    log(color(EVENT, "pocket camp  ") .. arg.kind .. (arg.memberId and "  " .. nameOf(arg.memberId) or ""))
   elseif event == "awaySummary" then
     log(color(EVENT, "away summary  ") .. tostring(arg.count) .. " entries from " .. #arg.members .. " Members")
   else

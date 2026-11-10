@@ -7,6 +7,10 @@
 -- target size (artUnit), so the art stays crisp at any UI scale. One
 -- OnUpdate on the band steps the fire, embers and sleep marks, and
 -- runs only while the band is shown. Silent. See docs/design/camp.md.
+-- The Pocket Camp (UI/PocketCamp.lua) is a band of its own: its actors
+-- also stand with a sword raised (adventuring) or hold a rod out to the
+-- fire (fishing), and :Animate plays its one-off animations. See
+-- docs/design/pocket-camp.md.
 
 local _, ns = ...
 
@@ -27,16 +31,32 @@ CampScene.SHORT_HEIGHT = 78
 -- Animation ticks per second, and how long a Cheer's hop lasts.
 local FPS = 6
 local HOP_FOR = 0.7
+-- How long each one-off animation plays (band:Animate), in seconds.
+local ANIMATION_FOR = { ding = 1.2, maxLevel = 1.8, death = 1.6, rareFind = 2, goal = 1.6 }
 -- Rows up from the band's bottom: where the ground line is, and where each
 -- sprite's bottom sits on it (from the prototype).
 local ROW = {
-  seat = 3, seated = 4, hop = 6, asleep = 3, grave = 3, flower = 2,
+  seat = 3, seated = 4, hop = 6, standing = 3, asleep = 3, grave = 3, flower = 2,
   logs = 3, fire = 5, tent = 5, ember = 16,
 }
 -- Each sprite's x from its actor's (or grave's) left edge. A spark sits
 -- by a seated figure's head, or on a sleeper's blanket, so even the short
 -- band never crops it.
 local OFFSET = { seat = -1, flower = 2, seatedSpark = 9, asleepSpark = 11 }
+-- A tool in an upright figure's hand, from the figure's left edge and its
+-- bottom row: the sword over the raised right hand, and the rod from the
+-- hand nearer the fire (mirrored on the fire's right).
+local SWORD = { x = 8, row = 12 }
+local ROD = { x = 10, mirroredX = -5, row = 3 }
+-- What plays over a figure's head, from the figure's left edge: a ding's
+-- star and a death's smoke rise this many rows, a rare find's fish is held.
+local STAR = { x = 3, rise = 3 }
+local FISH = { x = 2 }
+local SMOKE = { x = 2, row = -4, rise = 6 }
+-- A max level's burst: sparks fly this far out from the figure's middle,
+-- one each way.
+local BURST = { x = 4, row = 5, reach = 9,
+  ways = { { -1, 1 }, { 1, 1 }, { -1, 0 }, { 1, 0 }, { 0, 1 }, { -1, -1 }, { 1, -1 } } }
 -- A sleeper's three z's, small to normal, staggered up from the head:
 -- each one's x from the sleeper's left edge and its bottom row from the
 -- bedroll's top. They appear one at a time, hold, then clear, a step every
@@ -65,11 +85,15 @@ local function texture(parent, layer, sublevel)
 end
 
 -- Shows a sprite of the sheet on a texture, at its size in art pixels.
-local function setSprite(t, name, unit)
+-- mirrored flips it left to right.
+local function setSprite(t, name, unit, mirrored)
   local s = Sheet.sprites[name]
-  if t.sprite ~= name then
-    t:SetTexCoord(s[1] / Sheet.width, (s[1] + s[3]) / Sheet.width, s[2] / Sheet.height, (s[2] + s[4]) / Sheet.height)
-    t.sprite = name
+  local key = mirrored and name .. " mirrored" or name
+  if t.sprite ~= key then
+    local left, right = s[1] / Sheet.width, (s[1] + s[3]) / Sheet.width
+    if mirrored then left, right = right, left end
+    t:SetTexCoord(left, right, s[2] / Sheet.height, (s[2] + s[4]) / Sheet.height)
+    t.sprite = key
   end
   t:SetSize(s[3] * unit, s[4] * unit)
   t:Show()
@@ -126,12 +150,16 @@ local function take(list)
   return item
 end
 
-local function hideRest(list)
-  for i = list.used + 1, #list do
-    for _, part in pairs(list[i]) do
-      if type(part) == "table" and part.Hide then part:Hide() end
+local function hideParts(parts)
+  for _, part in pairs(parts) do
+    if type(part) == "table" then
+      if part.Hide then part:Hide() else hideParts(part) end
     end
   end
+end
+
+local function hideRest(list)
+  for i = list.used + 1, #list do hideParts(list[i]) end
 end
 
 -- Places a texture with its bottom left at art pixel x from the fire and
@@ -142,28 +170,105 @@ local function put(scene, t, x, row)
 end
 
 local function hopping(scene, actor)
-  local untilTime = actor.pose == "seated" and scene.hops[actor.memberId]
+  local untilTime = actor.pose ~= "asleep" and scene.hops[actor.memberId]
   return untilTime ~= nil and untilTime and untilTime > GetTime()
 end
 
--- Draws one actor's figure, seat or sleep marks, spark and name, for the
--- animation frame f.
+-- How far through a one-off animation is, 0 to 1, or nil when it isn't
+-- playing. memberId is nil for the fire's.
+local function playing(scene, kind, memberId)
+  local now = GetTime()
+  for _, animation in ipairs(scene.animations) do
+    if animation.kind == kind and animation.memberId == memberId and now < animation.ends then
+      return (now - animation.start) / (animation.ends - animation.start)
+    end
+  end
+  return nil
+end
+
+-- Draws what plays over one upright actor: a ding's star, a rare find's
+-- fish held up, a death's smoke and flicker, and a max level's burst.
+-- row is the figure's bottom row and top the row above its head.
+local function drawAnimations(scene, parts, actor, f, row, top)
+  local unit, x, id = scene.unit, actor.x, actor.memberId
+  local ding, fish, death = playing(scene, "ding", id), playing(scene, "rareFind", id), playing(scene, "death", id)
+  if fish then
+    setSprite(parts.mark, "fish", unit)
+    put(scene, parts.mark, x + FISH.x, top + 1)
+  elseif ding then
+    setSprite(parts.mark, "star", unit)
+    put(scene, parts.mark, x + STAR.x, top + 1 + math.floor(ding * STAR.rise))
+  elseif death then
+    setSprite(parts.mark, death < 0.5 and "smoke1" or "smoke2", unit)
+    put(scene, parts.mark, x + SMOKE.x, top + SMOKE.row + math.floor(death * SMOKE.rise))
+  else
+    parts.mark:Hide()
+  end
+  -- A death flickers the figure on alternate ticks.
+  local alpha = death and f % 2 == 0 and 0.3 or 1
+  parts.cloth:SetAlpha(alpha)
+  parts.skin:SetAlpha(alpha)
+
+  local burst = playing(scene, "maxLevel", id)
+  if burst then
+    parts.burst = parts.burst or {}
+    local reach = math.floor(burst * BURST.reach)
+    for i, way in ipairs(BURST.ways) do
+      local spark = parts.burst[i] or scene.texture("OVERLAY", 1)
+      parts.burst[i] = spark
+      setSprite(spark, burst < 0.6 and "spark" or "ember", unit)
+      put(scene, spark, x + BURST.x + way[1] * reach, row + BURST.row + way[2] * reach)
+    end
+  elseif parts.burst then
+    for _, spark in ipairs(parts.burst) do spark:Hide() end
+  end
+end
+
+-- Draws one actor's figure, seat or sleep marks, tool, spark and name, for
+-- the animation frame f. Upright poses: "seated", "fishing" (seated, a rod
+-- out to the fire) and "adventuring" (standing, a sword raised).
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
   local top
-  if actor.pose == "seated" then
-    local hop = hopping(scene, actor)
-    local row = hop and ROW.hop or ROW.seated
-    setSprite(parts.seat, "seat", scene.unit)
-    put(scene, parts.seat, x + OFFSET.seat, ROW.seat)
-    setSprite(parts.cloth, hop and "hopCloth" or "seatedCloth", scene.unit)
-    setSprite(parts.skin, hop and "hop" or "seated", scene.unit)
+  if actor.pose ~= "asleep" then
+    local standing = actor.pose == "adventuring"
+    -- A Cheer and a ding both hop.
+    local hop = hopping(scene, actor) or playing(scene, "ding", actor.memberId) ~= nil
+    local row = (standing and ROW.standing or ROW.seated) + (hop and ROW.hop - ROW.seated or 0)
+    if standing then
+      parts.seat:Hide()
+    else
+      setSprite(parts.seat, "seat", scene.unit)
+      put(scene, parts.seat, x + OFFSET.seat, ROW.seat)
+    end
+    local armsUp = hop or standing
+    setSprite(parts.cloth, armsUp and "hopCloth" or "seatedCloth", scene.unit)
+    setSprite(parts.skin, armsUp and "hop" or "seated", scene.unit)
     put(scene, parts.cloth, x, row)
     put(scene, parts.skin, x, row)
     for _, z in ipairs(parts.sleep) do z:Hide() end
     top = row + Sheet.sprites.seated[4]
+    if standing then
+      setSprite(parts.tool, "sword", scene.unit)
+      put(scene, parts.tool, x + SWORD.x, row + SWORD.row)
+      top = row + SWORD.row + Sheet.sprites.sword[4]
+    elseif actor.pose == "fishing" then
+      local mirrored = x > 0
+      setSprite(parts.tool, "rod", scene.unit, mirrored)
+      put(scene, parts.tool, x + (mirrored and ROD.mirroredX or ROD.x), row + ROD.row)
+    else
+      parts.tool:Hide()
+    end
+    drawAnimations(scene, parts, actor, f, row, top)
   else
     parts.seat:Hide()
+    parts.tool:Hide()
+    parts.mark:Hide()
+    parts.cloth:SetAlpha(1)
+    parts.skin:SetAlpha(1)
+    if parts.burst then
+      for _, spark in ipairs(parts.burst) do spark:Hide() end
+    end
     setSprite(parts.cloth, "asleepCloth", scene.unit)
     setSprite(parts.skin, "asleep", scene.unit)
     put(scene, parts.cloth, x, ROW.asleep)
@@ -200,10 +305,10 @@ local function drawActor(scene, parts, actor, f)
 
   if actor.spark then
     setSprite(parts.spark, "spark", scene.unit)
-    local seated = actor.pose == "seated"
-    local lift = seated and hopping(scene, actor) and ROW.hop - ROW.seated or 0
-    put(scene, parts.spark, x + (seated and OFFSET.seatedSpark or OFFSET.asleepSpark),
-      SPARK_ROW[actor.pose] + lift)
+    local upright = actor.pose ~= "asleep"
+    local lift = upright and hopping(scene, actor) and ROW.hop - ROW.seated or 0
+    put(scene, parts.spark, x + (upright and OFFSET.seatedSpark or OFFSET.asleepSpark),
+      (upright and SPARK_ROW.seated or SPARK_ROW.asleep) + lift)
   else
     parts.spark:Hide()
   end
@@ -215,7 +320,8 @@ local function drawFrame(scene, f)
   local unit = scene.unit
   setSprite(scene.logs, "logs", unit)
   put(scene, scene.logs, -7, ROW.logs)
-  setSprite(scene.flame, "fire" .. (f % 3 + 1), unit)
+  -- A Crew goal flares the fire for a moment.
+  setSprite(scene.flame, (playing(scene, "goal", nil) and "flare" or "fire") .. (f % 3 + 1), unit)
   put(scene, scene.flame, -5, ROW.fire)
   for i, ember in ipairs(scene.embers) do
     local life = math.floor((f * 0.7 + (i - 1) * 5) % 14)
@@ -229,7 +335,7 @@ local function drawFrame(scene, f)
   hideRest(scene.actorParts)
 
   scene.graveParts.used = 0
-  for _, grave in ipairs(view.graves) do
+  for _, grave in ipairs(view.graves or {}) do
     local parts = take(scene.graveParts)
     setSprite(parts.grave, "grave", unit)
     put(scene, parts.grave, grave.x, ROW.grave)
@@ -254,21 +360,39 @@ end
 local function onUpdate(band)
   local scene = band.scene
   if not scene.view then return end
-  local f = math.floor(GetTime() * FPS)
+  local now = GetTime()
+  local f = math.floor(now * FPS)
   if f == scene.frame then return end
   scene.frame = f
+  for i = #scene.animations, 1, -1 do
+    if scene.animations[i].ends <= now then table.remove(scene.animations, i) end
+  end
   drawFrame(scene, f)
 end
 
--- A Camp band in parent. gains: show each actor's gained text (While you
--- were away) instead of names.
-function CampScene.new(parent, gains)
+-- A Camp band in parent. options (all optional): gains shows each
+-- actor's gained text (While you were away) instead of names; target is
+-- the art pixel's size to aim for in UI units (default BAND_TARGET); and
+-- shadow gives the names a shadow, for a band over the game world.
+function CampScene.new(parent, options)
+  options = options or {}
   local band = CreateFrame("Frame", nil, parent)
   band:SetClipsChildren(true)
+  local function shadowed(label)
+    if options.shadow then
+      label:SetShadowColor(0, 0, 0, 1)
+      label:SetShadowOffset(1, -1)
+    end
+    return label
+  end
   local scene = {
     band = band,
-    gains = gains,
+    gains = options.gains,
+    target = options.target or CampScene.BAND_TARGET,
     hops = {},
+    -- The one-off animations playing: { kind, memberId, start, ends }.
+    animations = {},
+    texture = function(layer, sublevel) return texture(band.art, layer, sublevel) end,
     actorParts = pool(function()
       return {
         seat = texture(band.art, "ARTWORK", 0),
@@ -279,8 +403,10 @@ function CampScene.new(parent, gains)
           texture(band.art, "ARTWORK", 2),
           texture(band.art, "ARTWORK", 2),
         },
+        tool = texture(band.art, "ARTWORK", 3),
         spark = texture(band.art, "OVERLAY", 0),
-        label = nameLabel(band.art),
+        mark = texture(band.art, "OVERLAY", 1),
+        label = shadowed(nameLabel(band.art)),
       }
     end),
     graveParts = pool(function()
@@ -294,6 +420,7 @@ function CampScene.new(parent, gains)
   local sky = band:CreateTexture(nil, "BACKGROUND", nil, 0)
   sky:SetAllPoints()
   sky:SetColorTexture(Sheet.sky[1], Sheet.sky[2], Sheet.sky[3], 1)
+  scene.sky = sky
 
   -- The art's origin, on a whole pixel: everything is placed from it.
   scene.art = CreateFrame("Frame", nil, band)
@@ -308,7 +435,7 @@ function CampScene.new(parent, gains)
   scene.flame = texture(scene.art, "ARTWORK", 1)
   scene.embers = { texture(scene.art, "ARTWORK", 2), texture(scene.art, "ARTWORK", 2), texture(scene.art, "ARTWORK", 2) }
   -- Hidden until there's a view, so the more label has a home too.
-  scene.more = Skin.label(band, "small", Skin.MUTED, "OVERLAY")
+  scene.more = shadowed(Skin.label(band, "small", Skin.MUTED, "OVERLAY"))
   scene.more:SetPoint("BOTTOMRIGHT", -6, 4)
   band:SetScript("OnUpdate", onUpdate)
   band:Hide()
@@ -330,18 +457,45 @@ function CampScene.new(parent, gains)
   -- How many art columns fit `width` UI units, and the band's height for
   -- `height` UI units, both in whole art pixels. Call before Draw.
   function band:Measure(width, height)
-    scene.unit = CampScene.artUnit(band, CampScene.BAND_TARGET)
+    scene.unit = CampScene.artUnit(band, scene.target)
     local columns = math.floor(width / scene.unit)
     local rows = math.floor(height / scene.unit)
     scene.fire = math.floor(columns / 2)
     return columns, rows * scene.unit
   end
 
-  -- A Cheer for a Member: if they're seated here, they hop for a moment.
+  -- The band's size in UI units for a Camp exactly `columns` by `rows`
+  -- art pixels (the Pocket Camp's). Call before Draw, in Measure's place.
+  function band:Fit(columns, rows)
+    scene.unit = CampScene.artUnit(band, scene.target)
+    scene.fire = math.floor(columns / 2)
+    return columns * scene.unit, rows * scene.unit
+  end
+
+  -- How solid the sky and backdrop are, 0 to 1. At 0 only the fire, the
+  -- figures and the names show.
+  function band:SetBackdropAlpha(alpha)
+    scene.sky:SetAlpha(alpha)
+    scene.backdrop:SetAlpha(alpha)
+  end
+
+  -- Plays a one-off animation: "ding", "maxLevel", "death" or "rareFind"
+  -- on that Member's figure, if it's up by the fire here, or "goal" on the
+  -- fire.
+  function band:Animate(kind, memberId)
+    local lasts = ANIMATION_FOR[kind]
+    if not lasts then return end
+    local now = GetTime()
+    scene.animations[#scene.animations + 1] = { kind = kind, memberId = memberId, start = now, ends = now + lasts }
+    scene.frame = nil
+  end
+
+  -- A Cheer for a Member: if they're up by the fire here, they hop for a
+  -- moment.
   function band:Hop(memberId)
     if not scene.view then return end
     for _, actor in ipairs(scene.view.actors) do
-      if actor.memberId == memberId and actor.pose == "seated" then
+      if actor.memberId == memberId and actor.pose ~= "asleep" then
         scene.hops[memberId] = GetTime() + HOP_FOR
         scene.frame = nil
       end

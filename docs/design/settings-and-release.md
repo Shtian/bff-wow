@@ -24,6 +24,10 @@ One page in the game's native Settings panel (Esc → Options → AddOns → **B
 | | Show While you were away on login | on | #14 |
 | | Show minimap button | on | #7 |
 | | Show the Camp | on | #127, `docs/design/camp.md` |
+| | Show the Pocket Camp | off | #161, `docs/design/pocket-camp.md` |
+| | Pocket Camp backdrop opacity, a slider from 0% to 100% | 60% | `docs/design/pocket-camp.md` |
+| | Lock the Pocket Camp's position | off | `docs/design/pocket-camp.md` |
+| | Hide the Pocket Camp in combat | off | `docs/design/pocket-camp.md` |
 | **Toasts** | Show toasts for live events | on | `docs/design/toasts.md` |
 | | Sound, with a Play button | Friend online | `docs/design/toasts.md` |
 | | Move toasts button | | `docs/design/toasts.md` |
@@ -42,7 +46,7 @@ Everything is **account-wide** in `BFF_DB`, including the minimap button positio
 
 ### One list in Core
 
-Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): its key, kind (`toggle` for on/off, `sound`, `position` or `panelPlace`), default, how it's saved, and the Settings page's section and label as finished text. The list drives:
+Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): its key, kind (`toggle` for on/off, `sound`, `position`, `panelPlace` or `percent`), default, how it's saved, and the Settings page's section and label as finished text. The list drives:
 
 - **Storage**, in the shape earlier versions saved, so nothing is migrated:
 
@@ -53,6 +57,11 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `awayPopup` | `awayPopupOff = true`, or nil while on |
   | `minimap` | `hide = true` inside the minimap table LibDBIcon reads, or nil while on |
   | `camp` | `campOff = true`, or nil while on |
+  | `pocketCamp` | `pocketCamp = true`, or nil while off |
+  | `pocketCampOpacity` | `pocketCampOpacity`, a whole percentage from 0 to 100; nil for the default 60 |
+  | `pocketCampLocked` | `pocketCampLocked = true`, or nil while off |
+  | `pocketCampCombat` | `pocketCampCombatHide = true`, or nil while off |
+  | `pocketCampPosition` | `{ x, y }`, the Pocket Camp's bottom left corner from the screen's; nil where it starts |
   | `toasts` | `toastsOff = true`, or nil while on |
   | `toastSound` | the sound's name, or nil for the default |
   | `toastPosition` | `{ x, y }`, or nil for the default |
@@ -66,11 +75,13 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
 
 - **Core's interface:** `setting(key)`, `setSetting(key, value)` and `settings()` (the page's sections). The named methods (`isPaused()`, `setToasts(on)` and the rest) stay as hand-written one-line wrappers, so they're greppable.
 - **Events:** a real change fires `settingChanged(key, value)`, not `changed`; setting a value it already has fires nothing. Core's own reactions run first (Pause sharing pauses Gossip).
-- **The page:** a section header per section and a checkbox per on/off setting, built in a loop from `settings()`, so a new on/off setting needs only a list entry. Settings with no section, the Together tab's Show menu choices (`docs/design/together.md`) and the Catches tab's names checkbox (`docs/design/catches.md`), aren't on the page; those menus show them. The sound picker (with Play), Move toasts and Reset BFF window are drawn by hand but read and write through `setting()` and `setSetting()`. Leave Crew sits under Appear offline.
+- **The page:** a section header per section and a checkbox per on/off setting, built in a loop from `settings()`, so a new on/off setting needs only a list entry. Settings with no section, the Together tab's Show menu choices (`docs/design/together.md`) and the Catches tab's names checkbox (`docs/design/catches.md`), aren't on the page; those menus show them; nor is `pocketCampPosition`, which dragging the Pocket Camp sets. The sound picker (with Play), Move toasts, Reset BFF window and the percentage slider are drawn by hand but read and write through `setting()` and `setSetting()`. Leave Crew sits under Appear offline.
 
 Display name isn't in the list: it's part of your Member record and spreads to the Crew.
 
 The panel's size and position (`panelPlace`, #109) is saved through Core, not the game's window-layout cache, which is applied before the panel is created. `setPanelPlace(width, height, left, top)` saves where a move or resize left it, `resetPanelPlace()` goes back to the default, and `panelPlace(screenWidth, screenHeight)` says where it opens on this screen: shrunk to fit and moved onto it, with nil `left` and `top` for centred. The grip in the panel's bottom right corner resizes it (double-click resets), and the Settings page has Reset BFF window under Notifications and display, greyed out while the panel is at its default.
+
+Answered **Tips** (`docs/design/pocket-camp.md`) are saved beside the settings, as `tipsAnswered = { [key] = true }`, account-wide. There is no control to show them again.
 
 Core also decides where each Live event goes: `feedEntry`, `reaction` and `spare` carry `outlets = { chat, toast }` from the chat-line and toast settings, and App shows them as told. With both off nothing is announced or marked seen, so they wait for While you were away.
 

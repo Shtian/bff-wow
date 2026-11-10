@@ -86,7 +86,7 @@ end
 local function create()
   frame = Skin.window("BFFAway", WIDTH, "While you were away")
   frame:SetPoint("CENTER", 0, 120)
-  frame.camp = ns.CampScene.new(frame, true)
+  frame.camp = ns.CampScene.new(frame, { gains = true })
   frame.camp:SetPoint("TOPLEFT", 1, -Skin.HEADER_HEIGHT)
   frame.camp:SetPoint("TOPRIGHT", -1, -Skin.HEADER_HEIGHT)
   Skin.edge(frame.camp, "BOTTOM", Skin.LINE, "OVERLAY")

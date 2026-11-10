@@ -18,7 +18,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PAL = {
   K: "#0b0a12", S: "#e8b890", s: "#b98465", W: "#fff3c4", Y: "#ffe9a0", G: "#ffd14a", O: "#f0a21c",
   R: "#c9481c", B: "#5a3a24", b: "#3a2518", T: "#8c8796", t: "#5d5966", L: "#70e370", P: "#f2b8d0",
-  Z: "#adabb8",
+  Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8",
 };
 // Cloth tones: a white C and a 62% D, tinted by the class colour in game.
 // Sleepers' cloth is 55% of that, as the prototype shaded bedrolls.
@@ -44,6 +44,22 @@ const SLEEP = [
   ["ZZZZ", "..Z.", ".Z..", "ZZZZ"],
   ["ZZZZZ", "...Z.", "..Z..", ".Z...", "ZZZZZ"],
 ];
+// The Pocket Camp's poses and one-off animations (docs/design/pocket-camp.md).
+// A fishing rod held out from a seated figure's hand, its line and bobber
+// hanging from the tip; drawn mirrored on the fire's right.
+const ROD = [".....B.", "....B.Z", "....B.Z", "...B..Z", "...B..Z", "..B...Z", "..B...Z", ".B....Z", ".B....R", "B......"];
+// A sword raised in a standing figure's hand: adventuring.
+const SWORD = [".W.", ".Z.", ".Z.", ".Z.", ".Z.", "GGG", ".B."];
+// A ding's gold star, a rare find's fish held up, and a death's smoke.
+const STAR = ["..G..", "GGYGG", ".GYG.", ".G.G.", "G...G"];
+const FISH = [".FFF...F", "FFKFFFFF", "FfffFFFF", ".fff...f"];
+const SMOKE = [
+  ["..TT...", ".TTTT..", "TTtTTT.", ".TTTtT.", "..tt..."],
+  [".T..TT.", "T.TT..T", ".T..T..", "T..T..T", "..T.T.."],
+];
+// The fire flaring for a Crew goal: each flame frame with its upper rows
+// doubled, so it stands taller on the same logs.
+const flare = (rows) => rows.flatMap((row, j) => (j < 8 ? [row, row] : [row]));
 const EMBER = ["G"];
 const EMBER_COOL = ["R"];
 
@@ -87,6 +103,9 @@ const SPRITES = [
   ["logs", skin(LOGS)], ["seat", skin(SEAT)], ["sleep1", skin(SLEEP[0])], ["sleep2", skin(SLEEP[1])], ["sleep3", skin(SLEEP[2])],
   ["ember", skin(EMBER)], ["emberCool", skin(EMBER_COOL)],
   ["tent", tent()],
+  ["rod", skin(ROD)], ["sword", skin(SWORD)], ["star", skin(STAR)], ["fish", skin(FISH)],
+  ["smoke1", skin(SMOKE[0])], ["smoke2", skin(SMOKE[1])],
+  ["flare1", skin(flare(FIRE[0]))], ["flare2", skin(flare(FIRE[1]))], ["flare3", skin(flare(FIRE[2]))],
 ];
 
 function hex(color) {

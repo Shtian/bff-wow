@@ -1,8 +1,11 @@
 -- Camp: the Crew as a small pixel campsite, worked out from Roster's rows
 -- and Feed's entries, placed so the UI only draws it. Who is there, seated
 -- by the fire or asleep, the graves recent deaths leave, the flowers
--- Respects put on them and the spark over a fresh max level. Pure and
--- stateless: tested through Core:camp(). See docs/design/camp.md.
+-- Respects put on them and the spark over a fresh max level. Also the
+-- Pocket Camp, the cut-down one kept on screen: the fire and the online
+-- Members, with what each is doing. Pure and stateless: tested through
+-- Core:camp() and Core:pocketCamp(). See docs/design/camp.md and
+-- docs/design/pocket-camp.md.
 
 local _, ns = ...
 
@@ -17,7 +20,8 @@ local DAY = 24 * 60 * 60
 -- `graveGap` before it, `gap` sits between neighbours and `margin` inside
 -- each edge of the band. The tent, `tent` wide, only shows when there's
 -- room. UI reads the same table to draw it. The panel's band is between
--- `minColumns` and `maxColumns` wide; the popup's is `awayColumns`.
+-- `minColumns` and `maxColumns` wide; the popup's is `awayColumns`. The
+-- Pocket Camp is always `pocketColumns` wide and `pocketRows` high.
 local LAYOUT = {
   fire = 9,
   seated = 12,
@@ -30,6 +34,8 @@ local LAYOUT = {
   minColumns = 128,
   maxColumns = 375,
   awayColumns = 120,
+  pocketColumns = 112,
+  pocketRows = 34,
 }
 Camp.LAYOUT = LAYOUT
 
@@ -40,8 +46,8 @@ local MEMBER_GRAVES = 2
 local GRAVES = 4
 
 -- Online Members, you first, in Roster's order; then sleepers, most
--- recent Last seen first.
-local function candidates(rows)
+-- recent Last seen first, unless onlineOnly.
+local function candidates(rows, onlineOnly)
   local seated, asleep = {}, {}
   for _, row in ipairs(rows) do
     if row.own or row.online then
@@ -54,6 +60,7 @@ local function candidates(rows)
     if a.lastSeen ~= b.lastSeen then return a.lastSeen > b.lastSeen end
     return a.memberId < b.memberId
   end)
+  if onlineOnly then return seated end
   for _, row in ipairs(asleep) do seated[#seated + 1] = row end
   return seated
 end
@@ -131,8 +138,10 @@ end
 
 -- The Camp at `columns` art pixels wide, from Roster's rows (yours first)
 -- and Feed's entries (newest first, as Feed:describe gives them), at time
--- now. options.tent false leaves the tent out. Returns { columns, actors,
--- graves, tent, more }; see Core:camp().
+-- now. options.tent false leaves the tent out; options.onlineOnly leaves
+-- out sleepers and graves, and options.moreText words the count of who
+-- didn't fit (default "+%d more"). Returns { columns, actors, graves,
+-- tent, more }; see Core:camp().
 function Camp.view(rows, entries, now, columns, options)
   options = options or {}
   columns = math.max(1, math.floor(columns))
@@ -144,10 +153,10 @@ function Camp.view(rows, entries, now, columns, options)
 
   local view = { columns = columns, actors = {}, graves = {} }
   local more = 0
-  for _, row in ipairs(candidates(rows)) do
+  for _, row in ipairs(candidates(rows, options.onlineOnly)) do
     local seated = row.own or row.online
     local figure = seated and LAYOUT.seated or LAYOUT.asleep
-    local own = graves[row.memberId] or {}
+    local own = not options.onlineOnly and graves[row.memberId] or {}
     -- A slot that won't fit with its graves may fit without them.
     local first, second = roomier(left, right)
     local x, graveXs, side
@@ -180,7 +189,7 @@ function Camp.view(rows, entries, now, columns, options)
     end
   end
   view.more = more > 0 and more or nil
-  view.moreText = view.more and ("+%d more"):format(more) or nil
+  view.moreText = view.more and (options.moreText or "+%d more"):format(more) or nil
 
   if options.tent ~= false then
     local side = roomier(left, right)
@@ -189,6 +198,37 @@ function Camp.view(rows, entries, now, columns, options)
   end
   labelRoom(view.actors, leftEdge, rightEdge)
   for _, actor in ipairs(view.actors) do actor.side = nil end
+  return view
+end
+
+-- The Pocket Camp: the fire and the online Members, you first, as many as
+-- fit, at LAYOUT.pocketColumns by LAYOUT.pocketRows. fishing is the set
+-- of Member ids fishing now. Each actor is as in view(), with pose
+-- ("fishing" while fishing, else "adventuring" while the Character being
+-- played is in an instance, else "seated"), instance (its name, while in
+-- one) and status (the pose in words). Members that didn't fit are counted
+-- in more ("+2"). tooltip lists who is doing what: { title, lines }. See
+-- Core:pocketCamp().
+function Camp.pocket(rows, entries, now, fishing)
+  local view = Camp.view(rows, entries, now, LAYOUT.pocketColumns,
+    { tent = false, onlineOnly = true, moreText = "+%d" })
+  view.rows = LAYOUT.pocketRows
+  view.graves = nil
+  local byMember = {}
+  for _, row in ipairs(rows) do byMember[row.memberId] = row end
+  local lines = {}
+  for i, actor in ipairs(view.actors) do
+    actor.instance = byMember[actor.memberId].instance
+    if fishing[actor.memberId] then
+      actor.pose, actor.status = "fishing", "fishing"
+    elseif actor.instance then
+      actor.pose, actor.status = "adventuring", "in " .. actor.instance
+    else
+      actor.status = "by the fire"
+    end
+    lines[i] = ("%s: %s"):format(actor.label, actor.status)
+  end
+  view.tooltip = { title = "Pocket Camp", lines = lines }
   return view
 end
 

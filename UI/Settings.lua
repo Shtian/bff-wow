@@ -3,8 +3,9 @@
 -- then a section per section of Core's settings list (Sharing, with Leave
 -- Crew under Appear offline; Notifications and display; Toasts from the
 -- toasts decision). Every on/off setting in the list gets a checkbox built
--- from core:settings(); the sound picker, Move toasts and Reset BFF window
--- are drawn by hand.
+-- from core:settings(); the sound picker, Move toasts, Reset BFF window and
+-- the percentage slider (the Pocket Camp's backdrop opacity) are drawn by
+-- hand.
 -- A canvas page, since the standard controls have no text box. Everything
 -- is read and written through Core. See docs/design/settings-and-release.md
 -- and docs/design/toasts.md.
@@ -193,6 +194,41 @@ function custom.panelPlace(setting)
     element = reset,
     draw = function(place) reset:SetEnabled(place ~= nil) end,
     setEnabled = function(on) reset:SetEnabled(on) end,
+  }
+end
+
+-- A percentage, 0 to 100: a slider with its value beside it, saved as it's
+-- dragged. Template-free, so it doesn't depend on the client's slider
+-- templates.
+function custom.percent(setting)
+  local label = createLabel(frame, setting.label)
+  label.inset, label.gap = INDENT, 12
+  local slider = CreateFrame("Slider", nil, frame)
+  slider:SetOrientation("HORIZONTAL")
+  slider:SetSize(140, 16)
+  slider:SetPoint("LEFT", label, "LEFT", 210, 0)
+  slider:SetMinMaxValues(0, 100)
+  slider:SetValueStep(5)
+  if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
+  local track = slider:CreateTexture(nil, "BACKGROUND")
+  track:SetColorTexture(1, 1, 1, 0.15)
+  track:SetHeight(4)
+  track:SetPoint("LEFT")
+  track:SetPoint("RIGHT")
+  slider:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+  local value = createLabel(frame, "")
+  value:SetPoint("LEFT", slider, "RIGHT", 8, 0)
+  slider:SetScript("OnValueChanged", function(_, percent, userInput)
+    value:SetText(("%d%%"):format(percent))
+    if userInput then core:setSetting(setting.key, percent) end
+  end)
+  return {
+    element = label,
+    draw = function(percent) slider:SetValue(percent) end,
+    setEnabled = function(on)
+      label:SetAlpha(on and 1 or 0.5)
+      slider:SetEnabled(on)
+    end,
   }
 end
 

@@ -20,8 +20,10 @@
 -- and redraw when a resize ends. While Core has a Camp (camp()), its band
 -- runs across the window under the header, above the sidebar and every
 -- tab, drawn by CampScene; Roster rows show a small seated figure in place
--- of the class icon, and a Cheer makes a seated friend hop. It never sees
--- a Member record.
+-- of the class icon, and a Cheer makes a seated friend hop. Under the band
+-- sits Core's Tip (tip()), when there is one: a card offering a feature
+-- that's off by default, with a button to turn it on and one to dismiss
+-- it. It never sees a Member record.
 
 local _, ns = ...
 
@@ -124,6 +126,11 @@ local frame
 -- The Camp band, and its height now (0 while there's no Camp).
 local camp
 local campHeight = 0
+-- The Tip card under the band, and its height now (0 while there's no Tip).
+local tipCard
+local tipHeight = 0
+local TIP_BUTTON = 84
+local TIP_PAD = 10
 local setup
 local nav
 local section
@@ -152,7 +159,7 @@ local function contentWidth()
 end
 
 local function contentHeight()
-  return frame:GetHeight() - HEADER - campHeight - 1
+  return frame:GetHeight() - HEADER - campHeight - tipHeight - 1
 end
 
 -- A scroll view's width: the content less the thumb's gutter.
@@ -626,7 +633,7 @@ local function drawNav(unseen, sparesUnseen)
   setSelected(nav.settings, false)
   -- Every tab and Settings, the sidebar's top inset and Settings' room
   -- under it.
-  local sidebarHeight = frame:GetHeight() - HEADER - campHeight - 1
+  local sidebarHeight = frame:GetHeight() - HEADER - campHeight - tipHeight - 1
   local height = math.min(NAV_HEIGHT, math.floor((sidebarHeight - NAV_TOP - NAV_BOTTOM) / NAV_ROWS))
   for _, button in ipairs({ nav.roster, nav.feed, nav.goals, nav.when, nav.spares, nav.professions, nav.together,
     nav.catches, nav.settings }) do
@@ -1696,11 +1703,55 @@ local function drawCamp(inCrew)
   camp:Draw(view)
 end
 
--- With a Crew the content sits right of the sidebar, under the Camp; without one it takes
--- the whole window.
+-- The Tip card: Core's text on the left, Turn on and No thanks on the
+-- right. Either answers the Tip, and Core's changed event redraws without
+-- it.
+local function createTip()
+  tipCard = CreateFrame("Frame", nil, frame)
+  Skin.fill(tipCard, Skin.SIDEBAR)
+  Skin.edge(tipCard, "BOTTOM", Skin.LINE)
+  Skin.edge(tipCard, "LEFT", GOLD)
+  tipCard.text = Skin.label(tipCard, "small", TEXT)
+  tipCard.text:SetPoint("LEFT", INSET, 0)
+  tipCard.text:SetWordWrap(true)
+  tipCard.dismiss = Skin.button(tipCard, "", function() core:dismissTip(tipCard.key) end)
+  tipCard.dismiss:SetSize(TIP_BUTTON, SMALL_BUTTON)
+  tipCard.dismiss:SetPoint("RIGHT", -INSET, 0)
+  tipCard.accept = Skin.button(tipCard, "", function() core:acceptTip(tipCard.key) end, true)
+  tipCard.accept:SetSize(TIP_BUTTON, SMALL_BUTTON)
+  tipCard.accept:SetPoint("RIGHT", tipCard.dismiss, "LEFT", -6, 0)
+end
+
+-- The Tip card, when Core has a Tip: across the window under the Camp
+-- band, as high as its text.
+local function drawTip()
+  local tip = core:tip()
+  if not tip then
+    tipHeight = 0
+    if tipCard then tipCard:Hide() end
+    return
+  end
+  if not tipCard then createTip() end
+  tipCard.key = tip.key
+  tipCard.accept:SetText(tip.accept)
+  tipCard.dismiss:SetText(tip.dismiss)
+  -- Set outright, so the wrapped text has a height before layout.
+  tipCard.text:SetWidth(frame:GetWidth() - 2 - 3 * INSET - 2 * TIP_BUTTON - 6)
+  tipCard.text:SetText(tip.text)
+  tipHeight = math.ceil(math.max(tipCard.text:GetStringHeight(), SMALL_BUTTON)) + 2 * TIP_PAD
+  tipCard:ClearAllPoints()
+  tipCard:SetPoint("TOPLEFT", 1, -HEADER - campHeight)
+  tipCard:SetPoint("TOPRIGHT", -1, -HEADER - campHeight)
+  tipCard:SetHeight(tipHeight)
+  tipCard:Show()
+end
+
+-- With a Crew the content sits right of the sidebar, under the Camp and
+-- the Tip; without one it takes the whole window.
 local function layout(inCrew)
   drawCamp(inCrew)
-  local top = -HEADER - campHeight
+  drawTip()
+  local top = -HEADER - campHeight - tipHeight
   frame.sidebar:SetShown(inCrew)
   frame.sidebar:ClearAllPoints()
   frame.sidebar:SetPoint("TOPLEFT", 1, top)
@@ -1975,16 +2026,19 @@ end
 
 -- Pause sharing shows in the Roster's footer, whose height the rows sit
 -- above, so the open tab redraws. A new panel place (a resize, a move or a
--- reset) puts the window there and redraws the views at its size.
+-- reset) puts the window there and redraws the views at its size. The
+-- Pocket Camp turned on in Settings answers its Tip, so the card goes.
 function Panel.settingChanged(key)
   if key == "panelPlace" and frame then applyPlace() end
-  if key == "paused" or key == "panelPlace" or key == "camp" then Panel.refresh() end
+  if key == "paused" or key == "panelPlace" or key == "camp" or key == "pocketCamp" then Panel.refresh() end
 end
 
 -- You Cheered a Member (from the Feed, a toast or While you were away):
--- they hop, if they're seated by the fire.
+-- they hop, if they're seated by the fire, here and in the Pocket Camp.
 function Panel.cheered(memberId)
-  if camp and memberId then camp:Hop(memberId) end
+  if not memberId then return end
+  if camp then camp:Hop(memberId) end
+  ns.PocketCamp.cheered(memberId)
 end
 
 function Panel.toggle()

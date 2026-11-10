@@ -71,6 +71,10 @@ _Avoid_: Notification, alert, live news
 The scene of the Crew shown at the top of the panel and in While you were away: every Member the Roster shows around a campfire, seated by it while online and asleep in a bedroll while not, with a Grave for each recent death and a spark over a fresh max level. Another way of showing what the Roster and the Feed already say; it has no data of its own. Respects show in it as a flower on the Grave.
 _Avoid_: Scene (when meaning the Camp), campsite, diorama
 
+**Pocket Camp**:
+A small, movable on-screen Camp you can keep up while playing: the fire and the Members by it (online), with what they are doing as far as the Roster and Feed know. It opens the panel on click.
+_Avoid_: mini Camp, overlay, widget, transparent fire
+
 **Grave**:
 The mark a death in the last 24 hours leaves in the Camp, beside its Member: one per death, at most 2 per Member and 4 in the Camp. It gets a flower once any Member has paid Respects to that death.
 _Avoid_: Tombstone, death marker
@@ -78,6 +82,10 @@ _Avoid_: Tombstone, death marker
 **Toast**:
 A small on-screen notice for a Live event, with an optional sound. Shows the same things as the chat line.
 _Avoid_: Popup, alert, notification (when meaning a toast)
+
+**Tip**:
+A one-time card at the top of the panel offering a feature that's off by default, with a button to turn it on and one to dismiss it. Once answered, it never shows again on any Character of the account.
+_Avoid_: Toast (for a Tip), notice, announcement, what's new
 
 **Play times**:
 The hours of the week a Member usually plays, from the last 4 weeks of their own client's counting, across all their Characters. A Member **usually plays** an hour they played at least 10 minutes in, in at least 2 of those weeks.

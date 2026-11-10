@@ -93,6 +93,11 @@ local SETTINGS = {
   { key = "toasts", default = true, other = false },
   { key = "minimap", default = true, other = false },
   { key = "camp", default = true, other = false },
+  { key = "pocketCamp", default = false, other = true },
+  { key = "pocketCampOpacity", default = 60, other = 25 },
+  { key = "pocketCampLocked", default = false, other = true },
+  { key = "pocketCampCombat", default = false, other = true },
+  { key = "pocketCampPosition", default = nil, other = { x = 300, y = 200 } },
   { key = "toastSound", default = "UI_BNET_TOAST", other = "none" },
   { key = "toastPosition", default = nil, other = { x = 400, y = 600 } },
   { key = "panelPlace", default = nil, other = { width = 600, height = 500, left = 100, top = 900 } },
@@ -111,8 +116,8 @@ describe("Settings list", function()
     for _, section in ipairs(core:settings()) do
       for _, setting in ipairs(section.settings) do keys[#keys + 1] = setting.key end
     end
-    assert.same({ "paused", "chatLines", "awayPopup", "minimap", "camp", "panelPlace", "toasts", "toastSound",
-      "toastPosition" }, keys)
+    assert.same({ "paused", "chatLines", "awayPopup", "minimap", "camp", "pocketCamp", "pocketCampOpacity",
+      "pocketCampLocked", "pocketCampCombat", "panelPlace", "toasts", "toastSound", "toastPosition" }, keys)
   end)
 
   it("gives the Settings page sections with finished labels and current values", function()
