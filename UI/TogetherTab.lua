@@ -127,13 +127,21 @@ local function line(text, color)
   GameTooltip:AddLine(text, color[1], color[2], color[3])
 end
 
+-- A Character's line: the Character (full name, level and the extra
+-- parts) on the left, whose they are on the right, so the two names never
+-- run together.
+local function characterLine(character, extra)
+  local parts = {
+    classHex(character.classFilename) .. character.fullName .. "|r",
+    colored(tostring(character.level), MUTED),
+  }
+  for _, part in ipairs(extra) do parts[#parts + 1] = part end
+  GameTooltip:AddDoubleLine(table.concat(parts, " "), character.member, 1, 1, 1, DIM[1], DIM[2], DIM[3])
+end
+
 local function groupTooltip(owner)
   for _, character in ipairs(owner.group.characters) do
-    local parts = {
-      colored(character.member, TEXT),
-      classHex(character.classFilename) .. character.name .. "|r",
-      colored(tostring(character.level), MUTED),
-    }
+    local parts = {}
     if character.alt then parts[#parts + 1] = colored("alt", DIM) end
     if character.online and not character.own then parts[#parts + 1] = colored("online", ONLINE) end
     if character.canPlay then
@@ -141,7 +149,7 @@ local function groupTooltip(owner)
     elseif character.apart then
       parts[#parts + 1] = colored(character.apart, DIM)
     end
-    line(table.concat(parts, " "))
+    characterLine(character, parts)
   end
 end
 
@@ -156,14 +164,10 @@ local function dungeonTooltip(owner)
   end
   line(tooltip.you, tooltip.fits and TEXT or DIM)
   for _, fitter in ipairs(tooltip.fitters) do
-    local parts = {
-      colored(fitter.member, TEXT),
-      classHex(fitter.classFilename) .. fitter.name .. "|r",
-      colored(tostring(fitter.level), MUTED),
-    }
+    local parts = {}
     if fitter.online then parts[#parts + 1] = colored("online", ONLINE) end
     if fitter.far then parts[#parts + 1] = colored("· " .. fitter.far, DIM) end
-    line(table.concat(parts, " "))
+    characterLine(fitter, parts)
   end
   if tooltip.none then line(tooltip.none, DIM) end
   if tooltip.almost then line(tooltip.almost, DIM) end

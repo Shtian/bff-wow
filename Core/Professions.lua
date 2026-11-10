@@ -284,7 +284,8 @@ function Professions.tab(rows, sortBy)
       for order, character in ipairs(member.characters) do
         for _, p in ipairs(character.professions or {}) do
           if p.skillLine == profession.skillLine then
-            characters[#characters + 1] = { name = character.name, classFilename = character.classFilename,
+            characters[#characters + 1] = { name = character.name, fullName = character.fullName,
+              classFilename = character.classFilename,
               alt = not character.main, skill = p.skill, max = p.max, rank = p.rank, full = p.full, capped = p.capped,
               order = order }
           end

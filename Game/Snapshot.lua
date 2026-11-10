@@ -59,9 +59,15 @@ local function read()
   end
 
   local _, classFilename = UnitClass("player")
+  -- On Forever UnitName's second value is the last name (retail's realm).
+  local name, lastName = UnitName("player")
+  if (issecretvalue and issecretvalue(lastName)) or type(lastName) ~= "string" or lastName == "" then
+    lastName = nil
+  end
   return {
     guid = guid,
-    name = UnitName("player"),
+    name = name,
+    lastName = lastName,
     classFilename = classFilename,
     level = level,
     xp = UnitXP("player"),

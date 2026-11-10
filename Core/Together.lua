@@ -152,6 +152,7 @@ local function membersOf(rows)
       member.characters[#member.characters + 1] = {
         member = member,
         name = character.name,
+        fullName = character.fullName,
         classFilename = character.classFilename,
         level = character.level,
         main = character.main == true,
@@ -212,6 +213,7 @@ local function describeCharacter(character, yourLevel)
     memberId = character.member.id,
     member = own and "You" or character.member.name,
     name = character.name,
+    fullName = character.fullName,
     classFilename = character.classFilename,
     level = character.level,
     alt = not character.main,
@@ -373,6 +375,7 @@ local function describeDungeon(dungeon, others, yourLevel)
       memberId = character.member.id,
       member = character.member.name,
       name = character.name,
+      fullName = character.fullName,
       classFilename = character.classFilename,
       level = character.level,
       online = character.played,

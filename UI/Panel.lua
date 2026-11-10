@@ -165,6 +165,8 @@ local function className(classFilename)
 end
 
 -- Whisper and Invite, guarded since Midnight moved some chat functions.
+-- On Forever a Character is whispered and invited as "First Last"; the
+-- first name alone reaches no one (or someone else).
 local function whisper(name)
   local sendTell = ChatFrameUtil and ChatFrameUtil.SendTell or ChatFrame_SendTell
   if sendTell then sendTell(name) end
@@ -204,7 +206,7 @@ local function showTooltip(owner)
   local row, character = owner.row, owner.character
   if not row then return end
   placeBeside(owner)
-  GameTooltip:AddLine(character.name, classColor(character.classFilename))
+  GameTooltip:AddLine(character.fullName, classColor(character.classFilename))
   GameTooltip:AddLine(("Level %d %s %s"):format(character.level, className(character.classFilename),
     character.main and "(Main)" or "(Alt)"), 1, 1, 1)
   GameTooltip:AddLine(row.own and "Your Character" or ("%s's Character"):format(row.displayName or "?"), 1, 1, 1)
@@ -249,7 +251,7 @@ local function showMenu(owner)
   local row, character = owner.row, owner.character
   if not row then return end
   MenuUtil.CreateContextMenu(owner, function(_, root)
-    root:CreateTitle(character.name)
+    root:CreateTitle(character.fullName)
     if row.own then
       local setMain = root:CreateButton("Set as Main", function() core:setMain(character.guid) end)
       setMain:SetEnabled(not (character.main and row.mainSet))
@@ -257,8 +259,8 @@ local function showMenu(owner)
         root:CreateButton("Main: most recently played", function() core:setMain(nil) end)
       end
     else
-      root:CreateButton("Whisper", function() whisper(character.name) end):SetEnabled(character.playing)
-      root:CreateButton("Invite", function() invite(character.name) end):SetEnabled(character.playing)
+      root:CreateButton("Whisper", function() whisper(character.fullName) end):SetEnabled(character.playing)
+      root:CreateButton("Invite", function() invite(character.fullName) end):SetEnabled(character.playing)
       local name = row.displayName or character.name
       root:CreateButton(("When does %s play?"):format(name), function() Panel.showWhen(row.memberId) end)
       root:CreateButton(("Remove %s..."):format(name), function()
@@ -1426,7 +1428,7 @@ local function tileTooltip(tile)
     local skill = ("%d/%d"):format(character.skill, character.max)
     if character.rank then skill = Skin.hex(MUTED) .. character.rank .. "|r " .. skill end
     local r, g, b = classColor(character.classFilename)
-    GameTooltip:AddDoubleLine(character.name, skill, r, g, b, TEXT[1], TEXT[2], TEXT[3])
+    GameTooltip:AddDoubleLine(character.fullName, skill, r, g, b, TEXT[1], TEXT[2], TEXT[3])
   end
 end
 
