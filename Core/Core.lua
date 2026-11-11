@@ -1187,6 +1187,7 @@ Core.DEFAULT_TOAST_SOUND = "UI_BNET_TOAST"
 local SHARING = "Sharing"
 local NOTIFICATIONS = "Notifications and display"
 local TOASTS = "Toasts"
+local POCKET_CAMP = "Pocket Camp"
 
 local SETTINGS = {
   {
@@ -1216,29 +1217,6 @@ local SETTINGS = {
     label = "Show the Camp",
     saved = offFlag("campOff"),
   },
-  -- The Pocket Camp (pocketCamp()): whether it shows, its backdrop's
-  -- opacity as a percentage, whether it can be dragged, and hiding it in
-  -- combat.
-  {
-    key = "pocketCamp", section = NOTIFICATIONS, kind = "toggle",
-    label = "Show the Pocket Camp",
-    saved = onFlag("pocketCamp"),
-  },
-  {
-    key = "pocketCampOpacity", section = NOTIFICATIONS, kind = "percent",
-    label = "Pocket Camp backdrop opacity",
-    saved = percent("pocketCampOpacity", 60),
-  },
-  {
-    key = "pocketCampLocked", section = NOTIFICATIONS, kind = "toggle",
-    label = "Lock the Pocket Camp's position",
-    saved = onFlag("pocketCampLocked"),
-  },
-  {
-    key = "pocketCampCombat", section = NOTIFICATIONS, kind = "toggle",
-    label = "Hide the Pocket Camp in combat",
-    saved = onFlag("pocketCampCombatHide"),
-  },
   -- The panel's size and position (panelPlace()); the page shows a reset.
   {
     key = "panelPlace", section = NOTIFICATIONS, kind = "panelPlace",
@@ -1262,6 +1240,29 @@ local SETTINGS = {
     key = "toastPosition", section = TOASTS, kind = "position",
     label = "Move toasts",
     saved = screenPosition("toastPosition"),
+  },
+  -- The Pocket Camp (pocketCamp()), in a section of its own: whether it shows, its backdrop's
+  -- opacity as a percentage, whether it can be dragged, and hiding it in
+  -- combat.
+  {
+    key = "pocketCamp", section = POCKET_CAMP, kind = "toggle",
+    label = "Show the Pocket Camp",
+    saved = onFlag("pocketCamp"),
+  },
+  {
+    key = "pocketCampOpacity", section = POCKET_CAMP, kind = "percent",
+    label = "Backdrop opacity",
+    saved = percent("pocketCampOpacity", 60),
+  },
+  {
+    key = "pocketCampLocked", section = POCKET_CAMP, kind = "toggle",
+    label = "Lock its position",
+    saved = onFlag("pocketCampLocked"),
+  },
+  {
+    key = "pocketCampCombat", section = POCKET_CAMP, kind = "toggle",
+    label = "Hide in combat",
+    saved = onFlag("pocketCampCombatHide"),
   },
   -- Where the Pocket Camp was dragged to: its bottom left corner, as
   -- { x, y } from the screen's bottom left; nil where it starts. Not on

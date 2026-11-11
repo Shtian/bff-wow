@@ -68,14 +68,14 @@ Nothing new is sent: the entries are the ones Feed already makes.
 
 ## Settings
 
-In Notifications and display, under Show the Camp (`docs/design/settings-and-release.md` has how each is saved):
+In a section of their own on the Settings page, Pocket Camp, after Toasts (`docs/design/settings-and-release.md` has how each is saved):
 
 | Key | Label | Default |
 |---|---|---|
 | `pocketCamp` | Show the Pocket Camp | off |
-| `pocketCampOpacity` | Pocket Camp backdrop opacity (0 to 100, a slider) | 60 |
-| `pocketCampLocked` | Lock the Pocket Camp's position | off |
-| `pocketCampCombat` | Hide the Pocket Camp in combat | off |
+| `pocketCampOpacity` | Backdrop opacity (0 to 100, a slider) | 60 |
+| `pocketCampLocked` | Lock its position | off |
+| `pocketCampCombat` | Hide in combat | off |
 | `pocketCampPosition` | not on the page: where it was dragged to | nil |
 
 All account-wide. With `camp` off the Pocket Camp never shows, whatever its own setting says.
