@@ -16,9 +16,9 @@ local Skin = ns.Skin
 local HBDPins = LibStub("HereBeDragons-Pins-2.0")
 
 -- The avatar's art unit on the map: smaller than on Roster rows.
-local FIGURE_TARGET = 1.25
+local FIGURE_TARGET = 1.4
 -- The class icon's size while the Camp is off.
-local ICON = 14
+local ICON = 16
 -- The online dot, with a dark keyline round it so it reads on a bright map.
 local DOT = 5
 local KEYLINE = 1
