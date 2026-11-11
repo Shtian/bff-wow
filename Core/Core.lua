@@ -84,6 +84,7 @@ local function sentLine(self, message, size, to)
     return ("send DIGEST%s · %d versions%s · %d B · %s"):format(to and (" to " .. to) or "", count,
       message.partial and " (more in turn)" or "", size, traceVersions(self, message.versions))
   end
+  if message.type == "WHERE" then return ("send WHERE · %d B"):format(size) end
   local records = {}
   for i, record in ipairs(type(message.records) == "table" and message.records or {}) do
     records[i] = traceRecord(self, record)
@@ -101,6 +102,15 @@ local function traceReceived(self, record, kept)
     line = line .. (" · late %ds"):format(math.max(0, self.now() - record.version))
   end
   return line
+end
+
+-- Signs, encodes, traces and hands a message to the link: to everyone, or
+-- only the Character named `to`.
+local function sendMessage(self, message, to)
+  message.from = self.ledger:memberId()
+  local encoded = ns.Codec.encode(message)
+  if self.trace then self.trace(sentLine(self, message, #encoded, to)) end
+  self.link.send(encoded, to)
 end
 
 -- deps: db, now(), random(), link (with send(string, to): to everyone, or
@@ -162,14 +172,21 @@ function Core.new(deps)
   self.crewGoals = ns.Goals.new(deps.db, self.ledger, deps.now, deps.maxLevel)
   -- Every message carries the sender's Member id. Where you stand is only
   -- read when own DATA goes out, so moving alone never sends anything.
+  -- Moving in the open world sends a small WHERE instead (see Where).
   local locate = type(deps.locate) == "function" and deps.locate or nil
+  self.where = ns.Where.new(deps.now, locate)
   local Gossip = type(deps.gossip) == "table" and deps.gossip or ns.Gossip
   self.gossip = Gossip.new(self.ledger, deps.now, deps.random, function(message, to)
-    message.from = self.ledger:memberId()
-    local encoded = ns.Codec.encode(message)
-    if self.trace then self.trace(sentLine(self, message, #encoded, to)) end
-    self.link.send(encoded, to)
-  end, locate and function() self.ledger:locate(locate()) end)
+    sendMessage(self, message, to)
+  end, locate and function()
+    local location = self.where:read()
+    local changed = self.ledger:locate(location)
+    local own = self.ledger:own()
+    -- A WHERE went out since the record's spot was written: this DATA must
+    -- be newer than it, even if the spot is back where the record has it.
+    if not changed and own and self.where:sentSince(own.version) then self.ledger:touch() end
+    self.where:dataSent(location)
+  end)
   self.gossip:setPaused(self:isPaused())
   self.playTracker = ns.PlayTimes.new(deps.db, deps.now)
   -- The own record's Play times may be out of date until the first tick.
@@ -527,10 +544,18 @@ Core.selectTogether = ns.Together.select
 -- mapId, x and y (0–1 on that map), zone, instance (the instance's name
 -- while inside one, the spot then being the last one outside), online,
 -- sinceSeen (seconds since the Member was last seen) and lastSeenText (as
--- rows() words it).
+-- rows() words it), and figure (the shown Character's class, for the
+-- Camp's seated figure, while the Camp is on). A spot heard in a WHERE since
+-- the record was written is used over the record's. None while the mapPins
+-- setting is off.
 function Core:mapPins()
   local pins = {}
+  if not self:setting("mapPins") then return pins end
+  local campOn = self:setting("camp")
   for _, row in ipairs(ns.Roster.rows(self.ledger, self.now())) do
+    local record = not row.own and self.ledger:record(row.memberId)
+    local live = record and self.where:spot(row.memberId, row.guid, record.version)
+    if live then row.mapId, row.x, row.y, row.instance = live.mapId, live.x, live.y, nil end
     if not row.own and row.mapId and row.x and row.y then
       pins[#pins + 1] = {
         memberId = row.memberId,
@@ -544,6 +569,7 @@ function Core:mapPins()
         y = row.y,
         zone = row.zone,
         instance = row.instance,
+        figure = campOn and row.classFilename or nil,
         online = row.online,
         sinceSeen = row.sinceSeen,
         lastSeenText = row.lastSeenText,
@@ -641,11 +667,25 @@ local function awaySummary(self)
 end
 
 -- Called once a second. Core decides what is due.
+-- While moving with others online, a WHERE goes out to everyone (Where),
+-- only while Gossip talks: never paused, out of a Crew or with the link down.
+local function shareWhere(self)
+  local talking = self.gossip.open == true and not (self.db.crew and self.db.crew.leaving)
+  local others = 0
+  for id in pairs(self.online) do
+    if id ~= self.ledger:memberId() then others = others + 1 end
+  end
+  local own = self.ledger:own()
+  local message = self.where:tick(talking, others, self.ledger:playing(), own and own.version)
+  if message then sendMessage(self, message) end
+end
+
 function Core:tick()
   -- Counts the second played.
   if self.playTracker:tick() then self.playTimesDue = true end
   sharePlayTimes(self)
   self.gossip:tick()
+  shareWhere(self)
   if self.log:tick() then awaySummary(self) end
   if self.db.crew and self.crewGoals:tick() then
     -- A Crew's first sync: what it has isn't news to you, as for its goals.
@@ -1088,6 +1128,12 @@ local SETTINGS = {
     label = "Show the Camp",
     saved = offFlag("campOff"),
   },
+  -- Other Members' pins on the world map (mapPins()).
+  {
+    key = "mapPins", section = NOTIFICATIONS, kind = "toggle",
+    label = "Show your Crew on the world map",
+    saved = offFlag("mapPinsOff"),
+  },
   -- The panel's size and position (panelPlace()); the page shows a reset.
   {
     key = "panelPlace", section = NOTIFICATIONS, kind = "panelPlace",
@@ -1390,6 +1436,7 @@ end
 function Core:removeMember(id)
   if not self.ledger:remove(id) then return nil, "unknownMember" end
   self.gossip:forget(id)
+  self.where:forget(id)
   self.log:dropMember(id)
   self.spareLife:memberRemoved()
   self.online[id] = nil
@@ -1539,7 +1586,13 @@ function Core:received(message)
 
   self.ledger:heard(decoded.from)
   local changed = false
-  if decoded.type == "DIGEST" and type(decoded.versions) == "table" then
+  if decoded.type == "WHERE" then
+    local kept = not self.ledger:isRemoved(decoded.from) and self.where:heard(decoded.from, decoded)
+    if self.trace then
+      self.trace(("receive WHERE from %s · %s"):format(traceName(self, decoded.from), kept and "ok" or "ignored"))
+    end
+    if kept then self.listener("moved") end
+  elseif decoded.type == "DIGEST" and type(decoded.versions) == "table" then
     local partial = decoded.partial == true
     if self.trace then
       self.trace(("receive DIGEST from %s · ok%s · %s"):format(traceName(self, decoded.from),

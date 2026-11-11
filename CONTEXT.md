@@ -79,6 +79,10 @@ _Avoid_: Tombstone, death marker
 A small on-screen notice for a Live event, with an optional sound. Shows the same things as the chat line.
 _Avoid_: Popup, alert, notification (when meaning a toast)
 
+**Map pin**:
+A Member's mark on the world map where their shown Character was last seen: their Camp figure (or class icon with the Camp off), ringed while online. While a Member moves in the open world, their client sends a small **WHERE** so the pin follows them between their record's updates; the record still carries the last spot for anyone who missed it.
+_Avoid_: Dot, blip, marker
+
 **Play times**:
 The hours of the week a Member usually plays, from the last 4 weeks of their own client's counting, across all their Characters. A Member **usually plays** an hour they played at least 10 minutes in, in at least 2 of those weeks.
 _Avoid_: Schedule, availability, activity
