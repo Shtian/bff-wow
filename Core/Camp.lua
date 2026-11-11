@@ -206,7 +206,8 @@ end
 -- of Member ids fishing now. Each actor is as in view(), with pose
 -- ("fishing" while fishing, else "adventuring" while the Character being
 -- played is in an instance, else "seated"), instance (its name, while in
--- one) and status (the pose in words). Members that didn't fit are counted
+-- one), status (the pose in words) and row (the Member's Roster row, for
+-- the tooltip over the figure). Members that didn't fit are counted
 -- in more ("+2"). tooltip lists who is doing what: { title, lines }. See
 -- Core:pocketCamp().
 function Camp.pocket(rows, entries, now, fishing)
@@ -218,7 +219,8 @@ function Camp.pocket(rows, entries, now, fishing)
   for _, row in ipairs(rows) do byMember[row.memberId] = row end
   local lines = {}
   for i, actor in ipairs(view.actors) do
-    actor.instance = byMember[actor.memberId].instance
+    actor.row = byMember[actor.memberId]
+    actor.instance = actor.row.instance
     if fishing[actor.memberId] then
       actor.pose, actor.status = "fishing", "fishing"
     elseif actor.instance then

@@ -18,7 +18,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PAL = {
   K: "#0b0a12", S: "#e8b890", s: "#b98465", W: "#fff3c4", Y: "#ffe9a0", G: "#ffd14a", O: "#f0a21c",
   R: "#c9481c", B: "#5a3a24", b: "#3a2518", T: "#8c8796", t: "#5d5966", L: "#70e370", P: "#f2b8d0",
-  Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8",
+  Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8", N: "#ece8d8",
 };
 // Cloth tones: a white C and a 62% D, tinted by the class colour in game.
 // Sleepers' cloth is 55% of that, as the prototype shaded bedrolls.
@@ -57,6 +57,9 @@ const SMOKE = [
   ["..TT...", ".TTTT..", "TTtTTT.", ".TTTtT.", "..tt..."],
   [".T..TT.", "T.TT..T", ".T..T..", "T..T..T", "..T.T.."],
 ];
+// A figure as a skeleton, for a while after a death: the seated figure's
+// outline in bone: a skull, a spine, ribs and a pelvis. One layer, untinted.
+const SKELETON = ["....KKKK....", "...KNNNNK...", "..KNNNNNNK..", "..KNKNNKNK..", "..KNKNNKNK..", "..KNNNNNNK..", "...KNNNNK...", "...KKNNKK...", ".KNNNNNNNNK.", ".KNKKNNKKNK.", ".KKNNNNNNKK.", "..KNKKKKNK..", "..KKK..KKK.."];
 // The fire flaring for a Crew goal: each flame frame with its upper rows
 // doubled, so it stands taller on the same logs.
 const flare = (rows) => rows.flatMap((row, j) => (j < 8 ? [row, row] : [row]));
@@ -104,7 +107,7 @@ const SPRITES = [
   ["ember", skin(EMBER)], ["emberCool", skin(EMBER_COOL)],
   ["tent", tent()],
   ["rod", skin(ROD)], ["sword", skin(SWORD)], ["star", skin(STAR)], ["fish", skin(FISH)],
-  ["smoke1", skin(SMOKE[0])], ["smoke2", skin(SMOKE[1])],
+  ["smoke1", skin(SMOKE[0])], ["smoke2", skin(SMOKE[1])], ["skeleton", skin(SKELETON)],
   ["flare1", skin(flare(FIRE[0]))], ["flare2", skin(flare(FIRE[1]))], ["flare3", skin(flare(FIRE[2]))],
 ];
 

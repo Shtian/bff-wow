@@ -31,8 +31,17 @@ CampScene.SHORT_HEIGHT = 78
 -- Animation ticks per second, and how long a Cheer's hop lasts.
 local FPS = 6
 local HOP_FOR = 0.7
--- How long each one-off animation plays (band:Animate), in seconds.
-local ANIMATION_FOR = { ding = 1.2, maxLevel = 1.8, death = 1.6, rareFind = 2, goal = 1.6 }
+-- How long each one-off animation plays (band:Animate), in seconds: a
+-- quick opening, then a tail long enough to notice at a glance.
+local ANIMATION_FOR = { ding = 10, maxLevel = 10, death = 10, rareFind = 10, goal = 10 }
+-- The openings: a ding's star rises for this long, and a death's smoke
+-- rises while the figure flickers. A max level's burst repeats this often.
+local STAR_RISES_FOR = 1.2
+local SMOKE_FOR = 1.6
+local BURST_EVERY = 1.8
+-- A celebrating figure (a ding or a max level) and a held-up fish bounce:
+-- up for this many ticks, then down for as many.
+local BOUNCE_TICKS = 3
 -- Rows up from the band's bottom: where the ground line is, and where each
 -- sprite's bottom sits on it (from the prototype).
 local ROW = {
@@ -174,43 +183,61 @@ local function hopping(scene, actor)
   return untilTime ~= nil and untilTime and untilTime > GetTime()
 end
 
--- How far through a one-off animation is, 0 to 1, or nil when it isn't
--- playing. memberId is nil for the fire's.
+-- How many seconds a one-off animation has played, or nil when it isn't
+-- playing. The newest of its kind counts. memberId is nil for the fire's.
 local function playing(scene, kind, memberId)
   local now = GetTime()
-  for _, animation in ipairs(scene.animations) do
+  for i = #scene.animations, 1, -1 do
+    local animation = scene.animations[i]
     if animation.kind == kind and animation.memberId == memberId and now < animation.ends then
-      return (now - animation.start) / (animation.ends - animation.start)
+      return now - animation.start
     end
   end
   return nil
 end
 
+-- Up or down, swapping every BOUNCE_TICKS ticks.
+local function bounced(f)
+  return math.floor(f / BOUNCE_TICKS) % 2 == 0
+end
+
+-- Whether a figure is up on its feet celebrating: a Cheer's hop, or the
+-- bounce a ding and a max level keep up while they play.
+local function celebrating(scene, actor, f)
+  if hopping(scene, actor) then return true end
+  local ding = playing(scene, "ding", actor.memberId)
+  if ding and ding < STAR_RISES_FOR then return true end
+  return (ding or playing(scene, "maxLevel", actor.memberId)) ~= nil and bounced(f)
+end
+
 -- Draws what plays over one upright actor: a ding's star, a rare find's
--- fish held up, a death's smoke and flicker, and a max level's burst.
+-- fish held up, a death's smoke and flicker, and a max level's bursts.
 -- row is the figure's bottom row and top the row above its head.
 local function drawAnimations(scene, parts, actor, f, row, top)
   local unit, x, id = scene.unit, actor.x, actor.memberId
   local ding, fish, death = playing(scene, "ding", id), playing(scene, "rareFind", id), playing(scene, "death", id)
+  local smoke = death and death < SMOKE_FOR and death / SMOKE_FOR
   if fish then
     setSprite(parts.mark, "fish", unit)
-    put(scene, parts.mark, x + FISH.x, top + 1)
+    put(scene, parts.mark, x + FISH.x, top + 1 + (bounced(f) and 1 or 0))
   elseif ding then
+    -- The star rises, then stays over the head while the figure bounces.
     setSprite(parts.mark, "star", unit)
-    put(scene, parts.mark, x + STAR.x, top + 1 + math.floor(ding * STAR.rise))
-  elseif death then
-    setSprite(parts.mark, death < 0.5 and "smoke1" or "smoke2", unit)
-    put(scene, parts.mark, x + SMOKE.x, top + SMOKE.row + math.floor(death * SMOKE.rise))
+    put(scene, parts.mark, x + STAR.x, top + 1 + math.floor(math.min(1, ding / STAR_RISES_FOR) * STAR.rise))
+  elseif smoke then
+    setSprite(parts.mark, smoke < 0.5 and "smoke1" or "smoke2", unit)
+    put(scene, parts.mark, x + SMOKE.x, top + SMOKE.row + math.floor(smoke * SMOKE.rise))
   else
     parts.mark:Hide()
   end
-  -- A death flickers the figure on alternate ticks.
-  local alpha = death and f % 2 == 0 and 0.3 or 1
+  -- The skeleton flickers on alternate ticks while the smoke rises.
+  local alpha = smoke and f % 2 == 0 and 0.3 or 1
   parts.cloth:SetAlpha(alpha)
   parts.skin:SetAlpha(alpha)
 
   local burst = playing(scene, "maxLevel", id)
   if burst then
+    burst = burst % BURST_EVERY / BURST_EVERY
     parts.burst = parts.burst or {}
     local reach = math.floor(burst * BURST.reach)
     for i, way in ipairs(BURST.ways) do
@@ -226,14 +253,15 @@ end
 
 -- Draws one actor's figure, seat or sleep marks, tool, spark and name, for
 -- the animation frame f. Upright poses: "seated", "fishing" (seated, a rod
--- out to the fire) and "adventuring" (standing, a sword raised).
+-- out to the fire) and "adventuring" (standing, a sword raised). After a
+-- death the figure is a skeleton for a while, whatever its pose.
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
   local top
   if actor.pose ~= "asleep" then
+    local dead = playing(scene, "death", actor.memberId) ~= nil
     local standing = actor.pose == "adventuring"
-    -- A Cheer and a ding both hop.
-    local hop = hopping(scene, actor) or playing(scene, "ding", actor.memberId) ~= nil
+    local hop = not dead and celebrating(scene, actor, f)
     local row = (standing and ROW.standing or ROW.seated) + (hop and ROW.hop - ROW.seated or 0)
     if standing then
       parts.seat:Hide()
@@ -242,13 +270,20 @@ local function drawActor(scene, parts, actor, f)
       put(scene, parts.seat, x + OFFSET.seat, ROW.seat)
     end
     local armsUp = hop or standing
-    setSprite(parts.cloth, armsUp and "hopCloth" or "seatedCloth", scene.unit)
-    setSprite(parts.skin, armsUp and "hop" or "seated", scene.unit)
+    if dead then
+      parts.cloth:Hide()
+      setSprite(parts.skin, "skeleton", scene.unit)
+    else
+      setSprite(parts.cloth, armsUp and "hopCloth" or "seatedCloth", scene.unit)
+      setSprite(parts.skin, armsUp and "hop" or "seated", scene.unit)
+    end
     put(scene, parts.cloth, x, row)
     put(scene, parts.skin, x, row)
     for _, z in ipairs(parts.sleep) do z:Hide() end
     top = row + Sheet.sprites.seated[4]
-    if standing then
+    if dead then
+      parts.tool:Hide()
+    elseif standing then
       setSprite(parts.tool, "sword", scene.unit)
       put(scene, parts.tool, x + SWORD.x, row + SWORD.row)
       top = row + SWORD.row + Sheet.sprites.sword[4]
@@ -294,7 +329,8 @@ local function drawActor(scene, parts, actor, f)
   label:ClearAllPoints()
   label:SetPoint("BOTTOM", scene.art, "BOTTOMLEFT", (scene.fire + centre) * scene.unit, (top + LABEL_GAP) * scene.unit)
   label:SetWidth(actor.labelWidth * scene.unit)
-  local text = scene.gains and actor.gained or (not scene.gains and actor.label) or nil
+  local text
+  if scene.gains then text = actor.gained elseif scene.names then text = actor.label end
   label:SetText(text or "")
   if scene.gains then
     Skin.color(label, actor.highlight and Skin.GOLD or Skin.ONLINE)
@@ -306,7 +342,7 @@ local function drawActor(scene, parts, actor, f)
   if actor.spark then
     setSprite(parts.spark, "spark", scene.unit)
     local upright = actor.pose ~= "asleep"
-    local lift = upright and hopping(scene, actor) and ROW.hop - ROW.seated or 0
+    local lift = upright and celebrating(scene, actor, f) and ROW.hop - ROW.seated or 0
     put(scene, parts.spark, x + (upright and OFFSET.seatedSpark or OFFSET.asleepSpark),
       (upright and SPARK_ROW.seated or SPARK_ROW.asleep) + lift)
   else
@@ -371,9 +407,11 @@ local function onUpdate(band)
 end
 
 -- A Camp band in parent. options (all optional): gains shows each
--- actor's gained text (While you were away) instead of names; target is
--- the art pixel's size to aim for in UI units (default BAND_TARGET); and
--- shadow gives the names a shadow, for a band over the game world.
+-- actor's gained text (While you were away) instead of names; names false
+-- leaves the names out (the Pocket Camp, whose figures have a tooltip);
+-- target is the art pixel's size to aim for in UI units (default
+-- BAND_TARGET); and shadow gives its text a shadow, for a band over the
+-- game world.
 function CampScene.new(parent, options)
   options = options or {}
   local band = CreateFrame("Frame", nil, parent)
@@ -388,6 +426,7 @@ function CampScene.new(parent, options)
   local scene = {
     band = band,
     gains = options.gains,
+    names = options.names ~= false,
     target = options.target or CampScene.BAND_TARGET,
     hops = {},
     -- The one-off animations playing: { kind, memberId, start, ends }.
@@ -477,6 +516,19 @@ function CampScene.new(parent, options)
   function band:SetBackdropAlpha(alpha)
     scene.sky:SetAlpha(alpha)
     scene.backdrop:SetAlpha(alpha)
+  end
+
+  -- The actor whose figure is at x, in UI units from the band's left edge,
+  -- or nil over the fire and between figures. Half the gap each side of a
+  -- figure counts as it.
+  function band:ActorAt(x)
+    if not scene.view or not scene.unit then return nil end
+    local at = x / scene.unit - scene.fire
+    local reach = LAYOUT.gap / 2
+    for _, actor in ipairs(scene.view.actors) do
+      if at >= actor.x - reach and at < actor.x + actor.width + reach then return actor end
+    end
+    return nil
   end
 
   -- Plays a one-off animation: "ding", "maxLevel", "death" or "rareFind"

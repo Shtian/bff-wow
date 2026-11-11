@@ -8,7 +8,7 @@ local _, ns = ...
 ns.CampSheet = {
   file = "Interface\\AddOns\\BFF\\Media\\CampSprites",
   width = 128,
-  height = 64,
+  height = 128,
   sprites = {
     seatedCloth = { 1, 1, 12, 13 },
     seated = { 15, 1, 12, 13 },
@@ -36,9 +36,10 @@ ns.CampSheet = {
     fish = { 57, 30, 8, 4 },
     smoke1 = { 67, 30, 7, 5 },
     smoke2 = { 76, 30, 7, 5 },
-    flare1 = { 85, 30, 11, 20 },
-    flare2 = { 98, 30, 11, 20 },
-    flare3 = { 111, 30, 11, 20 },
+    skeleton = { 85, 30, 12, 13 },
+    flare1 = { 99, 30, 11, 20 },
+    flare2 = { 112, 30, 11, 20 },
+    flare3 = { 1, 54, 11, 20 },
   },
   -- The backdrop's file, its size in texels, and the column the fire's
   -- centre sits on.

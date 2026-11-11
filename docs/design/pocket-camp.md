@@ -15,7 +15,8 @@ pocketCamp() -> nil, or {
     { memberId, label = "You" | displayName, classFilename, x, width, labelWidth,
       pose = "seated" | "adventuring" | "fishing",
       instance = "The Deadmines" | nil, status = "by the fire" | "in The Deadmines" | "fishing",
-      spark = true | nil, you = true | nil },
+      spark = true | nil, you = true | nil,
+      row = { ... } }, -- the Member's Roster row, for the tooltip over the figure
   },
   more = 2, moreText = "+2", -- online Members that didn't fit; nil when all did
   tooltip = { title = "Pocket Camp", lines = { "You: by the fire", "Bob: in The Deadmines" }, hint },
@@ -44,15 +45,17 @@ UI never reads a setting or a Member record. `UI/PocketCamp.lua` creates its fra
 
 ## One-off animations
 
-A new Feed entry made while running fires the listener event `pocketCampAnimation({ kind, memberId })`, and the Pocket Camp plays it once (1.2 to 2 s, visual only):
+A new Feed entry made while running fires the listener event `pocketCampAnimation({ kind, memberId })`, and the Pocket Camp plays it once, for 10 s (visual only). Each has a quick opening and a tail, so it's still there when you glance over a few seconds later:
 
 | Feed kind | Animation |
 |---|---|
-| ding | that Member hops with a small gold star above the head |
-| max level | a burst of sparks on that Member; the 24-hour spark stays |
-| death | a puff of grey smoke, and the figure flickers |
-| rare find | that Member holds up a fish (over the rod, if they're fishing) |
+| ding | a small gold star rises over that Member's head (1.2 s) and stays there while the figure bounces, half a second up and half down |
+| max level | that Member bounces while bursts of sparks fly out, one every 1.8 s; the 24-hour spark stays |
+| death | that Member is a skeleton, with a puff of grey smoke and a flicker for the first 1.6 s |
+| rare find | that Member holds up a fish, bobbing (over the rod, if they're fishing) |
 | goal (Crew-wide) | the fire flares; no `memberId` |
+
+The lengths are CampScene's (`ANIMATION_FOR` in `UI/CampScene.lua`). A second animation of the same kind for the same Member starts it over. They're kept in UI only, so a `/reload` drops one that's playing.
 
 No other kind animates. Core decides, in `animate()`:
 
@@ -79,15 +82,16 @@ All account-wide. With `camp` off the Pocket Camp never shows, whatever its own 
 
 ## UI
 
-- **Frame.** `UI/PocketCamp.lua`: a button on `UIParent`, strata LOW, clamped to the screen, with a CampScene band filling it (`CampScene.new(frame, { target = FIGURE_TARGET, shadow = true })`). Its art pixel aims for 2 UI units, as on rows and toasts, so it's about 224 by 68 UI units; `band:Fit(columns, rows)` gives the exact size in whole screen pixels. Names have a shadow, since the game world is behind them.
-- **Backdrop.** The band's sky and backdrop art at `opacity` (`band:SetBackdropAlpha`). At 0 only the fire, the figures, the names and "+N" show.
+- **Frame.** `UI/PocketCamp.lua`: a button on `UIParent`, strata LOW, clamped to the screen, with a CampScene band filling it (`CampScene.new(frame, { target = FIGURE_TARGET, shadow = true, names = false })`). Its art pixel aims for 2 UI units, as on rows and toasts, so it's about 224 by 68 UI units; `band:Fit(columns, rows)` gives the exact size in whole screen pixels. "+N" has a shadow, since the game world is behind it.
+- **No names.** With six figures there's room for about four letters each, so the Pocket Camp shows none; the tooltip says who a figure is.
+- **Backdrop.** The band's sky and backdrop art at `opacity` (`band:SetBackdropAlpha`). At 0 only the fire, the figures and "+N" show.
 - **Click** toggles the panel, as the minimap button does. In combat (`InCombatLockdown()`) it does nothing.
 - **Drag** moves it unless `locked`. Where it's dropped is saved with `core:setPocketCampPosition(left, bottom)`; until then it sits under the screen's centre. Locked, a click still works.
 - **Hide in combat.** With `hideInCombat`, the frame hides on `PLAYER_REGEN_DISABLED` and shows on `PLAYER_REGEN_ENABLED`. Hidden, its `OnUpdate` doesn't run.
-- **Tooltip.** Core's `tooltip`: the title, a line per figure, "+N" and the hint.
+- **Tooltip.** Over a figure, that Member's tooltip exactly as the Roster shows it (`Panel.characterTooltip(actor.row, actor.row)`: the Character being shown, level, zone, professions and so on), then the hint. Anywhere else, Core's `tooltip`: the title, a line per figure, "+N" and the hint. `band:ActorAt(x)` says which figure the mouse is over (half the gap each side counts), and the tooltip follows the mouse from one to the next.
 - **Poses.** CampScene draws `adventuring` as the standing (hop) figure with the `sword` sprite over its raised hand and no seat, and `fishing` as the seated figure with the `rod` sprite out towards the fire (mirrored on the fire's right).
-- **Animations.** `band:Animate(kind, memberId)` keeps each for its length and draws it on the band's 6-per-second tick: `star`, `fish`, `smoke1`/`smoke2` over the head, alternate-tick alpha for the flicker, seven sparks flying out for the burst, and `flare1`–`flare3` in the fire's place.
-- **Sprites.** `rod`, `sword`, `star`, `fish`, `smoke1`, `smoke2` and `flare1`–`flare3` are grids in `scripts/camp-art.mjs` (the flare is each fire frame with its upper rows doubled). Run it after changing one.
+- **Animations.** `band:Animate(kind, memberId)` keeps each for its length and draws it on the band's 6-per-second tick: `star`, `fish`, `smoke1`/`smoke2` over the head, `skeleton` in the figure's place (one untinted layer, no tool, whatever the pose), alternate-tick alpha for the flicker, seven sparks flying out for each burst, and `flare1`–`flare3` in the fire's place.
+- **Sprites.** `rod`, `sword`, `star`, `fish`, `smoke1`, `smoke2`, `skeleton` and `flare1`–`flare3` are grids in `scripts/camp-art.mjs` (the flare is each fire frame with its upper rows doubled). Run it after changing one.
 - **Redraws** on Core's `changed`, `crewChanged` and its settings, on a UI scale or display change, and every 30 s while shown.
 - **Silence.** It plays no sound.
 
@@ -108,7 +112,7 @@ Panel draws it as a card across the window under the Camp band, above the sideba
 
 ## Tests
 
-`tests/pocket_camp_spec.lua` drives real Cores through FakeNet: who is in `pocketCamp()` and when it's nil, "+N", adventuring, the spark, how it's shown, fishing (the 60 s, the restart, your own, first sight, login and reload), each animation and when none plays, and Tips. `tests/settings_spec.lua` covers the new settings. Frames and art aren't tested offline; in game, `/bff sim` and `/bff sim fish` make simulated Members fish.
+`tests/pocket_camp_spec.lua` drives real Cores through FakeNet: who is in `pocketCamp()` and when it's nil, "+N", adventuring, the spark, each actor's Roster row, how it's shown, fishing (the 60 s, the restart, your own, first sight, login and reload), each animation and when none plays, and Tips. `tests/settings_spec.lua` covers the new settings. Frames and art aren't tested offline; in game, `/bff sim` and `/bff sim fish` make simulated Members fish.
 
 ## Still to check in game
 
@@ -119,7 +123,8 @@ None of the rendering has run in a client, and the new sprites were authored as 
 - It's readable over bright and dark scenes at 0%, 60% and 100% opacity.
 - Dragging, the lock, and the position after `/reload` and on another Character.
 - A click in and out of combat; Hide in combat on and off.
-- Each pose and animation reads at size: the rod towards the fire on both sides, the sword, star, fish, smoke, burst and flare. The star and fish sit where the name is for a moment.
+- Each pose and animation reads at size: the rod towards the fire on both sides, the sword, star, fish, smoke, skeleton, bursts and flare, and that 10 s feels right for each.
+- The tooltip over each figure and over the fire, and that it changes as the mouse moves between them.
 - No measurable CPU cost while it's hidden.
 - The Tip card at the panel's narrowest (460) and with the short Camp band.
 - The Tip window at first login: its place next to While you were away, which opens a little later, and that it waits for combat to end.

@@ -207,12 +207,11 @@ local function placeBeside(owner)
   end
 end
 
--- The Character under the mouse: owner.row is its Member's row, and
--- owner.character the Character (the row itself for the shown one).
-local function showTooltip(owner)
-  local row, character = owner.row, owner.character
-  if not row then return end
-  placeBeside(owner)
+-- Adds a Character's lines to the tooltip: row is its Member's Roster row
+-- and character the Character (the row itself for the shown one). The
+-- Pocket Camp shows the same over its figures. The caller sets the owner
+-- and shows it.
+function Panel.characterTooltip(row, character)
   GameTooltip:AddLine(character.fullName, classColor(character.classFilename))
   GameTooltip:AddLine(("Level %d %s %s"):format(character.level, className(character.classFilename),
     character.main and "(Main)" or "(Alt)"), 1, 1, 1)
@@ -245,6 +244,14 @@ local function showTooltip(owner)
     GameTooltip:AddLine(("Within %d levels of you: can play together"):format(ns.Core.CAN_PLAY_LEVELS),
       GOLD[1], GOLD[2], GOLD[3])
   end
+end
+
+-- The Character under the mouse: owner.row is its Member's row, and
+-- owner.character the Character.
+local function showTooltip(owner)
+  if not owner.row then return end
+  placeBeside(owner)
+  Panel.characterTooltip(owner.row, owner.character)
   GameTooltip:Show()
 end
 

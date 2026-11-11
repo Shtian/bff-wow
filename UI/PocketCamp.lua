@@ -1,9 +1,10 @@
 -- PocketCamp: the small on-screen Camp you can keep up while playing. It
 -- draws Core's pocketCamp() with a CampScene band of its own: the fire and
 -- the online Members, each seated, adventuring or fishing, over a backdrop
--- of the opacity Core gives. A click toggles the panel (not in combat),
--- a drag moves it unless Core says it's locked, and where it's dropped is
--- saved through Core. Core's pocketCampAnimation events play on it, and a
+-- of the opacity Core gives. It shows no names: the mouse over a figure
+-- shows that Member's Roster tooltip, and over the fire who is doing what.
+-- A click toggles the panel (not in combat), a drag moves it unless Core
+-- says it's locked, and where it's dropped is saved through Core. Core's pocketCampAnimation events play on it, and a
 -- Cheer makes a friend hop. No frame is made until Core first has a Pocket
 -- Camp; hidden, nothing of it runs. It never reads a setting or a Member
 -- record. See docs/design/pocket-camp.md.
@@ -25,6 +26,9 @@ local frame
 -- What Core last gave: the Pocket Camp, or nil while there's none.
 local view
 local inCombat = false
+-- The Member whose tooltip is up, false for the Pocket Camp's own, nil
+-- while none is.
+local tooltipFor
 
 -- Puts the frame where Core says: where it was dropped, or where it starts.
 local function place()
@@ -47,14 +51,33 @@ local function dropped()
   if view then place() end
 end
 
+-- The actor whose figure the mouse is over, or nil.
+local function hovered()
+  local x = GetCursorPosition()
+  return frame.band:ActorAt(x / frame:GetEffectiveScale() - frame:GetLeft())
+end
+
+-- Over a figure, that Member's tooltip as the Roster shows it; anywhere
+-- else, who is doing what.
 local function showTooltip()
   if not view then return end
+  local actor = hovered()
+  tooltipFor = actor and actor.memberId or false
   GameTooltip:SetOwner(frame, "ANCHOR_TOP")
-  GameTooltip:AddLine(view.tooltip.title)
-  for _, line in ipairs(view.tooltip.lines) do GameTooltip:AddLine(line, 1, 1, 1) end
-  if view.moreText then GameTooltip:AddLine(view.moreText, MUTED[1], MUTED[2], MUTED[3]) end
+  if actor then
+    ns.Panel.characterTooltip(actor.row, actor.row)
+  else
+    GameTooltip:AddLine(view.tooltip.title)
+    for _, line in ipairs(view.tooltip.lines) do GameTooltip:AddLine(line, 1, 1, 1) end
+    if view.moreText then GameTooltip:AddLine(view.moreText, MUTED[1], MUTED[2], MUTED[3]) end
+  end
   GameTooltip:AddLine(view.tooltip.hint, MUTED[1], MUTED[2], MUTED[3])
   GameTooltip:Show()
+end
+
+local function hideTooltip()
+  tooltipFor = nil
+  GameTooltip:Hide()
 end
 
 local function create()
@@ -76,11 +99,16 @@ local function create()
     if not InCombatLockdown() then ns.Panel.toggle() end
   end)
   frame:SetScript("OnEnter", showTooltip)
-  frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  frame:SetScript("OnLeave", hideTooltip)
   -- Hidden mid-drag (combat began): the drag still saves where it got to.
   frame:SetScript("OnHide", dropped)
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
+    -- The tooltip follows the mouse from figure to figure.
+    if tooltipFor ~= nil and GameTooltip:IsOwned(frame) then
+      local actor = hovered()
+      if (actor and actor.memberId or false) ~= tooltipFor then showTooltip() end
+    end
     sinceRedraw = sinceRedraw + elapsed
     if sinceRedraw >= REDRAW_EVERY then
       sinceRedraw = 0
@@ -95,7 +123,7 @@ local function create()
   end)
   inCombat = InCombatLockdown() and true or false
 
-  frame.band = ns.CampScene.new(frame, { target = ns.CampScene.FIGURE_TARGET, shadow = true })
+  frame.band = ns.CampScene.new(frame, { target = ns.CampScene.FIGURE_TARGET, shadow = true, names = false })
   frame.band:SetAllPoints()
 end
 

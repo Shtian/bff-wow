@@ -183,6 +183,16 @@ describe("The Pocket Camp", function()
     assert.equal("Click to open BFF.", view.tooltip.hint)
   end)
 
+  it("gives each actor its Roster row, for the tooltip over its figure", function()
+    local _, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local view = a.core:pocketCamp()
+    local row = actorFor(view, b).row
+    assert.same({ b.memberId, "Bob", "Bob", 10, "Elwynn Forest", true },
+      { row.memberId, row.displayName, row.fullName, row.level, row.zone, row.playing })
+    assert.is_true(actorFor(view, a).row.own)
+  end)
+
   it("changes no record and sends nothing when read", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a = clients[1]
