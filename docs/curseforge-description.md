@@ -36,7 +36,8 @@ BFF is for a small group of friends who don't always play at the same time. It s
 | `/bff name <name>` | Set the name your friends see |
 | `/bff settings` | Open Settings |
 | `/bff minimap` | Bring back a hidden minimap button |
-| `/bff debug sync` | Turn the sync trace on or off: a line in chat for each message sent and received. Handy when reporting a sync bug. Off again after a reload |
+| `/bff report` | Open a report to copy into a bug report: versions, link state and the recent sync log. It includes your crew's character names |
+| `/bff debug sync` | Print the sync trace in chat: a line for each message sent and received. Off again after a reload |
 | `/bff help` | List the commands |
 
 ## How it works, and its limits
