@@ -83,6 +83,10 @@ _Avoid_: Tombstone, death marker
 A small on-screen notice for a Live event, with an optional sound. Shows the same things as the chat line.
 _Avoid_: Popup, alert, notification (when meaning a toast)
 
+**Map pin**:
+A Member's mark on the world map where their shown Character was last seen: their Camp figure (or class icon with the Camp off), with a small green dot while online. While a Member moves in the open world, their client sends a small **WHERE** so the pin follows them between their record's updates; the record still carries the last spot for anyone who missed it.
+_Avoid_: Dot, blip, marker
+
 **Tip**:
 A one-time offer of a feature that's off by default, with a button to turn it on and one to dismiss it: a small window the first time, and a card at the top of the panel until it's answered. Once answered, it never shows again on any Character of the account.
 _Avoid_: Toast (for a Tip), notice, announcement, what's new

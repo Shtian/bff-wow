@@ -163,7 +163,8 @@ end
 
 -- Records where the Character being played is, from locate(): mapId, x
 -- and y (0–1 on that map) for the open world, which also clears the
--- instance; or instance (its name) alone, keeping the last open-world spot.
+-- instance; or instance (its name), with the last open-world spot if
+-- given, else keeping the record's.
 -- Nil, or anything else, keeps what was known. Returns true if the record
 -- changed.
 function Ledger:locate(location)
@@ -173,10 +174,15 @@ function Ledger:locate(location)
 
   local mapId, x, y, instance = location.mapId, location.x, location.y, location.instance
   local spot
-  if type(mapId) == "number" and type(x) == "number" and type(y) == "number" then
+  local hasSpot = type(mapId) == "number" and type(x) == "number" and type(y) == "number"
+  if type(instance) == "string" and instance ~= "" then
+    if hasSpot then
+      spot = { mapId = mapId, x = round(x), y = round(y), instance = instance }
+    else
+      spot = { mapId = saved.mapId, x = saved.x, y = saved.y, instance = instance }
+    end
+  elseif hasSpot then
     spot = { mapId = mapId, x = round(x), y = round(y) }
-  elseif type(instance) == "string" and instance ~= "" then
-    spot = { mapId = saved.mapId, x = saved.x, y = saved.y, instance = instance }
   else
     return false
   end

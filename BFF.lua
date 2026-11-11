@@ -139,6 +139,10 @@ local function onCoreEvent(event, arg, more)
     ns.Minimap.settingChanged(arg, more)
     ns.Toasts.settingChanged(arg, more)
     ns.Settings.settingChanged(arg, more)
+    ns.MapPins.settingChanged(arg, more)
+  elseif event == "moved" then
+    -- A Member's live spot (a WHERE): only the map shows it.
+    ns.MapPins.moved()
   elseif event == "crewChanged" then
     ns.ChannelLink.setCrew(ns.core:crew())
     ns.Panel.refresh()

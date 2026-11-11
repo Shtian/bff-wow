@@ -114,19 +114,24 @@ end
 
 -- A small seated figure, two layers on one rectangle: the cloth in the
 -- class colour under skin and outline. :SetClass(classFilename) draws it;
--- :Layout() sizes it at FIGURE_TARGET, after the UI scale changes.
+-- :Layout() sizes it at its target (FIGURE_TARGET unless :SetTarget(target)
+-- says otherwise, as map pins do), after the UI scale changes.
 function CampScene.figure(parent)
   local frame = CreateFrame("Frame", nil, parent)
+  frame.target = CampScene.FIGURE_TARGET
   frame.cloth = texture(frame, "ARTWORK", 0)
   frame.cloth:SetPoint("BOTTOMLEFT")
   frame.skin = texture(frame, "ARTWORK", 1)
   frame.skin:SetPoint("BOTTOMLEFT")
   function frame:Layout()
-    local unit = CampScene.artUnit(self, CampScene.FIGURE_TARGET)
+    local unit = CampScene.artUnit(self, self.target)
     local s = Sheet.sprites.seated
     self:SetSize(s[3] * unit, s[4] * unit)
     setSprite(self.cloth, "seatedCloth", unit)
     setSprite(self.skin, "seated", unit)
+  end
+  function frame:SetTarget(target)
+    self.target = target
   end
   function frame:SetClass(classFilename)
     self:Layout()

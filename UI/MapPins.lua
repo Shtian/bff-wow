@@ -1,9 +1,11 @@
 -- MapPins: a pin on the world map for where each other Member was last
 -- seen, from Core's mapPins(), drawn through HereBeDragons-Pins. A pin is
--- a dot in the shown Character's class colour, ringed green while online
--- and faded while offline, and shows on its own map and on the zone,
--- continent and world maps above it. Hovering one says who, where and
--- when. Your own Member has none; the game already shows you.
+-- the Member's avatar: the Camp's seated figure in the shown Character's
+-- class colour, or the class icon while the Camp is off. It has a small
+-- green dot while online and is faded while offline, and shows
+-- on its own map and on the zone, continent and world maps above it.
+-- Hovering one says who, where and when. Your own Member has none; the
+-- game already shows you. With the map setting off Core gives no pins.
 
 local _, ns = ...
 
@@ -13,9 +15,16 @@ ns.MapPins = MapPins
 local Skin = ns.Skin
 local HBDPins = LibStub("HereBeDragons-Pins-2.0")
 
-local SIZE = 12
-local RING = 3
--- A dark keyline outside the ring, so a green ring reads on a bright map.
+-- Each pin size (Core's mapPinSize): the avatar's art unit on the map, and
+-- the class icon's size while the Camp is off. Medium is a bit smaller
+-- than on Roster rows.
+local SIZES = {
+  small = { figure = 1.1, icon = 13 },
+  medium = { figure = 1.4, icon = 16 },
+  large = { figure = 1.8, icon = 20 },
+}
+-- The online dot, with a dark keyline round it so it reads on a bright map.
+local DOT = 5
 local KEYLINE = 1
 local OFFLINE_ALPHA = 0.5
 
@@ -48,24 +57,33 @@ local function hideTooltip()
   GameTooltip:Hide()
 end
 
+local function disc(parent, sublevel, size)
+  local t = parent:CreateTexture(nil, "OVERLAY", nil, sublevel)
+  t:SetSize(size, size)
+  t:SetColorTexture(1, 1, 1, 1)
+  return Skin.round(parent, t)
+end
+
 local function createFrame()
   local frame = CreateFrame("Frame", nil, UIParent)
-  frame:SetSize(SIZE + 2 * (RING + KEYLINE), SIZE + 2 * (RING + KEYLINE))
   frame:EnableMouse(true)
-  frame.keyline = frame:CreateTexture(nil, "OVERLAY", nil, 0)
-  frame.keyline:SetAllPoints()
-  frame.keyline:SetColorTexture(Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1)
-  Skin.round(frame, frame.keyline)
-  frame.ring = frame:CreateTexture(nil, "OVERLAY", nil, 1)
-  frame.ring:SetSize(SIZE + 2 * RING, SIZE + 2 * RING)
-  frame.ring:SetPoint("CENTER")
-  frame.ring:SetColorTexture(1, 1, 1, 1)
-  Skin.round(frame, frame.ring)
-  frame.dot = frame:CreateTexture(nil, "OVERLAY", nil, 2)
-  frame.dot:SetSize(SIZE, SIZE)
-  frame.dot:SetPoint("CENTER")
-  frame.dot:SetColorTexture(1, 1, 1, 1)
-  Skin.round(frame, frame.dot)
+  -- The Camp's seated figure while the Camp is on, else the class icon.
+  frame.figure = ns.CampScene.figure(frame)
+  frame.figure:SetPoint("CENTER")
+  frame.icon = frame:CreateTexture(nil, "ARTWORK")
+  frame.icon:SetPoint("CENTER")
+  Skin.round(frame, frame.icon)
+  -- The online dot, on a frame of its own so it sits over the figure.
+  local badge = CreateFrame("Frame", nil, frame)
+  badge:SetSize(DOT + 2 * KEYLINE, DOT + 2 * KEYLINE)
+  badge:SetPoint("CENTER", frame, "BOTTOMRIGHT", -1, 1)
+  local keyline = disc(badge, 0, DOT + 2 * KEYLINE)
+  keyline:SetPoint("CENTER")
+  keyline:SetVertexColor(Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1)
+  local dot = disc(badge, 1, DOT)
+  dot:SetPoint("CENTER")
+  Skin.color(dot, Skin.ONLINE)
+  frame.online = badge
   frame:SetScript("OnEnter", showTooltip)
   frame:SetScript("OnLeave", hideTooltip)
   frame:Hide()
@@ -74,8 +92,22 @@ end
 
 local function draw(frame, pin)
   frame.pin = pin
-  frame.dot:SetVertexColor(Skin.classColor(pin.classFilename))
-  Skin.color(frame.ring, pin.online and Skin.ONLINE or Skin.WINDOW)
+  local size = SIZES[pin.size] or SIZES.medium
+  if pin.figure then
+    frame.icon:Hide()
+    frame.figure:SetTarget(size.figure)
+    frame.figure:SetClass(pin.figure)
+    frame:SetSize(frame.figure:GetSize())
+  else
+    frame.figure:Hide()
+    frame.icon:SetAtlas("classicon-" .. (pin.classFilename or ""):lower())
+    frame.icon:SetSize(size.icon, size.icon)
+    frame.icon:Show()
+    frame:SetSize(size.icon, size.icon)
+  end
+  -- Kept over the figure after HereBeDragons reparents the pin.
+  frame.online:SetFrameLevel(frame:GetFrameLevel() + 5)
+  frame.online:SetShown(pin.online)
   frame:SetAlpha(pin.online and 1 or OFFLINE_ALPHA)
 end
 
@@ -87,13 +119,26 @@ function MapPins.refresh()
   for i, pin in ipairs(pins) do
     local frame = frames[i] or createFrame()
     frames[i] = frame
-    draw(frame, pin)
     HBDPins:AddWorldMapIconMap(MapPins, frame, pin.mapId, pin.x, pin.y, HBD_PINS_WORLDMAP_SHOW_WORLD)
+    -- Drawn once on the map's canvas, so the figure's art unit is worked
+    -- out at the canvas's scale.
+    draw(frame, pin)
   end
   for i = #pins + 1, #frames do
     frames[i].pin = nil
     frames[i]:Hide()
   end
+end
+
+-- The map setting: Core gives no pins while it's off.
+-- A Member's live spot changed: redrawn now if the map is open, else when
+-- it opens.
+function MapPins.moved()
+  if WorldMapFrame and WorldMapFrame:IsShown() then MapPins.refresh() end
+end
+
+function MapPins.settingChanged(key)
+  if key == "mapPins" or key == "mapPinSize" or key == "camp" then MapPins.refresh() end
 end
 
 function MapPins.start(c)

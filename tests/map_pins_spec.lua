@@ -63,6 +63,8 @@ describe("Map pins", function()
       x = 0.412,
       y = 0.655,
       zone = "Elwynn Forest",
+      figure = "WARRIOR",
+      size = "medium",
       online = true,
       sinceSeen = 20,
       lastSeenText = "online",
@@ -96,18 +98,130 @@ describe("Map pins", function()
     assert.same({ 0, 1 }, { pin.x, pin.y })
   end)
 
-  it("don't send DATA when a Member only moves; the move rides the heartbeat", function()
+  it("follow a Member who moves, with a small WHERE and no DATA", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
 
     local mark = #net.wire
+    local moved = a:count("moved")
     b:move({ mapId = 1429, x = 0.5, y = 0.5 })
-    net:run(HEARTBEAT - 30)
+    net:run(15)
     assert.same({}, net:sent(mark, b.name, "DATA"))
-    assert.equal(0.412, pinFor(a, b).x)
-
-    net:run(60)
+    local where = net:sent(mark, b.name, "WHERE")
+    assert.equal(1, #where)
+    assert.same({ 1429, 0.5, 0.5 }, { where[1].mapId, where[1].x, where[1].y })
     assert.equal(0.5, pinFor(a, b).x)
+    assert.is_true(a:count("moved") > moved)
+  end)
+
+  it("send no WHERE while standing still, or with no one else online", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+
+    local mark = #net.wire
+    net:run(120)
+    assert.same({}, net:sent(mark, nil, "WHERE"))
+
+    a:logout()
+    net:run(5)
+    mark = #net.wire
+    b:move({ mapId = 1429, x = 0.6, y = 0.6 })
+    net:run(30)
+    assert.same({}, net:sent(mark, b.name, "WHERE"))
+  end)
+
+  it("send no WHERE for a shuffle on the spot", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local b = clients[2]
+
+    local mark = #net.wire
+    b:move({ mapId = 1429, x = 0.4125, y = 0.6555 })
+    net:run(30)
+    assert.same({}, net:sent(mark, b.name, "WHERE"))
+  end)
+
+  it("send a WHERE at most every 10 s while moving, less often in a bigger Crew", function()
+    local function wheres(names)
+      local net, clients = crew(names)
+      local b = clients[2]
+      local mark = #net.wire
+      for i = 1, 60 do
+        b:move({ mapId = 1429, x = 0.1 + i * 0.01, y = 0.5 })
+        net:run(1)
+      end
+      return #net:sent(mark, b.name, "WHERE")
+    end
+    local few = wheres({ "Ann", "Bob" })
+    assert.is_true(few >= 5 and few <= 6, few)
+    -- Five others online: one every 15 s.
+    local many = wheres({ "Ann", "Bob", "Cid", "Dot", "Eve", "Fay" })
+    assert.is_true(many >= 3 and many <= 4, many)
+  end)
+
+  it("send no WHERE while paused", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local b = clients[2]
+    b.core:setPaused(true)
+
+    local mark = #net.wire
+    b:move({ mapId = 1429, x = 0.5, y = 0.5 })
+    net:run(30)
+    assert.same({}, net:sent(mark, b.name, "WHERE"))
+  end)
+
+  it("give way to a newer record, and the record's spot rides the heartbeat", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+
+    b:move({ mapId = 1429, x = 0.5, y = 0.5 })
+    net:run(15)
+    b:move({ mapId = 1436, x = 0.3, y = 0.4 })
+    b:play({ zone = "Westfall" })
+    net:run(12)
+    assert.same({ 1436, 0.3, 0.4 }, { pinFor(a, b).mapId, pinFor(a, b).x, pinFor(a, b).y })
+
+    -- A Member who joins later gets the spot from the record alone.
+    local c = net:add("Cid", { location = ELWYNN }):login()
+    c:join(a.core:crew().code)
+    net:run(20)
+    assert.same({ 1436, 0.3, 0.4 }, { pinFor(c, b).mapId, pinFor(c, b).x, pinFor(c, b).y })
+  end)
+
+  it("keep the last spot heard outside when a Member enters an instance", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+
+    b:move({ mapId = 1436, x = 0.42, y = 0.71 })
+    net:run(4)
+    b:move({ instance = "The Deadmines" })
+    b:play({ zone = "The Deadmines" })
+    net:run(12)
+    local pin = pinFor(a, b)
+    assert.equal("The Deadmines", pin.instance)
+    assert.same({ 1436, 0.42, 0.71 }, { pin.mapId, pin.x, pin.y })
+  end)
+
+  it("ignore a WHERE that's malformed, for another Character, or from a removed Member", function()
+    local net, clients, ns = crew({ "Ann", "Bob", "Cid" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    local function where(from, fields)
+      local message = { type = "WHERE", from = from.memberId, character = from.character.guid,
+        mapId = 1436, x = 0.2, y = 0.3, at = net:now() }
+      for k, v in pairs(fields or {}) do message[k] = v end
+      a.core:received(ns.Codec.encode(message))
+    end
+    where(b, { x = 1.5 })
+    where(b, { mapId = "Westfall" })
+    where(b, { at = "now" })
+    where(b, { character = "Player-0-Someone" })
+    assert.same({ 1429, 0.412, 0.655 }, { pinFor(a, b).mapId, pinFor(a, b).x, pinFor(a, b).y })
+
+    a.core:removeMember(c.memberId)
+    where(c)
+    assert.is_nil(pinFor(a, c))
+
+    where(b)
+    assert.same({ 1436, 0.2, 0.3 }, { pinFor(a, b).mapId, pinFor(a, b).x, pinFor(a, b).y })
   end)
 
   it("are refreshed when a zone change goes out", function()
@@ -228,6 +342,30 @@ describe("Map pins", function()
     local pin = pinFor(c, b)
     assert.is_table(pin)
     assert.same({ 1429, 0.412, 0.655 }, { pin.mapId, pin.x, pin.y })
+  end)
+
+  it("show the Member's Camp figure only while the Camp is on", function()
+    local _, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    assert.equal("WARRIOR", pinFor(a, b).figure)
+    a.core:setSetting("camp", false)
+    assert.is_nil(pinFor(a, b).figure)
+  end)
+
+  it("carry the map pin size setting", function()
+    local _, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    a.core:setSetting("mapPinSize", "small")
+    assert.equal("small", pinFor(a, b).size)
+  end)
+
+  it("are all gone while the map setting is off", function()
+    local _, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    a.core:setSetting("mapPins", false)
+    assert.same({}, a.core:mapPins())
+    a.core:setSetting("mapPins", true)
+    assert.equal(1, #a.core:mapPins())
   end)
 
   it("drop a record whose spot is off the map", function()
