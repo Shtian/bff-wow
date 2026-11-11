@@ -162,8 +162,38 @@ local function itemInfoReceived()
   end)
 end
 
+-- The sync trace: one trace(line) function, given to Core and the channel
+-- link at start. Each line gets the time of day and GetTime() and always
+-- goes in the sync log (ns.syncLog, saved per Character, for /bff report).
+-- While /bff debug sync is on (off at every login and reload) it is also
+-- printed: in a dev checkout the /bffdev console sets ns.traceSink(stamp,
+-- text), which shows the line in its log and returns true, else it goes
+-- to chat.
+local syncLog = ns.SyncLog.new()
+ns.syncLog = syncLog
+local syncTrace = false
+local function traceLine(text)
+  local stamp = ("%s %.3f"):format(date("%H:%M:%S"), GetTime())
+  syncLog:add(stamp .. "  " .. text)
+  if not syncTrace then return end
+  if ns.traceSink and ns.traceSink(stamp, text) then return end
+  print(("|cff33ff99BFF|r |cff888888%s|r %s"):format(stamp, text))
+end
+
+-- Whether trace lines are printed as well as logged.
+function ns.setSyncTrace(on)
+  syncTrace = on and true or false
+end
+
+function ns.isSyncTraceOn()
+  return syncTrace
+end
+
 local function start(isInitialLogin)
   BFF_DB = BFF_DB or {}
+  BFF_CharacterDB = BFF_CharacterDB or {}
+  syncLog:restore(BFF_CharacterDB.syncLog,
+    ("-- earlier sessions above · this one began %s --"):format(date("%Y-%m-%d %H:%M:%S")))
   ns.core = ns.Core.new({
     db = BFF_DB,
     now = GetServerTime,
@@ -178,6 +208,8 @@ local function start(isInitialLogin)
     itemLook = ns.Skin.itemLook,
     findItem = ns.Bags.findItem,
   })
+  ns.core:setTrace(traceLine)
+  ns.ChannelLink.setTrace(traceLine)
   ns.ChannelLink.start(ns.core, function(kind) say(MESSAGES[kind]) end)
   ns.ChannelLink.setCrew(ns.core:crew())
   ns.Panel.start(ns.core)
@@ -193,6 +225,8 @@ local function start(isInitialLogin)
 end
 
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+-- Logging out or reloading: the sync log is saved for the next session.
+eventFrame:RegisterEvent("PLAYER_LOGOUT")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 -- After a real login the bags read as empty until the first of these, so
 -- Core checks Spare items only on it.
@@ -212,6 +246,8 @@ eventFrame:RegisterEvent("DISPLAY_SIZE_CHANGED")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_ENTERING_WORLD" and not ns.core then
     start((...))
+  elseif event == "PLAYER_LOGOUT" then
+    if ns.core then BFF_CharacterDB.syncLog = syncLog:save() end
   elseif event == "GET_ITEM_INFO_RECEIVED" then
     if ns.core then itemInfoReceived() end
   elseif event == "BAG_UPDATE_DELAYED" then
@@ -369,26 +405,9 @@ function commands.sim(rest)
   end
 end
 
--- The sync trace (/bff debug sync): off at every login and reload. Each
--- line from Core and the channel link gets the time of day and GetTime().
--- In a dev checkout the /bffdev console sets ns.traceSink(stamp, text): it
--- shows the line in its log and returns true, else the line goes to chat.
-local syncTrace = false
-local function traceLine(text)
-  local stamp = ("%s %.3f"):format(date("%H:%M:%S"), GetTime())
-  if ns.traceSink and ns.traceSink(stamp, text) then return end
-  print(("|cff33ff99BFF|r |cff888888%s|r %s"):format(stamp, text))
-end
-
-function ns.setSyncTrace(on)
-  syncTrace = on and true or false
-  local trace = syncTrace and traceLine or nil
-  ns.core:setTrace(trace)
-  ns.ChannelLink.setTrace(trace)
-end
-
-function ns.isSyncTraceOn()
-  return syncTrace
+-- A diagnostics report to copy into a bug report.
+function commands.report()
+  ns.Report.show()
 end
 
 function commands.debug(rest)
@@ -399,7 +418,7 @@ end
 
 local HELP = "/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff professions, "
   .. "/bff together, /bff catches, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, "
-  .. "/bff minimap, /bff leave, /bff debug sync, /bff help"
+  .. "/bff minimap, /bff leave, /bff report, /bff debug sync, /bff help"
 
 function commands.help()
   say(HELP)

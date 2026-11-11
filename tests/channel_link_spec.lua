@@ -150,4 +150,100 @@ describe("The channel link", function()
     assert.equal(1, core.count("gone", "Bob"))
     assert.equal(0, core.count("sendFailed"))
   end)
+
+  describe("trace", function()
+    -- Starts the trace: the lines it reports.
+    local function traced(link)
+      local lines = {}
+      link.setTrace(function(line) lines[#lines + 1] = line end)
+      return lines
+    end
+
+    local function containing(lines, text)
+      local found = {}
+      for _, line in ipairs(lines) do
+        if line:find(text, 1, true) then found[#found + 1] = line end
+      end
+      return found
+    end
+
+    it("reports a No player named it could read but that names no peer, with the peers compared", function()
+      local game, link, core = linked()
+      local lines = traced(link)
+      game.fire("CHAT_MSG_SYSTEM", "No player named 'Dan Smith' is currently playing.")
+      assert.same({ "notice: No player named Dan Smith · not a peer (peers: bob, cat)" }, lines)
+      assert.equal(0, core.count("gone"))
+    end)
+
+    it("still reports a No player named for a peer as before", function()
+      local game, link = linked()
+      local lines = traced(link)
+      game.fire("CHAT_MSG_SYSTEM", "No player named 'Bob' is currently playing.")
+      assert.equal(1, #containing(lines, "notice: No player named Bob"))
+      assert.equal(0, #containing(lines, "not a peer"))
+    end)
+
+    it("reports an unreadable system message shortly after a whisper, without reading it", function()
+      local game, link = linked()
+      local lines = traced(link)
+      game.instance = { true, "party" }
+      link.send("1|short")
+      game.lockdown = true
+      game.advance(1)
+      game.fire("CHAT_MSG_SYSTEM", game.secret())
+      local found = containing(lines, "notice: unreadable system message")
+      assert.equal(1, #found)
+      assert.truthy(found[1]:find("1.0 s after a whisper", 1, true), found[1])
+      assert.truthy(found[1]:find("in instance: party", 1, true), found[1])
+      assert.truthy(found[1]:find("lockdown: yes", 1, true), found[1])
+      -- The chat filter doesn't read it either.
+      assert.is_false(game.filters.CHAT_MSG_SYSTEM(nil, "CHAT_MSG_SYSTEM", game.secret()))
+    end)
+
+    it("leaves out an unreadable system message long after any whisper", function()
+      local game, link = linked()
+      local lines = traced(link)
+      game.fire("CHAT_MSG_SYSTEM", game.secret())
+      link.send("1|short")
+      game.advance(30)
+      game.fire("CHAT_MSG_SYSTEM", game.secret())
+      assert.equal(0, #containing(lines, "unreadable"))
+    end)
+
+    it("reports entering and leaving an instance", function()
+      local game, link = linked()
+      local lines = traced(link)
+      game.fire("PLAYER_ENTERING_WORLD", false, false)
+      game.instance = { true, "party" }
+      game.fire("PLAYER_ENTERING_WORLD", false, false)
+      game.fire("PLAYER_ENTERING_WORLD", false, false)
+      game.instance = { false, "none" }
+      game.fire("PLAYER_ENTERING_WORLD", false, false)
+      assert.same({ "entered an instance (party)", "left an instance (party)" }, lines)
+    end)
+
+    it("reports leaving the group or the group disbanding", function()
+      local game, link = linked()
+      local lines = traced(link)
+      game.fire("GROUP_LEFT")
+      assert.same({ "left the group, or it disbanded" }, lines)
+    end)
+  end)
+
+  it("tells whether the link is up, why not, and how many peers it has", function()
+    local game = wow()
+    local link = game.load("Game/ChannelLink.lua", {}).ChannelLink
+    link.start(fakeCore(), function() end)
+    assert.same({ up = false, reason = "no Crew", peers = 0, lockdown = false }, link.state())
+
+    link.setCrew({ channel = CHANNEL, password = "pw" })
+    game.advance(11)
+    game.fire("CHAT_MSG_CHANNEL_LIST", "*Bob, Cat-Realm", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
+    assert.same({ up = true, peers = 2, lockdown = false }, link.state())
+
+    game.instance = { true, "party" }
+    game.lockdown = true
+    game.fire("ADDON_RESTRICTION_STATE_CHANGED", 1, 1)
+    assert.same({ up = false, reason = "lockdown", peers = 2, instance = "party", lockdown = true }, link.state())
+  end)
 end)

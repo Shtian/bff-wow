@@ -73,7 +73,8 @@ Slash commands do the same without the panel:
 | `/bff code` | Prints the current Crew code |
 | `/bff name <name>` | Changes your display name |
 | `/bff leave` | Leaves the Crew (asks to confirm) |
-| `/bff debug sync` | Turns the sync trace on or off for the session (`docs/design/code-structure.md`) |
+| `/bff report` | Opens a copyable diagnostics report with the sync log (`docs/design/code-structure.md`) |
+| `/bff debug sync` | Turns printing the sync trace on or off for the session (`docs/design/code-structure.md`) |
 
 The default display name for slash commands is the current Character's name, as in the setup view. It can also be changed in Settings. Changing it writes your own record, so it spreads like any other change.
 

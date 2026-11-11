@@ -16,7 +16,23 @@ return function()
     -- What UnitName("player") returns. On Forever a Character's last name
     -- comes second, where retail puts the realm.
     player = { "Me" },
+    -- What IsInInstance() returns.
+    instance = { false, "none" },
   }
+
+  -- A secret value, as Midnight hands addons for chat text it may not read:
+  -- reading it in any way (indexing, concatenating, tostring, #) errors, so
+  -- a test fails if the code under test touches it.
+  local secrets = setmetatable({}, { __mode = "k" })
+  function game.secret()
+    local function refuse() error("read a secret value", 2) end
+    local value = setmetatable({}, {
+      __index = refuse, __newindex = refuse, __concat = refuse, __tostring = refuse,
+      __len = refuse, __eq = refuse, __lt = refuse, __le = refuse, __call = refuse,
+    })
+    secrets[value] = true
+    return value
+  end
 
   local function schedule(delay, fn, interval)
     local timer = { due = game.time + delay, fn = fn, interval = interval }
@@ -83,6 +99,8 @@ return function()
     NUM_CHAT_WINDOWS = 0,
     Ambiguate = function(name) return (name:gsub("%-.*$", "")) end,
     UnitName = function() return unpack(game.player) end,
+    IsInInstance = function() return unpack(game.instance) end,
+    issecretvalue = function(value) return secrets[value] == true end,
     ERR_CHAT_PLAYER_NOT_FOUND_S = "No player named '%s' is currently playing.",
     ERR_TOO_MANY_CHAT_CHANNELS = "You can only be in %d channels at a time.",
     ChatFrame_AddMessageEventFilter = function(event, fn)
