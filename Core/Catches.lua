@@ -324,6 +324,14 @@ local function valid(record)
   return pairs(list)
 end
 
+-- How many catches a record holds in all: every type's count. The Pocket
+-- Camp shows a Member fishing when it grows (Core:pocketCamp()).
+function Catches.total(record)
+  local total = 0
+  for _, entry in valid(record) do total = total + entry.n end
+  return total
+end
+
 -- Kinds whose Crew-first catch is a rare find: Feed news.
 local RARE = { quest = true, contest = true }
 

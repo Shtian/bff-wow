@@ -46,6 +46,8 @@ UI/Skin.lua
 UI/CampSheet.lua
 UI/CampScene.lua
 UI/Panel.lua
+UI/PocketCamp.lua
+UI/TipDialog.lua
 UI/TogetherTab.lua
 UI/CatchesTab.lua
 UI/GoalsTab.lua

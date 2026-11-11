@@ -1,7 +1,8 @@
 // Builds the Camp's art from pixel grids: Media/CampSprites.tga (every
 // sprite, a 1-pixel transparent gutter round each cell),
 // Media/CampBackdrop.tga (the static night sky, hills, pines and the fire's
-// glow on the ground) and UI/CampSheet.lua (where each sprite sits). The
+// glow on the ground), Media/CampPocketBackdrop.tga (the Pocket Camp's
+// soft-edged piece of it) and UI/CampSheet.lua (where each sprite sits). The
 // grids come from the prototype (prototype/ui-personality). Run it after
 // changing a grid: node scripts/camp-art.mjs. See docs/design/camp.md.
 //
@@ -18,7 +19,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PAL = {
   K: "#0b0a12", S: "#e8b890", s: "#b98465", W: "#fff3c4", Y: "#ffe9a0", G: "#ffd14a", O: "#f0a21c",
   R: "#c9481c", B: "#5a3a24", b: "#3a2518", T: "#8c8796", t: "#5d5966", L: "#70e370", P: "#f2b8d0",
-  Z: "#adabb8",
+  Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8", N: "#ece8d8",
 };
 // Cloth tones: a white C and a 62% D, tinted by the class colour in game.
 // Sleepers' cloth is 55% of that, as the prototype shaded bedrolls.
@@ -44,6 +45,25 @@ const SLEEP = [
   ["ZZZZ", "..Z.", ".Z..", "ZZZZ"],
   ["ZZZZZ", "...Z.", "..Z..", ".Z...", "ZZZZZ"],
 ];
+// The Pocket Camp's poses and one-off animations (docs/design/pocket-camp.md).
+// A fishing rod held out from a seated figure's hand, its line and bobber
+// hanging from the tip; drawn mirrored on the fire's right.
+const ROD = [".....B.", "....B.Z", "....B.Z", "...B..Z", "...B..Z", "..B...Z", "..B...Z", ".B....Z", ".B....R", "B......"];
+// A sword raised in a standing figure's hand: adventuring.
+const SWORD = [".W.", ".Z.", ".Z.", ".Z.", ".Z.", "GGG", ".B."];
+// A ding's gold star, a rare find's fish held up, and a death's smoke.
+const STAR = ["..G..", "GGYGG", ".GYG.", ".G.G.", "G...G"];
+const FISH = [".FFF...F", "FFKFFFFF", "FfffFFFF", ".fff...f"];
+const SMOKE = [
+  ["..TT...", ".TTTT..", "TTtTTT.", ".TTTtT.", "..tt..."],
+  [".T..TT.", "T.TT..T", ".T..T..", "T..T..T", "..T.T.."],
+];
+// A figure as a skeleton, for a while after a death: the seated figure's
+// outline in bone: a skull, a spine, ribs and a pelvis. One layer, untinted.
+const SKELETON = ["....KKKK....", "...KNNNNK...", "..KNNNNNNK..", "..KNKNNKNK..", "..KNKNNKNK..", "..KNNNNNNK..", "...KNNNNK...", "...KKNNKK...", ".KNNNNNNNNK.", ".KNKKNNKKNK.", ".KKNNNNNNKK.", "..KNKKKKNK..", "..KKK..KKK.."];
+// The fire flaring for a Crew goal: each flame frame with its upper rows
+// doubled, so it stands taller on the same logs.
+const flare = (rows) => rows.flatMap((row, j) => (j < 8 ? [row, row] : [row]));
 const EMBER = ["G"];
 const EMBER_COOL = ["R"];
 
@@ -87,6 +107,9 @@ const SPRITES = [
   ["logs", skin(LOGS)], ["seat", skin(SEAT)], ["sleep1", skin(SLEEP[0])], ["sleep2", skin(SLEEP[1])], ["sleep3", skin(SLEEP[2])],
   ["ember", skin(EMBER)], ["emberCool", skin(EMBER_COOL)],
   ["tent", tent()],
+  ["rod", skin(ROD)], ["sword", skin(SWORD)], ["star", skin(STAR)], ["fish", skin(FISH)],
+  ["smoke1", skin(SMOKE[0])], ["smoke2", skin(SMOKE[1])], ["skeleton", skin(SKELETON)],
+  ["flare1", skin(flare(FIRE[0]))], ["flare2", skin(flare(FIRE[1]))], ["flare3", skin(flare(FIRE[2]))],
 ];
 
 function hex(color) {
@@ -208,9 +231,38 @@ function backdrop() {
   return img;
 }
 
+// The Pocket Camp's backdrop: the POCKET_W x POCKET_H art pixels of the
+// backdrop round the fire, with soft edges so it doesn't sit on the game
+// world as a hard rectangle. A rounded shape, solid in the middle and
+// dithered away towards its rim. In a 128 x 64 file, its bottom on the
+// file's and the fire on column 64. POCKET_W and POCKET_H are Core's
+// pocketColumns and pocketRows (Core/Camp.lua).
+const POCKET_W = 112, POCKET_H = 34, POCKET_FILE_W = 128, POCKET_FILE_H = 64;
+function pocketBackdrop(back) {
+  const img = image(POCKET_FILE_W, POCKET_FILE_H);
+  const fromX = FILE_W / 2 - POCKET_W / 2, fromY = FILE_H - POCKET_H;
+  const toX = POCKET_FILE_W / 2 - POCKET_W / 2, toY = POCKET_FILE_H - POCKET_H;
+  // How round the shape is (2 is an ellipse, higher is squarer), how much
+  // of the way out from the middle the fade takes, the row its middle is
+  // on, and how far out the bottom row counts: the ground under the
+  // figures stays mostly solid.
+  const round = 4, fade = 0.22, middle = 20, bottom = 0.86;
+  for (let j = 0; j < POCKET_H; j++) for (let i = 0; i < POCKET_W; i++) {
+    const u = Math.abs((i + 0.5) / (POCKET_W / 2) - 1), y = j + 0.5;
+    const v = y < middle ? (middle - y) / middle : (y - middle) / (POCKET_H - middle) * bottom;
+    const d = Math.pow(Math.pow(u, round) + Math.pow(v, round), 1 / round);
+    if ((1 - d) / fade <= BAYER[j % 4][i % 4]) continue;
+    const from = ((fromY + j) * back.width + fromX + i) * 4, to = ((toY + j) * img.width + toX + i) * 4;
+    img.pixels.set(back.pixels.subarray(from, from + 4), to);
+  }
+  return img;
+}
+
 const { img, placed } = sheet();
+const back = backdrop();
 writeFileSync(join(root, "Media", "CampSprites.tga"), tga(img));
-writeFileSync(join(root, "Media", "CampBackdrop.tga"), tga(backdrop()));
+writeFileSync(join(root, "Media", "CampBackdrop.tga"), tga(back));
+writeFileSync(join(root, "Media", "CampPocketBackdrop.tga"), tga(pocketBackdrop(back)));
 
 const [skyR, skyG, skyB] = hex(SKY_TOP).map((v) => +(v / 255).toFixed(3));
 const lines = placed.map((s) => `    ${s.name} = { ${s.x}, ${s.y}, ${s.w}, ${s.h} },`);
@@ -235,6 +287,13 @@ ${lines.join("\n")}
     width = ${FILE_W},
     height = ${FILE_H},
     fire = ${FILE_W / 2},
+  },
+  -- The Pocket Camp's backdrop, soft-edged: the same, for its own file.
+  pocketBackdrop = {
+    file = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampPocketBackdrop",
+    width = ${POCKET_FILE_W},
+    height = ${POCKET_FILE_H},
+    fire = ${POCKET_FILE_W / 2},
   },
   -- The sky's top colour, above the backdrop's art.
   sky = { ${skyR}, ${skyG}, ${skyB} },

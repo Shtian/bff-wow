@@ -26,7 +26,7 @@ Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
 -- The game's dungeons and the Together tab's line geometry (see together()).
 Core.DUNGEONS = ns.Together.DUNGEONS
 Core.TOGETHER_LAYOUT = ns.Together.LAYOUT
--- The Camp's geometry in art pixels (see camp()).
+-- The Camp's geometry in art pixels (see camp() and pocketCamp()).
 Core.CAMP_LAYOUT = ns.Camp.LAYOUT
 -- The final bosses known: encounter ID to the name of the instance a kill
 -- clears (see encounterEnded()).
@@ -141,6 +141,9 @@ function Core.new(deps)
     utcOffset = type(deps.utcOffset) == "number" and deps.utcOffset or 0,
     finalBosses = type(deps.finalBosses) == "table" and deps.finalBosses or ns.Clears.FINAL_BOSSES,
     linkUp = false,
+    -- Who the Pocket Camp shows fishing: Member id to when it ends. Kept
+    -- in memory only.
+    fishing = {},
   }, Core)
   local itemLink = type(deps.itemLink) == "function" and deps.itemLink or nil
   local itemLook = type(deps.itemLook) == "function" and deps.itemLook or nil
@@ -213,8 +216,69 @@ local function liveEntry(self, entry)
   return described
 end
 
+-- Whether the Pocket Camp shows: in a Crew, with it and the Camp on.
+local function pocketCampOn(self)
+  return self.db.crew ~= nil and self:setting("camp") and self:setting("pocketCamp")
+end
+
+-- The Pocket Camp as Camp.pocket gives it.
+local function pocketView(self)
+  local now = self.now()
+  local fishing = {}
+  for id, ends in pairs(self.fishing) do
+    if ends > now then fishing[id] = true end
+  end
+  return ns.Camp.pocket(ns.Roster.rows(self.ledger, now), self.log:since(now - ns.Camp.RECENT), now, fishing)
+end
+
+-- How long the Pocket Camp shows a Member fishing after a catch.
+local FISHING_FOR = 60
+
+-- A Member's catches were seen to grow: the Pocket Camp shows them fishing
+-- from now, starting over if they already were.
+local function startFishing(self, id)
+  self.fishing[id] = self.now() + FISHING_FOR
+end
+
+-- Drops the fishing spells that are over. Returns true if any ended.
+local function fishingEnded(self)
+  local now, ended = self.now(), false
+  for id, ends in pairs(self.fishing) do
+    if ends <= now then
+      self.fishing[id] = nil
+      ended = true
+    end
+  end
+  return ended
+end
+
+-- The Feed kinds the Pocket Camp plays a one-off animation for.
+local ANIMATED = { ding = true, maxLevel = true, death = true, rareFind = true, goal = true }
+
+-- New Feed entries, made while running: the Pocket Camp, while it shows,
+-- plays an animation for each that has one (pocketCampAnimation), on the
+-- Member's figure if they're by its fire, or on the fire for a Crew goal.
+-- Whatever the chat-line and toast settings are; nothing is marked seen.
+local function animate(self, entries)
+  if #entries == 0 or not pocketCampOn(self) then return end
+  local view
+  for _, entry in ipairs(entries) do
+    if entry.kind == "goal" then
+      self.listener("pocketCampAnimation", { kind = "goal" })
+    elseif ANIMATED[entry.kind] then
+      view = view or pocketView(self)
+      for _, actor in ipairs(view.actors) do
+        if actor.memberId == entry.memberId then
+          self.listener("pocketCampAnimation", { kind = entry.kind, memberId = entry.memberId })
+        end
+      end
+    end
+  end
+end
+
 local function announce(self, entries, reactions, notices)
   if not self.log:isSettled() then return end
+  animate(self, entries)
   local to = outlets(self)
   if not (to.chat or to.toast) then return end
   for _, entry in ipairs(entries) do
@@ -274,6 +338,7 @@ function Core:updateOwn(character)
   if changed then
     -- Your own events go into the Feed only while in a Crew.
     local entries = self.db.crew and self.log:ownChanged(before, character.guid) or {}
+    animate(self, entries)
     -- Feed news goes out now, even a professions-only change.
     self.gossip:ownChanged(#entries > 0 and "now" or ns.Gossip.urgency(before, character))
     -- Professions first known change who counts, as for others.
@@ -347,7 +412,8 @@ end
 -- outside a Crew too, and shared with the next send, as professions are.
 -- In a Crew, the Crew's first catch of a rare type makes a Feed entry and
 -- goes out now, and types caught can reach a Crew goal step. Returns true
--- if your record changed.
+-- if your record changed. The Pocket Camp shows you fishing for a minute
+-- after.
 function Core:caught(loot)
   if not self.ledger:own() then return false end
   local now, character = self.now(), self.ledger:playing()
@@ -355,6 +421,8 @@ function Core:caught(loot)
   local changed = self.ledger:changeOwn(function(record) return ns.Catches.add(record, loot, now, character) end)
   if changed then
     local entries = self.db.crew and self.log:ownCaught(had) or {}
+    startFishing(self, self.ledger:memberId())
+    animate(self, entries)
     self.gossip:ownChanged(#entries > 0 and "now" or "later")
     checkGoals(self)
     self.listener("changed")
@@ -572,6 +640,34 @@ function Core:camp(columns)
   return ns.Camp.view(ns.Roster.rows(self.ledger, now), self.log:since(now - ns.Camp.RECENT), now, columns)
 end
 
+-- The Pocket Camp: the small Camp kept on screen, or nil outside a Crew
+-- and while the Pocket Camp or the Camp setting is off. Always
+-- Core.CAMP_LAYOUT.pocketColumns art pixels wide and pocketRows high:
+-- { columns, rows, actors, more, moreText, tooltip, opacity, locked,
+-- hideInCombat, position }. actors are the online Members only, you
+-- first, as many as fit, each as in camp() plus pose ("seated",
+-- "adventuring": the Character being played is in an instance, or
+-- "fishing": for a minute after their catches were seen to grow, or yours
+-- did), instance (its name, while in one) and status (the pose in words:
+-- "by the fire", "in The Deadmines", "fishing"). No sleepers, graves or
+-- tent; more counts the online Members that didn't fit ("+2"). tooltip is
+-- { title, lines ("Bob: in The Deadmines", one per actor), hint }. The
+-- rest is how UI shows it: opacity (the backdrop's, 0 to 1), locked (it
+-- can't be dragged), hideInCombat and position ({ x, y }: its bottom left
+-- corner from the screen's, or nil where it hasn't been moved). Derived on
+-- read, from what the Roster and Feed know: it can lag, and nothing is
+-- sent. See docs/design/pocket-camp.md.
+function Core:pocketCamp()
+  if not pocketCampOn(self) then return nil end
+  local view = pocketView(self)
+  view.opacity = self:setting("pocketCampOpacity") / 100
+  view.locked = self:setting("pocketCampLocked")
+  view.hideInCombat = self:setting("pocketCampCombat")
+  view.position = self:setting("pocketCampPosition")
+  view.tooltip.hint = view.locked and "Click to open BFF." or "Click to open BFF. Drag to move."
+  return view
+end
+
 -- Counts for the title and minimap button: online, members, canPlay (online
 -- Members whose Character being played can play with you), hidden
 -- (Characters unseen for Core.HIDE_AFTER_DAYS) and spares (others'
@@ -640,6 +736,18 @@ local function awaySummary(self)
   self.listener("changed")
 end
 
+-- Offers the Tip there is, the first time there is one: the tip event,
+-- with tip()'s Tip, for a window of its own. Once per Tip on the account,
+-- answered or not; after that it only shows in the panel.
+local function offerTip(self)
+  local tip = self:tip()
+  local offered = self.db.tipsOffered
+  if not tip or (offered and offered[tip.key]) then return end
+  self.db.tipsOffered = offered or {}
+  self.db.tipsOffered[tip.key] = true
+  self.listener("tip", tip)
+end
+
 -- Called once a second. Core decides what is due.
 function Core:tick()
   -- Counts the second played.
@@ -653,6 +761,9 @@ function Core:tick()
     self.listener("changed")
   end
   if self.db.crew then self.spareLife:tick() end
+  offerTip(self)
+  -- A fishing spell ended: the Pocket Camp redraws.
+  if fishingEnded(self) and pocketCampOn(self) then self.listener("changed") end
   checkOnline(self)
 end
 
@@ -1011,6 +1122,23 @@ local function screenPosition(field)
   }
 end
 
+-- A whole percentage, 0 to 100, saved as nil while it's the default.
+local function percent(field, default)
+  return {
+    read = function(db)
+      local value = db[field]
+      if type(value) ~= "number" then return default end
+      return value
+    end,
+    write = function(db, value)
+      if type(value) ~= "number" then value = default end
+      value = math.max(0, math.min(100, math.floor(value + 0.5)))
+      if value == default then value = nil end
+      db[field] = value
+    end,
+  }
+end
+
 -- The panel's size limits and the size it opens at, in UI units.
 Core.PANEL_MIN_WIDTH, Core.PANEL_MIN_HEIGHT = 460, 380
 Core.PANEL_WIDTH, Core.PANEL_HEIGHT = 640, 520
@@ -1059,6 +1187,7 @@ Core.DEFAULT_TOAST_SOUND = "UI_BNET_TOAST"
 local SHARING = "Sharing"
 local NOTIFICATIONS = "Notifications and display"
 local TOASTS = "Toasts"
+local POCKET_CAMP = "Pocket Camp"
 
 local SETTINGS = {
   {
@@ -1112,6 +1241,33 @@ local SETTINGS = {
     label = "Move toasts",
     saved = screenPosition("toastPosition"),
   },
+  -- The Pocket Camp (pocketCamp()), in a section of its own: whether it shows, its backdrop's
+  -- opacity as a percentage, whether it can be dragged, and hiding it in
+  -- combat.
+  {
+    key = "pocketCamp", section = POCKET_CAMP, kind = "toggle",
+    label = "Show the Pocket Camp",
+    saved = onFlag("pocketCamp"),
+  },
+  {
+    key = "pocketCampOpacity", section = POCKET_CAMP, kind = "percent",
+    label = "Backdrop opacity",
+    saved = percent("pocketCampOpacity", 60),
+  },
+  {
+    key = "pocketCampLocked", section = POCKET_CAMP, kind = "toggle",
+    label = "Lock its position",
+    saved = onFlag("pocketCampLocked"),
+  },
+  {
+    key = "pocketCampCombat", section = POCKET_CAMP, kind = "toggle",
+    label = "Hide in combat",
+    saved = onFlag("pocketCampCombatHide"),
+  },
+  -- Where the Pocket Camp was dragged to: its bottom left corner, as
+  -- { x, y } from the screen's bottom left; nil where it starts. Not on
+  -- the page.
+  { key = "pocketCampPosition", kind = "position", saved = screenPosition("pocketCampPosition") },
   -- The Together tab's Show menu (together().show), saved in db.together.
   { key = "togetherOffline", kind = "toggle", saved = offFlag("offlineOff", "together") },
   { key = "togetherAlts", kind = "toggle", saved = onFlag("alts", "together") },
@@ -1130,6 +1286,31 @@ local function settingFor(key)
   local setting = SETTING[key]
   if not setting then error(("Core: no setting %q"):format(tostring(key)), 3) end
   return setting
+end
+
+-- Tips: one-time cards at the top of the panel, each offering a feature
+-- that's off by default. In order; the panel shows the first unanswered
+-- one, and the first time there is one it's also offered in a window of
+-- its own (the tip event). key names it in the saved answers, title is the
+-- window's, text is the card's and the window's, setting is the on/off
+-- setting Turn on turns on, and needs (optional) a setting that must be on
+-- for the Tip to show. Adding the next one is an entry here.
+local TIPS = {
+  {
+    key = "pocketCamp", setting = "pocketCamp", needs = "camp",
+    title = "New: the Pocket Camp",
+    text = "Keep your Crew on screen. The Pocket Camp shows the fire and who's by it while you play. "
+      .. "You can turn it on or off any time in Settings.",
+  },
+}
+
+local TIP = {}
+for _, tip in ipairs(TIPS) do TIP[tip.key] = tip end
+
+-- A Tip is answered for good, on every Character of the account.
+local function answerTip(self, tip)
+  self.db.tipsAnswered = self.db.tipsAnswered or {}
+  self.db.tipsAnswered[tip.key] = true
 end
 
 -- What Core itself does when a setting changes, by key.
@@ -1154,7 +1335,49 @@ function Core:setSetting(key, value)
   if (saved.same or rawequal)(before, after) then return end
   local onChange = ON_CHANGE[key]
   if onChange then onChange(self, after) end
+  -- A feature turned on by hand needs no Tip any more.
+  for _, tip in ipairs(TIPS) do
+    if tip.setting == key and after == true then answerTip(self, tip) end
+  end
   self.listener("settingChanged", key, after)
+end
+
+-- The Tip to show at the top of the panel: the first unanswered one,
+-- ready to render ({ key, title, text, accept, dismiss }: the window's
+-- title, the text and the two buttons' labels), or nil when there's none, or outside a Crew. A Tip
+-- is answered by acceptTip() or dismissTip(), or by its feature having
+-- been turned on in Settings, and then never shows again on the account.
+function Core:tip()
+  if not self.db.crew then return nil end
+  local answered = self.db.tipsAnswered or {}
+  for _, tip in ipairs(TIPS) do
+    if not answered[tip.key] and not self:setting(tip.setting) and (not tip.needs or self:setting(tip.needs)) then
+      return { key = tip.key, title = tip.title, text = tip.text, accept = "Turn on", dismiss = "No thanks" }
+    end
+  end
+  return nil
+end
+
+
+-- Turn on: answers the Tip and turns its feature on. Returns true, or
+-- false for a key that isn't a Tip.
+function Core:acceptTip(key)
+  local tip = TIP[key]
+  if not tip then return false end
+  answerTip(self, tip)
+  self:setSetting(tip.setting, true)
+  self.listener("changed")
+  return true
+end
+
+-- No thanks: answers the Tip and does nothing else. Returns true, or false
+-- for a key that isn't a Tip.
+function Core:dismissTip(key)
+  local tip = TIP[key]
+  if not tip then return false end
+  answerTip(self, tip)
+  self.listener("changed")
+  return true
 end
 
 -- The Settings page, ready to render: sections in order, { title,
@@ -1211,6 +1434,13 @@ function Core:toastPosition()
   local position = self:setting("toastPosition")
   if not position then return nil end
   return position.x, position.y
+end
+
+-- Where the Pocket Camp was dragged to: its bottom left corner, in UI
+-- units from the screen's bottom left. Account-wide. Nil x puts it back
+-- where it starts.
+function Core:setPocketCampPosition(x, y)
+  self:setSetting("pocketCampPosition", x and { x = x, y = y } or nil)
 end
 
 -- The panel's size and position as the player left it, by its top left
@@ -1393,6 +1623,7 @@ function Core:removeMember(id)
   self.log:dropMember(id)
   self.spareLife:memberRemoved()
   self.online[id] = nil
+  self.fishing[id] = nil
   checkGoals(self, true)
   self.listener("changed")
   return true
@@ -1435,6 +1666,7 @@ local function finishLeaving(self)
   self.crewGoals:clear()
   self.db.catchTypesTold = nil
   self.online = {}
+  self.fishing = {}
   self.listener("crewChanged")
   self.listener("notice", "leftCrew")
 end
@@ -1494,6 +1726,11 @@ local function dataReceived(self, records, from)
       changed = true
       self.log:dataMerged()
       self.crewGoals:dataMerged()
+      -- More catches than the copy held, seen while running: they fish.
+      if before and not record.left and self.log:isSettled()
+        and ns.Catches.total(record) > ns.Catches.total(before) then
+        startFishing(self, record.id)
+      end
       local entries, reactions = self.log:recordChanged(before, record)
       announce(self, entries, reactions, self.spareLife:recordChanged(before, record))
       -- A Member first seen, leaving or back, or professions first shared,
