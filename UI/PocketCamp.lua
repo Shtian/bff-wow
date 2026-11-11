@@ -1,7 +1,7 @@
 -- PocketCamp: the small on-screen Camp you can keep up while playing. It
 -- draws Core's pocketCamp() with a CampScene band of its own: the fire and
--- the online Members, each seated, adventuring or fishing, over a backdrop
--- of the opacity Core gives. It shows no names: the mouse over a figure
+-- the online Members, each seated, adventuring or fishing, over a
+-- soft-edged backdrop of the opacity Core gives. It shows no names: the mouse over a figure
 -- shows that Member's Roster tooltip, and over the fire who is doing what.
 -- A click toggles the panel (not in combat), a drag moves it unless Core
 -- says it's locked, and where it's dropped is saved through Core. Core's pocketCampAnimation events play on it, and a
@@ -123,7 +123,9 @@ local function create()
   end)
   inCombat = InCombatLockdown() and true or false
 
-  frame.band = ns.CampScene.new(frame, { target = ns.CampScene.FIGURE_TARGET, shadow = true, names = false })
+  frame.band = ns.CampScene.new(frame, {
+    target = ns.CampScene.FIGURE_TARGET, shadow = true, names = false, backdrop = ns.CampSheet.pocketBackdrop,
+  })
   frame.band:SetAllPoints()
 end
 

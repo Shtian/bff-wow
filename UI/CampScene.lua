@@ -410,8 +410,9 @@ end
 -- actor's gained text (While you were away) instead of names; names false
 -- leaves the names out (the Pocket Camp, whose figures have a tooltip);
 -- target is the art pixel's size to aim for in UI units (default
--- BAND_TARGET); and shadow gives its text a shadow, for a band over the
--- game world.
+-- BAND_TARGET); shadow gives its text a shadow, for a band over the game
+-- world; and backdrop is the backdrop art to draw in the usual one's place
+-- with no sky filled in behind it (CampSheet.pocketBackdrop, soft-edged).
 function CampScene.new(parent, options)
   options = options or {}
   local band = CreateFrame("Frame", nil, parent)
@@ -427,6 +428,7 @@ function CampScene.new(parent, options)
     band = band,
     gains = options.gains,
     names = options.names ~= false,
+    backdropArt = options.backdrop or Sheet.backdrop,
     target = options.target or CampScene.BAND_TARGET,
     hops = {},
     -- The one-off animations playing: { kind, memberId, start, ends }.
@@ -459,6 +461,8 @@ function CampScene.new(parent, options)
   local sky = band:CreateTexture(nil, "BACKGROUND", nil, 0)
   sky:SetAllPoints()
   sky:SetColorTexture(Sheet.sky[1], Sheet.sky[2], Sheet.sky[3], 1)
+  -- Art with its own shape has no sky behind it.
+  sky:SetShown(options.backdrop == nil)
   scene.sky = sky
 
   -- The art's origin, on a whole pixel: everything is placed from it.
@@ -468,7 +472,7 @@ function CampScene.new(parent, options)
   if scene.art.SetRoundLayoutToNearestPixel then scene.art:SetRoundLayoutToNearestPixel(true) end
   band.art = scene.art
   scene.backdrop = scene.art:CreateTexture(nil, "BACKGROUND", nil, 1)
-  scene.backdrop:SetTexture(Sheet.backdrop.file, "CLAMP", "CLAMP", "NEAREST")
+  scene.backdrop:SetTexture(scene.backdropArt.file, "CLAMP", "CLAMP", "NEAREST")
   scene.tent = texture(scene.art, "BORDER", 0)
   scene.logs = texture(scene.art, "ARTWORK", 0)
   scene.flame = texture(scene.art, "ARTWORK", 1)
@@ -486,8 +490,8 @@ function CampScene.new(parent, options)
       return
     end
     scene.frame = nil
-    scene.backdrop:SetSize(Sheet.backdrop.width * scene.unit, Sheet.backdrop.height * scene.unit)
-    put(scene, scene.backdrop, -Sheet.backdrop.fire, 0)
+    scene.backdrop:SetSize(scene.backdropArt.width * scene.unit, scene.backdropArt.height * scene.unit)
+    put(scene, scene.backdrop, -scene.backdropArt.fire, 0)
     scene.more:SetText(view.moreText or "")
     band:Show()
     onUpdate(band)
@@ -512,7 +516,7 @@ function CampScene.new(parent, options)
   end
 
   -- How solid the sky and backdrop are, 0 to 1. At 0 only the fire, the
-  -- figures and the names show.
+  -- figures and the text show.
   function band:SetBackdropAlpha(alpha)
     scene.sky:SetAlpha(alpha)
     scene.backdrop:SetAlpha(alpha)

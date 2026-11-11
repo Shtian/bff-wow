@@ -49,6 +49,13 @@ ns.CampSheet = {
     height = 64,
     fire = 256,
   },
+  -- The Pocket Camp's backdrop, soft-edged: the same, for its own file.
+  pocketBackdrop = {
+    file = "Interface\\AddOns\\BFF\\Media\\CampPocketBackdrop",
+    width = 128,
+    height = 64,
+    fire = 64,
+  },
   -- The sky's top colour, above the backdrop's art.
   sky = { 0.027, 0.039, 0.118 },
 }

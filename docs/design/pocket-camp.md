@@ -84,7 +84,7 @@ All account-wide. With `camp` off the Pocket Camp never shows, whatever its own 
 
 - **Frame.** `UI/PocketCamp.lua`: a button on `UIParent`, strata LOW, clamped to the screen, with a CampScene band filling it (`CampScene.new(frame, { target = FIGURE_TARGET, shadow = true, names = false })`). Its art pixel aims for 2 UI units, as on rows and toasts, so it's about 224 by 68 UI units; `band:Fit(columns, rows)` gives the exact size in whole screen pixels. "+N" has a shadow, since the game world is behind it.
 - **No names.** With six figures there's room for about four letters each, so the Pocket Camp shows none; the tooltip says who a figure is.
-- **Backdrop.** The band's sky and backdrop art at `opacity` (`band:SetBackdropAlpha`). At 0 only the fire, the figures and "+N" show.
+- **Backdrop.** Its own art, `Media/CampPocketBackdrop.tga` (`CampSheet.pocketBackdrop`, passed as CampScene's `backdrop` option): the 112 by 34 art pixels of the Camp's backdrop round the fire, cut to a rounded shape that's solid in the middle and dithered away at the rim, so it doesn't sit on the game world as a hard rectangle. `scripts/camp-art.mjs` generates it (`pocketBackdrop`: the roundness, the fade's width and how solid the ground stays are constants there), and its size must match `pocketColumns` and `pocketRows`. No sky is filled in behind it. It's drawn at `opacity` (`band:SetBackdropAlpha`). At 0 only the fire, the figures and "+N" show.
 - **Click** toggles the panel, as the minimap button does. In combat (`InCombatLockdown()`) it does nothing.
 - **Drag** moves it unless `locked`. Where it's dropped is saved with `core:setPocketCampPosition(left, bottom)`; until then it sits under the screen's centre. Locked, a click still works.
 - **Hide in combat.** With `hideInCombat`, the frame hides on `PLAYER_REGEN_DISABLED` and shows on `PLAYER_REGEN_ENABLED`. Hidden, its `OnUpdate` doesn't run.
@@ -120,7 +120,7 @@ None of the rendering has run in a client, and the new sprites were authored as 
 
 - With the setting off, no `BFFPocketCamp` frame exists.
 - Pixels stay crisp at a few UI scales and across drags (the frame's corner can land between screen pixels; the art's origin frame rounds to the nearest).
-- It's readable over bright and dark scenes at 0%, 60% and 100% opacity.
+- It's readable over bright and dark scenes at 0%, 60% and 100% opacity, and the backdrop's dithered rim looks right at size.
 - Dragging, the lock, and the position after `/reload` and on another Character.
 - A click in and out of combat; Hide in combat on and off.
 - Each pose and animation reads at size: the rod towards the fire on both sides, the sword, star, fish, smoke, skeleton, bursts and flare, and that 10 s feels right for each.
