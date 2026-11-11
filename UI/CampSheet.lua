@@ -8,7 +8,7 @@ local _, ns = ...
 ns.CampSheet = {
   file = "Interface\\AddOns\\BFF\\Media\\CampSprites",
   width = 128,
-  height = 64,
+  height = 128,
   sprites = {
     seatedCloth = { 1, 1, 12, 13 },
     seated = { 15, 1, 12, 13 },
@@ -30,6 +30,16 @@ ns.CampSheet = {
     ember = { 91, 16, 1, 1 },
     emberCool = { 94, 16, 1, 1 },
     tent = { 1, 30, 33, 22 },
+    rod = { 36, 30, 7, 10 },
+    sword = { 45, 30, 3, 7 },
+    star = { 50, 30, 5, 5 },
+    fish = { 57, 30, 8, 4 },
+    smoke1 = { 67, 30, 7, 5 },
+    smoke2 = { 76, 30, 7, 5 },
+    skeleton = { 85, 30, 12, 13 },
+    flare1 = { 99, 30, 11, 20 },
+    flare2 = { 112, 30, 11, 20 },
+    flare3 = { 1, 54, 11, 20 },
   },
   -- The backdrop's file, its size in texels, and the column the fire's
   -- centre sits on.
@@ -38,6 +48,13 @@ ns.CampSheet = {
     width = 512,
     height = 64,
     fire = 256,
+  },
+  -- The Pocket Camp's backdrop, soft-edged: the same, for its own file.
+  pocketBackdrop = {
+    file = "Interface\\AddOns\\BFF\\Media\\CampPocketBackdrop",
+    width = 128,
+    height = 64,
+    fire = 64,
   },
   -- The sky's top colour, above the backdrop's art.
   sky = { 0.027, 0.039, 0.118 },

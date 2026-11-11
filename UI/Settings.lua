@@ -3,9 +3,11 @@
 -- then a section per section of Core's settings list (Sharing, with Leave
 -- Crew under Appear offline; Notifications and display; Toasts from the
 -- toasts decision). Every on/off setting in the list gets a checkbox built
--- from core:settings(); the sound picker, Move toasts and Reset BFF window
--- are drawn by hand.
--- A canvas page, since the standard controls have no text box. Everything
+-- from core:settings(); the sound picker, Move toasts, Reset BFF window and
+-- the percentage slider (the Pocket Camp's backdrop opacity) are drawn by
+-- hand.
+-- A canvas page, since the standard controls have no text box. Its content
+-- scrolls, since the sections are taller than the game's panel. Everything
 -- is read and written through Core. See docs/design/settings-and-release.md
 -- and docs/design/toasts.md.
 
@@ -20,9 +22,15 @@ local function noop() end
 
 local INDENT = 16
 local SECTION_GAP = 22
+-- Room under the last control, and for the scroll bar on the right.
+local BOTTOM_MARGIN = 24
+local SCROLL_BAR_ROOM = 26
 
 local core
 local category
+-- The canvas the game's Settings panel shows, and inside it the scrolling
+-- content every control is made on.
+local page
 local frame
 
 local function createLabel(parent, text, template)
@@ -228,6 +236,42 @@ function custom.panelPlace(setting)
   }
 end
 
+-- A percentage, 0 to 100: a slider with its value beside it, saved as it's
+-- dragged. Template-free, so it doesn't depend on the client's slider
+-- templates.
+function custom.percent(setting)
+  local label = createLabel(frame, setting.label)
+  label.inset, label.gap = INDENT, 12
+  local slider = CreateFrame("Slider", nil, frame)
+  slider:SetOrientation("HORIZONTAL")
+  slider:SetSize(140, 16)
+  slider:SetPoint("LEFT", label, "LEFT", 210, 0)
+  slider:SetMinMaxValues(0, 100)
+  slider:SetValueStep(5)
+  if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
+  local track = slider:CreateTexture(nil, "BACKGROUND")
+  track:SetColorTexture(1, 1, 1, 0.3)
+  track:SetHeight(4)
+  track:SetPoint("LEFT")
+  track:SetPoint("RIGHT")
+  slider:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+  local value = createLabel(frame, "")
+  -- Clear of the thumb, which hangs over the slider's end at 100%.
+  value:SetPoint("LEFT", slider, "RIGHT", 20, 0)
+  slider:SetScript("OnValueChanged", function(_, percent, userInput)
+    value:SetText(("%d%%"):format(percent))
+    if userInput then core:setSetting(setting.key, percent) end
+  end)
+  return {
+    element = label,
+    draw = function(percent) slider:SetValue(percent) end,
+    setEnabled = function(on)
+      label:SetAlpha(on and 1 or 0.5)
+      slider:SetEnabled(on)
+    end,
+  }
+end
+
 -- An on/off setting: a checkbox.
 local function createToggle(setting)
   local box = createCheckbox(setting.label, function(checked)
@@ -293,6 +337,9 @@ local function layout(crew)
       above = element
     end
   end
+  -- The content is as tall as what's on it, so the scroll bar knows.
+  local top, bottom = frame:GetTop(), above:GetBottom()
+  if top and bottom then frame:SetHeight(top - bottom + BOTTOM_MARGIN) end
 end
 
 -- Draws one setting's control. With toasts off, the Toasts section's
@@ -312,26 +359,40 @@ local function drawSetting(key, value)
   end
 end
 
+-- The game's scroll frame, the newer template where the client has it.
+local function createScroll()
+  local hasNew = C_XMLUtil and C_XMLUtil.GetTemplateInfo and C_XMLUtil.GetTemplateInfo("ScrollFrameTemplate") ~= nil
+  local scroll = CreateFrame("ScrollFrame", nil, page, hasNew and "ScrollFrameTemplate" or "UIPanelScrollFrameTemplate")
+  scroll:SetPoint("TOPLEFT", 0, -4)
+  scroll:SetPoint("BOTTOMRIGHT", -SCROLL_BAR_ROOM, 4)
+  local content = CreateFrame("Frame", nil, scroll)
+  content:SetSize(1, 1)
+  scroll:SetScrollChild(content)
+  scroll:SetScript("OnSizeChanged", function(_, width) content:SetWidth(width) end)
+  return content
+end
+
 local function create()
-  frame = CreateFrame("Frame")
-  frame:Hide()
+  page = CreateFrame("Frame")
+  page:Hide()
+  frame = createScroll()
   frame.title = createLabel(frame, "BFF", "GameFontNormalHuge")
   frame.title:SetPoint("TOPLEFT", 16, -16)
   createYou()
   frame.elements = {}
   createSections()
-  frame:SetScript("OnShow", Page.refresh)
+  page:SetScript("OnShow", Page.refresh)
   -- A refused name is forgotten once the page closes.
-  frame:SetScript("OnHide", function() frame.nameError:SetText("") end)
-  frame.OnRefresh = Page.refresh
-  frame.OnCommit = noop
-  frame.OnDefault = noop
+  page:SetScript("OnHide", function() frame.nameError:SetText("") end)
+  page.OnRefresh = Page.refresh
+  page.OnCommit = noop
+  page.OnDefault = noop
 end
 
 -- Redraws from Core, if the page is open. Out of a Crew the Crew code and
 -- Leave Crew are hidden, and the sections below close up.
 function Page.refresh()
-  if not frame or not frame:IsShown() then return end
+  if not page or not page:IsShown() then return end
   local crew = core:crew()
 
   if not frame.name:HasFocus() and frame.nameError:GetText() == "" then showName() end
@@ -354,7 +415,7 @@ end
 
 -- Updates the control for a setting that changed, if the page is open.
 function Page.settingChanged(key, value)
-  if not frame or not frame:IsShown() then return end
+  if not page or not page:IsShown() then return end
   drawSetting(key, value)
 end
 
@@ -372,6 +433,6 @@ end
 function Page.start(theCore)
   core = theCore
   create()
-  category = Settings.RegisterCanvasLayoutCategory(frame, "BFF")
+  category = Settings.RegisterCanvasLayoutCategory(page, "BFF")
   Settings.RegisterAddOnCategory(category)
 end

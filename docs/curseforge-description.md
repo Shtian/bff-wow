@@ -8,6 +8,14 @@ BFF is for a small group of friends who don't always play at the same time. It s
 
 - **While you were away:** when you log in, see every ding, death and new character your friends had since you last played.
 - **Gather round the fire:** the Camp, a small pixel campsite at the top of the panel and in While you were away. Friends who are online sit by the fire and the rest sleep in bedrolls. A recent death leaves a grave, respects put a flower on it, and a fresh max level gets a spark. You can switch it off in Settings.
+- **Keep the fire on screen:** the Pocket Camp, an optional small Camp you can keep up while you play.
+  - Shows the fire and every friend who's online, you included.
+  - Each friend is shown doing what they're doing: sitting by the fire, standing with a sword raised while in a dungeon or raid, or holding a fishing rod after a catch.
+  - Reacts to news for about 10 seconds: a ding gets a gold star and a bounce, a max level bursts into sparks, a death turns the figure into a skeleton, a rare find is held up, and a crew goal makes the fire flare.
+  - Hover a friend to see their character, level, zone and professions. Hover the fire to see who's doing what.
+  - Click it to open BFF. Drag it anywhere on screen.
+  - Its own Settings section: backdrop opacity from see-through to solid, lock its position, and hide it in combat.
+  - Off by default. BFF offers it once when you log in, and you can turn it on or off any time in Settings.
 - **Your whole crew:** every friend's characters, levels and whereabouts, and when each was last seen. Alts are grouped under the person who plays them.
 - **Cheer every ding:** one click sends a cheer for a ding, respects for a death, or a welcome for someone new. Toasts can play an optional sound.
 - **Level up together:** goals the whole crew works towards, like everyone reaching level 60, and trophies for what you do together, like clearing a dungeon or a raid, or catching every type of fish. Nobody is ranked.

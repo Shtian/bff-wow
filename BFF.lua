@@ -51,9 +51,19 @@ local function chatLine(entry)
   say(text)
 end
 
--- While you were away waits for combat to end.
+-- While you were away and a Tip's window wait for combat to end.
 local pendingAway
+local pendingTip
 local eventFrame = CreateFrame("Frame")
+
+local function showTip(tip)
+  if InCombatLockdown() then
+    pendingTip = tip
+    eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+  else
+    ns.TipDialog.show(tip)
+  end
+end
 
 local function showAway(summary)
   if InCombatLockdown() then
@@ -115,6 +125,8 @@ end
 local function onCoreEvent(event, arg, more)
   if event == "changed" then
     ns.Panel.refresh()
+    ns.PocketCamp.refresh()
+    ns.TipDialog.refresh()
     ns.Minimap.refresh()
     ns.MapPins.refresh()
     ns.Settings.refresh()
@@ -122,6 +134,8 @@ local function onCoreEvent(event, arg, more)
     -- arg is the key, more the new value; each module ignores keys it
     -- doesn't use.
     ns.Panel.settingChanged(arg, more)
+    ns.PocketCamp.settingChanged(arg, more)
+    ns.TipDialog.refresh()
     ns.Minimap.settingChanged(arg, more)
     ns.Toasts.settingChanged(arg, more)
     ns.Settings.settingChanged(arg, more)
@@ -132,6 +146,7 @@ local function onCoreEvent(event, arg, more)
   elseif event == "crewChanged" then
     ns.ChannelLink.setCrew(ns.core:crew())
     ns.Panel.refresh()
+    ns.PocketCamp.refresh()
     ns.Minimap.refresh()
     ns.MapPins.refresh()
     ns.Settings.refresh()
@@ -141,6 +156,10 @@ local function onCoreEvent(event, arg, more)
     -- Core says where each Live event goes: more is its outlets.
     if more.chat then chatLine(arg) end
     if more.toast then ns.Toasts.show(arg) end
+  elseif event == "tip" then
+    showTip(arg)
+  elseif event == "pocketCampAnimation" then
+    ns.PocketCamp.animate(arg)
   elseif event == "awaySummary" then
     showAway(arg)
   elseif event == "spareGone" then
@@ -217,6 +236,8 @@ local function start(isInitialLogin)
   ns.ChannelLink.start(ns.core, function(kind) say(MESSAGES[kind]) end)
   ns.ChannelLink.setCrew(ns.core:crew())
   ns.Panel.start(ns.core)
+  ns.PocketCamp.start(ns.core)
+  ns.TipDialog.start(ns.core)
   ns.Minimap.start(ns.core)
   ns.MapPins.start(ns.core)
   ns.Toasts.start(ns.core)
@@ -271,12 +292,17 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
   elseif event == "LOOT_CLOSED" then
     lootRead = false
   elseif event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
-    if ns.core then ns.Panel.refresh() end
+    if ns.core then
+      ns.Panel.refresh()
+      ns.PocketCamp.refresh()
+    end
   elseif event == "PLAYER_REGEN_ENABLED" then
     eventFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
-    local summary = pendingAway
-    pendingAway = nil
+    local summary, tip = pendingAway, pendingTip
+    pendingAway, pendingTip = nil, nil
     if summary then ns.Away.show(summary) end
+    -- Answered meanwhile (in Settings, say): nothing left to offer.
+    if tip and ns.core:tip() then ns.TipDialog.show(tip) end
   end
 end)
 
