@@ -64,6 +64,7 @@ describe("Map pins", function()
       y = 0.655,
       zone = "Elwynn Forest",
       figure = "WARRIOR",
+      size = "medium",
       online = true,
       sinceSeen = 20,
       lastSeenText = "online",
@@ -349,6 +350,13 @@ describe("Map pins", function()
     assert.equal("WARRIOR", pinFor(a, b).figure)
     a.core:setSetting("camp", false)
     assert.is_nil(pinFor(a, b).figure)
+  end)
+
+  it("carry the map pin size setting", function()
+    local _, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    a.core:setSetting("mapPinSize", "small")
+    assert.equal("small", pinFor(a, b).size)
   end)
 
   it("are all gone while the map setting is off", function()

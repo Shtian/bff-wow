@@ -545,13 +545,15 @@ Core.selectTogether = ns.Together.select
 -- while inside one, the spot then being the last one outside), online,
 -- sinceSeen (seconds since the Member was last seen) and lastSeenText (as
 -- rows() words it), and figure (the shown Character's class, for the
--- Camp's seated figure, while the Camp is on). A spot heard in a WHERE since
+-- Camp's seated figure, while the Camp is on) and size (the mapPinSize
+-- setting: "small", "medium" or "large"). A spot heard in a WHERE since
 -- the record was written is used over the record's. None while the mapPins
 -- setting is off.
 function Core:mapPins()
   local pins = {}
   if not self:setting("mapPins") then return pins end
   local campOn = self:setting("camp")
+  local size = self:setting("mapPinSize")
   for _, row in ipairs(ns.Roster.rows(self.ledger, self.now())) do
     local record = not row.own and self.ledger:record(row.memberId)
     local live = record and self.where:spot(row.memberId, row.guid, record.version)
@@ -570,6 +572,7 @@ function Core:mapPins()
         zone = row.zone,
         instance = row.instance,
         figure = campOn and row.classFilename or nil,
+        size = size,
         online = row.online,
         sinceSeen = row.sinceSeen,
         lastSeenText = row.lastSeenText,
@@ -1018,6 +1021,24 @@ local function onFlag(field, parent)
   }
 end
 
+-- One of choices' keys, saved as nil while it's the default; anything
+-- else reads and writes as the default.
+local function oneOf(field, choices, default)
+  local known = {}
+  for _, choice in ipairs(choices) do known[choice.key] = true end
+  local function valid(value)
+    if known[value] then return value end
+    return default
+  end
+  return {
+    read = function(db) return valid(db[field]) end,
+    write = function(db, value)
+      value = valid(value)
+      db[field] = value ~= default and value or nil
+    end,
+  }
+end
+
 -- A value saved as nil while it's the default.
 local function nilAsDefault(field, default)
   return {
@@ -1095,6 +1116,12 @@ end
 
 -- The toast sound's default: the name UI plays it by.
 Core.DEFAULT_TOAST_SOUND = "UI_BNET_TOAST"
+-- The map pin sizes, smallest first.
+Core.MAP_PIN_SIZES = {
+  { key = "small", label = "Small" },
+  { key = "medium", label = "Medium" },
+  { key = "large", label = "Large" },
+}
 
 local SHARING = "Sharing"
 local NOTIFICATIONS = "Notifications and display"
@@ -1133,6 +1160,13 @@ local SETTINGS = {
     key = "mapPins", section = NOTIFICATIONS, kind = "toggle",
     label = "Show your Crew on the world map",
     saved = offFlag("mapPinsOff"),
+  },
+  -- How big the pins are (each pin's size); UI picks the pixels.
+  {
+    key = "mapPinSize", section = NOTIFICATIONS, kind = "choice",
+    label = "Map pin size", needs = "mapPins",
+    choices = Core.MAP_PIN_SIZES,
+    saved = oneOf("mapPinSize", Core.MAP_PIN_SIZES, "medium"),
   },
   -- The panel's size and position (panelPlace()); the page shows a reset.
   {
@@ -1221,6 +1255,8 @@ function Core:settings()
         kind = setting.kind,
         label = setting.label,
         value = self:setting(setting.key),
+        choices = setting.choices,
+        needs = setting.needs,
       }
     end
   end

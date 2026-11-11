@@ -121,23 +121,27 @@ end
 -- that opens the same menu.
 local DROPDOWN = "WowStyle1DropdownTemplate"
 
--- Each picker has :draw(), which shows the chosen sound: the dropdown
--- reads it from its menu's radios, the button is given it as text.
-local function createSoundPicker()
+-- Each picker has :draw(), which shows the choice: the dropdown reads it
+-- from its menu's radios, the button is given it as text by chosenText().
+local function createPicker(buildMenu, chosenText)
   local hasDropdown = C_XMLUtil and C_XMLUtil.GetTemplateInfo
     and C_XMLUtil.GetTemplateInfo(DROPDOWN) ~= nil
   if hasDropdown then
     local dropdown = CreateFrame("DropdownButton", nil, frame, DROPDOWN)
-    dropdown:SetupMenu(buildSoundMenu)
+    dropdown:SetupMenu(buildMenu)
     dropdown.draw = dropdown.GenerateMenu
     return dropdown
   end
   local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-  button:SetScript("OnClick", function(owner) MenuUtil.CreateContextMenu(owner, buildSoundMenu) end)
+  button:SetScript("OnClick", function(owner) MenuUtil.CreateContextMenu(owner, buildMenu) end)
   function button:draw()
-    self:SetText(ns.Toasts.soundLabel(core:setting("toastSound")))
+    self:SetText(chosenText())
   end
   return button
+end
+
+local function createSoundPicker()
+  return createPicker(buildSoundMenu, function() return ns.Toasts.soundLabel(core:setting("toastSound")) end)
 end
 
 -- The controls for settings that aren't on/off, by kind: each makes the
@@ -163,6 +167,34 @@ function custom.sound(setting)
       label:SetAlpha(on and 1 or 0.5)
       picker:SetEnabled(on)
       play:SetEnabled(on)
+    end,
+  }
+end
+
+-- One of a few choices (Map pin size), from a dropdown of setting.choices.
+function custom.choice(setting)
+  local label = createLabel(frame, setting.label)
+  label.inset, label.gap = INDENT, 14
+  local function buildMenu(_, root)
+    for _, choice in ipairs(setting.choices) do
+      root:CreateRadio(choice.label, function() return core:setting(setting.key) == choice.key end,
+        function() core:setSetting(setting.key, choice.key) end)
+    end
+  end
+  local picker = createPicker(buildMenu, function()
+    for _, choice in ipairs(setting.choices) do
+      if choice.key == core:setting(setting.key) then return choice.label end
+    end
+    return ""
+  end)
+  picker:SetSize(160, 22)
+  picker:SetPoint("LEFT", label, "LEFT", 116, 0)
+  return {
+    element = label,
+    draw = function() picker:draw() end,
+    setEnabled = function(on)
+      label:SetAlpha(on and 1 or 0.5)
+      picker:SetEnabled(on)
     end,
   }
 end
@@ -234,7 +266,7 @@ local function createSections()
     for _, setting in ipairs(section.settings) do
       local make = setting.kind == "toggle" and createToggle or custom[setting.kind]
       local control = make(setting)
-      control.section, control.kind = section.title, setting.kind
+      control.section, control.kind, control.needs = section.title, setting.kind, setting.needs
       frame.controls[setting.key] = control
       frame.elements[#frame.elements + 1] = control.element
       if extras[setting.key] then
@@ -264,11 +296,15 @@ local function layout(crew)
 end
 
 -- Draws one setting's control. With toasts off, the Toasts section's
--- controls that aren't on/off (sound, Move toasts) are greyed out.
+-- controls that aren't on/off (sound, Move toasts) are greyed out, and so
+-- is any control that needs an on/off setting that's off (Map pin size).
 local function drawSetting(key, value)
   local control = frame.controls[key]
   if not control then return end
   control.draw(value)
+  for _, other in pairs(frame.controls) do
+    if other.needs == key then other.setEnabled(value) end
+  end
   if key == "toasts" then
     for _, other in pairs(frame.controls) do
       if other.kind ~= "toggle" and other.section == control.section then other.setEnabled(value) end

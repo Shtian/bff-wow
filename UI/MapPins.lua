@@ -15,10 +15,14 @@ ns.MapPins = MapPins
 local Skin = ns.Skin
 local HBDPins = LibStub("HereBeDragons-Pins-2.0")
 
--- The avatar's art unit on the map: smaller than on Roster rows.
-local FIGURE_TARGET = 1.4
--- The class icon's size while the Camp is off.
-local ICON = 16
+-- Each pin size (Core's mapPinSize): the avatar's art unit on the map, and
+-- the class icon's size while the Camp is off. Medium is a bit smaller
+-- than on Roster rows.
+local SIZES = {
+  small = { figure = 1.1, icon = 13 },
+  medium = { figure = 1.4, icon = 16 },
+  large = { figure = 1.8, icon = 20 },
+}
 -- The online dot, with a dark keyline round it so it reads on a bright map.
 local DOT = 5
 local KEYLINE = 1
@@ -64,10 +68,9 @@ local function createFrame()
   local frame = CreateFrame("Frame", nil, UIParent)
   frame:EnableMouse(true)
   -- The Camp's seated figure while the Camp is on, else the class icon.
-  frame.figure = ns.CampScene.figure(frame, FIGURE_TARGET)
+  frame.figure = ns.CampScene.figure(frame)
   frame.figure:SetPoint("CENTER")
   frame.icon = frame:CreateTexture(nil, "ARTWORK")
-  frame.icon:SetSize(ICON, ICON)
   frame.icon:SetPoint("CENTER")
   Skin.round(frame, frame.icon)
   -- The online dot, on a frame of its own so it sits over the figure.
@@ -89,15 +92,18 @@ end
 
 local function draw(frame, pin)
   frame.pin = pin
+  local size = SIZES[pin.size] or SIZES.medium
   if pin.figure then
     frame.icon:Hide()
+    frame.figure:SetTarget(size.figure)
     frame.figure:SetClass(pin.figure)
     frame:SetSize(frame.figure:GetSize())
   else
     frame.figure:Hide()
     frame.icon:SetAtlas("classicon-" .. (pin.classFilename or ""):lower())
+    frame.icon:SetSize(size.icon, size.icon)
     frame.icon:Show()
-    frame:SetSize(ICON, ICON)
+    frame:SetSize(size.icon, size.icon)
   end
   -- Kept over the figure after HereBeDragons reparents the pin.
   frame.online:SetFrameLevel(frame:GetFrameLevel() + 5)
@@ -132,7 +138,7 @@ function MapPins.moved()
 end
 
 function MapPins.settingChanged(key)
-  if key == "mapPins" or key == "camp" then MapPins.refresh() end
+  if key == "mapPins" or key == "mapPinSize" or key == "camp" then MapPins.refresh() end
 end
 
 function MapPins.start(c)

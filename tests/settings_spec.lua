@@ -94,6 +94,7 @@ local SETTINGS = {
   { key = "minimap", default = true, other = false },
   { key = "camp", default = true, other = false },
   { key = "mapPins", default = true, other = false },
+  { key = "mapPinSize", default = "medium", other = "large" },
   { key = "toastSound", default = "UI_BNET_TOAST", other = "none" },
   { key = "toastPosition", default = nil, other = { x = 400, y = 600 } },
   { key = "panelPlace", default = nil, other = { width = 600, height = 500, left = 100, top = 900 } },
@@ -112,7 +113,7 @@ describe("Settings list", function()
     for _, section in ipairs(core:settings()) do
       for _, setting in ipairs(section.settings) do keys[#keys + 1] = setting.key end
     end
-    assert.same({ "paused", "chatLines", "awayPopup", "minimap", "camp", "mapPins", "panelPlace", "toasts", "toastSound",
+    assert.same({ "paused", "chatLines", "awayPopup", "minimap", "camp", "mapPins", "mapPinSize", "panelPlace", "toasts", "toastSound",
       "toastPosition" }, keys)
   end)
 
@@ -127,6 +128,22 @@ describe("Settings list", function()
     assert.equal("Appear offline: send nothing, so your Crew sees you as offline", sections[1].settings[1].label)
     assert.equal("sound", sections[3].settings[2].kind)
     assert.equal("position", sections[3].settings[3].kind)
+  end)
+
+  it("offers map pin sizes as choices, needing the map setting, and keeps only a known size", function()
+    local core = newCore()
+    local size
+    for _, section in ipairs(core:settings()) do
+      for _, setting in ipairs(section.settings) do
+        if setting.key == "mapPinSize" then size = setting end
+      end
+    end
+    assert.same({
+      key = "mapPinSize", kind = "choice", label = "Map pin size", value = "medium", needs = "mapPins",
+      choices = { { key = "small", label = "Small" }, { key = "medium", label = "Medium" }, { key = "large", label = "Large" } },
+    }, size)
+    core:setSetting("mapPinSize", "huge")
+    assert.equal("medium", core:setting("mapPinSize"))
   end)
 
   it("refuses a key that isn't in the list", function()
