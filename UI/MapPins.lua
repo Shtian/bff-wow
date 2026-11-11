@@ -1,8 +1,8 @@
 -- MapPins: a pin on the world map for where each other Member was last
 -- seen, from Core's mapPins(), drawn through HereBeDragons-Pins. A pin is
--- the Member's avatar on a dark round plate: the Camp's seated figure in
--- the shown Character's class colour, or the class icon while the Camp is
--- off. It's ringed green while online and faded while offline, and shows
+-- the Member's avatar: the Camp's seated figure in the shown Character's
+-- class colour, or the class icon while the Camp is off. It has a small
+-- green dot while online and is faded while offline, and shows
 -- on its own map and on the zone, continent and world maps above it.
 -- Hovering one says who, where and when. Your own Member has none; the
 -- game already shows you. With the map setting off Core gives no pins.
@@ -15,14 +15,12 @@ ns.MapPins = MapPins
 local Skin = ns.Skin
 local HBDPins = LibStub("HereBeDragons-Pins-2.0")
 
--- The avatar's art unit on the map: a bit smaller than on Roster rows.
-local FIGURE_TARGET = 1.5
+-- The avatar's art unit on the map: smaller than on Roster rows.
+local FIGURE_TARGET = 1.25
 -- The class icon's size while the Camp is off.
-local ICON = 18
--- Room round the avatar inside the plate, the ring, and a dark keyline
--- outside it so a green ring reads on a bright map.
-local PAD = 2
-local RING = 2
+local ICON = 14
+-- The online dot, with a dark keyline round it so it reads on a bright map.
+local DOT = 5
 local KEYLINE = 1
 local OFFLINE_ALPHA = 0.5
 
@@ -55,42 +53,38 @@ local function hideTooltip()
   GameTooltip:Hide()
 end
 
-local function disc(frame, sublevel)
-  local t = frame:CreateTexture(nil, "OVERLAY", nil, sublevel)
-  t:SetPoint("CENTER")
+local function disc(parent, sublevel, size)
+  local t = parent:CreateTexture(nil, "OVERLAY", nil, sublevel)
+  t:SetSize(size, size)
   t:SetColorTexture(1, 1, 1, 1)
-  return Skin.round(frame, t)
+  return Skin.round(parent, t)
 end
 
 local function createFrame()
   local frame = CreateFrame("Frame", nil, UIParent)
   frame:EnableMouse(true)
-  frame.keyline = disc(frame, 0)
-  frame.keyline:SetVertexColor(Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1)
-  frame.ring = disc(frame, 1)
-  frame.plate = disc(frame, 2)
-  frame.plate:SetVertexColor(Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1)
   -- The Camp's seated figure while the Camp is on, else the class icon.
   frame.figure = ns.CampScene.figure(frame, FIGURE_TARGET)
-  frame.icon = frame:CreateTexture(nil, "OVERLAY", nil, 3)
+  frame.figure:SetPoint("CENTER")
+  frame.icon = frame:CreateTexture(nil, "ARTWORK")
   frame.icon:SetSize(ICON, ICON)
   frame.icon:SetPoint("CENTER")
   Skin.round(frame, frame.icon)
+  -- The online dot, on a frame of its own so it sits over the figure.
+  local badge = CreateFrame("Frame", nil, frame)
+  badge:SetSize(DOT + 2 * KEYLINE, DOT + 2 * KEYLINE)
+  badge:SetPoint("CENTER", frame, "BOTTOMRIGHT", -1, 1)
+  local keyline = disc(badge, 0, DOT + 2 * KEYLINE)
+  keyline:SetPoint("CENTER")
+  keyline:SetVertexColor(Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1)
+  local dot = disc(badge, 1, DOT)
+  dot:SetPoint("CENTER")
+  Skin.color(dot, Skin.ONLINE)
+  frame.online = badge
   frame:SetScript("OnEnter", showTooltip)
   frame:SetScript("OnLeave", hideTooltip)
   frame:Hide()
   return frame
-end
-
--- Sizes the plate round what it shows: the figure (sized by its art unit)
--- or the icon.
-local function size(frame, width, height)
-  local plate = math.max(width, height) + 2 * PAD
-  frame.plate:SetSize(plate, plate)
-  frame.ring:SetSize(plate + 2 * RING, plate + 2 * RING)
-  local outer = plate + 2 * (RING + KEYLINE)
-  frame.keyline:SetSize(outer, outer)
-  frame:SetSize(outer, outer)
 end
 
 local function draw(frame, pin)
@@ -98,16 +92,16 @@ local function draw(frame, pin)
   if pin.figure then
     frame.icon:Hide()
     frame.figure:SetClass(pin.figure)
-    frame.figure:ClearAllPoints()
-    frame.figure:SetPoint("CENTER")
-    size(frame, frame.figure:GetSize())
+    frame:SetSize(frame.figure:GetSize())
   else
     frame.figure:Hide()
     frame.icon:SetAtlas("classicon-" .. (pin.classFilename or ""):lower())
     frame.icon:Show()
-    size(frame, ICON, ICON)
+    frame:SetSize(ICON, ICON)
   end
-  Skin.color(frame.ring, pin.online and Skin.ONLINE or Skin.WINDOW)
+  -- Kept over the figure after HereBeDragons reparents the pin.
+  frame.online:SetFrameLevel(frame:GetFrameLevel() + 5)
+  frame.online:SetShown(pin.online)
   frame:SetAlpha(pin.online and 1 or OFFLINE_ALPHA)
 end
 
