@@ -39,6 +39,7 @@ Core/Core.lua
 
 Game/Snapshot.lua
 Game/Bags.lua
+Game/SyncLog.lua
 Game/ChannelLink.lua
 
 UI/Skin.lua
@@ -56,6 +57,7 @@ UI/Away.lua
 UI/ToastQueue.lua
 UI/Toasts.lua
 UI/Settings.lua
+UI/Report.lua
 
 #@do-not-package@
 Dev/FakeNet.lua

@@ -40,6 +40,9 @@ local STRANGER_MAX = 20
 -- After "No player named ...", how long more of them for that name (queued
 -- whispers, later chunks) stay out of chat.
 local NOT_FOUND_HIDE = 30
+-- An unreadable system message within this long after a whisper goes in
+-- the trace (#160: what the game says after a whisper in an instance).
+local SECRET_WINDOW = 5
 
 -- Channel events whose system notices for our channels don't print.
 local FILTERED_EVENTS = {
@@ -52,7 +55,8 @@ local FILTERED_EVENTS = {
 
 local core
 local onNotice
--- The sync trace (/bff debug sync): trace(line), or nil while it's off.
+-- The sync trace: trace(line). App sets it at start and keeps it set (the
+-- sync log keeps every line); nil only before that, and in tests.
 local trace
 local target          -- the Crew's channel and password, from Core
 local joining = false
@@ -79,6 +83,10 @@ local missed = {}
 -- chat filter hides it whether it runs before or after the event.
 local failedAt = {}
 local offlineMatched
+-- GetTime() of the last whisper sent, and whether (and which type of)
+-- instance the player was last seen in, for the trace.
+local lastWhisper
+local instanceType
 -- Upper-cased names of channels BFF is in or leaving, for the chat filter.
 local ours = {}
 
@@ -315,10 +323,15 @@ end
 -- that logged out before its leave notice arrived.
 local notFoundPattern = patternFor(ERR_CHAT_PLAYER_NOT_FOUND_S)
 
+-- The name in a "No player named ..." notice, whoever it is about.
+local function notFoundName(text)
+  if not notFoundPattern or not readable(text) then return nil end
+  return text:match(notFoundPattern)
+end
+
 -- The name in a "No player named ..." for a Character BFF whispered.
 local function notFound(text)
-  if not notFoundPattern or not readable(text) then return nil end
-  local name = text:match(notFoundPattern)
+  local name = notFoundName(text)
   if not name then return nil end
   local key = peerKey(name)
   local since = missed[key]
@@ -396,7 +409,34 @@ local function dropGone(key, why)
   core:gone(Ambiguate(name, "none"))
 end
 
+-- The peers' keys, sorted, for the trace.
+local function peerKeys()
+  local keys = {}
+  for key in pairs(peers) do keys[#keys + 1] = key end
+  table.sort(keys)
+  return table.concat(keys, ", ")
+end
+
+-- The instance type the player is in ("party", "raid"), or nil outside one.
+local function currentInstance()
+  local inInstance, kind = IsInInstance()
+  if not inInstance then return nil end
+  return readable(kind) and kind ~= "" and kind or "unknown"
+end
+
+-- A system message the game won't let addons read, shortly after a
+-- whisper: when and where, never its text.
+local function traceSecret()
+  if not lastWhisper or GetTime() - lastWhisper >= SECRET_WINDOW then return end
+  trace(("notice: unreadable system message %.1f s after a whisper · in instance: %s · lockdown: %s"):format(
+    GetTime() - lastWhisper, currentInstance() or "no", lockdown() and "yes" or "no"))
+end
+
 function events.CHAT_MSG_SYSTEM(text)
+  if issecretvalue and issecretvalue(text) then
+    if trace then traceSecret() end
+    return
+  end
   onError(text)
   if isOffline(text) then
     local key = offlinePeer()
@@ -412,6 +452,11 @@ function events.CHAT_MSG_SYSTEM(text)
   local key = name and peerKey(name)
   if trace and name then
     trace(("notice: No player named %s%s"):format(name, key and peers[key] and "" or " (already gone)"))
+  elseif trace then
+    local unmatched = notFoundName(text)
+    if unmatched then
+      trace(("notice: No player named %s · not a peer (peers: %s)"):format(unmatched, peerKeys()))
+    end
   end
   if key and peers[key] then
     missed[key] = GetTime()
@@ -457,6 +502,22 @@ function events.CHAT_MSG_CHANNEL_LEAVE(_, sender, ...)
   if not isTarget((select(7, ...))) or not readable(sender) then return end
   removePeer(sender, "left the channel")
   core:gone(Ambiguate(sender, "none"))
+end
+
+-- Entering or leaving an instance, for the trace's timeline around a
+-- dungeon. Every loading screen fires this, so it only notes a change.
+function events.PLAYER_ENTERING_WORLD()
+  local now = currentInstance()
+  if now == instanceType then return end
+  if trace then
+    trace(now and ("entered an instance (%s)"):format(now) or ("left an instance (%s)"):format(instanceType))
+  end
+  instanceType = now
+end
+
+-- The player left the group, or it disbanded (#160 happens after one).
+function events.GROUP_LEFT()
+  if trace then trace("left the group, or it disbanded") end
 end
 
 -- Whoever joined or left during lockdown: ask again once it lifts.
@@ -538,6 +599,9 @@ function ChannelLink.start(theCore, notice)
   onNotice = notice
 
   ChannelLink:RegisterComm(PREFIX, onComm)
+  -- App starts the link on the first PLAYER_ENTERING_WORLD, which this
+  -- frame is too late for.
+  instanceType = currentInstance()
 
   local addFilter = ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter or ChatFrame_AddMessageEventFilter
   for _, event in ipairs(FILTERED_EVENTS) do addFilter(event, filter) end
@@ -576,10 +640,22 @@ local function chunks(size)
   return math.ceil(size / 254)
 end
 
--- Turns the sync trace on (trace(line), lines without a timestamp) or off
--- (nil).
+-- Sets the sync trace: trace(line), lines without a timestamp, or nil for
+-- none.
 function ChannelLink.setTrace(fn)
   trace = fn
+end
+
+-- For /bff report: whether the link is up, why not if it isn't, how many
+-- other Characters are in the channel, the instance type the player is in
+-- (nil outside one) and whether chat messaging lockdown is on.
+function ChannelLink.state()
+  local count = 0
+  for _ in pairs(peers) do count = count + 1 end
+  return {
+    up = isUp, reason = not isUp and downReason() or nil, peers = count,
+    instance = currentInstance(), lockdown = lockdown() and true or false,
+  }
 end
 
 local function whisper(name, message)
@@ -588,6 +664,7 @@ local function whisper(name, message)
   -- two messages to the same peer never interleave.
   local priority = chunks(#message) == 1 and "ALERT" or "NORMAL"
   if trace then trace(("  to %s · %d B · %d chunks"):format(name, #message, chunks(#message))) end
+  lastWhisper = GetTime()
   ChannelLink:SendCommMessage(PREFIX, message, "WHISPER", name, priority, onSent, name)
 end
 
