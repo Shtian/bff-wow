@@ -64,3 +64,11 @@ BFF has no server. Each player's addon keeps their own data and passes it to the
 ## Feedback
 
 Bugs and ideas are welcome on [GitHub](https://github.com/Shtian/bff-wow/issues).
+
+## Thanks
+
+Some of BFF came from ideas players left in the comments on CurseForge:
+
+- **kayloohoo** asked for a small campfire to keep on screen, with little animations for what friends are doing. That became the Pocket Camp.
+- **absolutezabba12** asked for a setting to turn the map location off, more accurate positions, and the Camp's characters on the map in place of dots. That became the map pin setting, live positions and the Camp figures as map pins.
+- **TheDolmenDuke** asked for the Pocket Camp to show a friend at a shop or the auction house, in combat and handing in a quest, and for a dungeon icon of its own. That became the Pocket Camp's poses for what each friend is doing right now.
