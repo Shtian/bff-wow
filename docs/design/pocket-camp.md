@@ -71,7 +71,7 @@ A new Feed entry made while running fires the listener event `pocketCampAnimatio
 | max level | that Member bounces while bursts of sparks fly out, one every 1.8 s; the 24-hour spark stays |
 | death | that Member is a skeleton, with a puff of grey smoke and a flicker for the first 1.6 s |
 | rare find | that Member holds up a fish, bobbing (over the rod, if they're fishing) |
-| goal (Crew-wide) | the fire flares; no `memberId` |
+| goal (Crew-wide) | the fire flares, taller and purple; no `memberId` |
 | quest (not a Feed kind) | a gold question mark over that Member's head, bobbing |
 
 A mark over a raised figure (flying) is kept inside the band, so it sits over the head and not above it.
@@ -126,7 +126,7 @@ All account-wide. With `camp` off the Pocket Camp never shows, whatever its own 
 
   The griffin reaches 8 art pixels past the figure towards the fire and 6 away from it (`griffinFore` and `griffinAft` in `Core.CAMP_LAYOUT`), and Core keeps that clear when it places the figure. New tools have a dark outline (`outlined()` in the art script) so they read with the game world behind them.
 - **Animations.** `band:Animate(kind, memberId)` keeps each for its length and draws it on the band's 6-per-second tick: `star`, `fish`, `quest`, `smoke1`/`smoke2` over the head, `skeleton` in the figure's place (one untinted layer, no tool, whatever the pose), alternate-tick alpha for the flicker, seven sparks flying out for each burst, and `flare1`–`flare3` in the fire's place.
-- **Sprites.** The poses' sprites above, `star`, `quest`, `fish`, `smoke1`, `smoke2`, `skeleton` and `flare1`–`flare3` are grids in `scripts/camp-art.mjs` (the flare is each fire frame with its upper rows doubled). Run it after changing one.
+- **Sprites.** The poses' sprites above, `star`, `quest`, `fish`, `smoke1`, `smoke2`, `skeleton` and `flare1`–`flare3` are grids in `scripts/camp-art.mjs` (the flare is each fire frame with its upper rows doubled, painted in purples). Run it after changing one.
 - **Redraws** on Core's `changed`, `crewChanged` and its settings, on a UI scale or display change, and every 30 s while shown.
 - **Silence.** It plays no sound.
 

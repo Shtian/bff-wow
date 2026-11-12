@@ -11,7 +11,7 @@ BFF is for a small group of friends who don't always play at the same time. It s
 - **Keep the fire on screen:** the Pocket Camp, an optional small Camp you can keep up while you play.
   - Shows the fire and every friend who's online, you included.
   - Each friend is shown doing what they're doing: sitting by the fire, fighting with a sword raised, holding a torch in a dungeon or raid doorway, at a vendor or the auction house, resting under an inn's sign, flying on a griffin, crafting, gathering, or holding a fishing rod after a catch.
-  - Reacts to news for about 10 seconds: a ding gets a gold star and a bounce, a max level bursts into sparks, a death turns the figure into a skeleton, a rare find is held up, a handed-in quest pops a gold question mark, and a crew goal makes the fire flare.
+  - Reacts to news for about 10 seconds: a ding gets a gold star and a bounce, a max level bursts into sparks, a death turns the figure into a skeleton, a rare find is held up, a handed-in quest pops a gold question mark, and a crew goal makes the fire flare purple.
   - Hover a friend to see their character, level, zone and professions. Hover the fire to see who's doing what.
   - Click it to open BFF. Drag it anywhere on screen.
   - Its own Settings section: backdrop opacity from see-through to solid, lock its position, and hide it in combat.

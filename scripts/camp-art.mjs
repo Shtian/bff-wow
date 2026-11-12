@@ -126,8 +126,10 @@ const GRIFFIN_WING_UP = outlined([
   "NNNN.............", "ZNNNNNNNN........", "...ZNNNNNNNNNNNNN", "......ZNNNNNZNNNN", ".........ZNNNNNNN", "............ZNNNN",
 ]);
 // The fire flaring for a Crew goal: each flame frame with its upper rows
-// doubled, so it stands taller on the same logs.
+// doubled, so it stands taller on the same logs, and burning purple: the
+// flame's reds to yellows as deep purple to pale lilac.
 const flare = (rows) => rows.flatMap((row, j) => (j < 8 ? [row, row] : [row]));
+const FLARE_PAL = { R: "#5b2a9e", O: "#8a45d6", G: "#b77bf2", Y: "#dcc0ff", W: "#f6ecff" };
 const EMBER = ["G"];
 const EMBER_COOL = ["R"];
 
@@ -173,7 +175,8 @@ const SPRITES = [
   ["tent", tent()],
   ["rod", skin(ROD)], ["star", skin(STAR)], ["fish", skin(FISH)],
   ["smoke1", skin(SMOKE[0])], ["smoke2", skin(SMOKE[1])], ["skeleton", skin(SKELETON)],
-  ["flare1", skin(flare(FIRE[0]))], ["flare2", skin(flare(FIRE[1]))], ["flare3", skin(flare(FIRE[2]))],
+  ["flare1", paint(flare(FIRE[0]), FLARE_PAL)], ["flare2", paint(flare(FIRE[1]), FLARE_PAL)],
+  ["flare3", paint(flare(FIRE[2]), FLARE_PAL)],
   ["blade", skin(BLADE)], ["torch", skin(TORCH)], ["hammer", skin(HAMMER)], ["pick", skin(PICK)], ["anvil", skin(ANVIL)],
   ["arch", skin(ARCH)], ["archRaid", skin(ARCH_RAID)],
   ["bag", skin(BAG)], ["coins", skin(COINS)], ["innSign", skin(INN_SIGN)], ["quest", skin(QUEST)],
