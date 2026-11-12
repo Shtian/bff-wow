@@ -65,6 +65,10 @@ BFF has no server. Each player's addon keeps their own data and passes it to the
 
 Bugs and ideas are welcome on [GitHub](https://github.com/Shtian/bff-wow/issues).
 
+## Support
+
+If BFF brings your crew together and you'd like to say thanks, you can [buy me a coffee](https://buymeacoffee.com/mltdwymkxn). It's never expected.
+
 ## Thanks
 
 Some of BFF came from ideas players left in the comments on CurseForge:
