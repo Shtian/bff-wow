@@ -364,6 +364,130 @@ describe("Presence", function()
     end)
   end)
 
+  -- A peer who is unreachable with no notice saying so: in a dungeon, or
+  -- logged out with a leave notice that never came.
+  describe("silence", function()
+    -- With the link up, and a whisper to everyone a minute as the DIGEST is.
+    local function minutes(world, presence, count)
+      for _ = 1, count do
+        for _, name in ipairs(presence:targets()) do presence:whispered(name) end
+        world.advance(60)
+      end
+    end
+
+    local function listening()
+      local world, presence = withPeers()
+      presence:listening(true)
+      return world, presence
+    end
+
+    it("stops whispers to a peer who hasn't answered for 3 minutes", function()
+      local world, presence = listening()
+      presence:whispered("Bob")
+      world.advance(179)
+      assert.same({ "Bob" }, presence:targets("Bob"))
+      world.advance(1)
+      assert.same({}, presence:targets("Bob"))
+      assert.same({ "Cat-Realm" }, presence:targets())
+    end)
+
+    it("never reports the peer gone: they stay a peer", function()
+      local world, presence = listening()
+      minutes(world, presence, 4)
+      assert.same({}, presence:targets())
+      assert.same({}, world.gone)
+      assert.equal(2, presence:count())
+      assert.is_true(presence:has("Bob"))
+    end)
+
+    it("ends with the next whisper from them, which is delivered", function()
+      local world, presence = listening()
+      minutes(world, presence, 4)
+      presence:heard("Bob", "one")
+      assert.same({ "one" }, world.delivered)
+      assert.same({ "Bob" }, presence:targets())
+      assert.equal(0, world.arrived)
+    end)
+
+    it("never comes for a peer who is heard every minute", function()
+      local world, presence = listening()
+      for _ = 1, 10 do
+        minutes(world, presence, 1)
+        presence:heard("Bob", "digest")
+      end
+      assert.same({ "Bob" }, presence:targets())
+    end)
+
+    it("counts from the first whisper they didn't answer, not from when they were last heard", function()
+      local world, presence = listening()
+      -- Nothing whispered (as while Paused): no one has failed to answer.
+      world.advance(600)
+      assert.same({ "Bob", "Cat-Realm" }, presence:targets())
+      presence:whispered("Bob")
+      world.advance(60)
+      presence:whispered("Bob")
+      world.advance(119)
+      assert.same({ "Bob" }, presence:targets("Bob"))
+      world.advance(1)
+      assert.same({}, presence:targets("Bob"))
+    end)
+
+    it("doesn't count time with the link down, when no one can be heard", function()
+      local world, presence = listening()
+      presence:whispered("Bob")
+      world.advance(100)
+      presence:listening(false)
+      world.advance(1200)
+      presence:listening(true)
+      world.advance(79)
+      assert.same({ "Bob" }, presence:targets("Bob"))
+      world.advance(1)
+      assert.same({}, presence:targets("Bob"))
+    end)
+
+    -- Two peers who each lost the other's whispers would otherwise both
+    -- wait for the other to speak first.
+    it("still lets one whisper through every 5 minutes", function()
+      local world, presence = listening()
+      presence:whispered("Bob")
+      world.advance(180 + 299)
+      assert.same({}, presence:targets("Bob"))
+      world.advance(1)
+      assert.same({ "Bob" }, presence:targets("Bob"))
+      assert.same({ "Bob", "Cat-Realm" }, presence:targets())
+      presence:whispered("Bob")
+      assert.same({}, presence:targets("Bob"))
+      world.advance(300)
+      assert.same({ "Bob" }, presence:targets("Bob"))
+    end)
+
+    it("is forgotten when they leave and join again", function()
+      local world, presence = listening()
+      minutes(world, presence, 4)
+      presence:left("Bob")
+      presence:joined("Bob")
+      assert.same({ "Bob" }, presence:targets("Bob"))
+    end)
+
+    it("isn't ended by a member list that still names them", function()
+      local world, presence = listening()
+      minutes(world, presence, 4)
+      presence:listed({ "Bob", "Cat-Realm" })
+      assert.same({}, presence:targets())
+    end)
+
+    it("is traced when it starts and ends", function()
+      local world, presence = listening()
+      presence:whispered("Bob")
+      world.advance(180)
+      presence:heard("Bob", "one")
+      assert.same({
+        "peer silent: Bob (no whisper from them for 180 s)",
+        "peer heard again: Bob",
+      }, { world.lines[#world.lines - 1], world.lines[#world.lines] })
+    end)
+  end)
+
   it("traces peers coming and going in the sync trace's words", function()
     local world, presence = withPeers()
     presence:heard("Dan", "one")

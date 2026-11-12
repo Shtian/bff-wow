@@ -138,6 +138,7 @@ local function update(cause)
   local up = reason == nil
   if up == isUp then return end
   isUp = up
+  presence:listening(up)
   if trace then trace(up and ("link up (%s)"):format(cause or "ready") or ("link down (%s)"):format(reason)) end
   if up then core:up() else core:down() end
 end
@@ -548,8 +549,8 @@ local function whisper(name, message)
 end
 
 -- Best-effort: dropped while the link is down, and reaches only the
--- Characters known to be in the channel: all of them, or only the one
--- named `to`. ChannelLink.onSend, if set, also gets every message sent
+-- Characters known to be in the channel and not silent (Presence): all of
+-- them, or only the one named `to`. ChannelLink.onSend, if set, also gets every message sent
 -- (for /bff sim).
 function ChannelLink.send(message, to)
   if not isUp then
@@ -559,7 +560,12 @@ function ChannelLink.send(message, to)
   if ChannelLink.onSend then ChannelLink.onSend(message, to) end
   local names = presence:targets(to)
   if trace and #names == 0 then
-    trace(to and ("  not sent: %s is not in the channel"):format(to) or "  not sent: no one else in the channel")
+    if to then
+      trace(("  not sent: %s is %s"):format(to, presence:has(to) and "silent" or "not in the channel"))
+    else
+      trace(presence:count() > 0 and "  not sent: everyone in the channel is silent"
+        or "  not sent: no one else in the channel")
+    end
   end
   for _, name in ipairs(names) do whisper(name, message) end
 end

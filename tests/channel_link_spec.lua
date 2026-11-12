@@ -157,6 +157,85 @@ describe("The channel link", function()
     assert.equal(0, core.count("sendFailed"))
   end)
 
+  -- The game's AceComm delivery: a BFF whisper from a Character.
+  local function whisperFrom(game, sender, message)
+    game.onComm("BFF", message or "1|digest", "WHISPER", sender)
+  end
+
+  it("stops whispering a peer who hasn't answered for 3 minutes, until they whisper again", function()
+    local game, link, core = linked()
+    for _ = 1, 4 do
+      link.send("1|digest")
+      whisperFrom(game, "Cat-Realm")
+      game.advance(60)
+    end
+    local mark = #game.whispers
+    link.send("1|digest")
+    link.send("1|digest", "Bob")
+    assert.same({ "Cat-Realm" }, targets(game, mark))
+    -- Silence is no one's logout: the Roster keeps its own rule.
+    assert.equal(0, core.count("gone"))
+    assert.equal(0, core.count("down"))
+    assert.equal(2, link.state().peers)
+
+    whisperFrom(game, "Bob")
+    mark = #game.whispers
+    link.send("1|digest")
+    assert.same({ "Bob", "Cat-Realm" }, targets(game, mark))
+  end)
+
+  it("doesn't count silence while the link is down", function()
+    local game, link = linked()
+    link.send("1|digest")
+    game.lockdown = true
+    game.fire("ADDON_RESTRICTION_STATE_CHANGED", 1, 1)
+    game.advance(1200)
+    game.lockdown = false
+    game.fire("ADDON_RESTRICTION_STATE_CHANGED", 1, 0)
+    local mark = #game.whispers
+    link.send("1|digest")
+    assert.same({ "Bob", "Cat-Realm" }, targets(game, mark))
+  end)
+
+  it("leaves a peer dropped on No player named out when the member list still names them", function()
+    local game, link, core = linked()
+    link.send("1|data", "Bob")
+    game.fire("CHAT_MSG_SYSTEM", "No player named 'Bob' is currently playing.")
+    game.advance(60)
+    game.fire("CHAT_MSG_CHANNEL_LIST", "*Bob, Cat-Realm", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
+    assert.equal(1, link.state().peers)
+    -- No down and up, so no DIGEST to everyone each minute.
+    assert.equal(0, core.count("down"))
+    assert.equal(1, core.count("up"))
+
+    whisperFrom(game, "Bob")
+    assert.equal(2, link.state().peers)
+    assert.equal(1, core.count("received"))
+  end)
+
+  it("holds a whisper from a stranger until a member list shows them", function()
+    local game, _, core = linked()
+    whisperFrom(game, "Dan")
+    assert.equal(0, core.count("received"))
+    game.fire("CHAT_MSG_CHANNEL_LIST", "Dan", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
+    assert.equal(1, core.count("received"))
+    -- Someone new while up: Core hears down and up, for a fresh DIGEST.
+    assert.equal(1, core.count("down"))
+    assert.equal(2, core.count("up"))
+  end)
+
+  it("comes up 5 s after joining when no member list arrives", function()
+    local game = wow()
+    local link = game.load("Game/ChannelLink.lua", {}).ChannelLink
+    local core = fakeCore()
+    link.start(core, function() end)
+    link.setCrew({ channel = CHANNEL, password = "pw" })
+    game.advance(15)
+    assert.equal(0, core.count("up"))
+    game.advance(1)
+    assert.equal(1, core.count("up"))
+  end)
+
   -- #160: a peer's leaving doesn't cancel the whispers queued for them.
   describe("after a peer left the channel", function()
     local NOT_FOUND = "No player named 'Bob' is currently playing."

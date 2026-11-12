@@ -31,6 +31,15 @@ local OFFLINE_WINDOW = 3
 -- An unreadable notice within this long after a whisper may be about it.
 local UNREADABLE_WINDOW = 5
 
+-- A peer who hasn't answered for this long isn't whispered until they are
+-- heard again. Every peer sends a DIGEST about every minute, so this is
+-- three missed in a row.
+local SILENCE = 180
+-- A silent peer still gets one whisper this often. Without it two peers who
+-- lost each other's whispers for SILENCE at the same time would both wait
+-- for the other to speak first, for good.
+local RETRY = 300
+
 local OFFLINE_TEXT = "Player is offline."
 
 local function nothing() end
@@ -77,6 +86,15 @@ function Presence.new(deps)
     queued = {},
     lastChunk = {},
     lastWhisper = nil,
+    -- Peers whispered and not heard since: key -> for how many seconds,
+    -- counted only while the link is up (isListening), since no one can be
+    -- heard while it is down. And those it reached SILENCE for: key -> for
+    -- how many seconds since, or since the last whisper tried, counted the
+    -- same way.
+    unanswered = {},
+    silent = {},
+    isListening = false,
+    lastTick = deps.now(),
     -- When start() was called, while the first member list is awaited.
     waitingSince = nil,
     isReady = false,
@@ -86,6 +104,7 @@ end
 local function clear(self, why)
   if next(self.peers) then self.trace(("peers cleared (%s)"):format(why)) end
   self.peers, self.strangers, self.missed, self.failedAt = {}, {}, {}, {}
+  self.unanswered, self.silent = {}, {}
   self.isReady = false
   self.waitingSince = nil
 end
@@ -132,6 +151,7 @@ local function remove(self, name, why)
   local key = self.key(name)
   if self.peers[key] then self.trace(("peer removed: %s (%s)"):format(self.peers[key], why)) end
   self.peers[key] = nil
+  self.unanswered[key], self.silent[key] = nil, nil
 end
 
 -- A peer who logged out before their leave notice came.
@@ -184,6 +204,11 @@ function Presence:heard(name, message)
   local key = self.key(name)
   if reportedMissing(self, key) then add(self, name, "whispered again") end
   if self.peers[key] then
+    self.unanswered[key] = nil
+    if self.silent[key] then
+      self.silent[key] = nil
+      self.trace(("peer heard again: %s"):format(self.peers[key]))
+    end
     self.on.deliver(message)
     return
   end
@@ -201,9 +226,27 @@ function Presence:heard(name, message)
   end
 end
 
+-- The link went up or came down. Silence is only counted while it is up.
+function Presence:listening(isUp)
+  self.isListening = isUp
+end
+
 -- Once a second.
 function Presence:tick()
   local now = self.now()
+  local elapsed = now - self.lastTick
+  self.lastTick = now
+  if self.isListening then
+    for key, since in pairs(self.silent) do self.silent[key] = since + elapsed end
+    for key, waited in pairs(self.unanswered) do
+      waited = waited + elapsed
+      self.unanswered[key] = waited
+      if waited >= SILENCE and not self.silent[key] then
+        self.silent[key] = 0
+        self.trace(("peer silent: %s (no whisper from them for %d s)"):format(self.peers[key], SILENCE))
+      end
+    end
+  end
   if not self.isReady and self.waitingSince and now - self.waitingSince >= LIST_WAIT then
     self.isReady = true
     self.on.ready("no member list after " .. LIST_WAIT .. " s")
@@ -220,12 +263,25 @@ function Presence:tick()
   end
 end
 
+-- Whether a peer is silent and not due another try.
+local function muted(self, key)
+  local since = self.silent[key]
+  return since ~= nil and since < RETRY
+end
+
 -- Who to whisper, sorted: every peer, or only the one named `to` (none if
--- they aren't a peer).
+-- they aren't a peer). A silent peer is left out, but for one whisper every
+-- RETRY. Silence never makes them gone: whether a Member shows as online is
+-- the Roster's rule.
 function Presence:targets(to)
-  if to then return { self.peers[self.key(to)] } end
+  if to then
+    local key = self.key(to)
+    return { not muted(self, key) and self.peers[key] or nil }
+  end
   local keys = {}
-  for key in pairs(self.peers) do keys[#keys + 1] = key end
+  for key in pairs(self.peers) do
+    if not muted(self, key) then keys[#keys + 1] = key end
+  end
   table.sort(keys)
   local names = {}
   for i, key in ipairs(keys) do names[i] = self.peers[key] end
@@ -244,8 +300,14 @@ end
 
 -- A whisper to a name entered the send queue.
 function Presence:whispered(name)
-  self.queued[self.key(name)] = true
+  local key = self.key(name)
+  self.queued[key] = true
   self.lastWhisper = self.now()
+  if self.peers[key] then self.unanswered[key] = self.unanswered[key] or 0 end
+  if self.silent[key] then
+    self.trace(("  trying silent peer again: %s"):format(self.peers[key]))
+    self.silent[key] = 0
+  end
 end
 
 -- A chunk of a whisper to a name left the queue: whether any whisper to
