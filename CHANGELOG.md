@@ -15,6 +15,13 @@
 
 
 
+
+## 1.6.1
+<sub>2026-11-12</sub>
+
+- *(patch)*
+  The sync log (`/bff report`) now records every channel join and leave notice, to find out whether WoW: Forever tells BFF when a friend logs out.
+
 ## 1.6.0
 <sub>2026-11-12</sub>
 
