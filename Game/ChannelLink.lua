@@ -24,25 +24,10 @@ local JOIN_TIMEOUT = 10
 -- longest wait.
 local LEAVE_DELAY = 3
 local LEAVE_MAX = 15
--- A "Player is offline." within this long after a failed send to one
--- Character is about them.
-local OFFLINE_WINDOW = 3
--- The channel's member list: how long to wait for the first reply before
--- coming up anyway, how often to ask again, and how long a reply we asked
--- for stays out of chat.
-local LIST_WAIT = 5
+-- The channel's member list: how often to ask again, and how long a reply
+-- we asked for stays out of chat.
 local LIST_REFRESH = 60
 local LIST_HIDE = 5
--- Messages whispered by someone not (yet) known to be in the channel wait
--- this long for a member list that shows them, and at most this many.
-local STRANGER_WAIT = 10
-local STRANGER_MAX = 20
--- After "No player named ...", how long more of them for that name (queued
--- whispers, later chunks) stay out of chat.
-local NOT_FOUND_HIDE = 30
--- An unreadable system message within this long after a whisper goes in
--- the trace (#160: what the game says after a whisper in an instance).
-local SECRET_WINDOW = 5
 
 -- Channel events whose system notices for our channels don't print.
 local FILTERED_EVENTS = {
@@ -64,34 +49,16 @@ local joined = false
 local failed = false
 local settled = false
 local isUp = false
--- Whether the first member list since joining is in (or LIST_WAIT passed).
-local listed = false
 local listAsked
--- Bumped on every join and Crew change, so stale timers do nothing.
-local generation = 0
 local lastChannelUpdate
--- The other Characters in the channel: Ambiguate(name, "none"):lower() ->
--- the name to whisper.
-local peers = {}
--- Messages from senders not yet in peers: key -> { messages }.
-local strangers = {}
--- Characters whispered after they logged out: key -> GetTime() of the first
--- "No player named ..." for them.
-local missed = {}
--- Peers a send to failed: key -> GetTime() of the last failed chunk. And
--- when a "Player is offline." was last put down to one of them, so the
--- chat filter hides it whether it runs before or after the event.
-local failedAt = {}
-local offlineMatched
--- Whispers still in the send queue: key -> how many messages, and key ->
--- GetTime() of the last chunk that left. A peer's leaving cancels neither,
--- so a "No player named ..." for them can still come (#160). Never cleared
--- with the peers: the queue outlives them.
+-- Who is in the channel and can be whispered (Link/Presence.lua). Made
+-- below, once what it calls is defined.
+local presence
+-- Whispers still in the send queue: key -> how many messages. Presence is
+-- told while there are any.
 local queued = {}
-local lastChunk = {}
--- GetTime() of the last whisper sent, and whether (and which type of)
--- instance the player was last seen in, for the trace.
-local lastWhisper
+-- Whether (and which type of) instance the player was last seen in, for
+-- the trace.
 local instanceType
 -- Upper-cased names of channels BFF is in or leaving, for the chat filter.
 local ours = {}
@@ -158,7 +125,7 @@ end
 local function downReason()
   if not target then return "no Crew" end
   if not joined then return "not in the channel" end
-  if not listed then return "waiting for the member list" end
+  if not presence:ready() then return "waiting for the member list" end
   if lockdown() then return "lockdown" end
   return nil
 end
@@ -171,6 +138,7 @@ local function update(cause)
   local up = reason == nil
   if up == isUp then return end
   isUp = up
+  presence:listening(up)
   if trace then trace(up and ("link up (%s)"):format(cause or "ready") or ("link down (%s)"):format(reason)) end
   if up then core:up() else core:down() end
 end
@@ -194,53 +162,12 @@ local function askList()
   ListChannelByName(target.channel)
 end
 
-local function deliver(key)
-  local waiting = strangers[key]
-  strangers[key] = nil
-  if not waiting then return end
-  if trace then trace(("  delivering %d held whispers from %s"):format(#waiting.messages, peers[key])) end
-  for _, message in ipairs(waiting.messages) do core:received(message) end
-end
-
--- Returns true if the name is new. why is for the trace.
-local function addPeer(name, why)
-  if not readable(name) or name == "" or isSelf(name) then return false end
-  local key = peerKey(name)
-  if peers[key] then return false end
-  peers[key] = name
-  if trace then trace(("peer added: %s (%s)"):format(name, why)) end
-  deliver(key)
-  return true
-end
-
-local function removePeer(name, why)
-  if not readable(name) or name == "" then return end
-  local key = peerKey(name)
-  if trace and peers[key] then trace(("peer removed: %s (%s)"):format(peers[key], why)) end
-  peers[key] = nil
-end
-
-local function forgetPeers(why)
-  if trace and next(peers) then trace(("peers cleared (%s)"):format(why)) end
-  generation = generation + 1
-  peers, strangers, missed, failedAt = {}, {}, {}, {}
-  listed = false
-end
-
 local function onJoined()
   joining = false
   joined = true
   hide(target.channel)
-  forgetPeers("joined the channel")
+  presence:start()
   askList()
-  -- No reply (a channel of one may send none): come up anyway.
-  local current = generation
-  C_Timer.After(LIST_WAIT, function()
-    if generation == current and joined and not listed then
-      listed = true
-      update("no member list after " .. LIST_WAIT .. " s")
-    end
-  end)
   update("joined the channel")
 end
 
@@ -352,18 +279,6 @@ local function notFoundName(text)
   return text:match(notFoundPattern)
 end
 
--- The name in a "No player named ..." for a Character BFF whispered.
-local function notFound(text)
-  local name = notFoundName(text)
-  if not name then return nil end
-  local key = peerKey(name)
-  local since, chunk = missed[key], lastChunk[key]
-  if peers[key] or (since and GetTime() - since < NOT_FOUND_HIDE) then return name end
-  -- A peer who left with whispers to them still queued, or just sent.
-  if queued[key] or (chunk and GetTime() - chunk < NOT_FOUND_HIDE) then return name end
-  return nil
-end
-
 -- What the game says after a whisper to a Character who is offline,
 -- according to the wiki. Which text Forever prints is unverified (see
 -- docs/research/addon-message-reliability.md).
@@ -373,24 +288,12 @@ local function isOffline(text)
   return readable(text) and text == OFFLINE_TEXT
 end
 
--- The peer a "Player is offline." is about: it names no one, so only the
--- one peer a send failed to just before, or nil if none or several (an
--- account that can't send fails to everyone).
-local function offlinePeer()
-  local found
-  for key, time in pairs(failedAt) do
-    if GetTime() - time < OFFLINE_WINDOW and peers[key] then
-      if found then return nil end
-      found = key
-    end
-  end
-  return found
-end
-
+-- Hides the notices about a Character BFF whispered. Presence says whether
+-- one is ours; nothing is remembered here.
 local function systemFilter(_, _, text)
-  if notFound(text) ~= nil then return true end
-  return isOffline(text) and (offlinePeer() ~= nil
-    or (offlineMatched ~= nil and GetTime() - offlineMatched < OFFLINE_WINDOW))
+  local name = notFoundName(text)
+  if name then return presence:hidesNotFound(name) end
+  return isOffline(text) and presence:hidesOffline()
 end
 
 -- "You can only be in %d channels at a time."
@@ -425,23 +328,6 @@ function events.CHAT_MSG_CHANNEL_NOTICE(kind, ...)
   end
 end
 
--- A peer who logged out before their leave notice came: off the peers
--- list, and offline for Core.
-local function dropGone(key, why)
-  local name = peers[key]
-  if not name then return end
-  removePeer(name, why)
-  core:gone(Ambiguate(name, "none"))
-end
-
--- The peers' keys, sorted, for the trace.
-local function peerKeys()
-  local keys = {}
-  for key in pairs(peers) do keys[#keys + 1] = key end
-  table.sort(keys)
-  return table.concat(keys, ", ")
-end
-
 -- The instance type the player is in ("party", "raid"), or nil outside one.
 local function currentInstance()
   local inInstance, kind = IsInInstance()
@@ -451,72 +337,41 @@ end
 
 -- A system message the game won't let addons read, shortly after a
 -- whisper: when and where, never its text.
-local function traceSecret()
-  if not lastWhisper or GetTime() - lastWhisper >= SECRET_WINDOW then return end
+local function traceSecret(since)
   trace(("notice: unreadable system message %.1f s after a whisper · in instance: %s · lockdown: %s"):format(
-    GetTime() - lastWhisper, currentInstance() or "no", lockdown() and "yes" or "no"))
+    since, currentInstance() or "no", lockdown() and "yes" or "no"))
 end
 
 function events.CHAT_MSG_SYSTEM(text)
   if issecretvalue and issecretvalue(text) then
-    if trace then traceSecret() end
+    local since = presence:unreadable()
+    if trace and since then traceSecret(since) end
     return
   end
   onError(text)
   if isOffline(text) then
-    local key = offlinePeer()
-    if trace then trace(("notice: %s (%s)"):format(OFFLINE_TEXT, key and peers[key] or "not ours, or not clear whose")) end
-    if key then
-      offlineMatched = GetTime()
-      dropGone(key, OFFLINE_TEXT)
-    end
+    presence:offline()
     return
   end
-  -- Logged out, and the leave notice hasn't come (or won't).
-  local name = notFound(text)
-  local key = name and peerKey(name)
-  if trace and name then
-    trace(("notice: No player named %s%s"):format(name, key and peers[key] and "" or " (already gone)"))
-  elseif trace then
-    local unmatched = notFoundName(text)
-    if unmatched then
-      trace(("notice: No player named %s · not a peer (peers: %s)"):format(unmatched, peerKeys()))
-    end
-  end
-  if key and peers[key] then
-    missed[key] = GetTime()
-    dropGone(key, "No player named")
-  end
+  local name = notFoundName(text)
+  if name then presence:notFound(name) end
 end
 
--- The member list: "*Owner, @Moderator, First Last, Name-Realm". Long
--- lists may come in several parts, so it only ever adds. The first one
--- since joining brings the link up; a Character found later while up
--- makes the link go down and straight back up, so Core sends them a fresh
--- DIGEST.
+-- The member list: "*Owner, @Moderator, First Last, Name-Realm".
 function events.CHAT_MSG_CHANNEL_LIST(text, _, _, arg4, _, _, _, _, arg9)
   if not joined or not isTarget(baseName(arg4, arg9)) or not readable(text) then return end
-  local found = false
+  local names = {}
   for entry in text:gmatch("[^,]+") do
     local name = entry:gsub("^%s*[%*@%+]*", ""):gsub("%s+$", "")
-    if addPeer(name, "member list") then found = true end
+    if not isSelf(name) then names[#names + 1] = name end
   end
-  if not listed then
-    listed = true
-    update("member list")
-  elseif found and isUp then
-    -- Straight to Core, leaving isUp as it is: the link itself never went
-    -- down. Neither call changes the Crew, so nothing comes back here.
-    if trace then trace("link down and up (new in member list)") end
-    core:down()
-    core:up()
-  end
+  presence:listed(names)
 end
 
 function events.CHAT_MSG_CHANNEL_JOIN(_, sender, _, arg4, _, _, _, arg8, arg9)
   local isCrew = isTarget(arg9)
   traceNotice("join", sender, arg4, arg8, arg9, isCrew)
-  if joined and isCrew then addPeer(sender, "joined the channel") end
+  if joined and isCrew and readable(sender) and not isSelf(sender) then presence:joined(sender) end
 end
 
 function events.UI_ERROR_MESSAGE(_, text)
@@ -529,8 +384,7 @@ function events.CHAT_MSG_CHANNEL_LEAVE(_, sender, _, arg4, _, _, _, arg8, arg9)
   local isCrew = isTarget(arg9)
   traceNotice("leave", sender, arg4, arg8, arg9, isCrew)
   if not isCrew or not readable(sender) then return end
-  removePeer(sender, "left the channel")
-  core:gone(Ambiguate(sender, "none"))
+  presence:left(sender)
 end
 
 -- Entering or leaving an instance, for the trace's timeline around a
@@ -561,7 +415,7 @@ end
 -- account that can't send addon messages): only they may have missed it,
 -- so the link stays up and Core sends them a DIGEST of their own soon.
 local function onFailed(name)
-  if peers[peerKey(name)] then core:sendFailed(Ambiguate(name, "none")) end
+  if presence:has(name) then core:sendFailed(Ambiguate(name, "none")) end
 end
 
 -- AceComm's callback, once per chunk, with the name whispered to, the
@@ -575,22 +429,18 @@ local function onSent(name, sent, total, didSend)
       didSend == false and "failed" or "sent"))
   end
   local key = peerKey(name)
-  lastChunk[key] = GetTime()
   if sent == total then
     local left = (queued[key] or 1) - 1
     queued[key] = left > 0 and left or nil
   end
-  if didSend == false then
-    failedAt[key] = GetTime()
-    C_Timer.After(0, function() onFailed(name) end)
-  end
+  presence:chunk(name, queued[key] ~= nil, didSend == false)
+  if didSend == false then C_Timer.After(0, function() onFailed(name) end) end
 end
 
 -- A message only counts from someone in the Crew channel: over the channel
 -- itself (password-protected), or whispered by a Character in it. Any other
--- way (party, guild) it is dropped. A whisper from someone not known to be
--- in the channel yet, usually a Character who just joined, waits for a
--- member list that shows them.
+-- way (party, guild) it is dropped. Presence holds a whisper from someone
+-- not known to be in the channel yet.
 local function onComm(_, message, distribution, sender)
   if trace then trace(("%s from %s · %d B"):format(distribution, tostring(sender), #message)) end
   if distribution == "CHANNEL" then
@@ -598,34 +448,28 @@ local function onComm(_, message, distribution, sender)
     return
   end
   if distribution ~= "WHISPER" or not target or not readable(sender) or isSelf(sender) then return end
-  local key = peerKey(sender)
-  if peers[key] then
-    core:received(message)
-    return
-  end
-  local waiting = strangers[key]
-  if not waiting then
-    waiting = { messages = {} }
-    strangers[key] = waiting
-    if trace then trace(("holding whispers from %s: not in the member list yet"):format(sender)) end
-    local current = generation
-    C_Timer.After(STRANGER_WAIT, function()
-      if generation == current and strangers[key] == waiting then
-        strangers[key] = nil
-        if trace then
-          trace(("dropped %d whispers from %s: not in the member list after %d s"):format(
-            #waiting.messages, sender, STRANGER_WAIT))
-        end
-      end
-    end)
-    askList()
-  end
-  if #waiting.messages < STRANGER_MAX then
-    waiting.messages[#waiting.messages + 1] = message
-  elseif trace then
-    trace(("dropped a whisper from %s: %d already held"):format(sender, STRANGER_MAX))
-  end
+  presence:heard(sender, message)
 end
+
+presence = ns.Presence.new({
+  now = GetTime,
+  key = peerKey,
+  trace = function(line) if trace then trace(line) end end,
+  deliver = function(message) core:received(message) end,
+  ready = update,
+  -- A Character found in the channel while the link is up: Core hears down
+  -- and straight back up, so it sends them a fresh DIGEST. isUp stays as
+  -- it is, since the link itself never went down, and neither call changes
+  -- the Crew, so nothing comes back here.
+  arrived = function()
+    if not isUp then return end
+    if trace then trace("link down and up (new in member list)") end
+    core:down()
+    core:up()
+  end,
+  gone = function(name) core:gone(Ambiguate(name, "none")) end,
+  askList = askList,
+})
 
 -- Starts the link. core gets up(), down(), gone(name) and received(message); notice
 -- gets "tooManyChannels" or "wrongPassword" when the channel can't be joined.
@@ -648,6 +492,7 @@ function ChannelLink.start(theCore, notice)
   frame:SetScript("OnEvent", function(_, event, ...) events[event](...) end)
   C_Timer.After(SETTLE_FALLBACK, settle)
   C_Timer.NewTicker(LIST_REFRESH, askList)
+  C_Timer.NewTicker(1, function() presence:tick() end)
 end
 
 -- Follows Core's crew(): joins its channel, or leaves the old one.
@@ -661,7 +506,7 @@ function ChannelLink.setCrew(crew)
     leave(target.channel)
   end
   target = crew and { channel = crew.channel, password = crew.password }
-  forgetPeers("Crew changed")
+  presence:stop()
   failed = false
   if name then ours[name:upper()] = true end
   update()
@@ -685,10 +530,8 @@ end
 -- other Characters are in the channel, the instance type the player is in
 -- (nil outside one) and whether chat messaging lockdown is on.
 function ChannelLink.state()
-  local count = 0
-  for _ in pairs(peers) do count = count + 1 end
   return {
-    up = isUp, reason = not isUp and downReason() or nil, peers = count,
+    up = isUp, reason = not isUp and downReason() or nil, peers = presence:count(),
     instance = currentInstance(), lockdown = lockdown() and true or false,
   }
 end
@@ -699,15 +542,15 @@ local function whisper(name, message)
   -- two messages to the same peer never interleave.
   local priority = chunks(#message) == 1 and "ALERT" or "NORMAL"
   if trace then trace(("  to %s · %d B · %d chunks"):format(name, #message, chunks(#message))) end
-  lastWhisper = GetTime()
   local key = peerKey(name)
   queued[key] = (queued[key] or 0) + 1
+  presence:whispered(name)
   ChannelLink:SendCommMessage(PREFIX, message, "WHISPER", name, priority, onSent, name)
 end
 
 -- Best-effort: dropped while the link is down, and reaches only the
--- Characters known to be in the channel: all of them, or only the one
--- named `to`. ChannelLink.onSend, if set, also gets every message sent
+-- Characters known to be in the channel and not silent (Presence): all of
+-- them, or only the one named `to`. ChannelLink.onSend, if set, also gets every message sent
 -- (for /bff sim).
 function ChannelLink.send(message, to)
   if not isUp then
@@ -715,15 +558,14 @@ function ChannelLink.send(message, to)
     return
   end
   if ChannelLink.onSend then ChannelLink.onSend(message, to) end
-  if to then
-    local name = peers[peerKey(to)]
-    if name then
-      whisper(name, message)
-    elseif trace then
-      trace(("  not sent: %s is not in the channel"):format(to))
+  local names = presence:targets(to)
+  if trace and #names == 0 then
+    if to then
+      trace(("  not sent: %s is %s"):format(to, presence:has(to) and "silent" or "not in the channel"))
+    else
+      trace(presence:count() > 0 and "  not sent: everyone in the channel is silent"
+        or "  not sent: no one else in the channel")
     end
-    return
   end
-  if trace and not next(peers) then trace("  not sent: no one else in the channel") end
-  for _, name in pairs(peers) do whisper(name, message) end
+  for _, name in ipairs(names) do whisper(name, message) end
 end

@@ -1,5 +1,6 @@
--- Core/ is pure Lua and gets no WoW globals (docs/design/code-structure.md),
--- only LibStub for the pure libraries and the bit library.
+-- Core/ and Link/ are pure Lua and get no WoW globals
+-- (docs/design/code-structure.md). Core/ gets LibStub for the pure libraries
+-- and the bit library.
 std = "lua51"
 max_line_length = false
 self = false
@@ -120,6 +121,7 @@ stds.libstub = { read_globals = { "LibStub" } }
 stds.bit = { read_globals = { "bit" } }
 
 files["Core/"] = { std = "lua51+libstub+bit" }
+files["Link/"] = { std = "lua51" }
 files["BFF.lua"] = { std = "lua51+wow" }
 files["Game/"] = { std = "lua51+wow+libstub" }
 files["UI/"] = { std = "lua51+wow+libstub" }
