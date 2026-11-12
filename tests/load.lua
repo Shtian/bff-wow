@@ -1,6 +1,7 @@
--- Loads Core the way the game does: the pure libraries Core uses, then every
--- Core/ file listed in BFF.toc, in order, called with the addon name and a
--- shared private namespace. FakeNet comes along for the scenario tests.
+-- Loads the pure code the way the game does: the pure libraries Core uses,
+-- then every Core/ and Link/ file listed in BFF.toc, in order, called with
+-- the addon name and a shared private namespace. FakeNet comes along for the
+-- scenario tests.
 
 -- LibStub keeps one copy of each library per process, as in game.
 local libraries = {
@@ -14,10 +15,10 @@ for _, path in ipairs(libraries) do
   chunk()
 end
 
-local function coreFiles()
+local function pureFiles()
   local files = {}
   for line in io.lines("BFF.toc") do
-    local path = line:match("^%s*(Core/[^%s]+%.lua)%s*$")
+    local path = line:match("^%s*(Core/[^%s]+%.lua)%s*$") or line:match("^%s*(Link/[^%s]+%.lua)%s*$")
     if path then files[#files + 1] = path end
   end
   assert(#files > 0, "BFF.toc lists no Core files")
@@ -26,7 +27,7 @@ end
 
 return function()
   local ns = {}
-  for _, path in ipairs(coreFiles()) do
+  for _, path in ipairs(pureFiles()) do
     assert(loadfile(path))("BFF", ns)
   end
   assert(loadfile("Dev/FakeNet.lua"))("BFF", ns)

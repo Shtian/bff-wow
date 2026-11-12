@@ -119,7 +119,13 @@ return function()
   game.env = env
 
   -- Loads a game-facing file into this game, with the addon's namespace.
+  -- The pure Link/ files BFF.toc lists come first, as in game: the channel
+  -- link builds on them.
   function game.load(path, ns)
+    for line in io.lines("BFF.toc") do
+      local pure = line:match("^%s*(Link/[^%s]+%.lua)%s*$")
+      if pure then assert(loadfile(pure))("BFF", ns) end
+    end
     local chunk = assert(loadfile(path))
     setfenv(chunk, env)
     chunk("BFF", ns)

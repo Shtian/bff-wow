@@ -39,6 +39,8 @@ Core/Where.lua
 Core/Doing.lua
 Core/Core.lua
 
+Link/Presence.lua
+
 Game/Snapshot.lua
 Game/Bags.lua
 Game/SyncLog.lua
