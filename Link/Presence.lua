@@ -81,7 +81,7 @@ function Presence.new(deps)
     offlineMatched = nil,
     -- Names with a whisper still in the send queue, and key -> when the
     -- last chunk left. A peer's leaving cancels neither, so a "No player
-    -- named ..." for them can still come (#160). Never cleared with the
+    -- named ..." for them can still come (#160, #178). Never cleared with the
     -- peers: the queue outlives them.
     queued = {},
     lastChunk = {},
@@ -227,7 +227,13 @@ function Presence:heard(name, message)
 end
 
 -- The link went up or came down. Silence is only counted while it is up.
+-- When it comes up every silent peer is due a try, so the DIGEST Core sends
+-- then reaches them: whatever kept them from hearing us may have ended
+-- with what kept the link down.
 function Presence:listening(isUp)
+  if isUp and not self.isListening then
+    for key in pairs(self.silent) do self.silent[key] = RETRY end
+  end
   self.isListening = isUp
 end
 
