@@ -308,7 +308,8 @@ describe("Gossip", function()
     local entries = 0
     for _ in pairs(digest.versions) do entries = entries + 1 end
     assert.equal(10, entries)
-    assert.is_true(digest.size <= 255, "DIGEST is " .. digest.size .. " bytes")
+    -- One chunk (Framing.ROOM).
+    assert.is_true(digest.size <= 247, "DIGEST is " .. digest.size .. " bytes")
   end)
 
   it("shows one out of date notice for messages from a newer BFF", function()
@@ -477,7 +478,8 @@ describe("In a Crew of more than ten Members", function()
       rounds = rounds + 1
       assert.equal(10, size(digest.versions))
       assert.is_true(digest.partial)
-      assert.is_true(digest.size <= 255, "DIGEST is " .. digest.size .. " bytes")
+      -- One chunk (Framing.ROOM).
+      assert.is_true(digest.size <= 247, "DIGEST is " .. digest.size .. " bytes")
       for id in pairs(digest.versions) do listed[id] = true end
     end
     assert.is_true(rounds >= 2, "rounds: " .. rounds)
@@ -515,13 +517,75 @@ describe("In a Crew of more than ten Members", function()
   end)
 end)
 
+describe("Lost and reordered chunks", function()
+  -- Ann and Bob, with Ann's DATA too long for one chunk.
+  local function pair()
+    local net, clients, ns = crew({ "Ann", "Bob" }, {
+      Ann = { character = {
+        guid = "Player-0-Ann", name = "Ann", classFilename = "WARRIOR", level = 10, xp = 0, maxXp = 1000,
+        zone = "The Sludge Fen by the Venture Co. tower north of Ratchet, past the oasis, 4h17q9z2", deaths = 0,
+      } },
+    })
+    net:run(60)
+    return net, clients[1], clients[2], ns
+  end
+
+  -- Ann's DATA sent since `mark`: how many chunks each took.
+  local function dataChunks(net, ns, mark)
+    local counts = {}
+    for i, message in ipairs(net:sent(mark, "Ann", "DATA")) do counts[i] = ns.Framing.count(message.size) end
+    return counts
+  end
+
+  it("deliver a message whose chunks arrive in another order", function()
+    local net, a, b, ns = pair()
+    local mark = #net.wire
+    net.chunked = function(chunks)
+      local reversed = {}
+      for i = #chunks, 1, -1 do reversed[#reversed + 1] = chunks[i] end
+      return reversed
+    end
+    a:play({ level = 11 })
+    net:run(2)
+    assert.is_true(dataChunks(net, ns, mark)[1] > 1)
+    assert.equal(11, b:rowFor(a).level)
+  end)
+
+  it("lose the whole message when one chunk is lost, and the friend who missed it asks again", function()
+    local net, a, b, ns = pair()
+    local mark = #net.wire
+    local lost = 0
+    net.chunked = function(chunks, from, to)
+      if from ~= "Ann" or to ~= "Bob" or #chunks == 1 then return chunks end
+      lost = lost + 1
+      return { chunks[1] }
+    end
+    a:play({ level = 11 })
+    net:run(2)
+    net.chunked = nil
+    assert.equal(1, lost)
+    assert.is_true(dataChunks(net, ns, mark)[1] > 1)
+    assert.equal(10, b:rowFor(a).level)
+
+    -- Given up on after 30 s, then a DIGEST of Bob's own to Ann, as after
+    -- a failed send.
+    net:run(40)
+    local asked = 0
+    for _, digest in ipairs(net:sent(mark, "Bob", "DIGEST")) do
+      if digest.to == "Ann" then asked = asked + 1 end
+    end
+    assert.equal(1, asked)
+    assert.equal(11, b:rowFor(a).level)
+  end)
+end)
+
 describe("Traffic", function()
   -- Whispers (chunks, one per friend) each Member sends a minute over ten
   -- minutes: the busiest Member's and the whole Crew's. Grinding, one
   -- Member gains XP every 5 s, dings every 2 minutes and changes zone every
   -- 3; idle, nobody plays.
   local function whispersPerMinute(count, grinding)
-    local net, clients = bigCrew(count)
+    local net, clients, ns = bigCrew(count)
     net:run(120)
     local mark = #net.wire
     local grinder = clients[1]
@@ -537,8 +601,7 @@ describe("Traffic", function()
     for _, client in ipairs(clients) do
       local whispers = 0
       for _, message in ipairs(net:sent(mark, client.name)) do
-        local chunks = message.size <= 255 and 1 or math.ceil(message.size / 254)
-        whispers = whispers + chunks * (message.to and 1 or count - 1)
+        whispers = whispers + ns.Framing.count(message.size) * (message.to and 1 or count - 1)
       end
       busiest = math.max(busiest, whispers / 10)
       total = total + whispers / 10
@@ -616,15 +679,14 @@ describe("A Crew with a Member on an older BFF", function()
 
   it("keeps traffic under the throttle in a Crew of more than ten", function()
     local old = legacyGossip()
-    local net, clients = bigCrew(14, { Member13 = { gossip = old }, Member14 = { gossip = old } })
+    local net, clients, ns = bigCrew(14, { Member13 = { gossip = old }, Member14 = { gossip = old } })
     net:run(140)
     local mark = #net.wire
     net:run(10 * 60)
     for _, client in ipairs(clients) do
       local whispers = 0
       for _, message in ipairs(net:sent(mark, client.name)) do
-        local chunks = message.size <= 255 and 1 or math.ceil(message.size / 254)
-        whispers = whispers + chunks * (message.to and 1 or 13)
+        whispers = whispers + ns.Framing.count(message.size) * (message.to and 1 or 13)
       end
       assert.is_true(whispers / 10 < 30, ("%s: %.1f whispers a minute"):format(client.name, whispers / 10))
     end

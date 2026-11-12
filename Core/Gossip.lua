@@ -40,7 +40,8 @@ local IN_FLIGHT = 2
 -- heard this recently and the Crew has more records than a DIGEST holds,
 -- the every-minute DIGEST is skipped.
 local OLDER_MEMORY = 15 * 60
--- Ten entries of id and version always fit one 255-byte message.
+-- Ten entries of id and version always fit one chunk (247 bytes of a
+-- 255-byte whisper, Link/Framing.lua).
 local DIGEST_SIZE = 10
 
 -- ledger; now() and random() from Core; send(message, to) encodes and

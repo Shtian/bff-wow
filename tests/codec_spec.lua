@@ -37,6 +37,15 @@ describe("Codec", function()
     assert.equal("newer", err)
   end)
 
+  it("still reads a message from a BFF on protocol 1", function()
+    local Codec = load().Codec
+    local older = Codec.encode(record):gsub("^%d+|", "1|")
+    assert.same(record, (Codec.decode(older)))
+    local value, err = Codec.decode((Codec.OLDEST - 1) .. "|" .. older:sub(3))
+    assert.is_nil(value)
+    assert.equal("invalid", err)
+  end)
+
   it("rejects garbage", function()
     local Codec = load().Codec
     for _, message in ipairs({ "", "hello", "x|abc", Codec.PROTOCOL .. "|not deflated" }) do

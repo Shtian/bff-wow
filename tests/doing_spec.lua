@@ -95,7 +95,8 @@ describe("What a Member is doing", function()
     local sent = doings(net, mark, "Bob")
     assert.equal(1, #sent)
     assert.equal("vendor", sent[1].doing)
-    assert.is_true(sent[1].size <= 255)
+    -- One chunk (Framing.ROOM).
+    assert.is_true(sent[1].size <= 247)
     -- The record didn't change: over the next DIGESTs no one asks for it.
     net:run(70)
     assert.equal(0, #net:sent(mark, nil, "DATA"))
