@@ -199,20 +199,23 @@ end
 -- What the Character is doing right now, for Core's doing(): in combat,
 -- at a vendor or the auction house (their windows, kept from their show
 -- and close events), resting, and flying (a flight path, or a flying
--- mount where the client has them). A value that reads secret is false.
+-- mount where the client has them). A value that reads secret is false,
+-- and so is one whose function the client doesn't have.
 local windows = { vendor = false, auction = false }
-local function flag(value)
+local function flag(ask, ...)
+  if not ask then return false end
+  local value = ask(...)
   if issecretvalue and issecretvalue(value) then return false end
   return value and true or false
 end
 
 function Snapshot.doing()
   return {
-    combat = flag(InCombatLockdown()),
+    combat = flag(InCombatLockdown),
     vendor = windows.vendor,
     auction = windows.auction,
-    resting = flag(IsResting()),
-    flying = flag(UnitOnTaxi("player")) or (IsFlying ~= nil and flag(IsFlying())),
+    resting = flag(IsResting),
+    flying = flag(UnitOnTaxi, "player") or flag(IsFlying),
   }
 end
 
