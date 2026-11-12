@@ -385,5 +385,5 @@ A 2px line fading in from gold, meeting a teal line at a small white spark: the 
 - **Don't** add shadows, gradients or glows to in-game frames (The Flat Ledger Rule), outside the Camp (The Lit Camp Rule).
 - **Don't** introduce a third typeface.
 - **Don't** fade a gold button to show it's disabled, or mark a row with a coloured side stripe.
-- **Don't** put icons in the sidebar or box a label in a chip.
+- **Don't** put icons in the sidebar or box a label in a chip. The panel's header holds the only icon buttons: Report a bug and Get in touch, small flat Smoke Muted glyphs (Ash Text on hover) left of the close button.
 - **Don't** set text smaller than 11px.

@@ -1671,7 +1671,15 @@ local function create()
     end
   end)
 
-  -- "● 2 of 3 online", left of the close button.
+  -- The bug report and Get in touch buttons, left of the close button.
+  frame.contact = Skin.headerButton(frame.header, "message", "Get in touch", function() ns.Contact.show() end)
+  frame.contact:SetPoint("RIGHT", frame.close, "LEFT", -2, 0)
+  frame.report = Skin.headerButton(frame.header, "bug", "Report a bug", function() ns.Report.show() end)
+  frame.report:SetPoint("RIGHT", frame.contact, "LEFT", -2, 0)
+
+  -- "● 2 of 3 online", left of those.
+  frame.headerRight:ClearAllPoints()
+  frame.headerRight:SetPoint("RIGHT", frame.report, "LEFT", -8, 0)
   frame.onlineDot = frame.header:CreateTexture(nil, "OVERLAY")
   frame.onlineDot:SetSize(6, 6)
   frame.onlineDot:SetColorTexture(1, 1, 1, 1)

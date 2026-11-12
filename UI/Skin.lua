@@ -405,13 +405,26 @@ end
 -- Small flat icons, drawn from solid rectangles ({ x, y, width, height }
 -- from the icon's top left) since Arial Narrow has no such glyphs: filter
 -- is three narrowing bars, a funnel; sort is an up arrow beside a down one;
--- group is two rows of two squares.
+-- group is two rows of two squares; bug is a beetle with its wings split;
+-- message is a speech bubble with two lines of text in it.
 local ICONS = {
   group = { width = 10, height = 9, rects = { { 0, 0, 4, 4 }, { 6, 0, 4, 4 }, { 0, 5, 4, 4 }, { 6, 5, 4, 4 } } },
   filter = { width = 10, height = 8, rects = { { 0, 0, 10, 2 }, { 2, 3, 6, 2 }, { 4, 6, 2, 2 } } },
   sort = { width = 11, height = 9, rects = {
     { 2, 0, 1, 1 }, { 1, 1, 3, 1 }, { 0, 2, 5, 1 }, { 2, 3, 1, 6 },
     { 8, 0, 1, 6 }, { 6, 6, 5, 1 }, { 7, 7, 3, 1 }, { 8, 8, 1, 1 },
+  } },
+  bug = { width = 11, height = 11, rects = {
+    { 2, 0, 1, 1 }, { 8, 0, 1, 1 }, { 3, 1, 1, 1 }, { 7, 1, 1, 1 }, { 4, 2, 3, 1 },
+    { 3, 3, 2, 7 }, { 6, 3, 2, 7 }, { 4, 10, 1, 1 }, { 6, 10, 1, 1 },
+    { 0, 3, 1, 1 }, { 10, 3, 1, 1 }, { 1, 4, 2, 1 }, { 8, 4, 2, 1 },
+    { 0, 6, 3, 1 }, { 8, 6, 3, 1 },
+    { 1, 8, 2, 1 }, { 8, 8, 2, 1 }, { 0, 9, 1, 1 }, { 10, 9, 1, 1 },
+  } },
+  message = { width = 11, height = 10, rects = {
+    { 1, 0, 9, 1 }, { 0, 1, 1, 6 }, { 10, 1, 1, 6 }, { 1, 7, 9, 1 },
+    { 2, 8, 2, 1 }, { 2, 9, 1, 1 },
+    { 2, 3, 7, 1 }, { 2, 5, 5, 1 },
   } },
 }
 
@@ -436,7 +449,7 @@ local function layOutIcon(icon)
   end
 end
 
--- An icon by kind ("filter", "sort" or "group") in a colour; :SetColor recolours it.
+-- An icon by kind (a key of ICONS) in a colour; :SetColor recolours it.
 function Skin.icon(parent, kind, color)
   local icon = CreateFrame("Frame", nil, parent)
   icon.spec = ICONS[kind]
@@ -592,6 +605,29 @@ function Skin.closeButton(parent, target)
   icon:SetDesaturated(true)
   Skin.color(icon, Skin.MUTED)
   button:SetScript("OnClick", function() target:Hide() end)
+  return button
+end
+
+-- A small square button in a window's header holding an icon by kind,
+-- Smoke Muted, Ash Text while hovered, with a one-line tooltip.
+function Skin.headerButton(parent, kind, tooltip, onClick)
+  local button = CreateFrame("Button", nil, parent)
+  button:SetSize(22, 22)
+  local hoverTexture = Skin.fill(button, Skin.HOVER, "HIGHLIGHT")
+  hoverTexture:SetBlendMode("ADD")
+  button.icon = Skin.icon(button, kind, Skin.MUTED)
+  button.icon:SetPoint("CENTER")
+  button:SetScript("OnClick", onClick)
+  button:SetScript("OnEnter", function(self)
+    self.icon:SetColor(Skin.TEXT)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:AddLine(tooltip)
+    GameTooltip:Show()
+  end)
+  button:SetScript("OnLeave", function(self)
+    self.icon:SetColor(Skin.MUTED)
+    GameTooltip:Hide()
+  end)
   return button
 end
 
