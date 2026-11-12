@@ -17,6 +17,17 @@
 
 
 
+
+## 2.0.0
+<sub>2026-11-12</sub>
+
+- *(major)*
+  BFF now splits long messages into chunks itself, so one that arrives out of order or with a piece missing no longer shows up as unreadable, and a friend whose update got lost is asked for it again within about half a minute. Friends on an older BFF are still seen, but they see an "out of date" notice and stop seeing you until they update.
+- *(patch)*
+  BFF stops whispering friends it can't reach. A friend who logged out but still shows in the channel list is no longer whispered again every minute, and a friend who hasn't answered for 3 minutes (in a dungeon, say) is left alone until BFF hears from them again.
+- *(patch)*
+  A friend who is behind is now sent what they missed directly, instead of everyone in the Crew getting it again, so BFF sends fewer messages.
+
 ## 1.6.2
 <sub>2026-11-12</sub>
 
