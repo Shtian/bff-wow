@@ -123,7 +123,7 @@ What it answers and reports:
 
 - **Who to whisper** (`targets(to)`): every peer, or the one named.
 - **Ready** (`ready()`, and `ready(why)` when it comes): the first member list since joining is in, or 5 s passed without one (a channel of one may get none). Joining again starts it over and forgets everyone.
-- **Peers** come from a member list (which may arrive in parts, so a list only ever adds) and from join notices. They go on a leave notice, on "No player named …" for them, and on "Player is offline." within 3 s of a failed send to that one peer only.
+- **Peers** come from a member list (which may arrive in parts, so a list only ever adds) and from join notices. They go on a leave notice, on "No player named …" for them, and on "Player is offline." within 3 s of a failed send to that one peer only. A peer dropped on "No player named …" is added again at once by a whisper from them or by their join notice, but not by a member list alone for 5 minutes: the list can go on showing a Character who logged out, and adding them back each minute would take the link down and up, send everyone a DIGEST and whisper them again every time.
 - **Arrived**: a member list showed a new peer while ready. The channel link turns it into `down()` then `up()`.
 - **Gone** (`gone(name)`): a peer left or was dropped, and any leave notice for the channel.
 - **Strangers**: a whisper from a Character not known to be in the channel (usually one who just joined) is held, and a member list asked for. It is delivered when a list or a join notice shows them, and dropped after 10 s otherwise. At most 20 messages are held per stranger.

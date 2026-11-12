@@ -21,6 +21,10 @@ local STRANGER_MAX = 20
 -- After "No player named ...", how long more of them for that name (queued
 -- whispers, later chunks) stay out of chat.
 local NOT_FOUND_HIDE = 30
+-- And how long a member list alone doesn't add them again: the list can go
+-- on showing a Character who logged out, and each re-add would whisper
+-- them, draw the same notice and drop them again, every minute.
+local READD_WAIT = 300
 -- A "Player is offline." within this long after a failed send to one peer
 -- is about them.
 local OFFLINE_WINDOW = 3
@@ -58,7 +62,8 @@ function Presence.new(deps)
     -- Senders not yet in peers: key -> { name, since, messages }.
     strangers = {},
     -- Peers whispered after they logged out: key -> when the first
-    -- "No player named ..." for them came.
+    -- "No player named ..." for them came. Forgotten when they are added
+    -- again, or after READD_WAIT.
     missed = {},
     -- Peers a send failed to: key -> when the last chunk failed. And when a
     -- "Player is offline." was last put down to one of them, so the chat
@@ -116,6 +121,7 @@ local function add(self, name, why)
   local key = self.key(name)
   if self.peers[key] then return false end
   self.peers[key] = name
+  self.missed[key] = nil
   self.trace(("peer added: %s (%s)"):format(name, why))
   deliverHeld(self, key)
   return true
@@ -136,13 +142,21 @@ local function drop(self, key, why)
   self.on.gone(name)
 end
 
+-- Whether a name was reported not found in the last READD_WAIT.
+local function reportedMissing(self, key)
+  local since = self.missed[key]
+  return since ~= nil and self.now() - since < READD_WAIT
+end
+
 -- A member list's names, without the player's own. Long lists may come in
 -- several parts, so a list only ever adds. The first one since start()
--- brings ready; a new name in a later one is reported as arrived.
+-- brings ready; a new name in a later one is reported as arrived. A name
+-- reported not found is left out: only a whisper from them or their join
+-- notice shows they are back.
 function Presence:listed(names)
   local found = false
   for _, name in ipairs(names) do
-    if add(self, name, "member list") then found = true end
+    if not reportedMissing(self, self.key(name)) and add(self, name, "member list") then found = true end
   end
   if not self.isReady then
     self.isReady = true
@@ -165,9 +179,10 @@ end
 
 -- A message whispered by a name. Only a peer's counts; one from anyone
 -- else, usually a Character who just joined, waits for a member list that
--- shows them.
+-- shows them. A peer dropped as not found is back the moment they whisper.
 function Presence:heard(name, message)
   local key = self.key(name)
+  if reportedMissing(self, key) then add(self, name, "whispered again") end
   if self.peers[key] then
     self.on.deliver(message)
     return
@@ -192,6 +207,9 @@ function Presence:tick()
   if not self.isReady and self.waitingSince and now - self.waitingSince >= LIST_WAIT then
     self.isReady = true
     self.on.ready("no member list after " .. LIST_WAIT .. " s")
+  end
+  for key, since in pairs(self.missed) do
+    if now - since >= READD_WAIT then self.missed[key] = nil end
   end
   for key, waiting in pairs(self.strangers) do
     if now - waiting.since >= STRANGER_WAIT then
