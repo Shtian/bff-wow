@@ -6,7 +6,7 @@ A World of Warcraft: Forever addon that keeps a group of friends connected when 
 - **Lua version:** WoW runs Lua 5.1. Offline tests run under LuaJIT (`brew install luajit`).
 - **Architecture:** see `docs/design/code-structure.md` (modules, the link port, sync rules) and `docs/adr/`. `docs/design/architecture.html` is the pre-build draft and is out of date: there is no Sync, Store, Transport, PING, HELLO or WANT.
 - **Checks:** `scripts/check.sh` runs luacheck and busted (extra args go to busted). CI runs the same.
-- **Releases:** a change to shipped files (`changedFilePatterns` in `.bumpy/_config.json`) needs a bumpy bump file in `.bumpy/`. Use the `add-change` skill. See `docs/design/settings-and-release.md`.
+- **Releases:** a change to shipped files (`changedFilePatterns` in `.bumpy/_config.json`) needs a bumpy bump file in `.bumpy/`. Use the `add-change` skill. A protocol bump is `major`. See `docs/design/settings-and-release.md`.
 
 ## Agent skills
 
