@@ -151,6 +151,46 @@ describe("The channel link", function()
     assert.equal(0, core.count("sendFailed"))
   end)
 
+  -- #160: a peer's leaving doesn't cancel the whispers queued for them.
+  describe("after a peer left the channel", function()
+    local NOT_FOUND = "No player named 'Bob' is currently playing."
+
+    local function hidden(game)
+      return game.filters.CHAT_MSG_SYSTEM(nil, "CHAT_MSG_SYSTEM", NOT_FOUND)
+    end
+
+    local function left(game)
+      game.fire("CHAT_MSG_CHANNEL_LEAVE", "", "Bob", nil, "5. " .. CHANNEL, nil, nil, nil, 5, CHANNEL)
+    end
+
+    it("hides No player named while a whisper to them is still queued, however long", function()
+      local game, link, core = linked()
+      link.send("1|data", "Bob")
+      left(game)
+      assert.equal(1, core.count("gone", "Bob"))
+      game.advance(120)
+      assert.is_true(hidden(game))
+    end)
+
+    it("hides it for a while after their last chunk went out, then no longer", function()
+      local game, link = linked()
+      link.send("1|data", "Bob")
+      left(game)
+      local whisper = game.whispers[1]
+      whisper.callback(whisper.arg, #whisper.text, #whisper.text, true)
+      game.advance(5)
+      assert.is_true(hidden(game))
+      game.advance(30)
+      assert.is_false(hidden(game))
+    end)
+
+    it("shows it when nothing was whispered to them", function()
+      local game = linked()
+      left(game)
+      assert.is_false(hidden(game))
+    end)
+  end)
+
   describe("trace", function()
     -- Starts the trace: the lines it reports.
     local function traced(link)
