@@ -801,12 +801,12 @@ local function watch(core)
   end
 
   local received, up, down, gone = core.received, core.up, core.down, core.gone
-  function core.received(self, message)
+  function core.received(self, message, sender)
     local text, from = describe(message)
     if from ~= self.ledger:memberId() then
       log(color(RECEIVED, "<- " .. (from and nameOf(from) or "?") .. "  ") .. text)
     end
-    return received(self, message)
+    return received(self, message, sender)
   end
   function core.up(self)
     log(color(LINK, "link up"))

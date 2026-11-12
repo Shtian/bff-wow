@@ -507,10 +507,11 @@ end
 
 -- A whisper from a peer (Presence held it if they weren't one yet): one of
 -- BFF's chunks, delivered once its message is whole, or a whole protocol 1
--- message, which AceComm put together.
+-- message, which AceComm put together. Core hears who whispered it, so
+-- it can reply to them alone.
 local function onWhisper(text, name)
   if not ns.Framing.isChunk(text) then
-    core:received(text)
+    core:received(text, Ambiguate(name, "none"))
     return
   end
   local message, chunks = framing:receive(peerKey(name), text)
@@ -518,7 +519,7 @@ local function onWhisper(text, name)
   if trace and chunks > 1 then
     trace(("  message from %s whole · %d B · %d chunks"):format(name, #message, chunks))
   end
-  core:received(message)
+  core:received(message, Ambiguate(name, "none"))
 end
 
 -- A message only counts from someone in the Crew channel: over the channel
@@ -573,7 +574,7 @@ framing = ns.Framing.new({
   end,
 })
 
--- Starts the link. core gets up(), down(), gone(name) and received(message); notice
+-- Starts the link. core gets up(), down(), gone(name) and received(message, from); notice
 -- gets "tooManyChannels" or "wrongPassword" when the channel can't be joined.
 function ChannelLink.start(theCore, notice)
   core = theCore
