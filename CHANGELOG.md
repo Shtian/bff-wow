@@ -14,6 +14,16 @@
 
 
 
+
+## 1.6.0
+<sub>2026-11-12</sub>
+
+- *(minor)*
+  The panel's header has a bug button that opens the bug report (`/bff report`) and a message button that opens Get in touch, with links to GitHub issues and CurseForge to copy. The bug report window now says where to paste the report and what to add to it.
+- *(minor)*
+  The Pocket Camp now shows what each friend is doing right now: fighting, at a vendor or the auction house, resting at an inn, flying on a griffin, crafting or gathering, with a gold question mark when they hand in a quest. Dungeons and raids get their own doorway, and the fire flares purple for a Crew goal.
+- *(patch)* Clicking a link in Get in touch no longer causes a Lua error.
+
 ## 1.5.0
 <sub>2026-11-11</sub>
 
