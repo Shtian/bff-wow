@@ -16,6 +16,15 @@
 
 
 
+
+## 1.6.2
+<sub>2026-11-12</sub>
+
+- *(patch)*
+  "No player named ... is currently playing" no longer shows in chat when a friend logs out while BFF still has messages queued for them.
+- *(patch)*
+  Friends no longer send you a Member you removed again after every sync. You still don't see them, and re-adding them brings them back as before.
+
 ## 1.6.1
 <sub>2026-11-12</sub>
 
