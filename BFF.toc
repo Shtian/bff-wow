@@ -59,6 +59,7 @@ UI/ToastQueue.lua
 UI/Toasts.lua
 UI/Settings.lua
 UI/Report.lua
+UI/Contact.lua
 
 #@do-not-package@
 Dev/FakeNet.lua
