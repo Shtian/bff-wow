@@ -116,6 +116,23 @@ local function baseName(arg4, arg9)
   return readable(arg4) and arg4:gsub("^%d+%.%s*", "") or nil
 end
 
+-- A chat event argument for the trace, without reading a secret one.
+local function shown(value)
+  if issecretvalue and issecretvalue(value) then return "secret" end
+  if type(value) == "string" then return ('"%s"'):format(value) end
+  return tostring(value)
+end
+
+-- Every join and leave notice, ours or not, with the arguments that say
+-- which channel it is (#162: whether Forever sends them for the Crew's
+-- channel, and how).
+local function traceNotice(kind, sender, arg4, arg8, arg9, isCrew)
+  if not trace then return end
+  local who = readable(sender) and sender or shown(sender)
+  trace(("channel %s: %s · arg 4 %s · arg 8 %s · arg 9 %s (%s)"):format(
+    kind, who, shown(arg4), shown(arg8), shown(arg9), isCrew and "Crew channel" or "other channel"))
+end
+
 -- Names may be "First Last" on Forever, and "Name-Realm" in chat events.
 local function peerKey(name)
   return Ambiguate(name, "none"):lower()
@@ -488,8 +505,10 @@ function events.CHAT_MSG_CHANNEL_LIST(text, _, _, arg4, _, _, _, _, arg9)
   end
 end
 
-function events.CHAT_MSG_CHANNEL_JOIN(_, sender, ...)
-  if joined and isTarget((select(7, ...))) then addPeer(sender, "joined the channel") end
+function events.CHAT_MSG_CHANNEL_JOIN(_, sender, _, arg4, _, _, _, arg8, arg9)
+  local isCrew = isTarget(arg9)
+  traceNotice("join", sender, arg4, arg8, arg9, isCrew)
+  if joined and isCrew then addPeer(sender, "joined the channel") end
 end
 
 function events.UI_ERROR_MESSAGE(_, text)
@@ -498,8 +517,10 @@ end
 
 -- Someone left the Crew channel, i.e. logged out: a real logout leaves it
 -- before any goodbye could be sent.
-function events.CHAT_MSG_CHANNEL_LEAVE(_, sender, ...)
-  if not isTarget((select(7, ...))) or not readable(sender) then return end
+function events.CHAT_MSG_CHANNEL_LEAVE(_, sender, _, arg4, _, _, _, arg8, arg9)
+  local isCrew = isTarget(arg9)
+  traceNotice("leave", sender, arg4, arg8, arg9, isCrew)
+  if not isCrew or not readable(sender) then return end
   removePeer(sender, "left the channel")
   core:gone(Ambiguate(sender, "none"))
 end
