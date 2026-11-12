@@ -8,8 +8,9 @@
 -- OnUpdate on the band steps the fire, embers and sleep marks, and
 -- runs only while the band is shown. Silent. See docs/design/camp.md.
 -- The Pocket Camp (UI/PocketCamp.lua) is a band of its own: its actors
--- also stand with a sword raised (adventuring) or hold a rod out to the
--- fire (fishing), and :Animate plays its one-off animations. See
+-- are also drawn doing what Core says they're doing (POSE: a torch in a
+-- doorway, a rod out to the fire, a griffin under them and so on), and
+-- :Animate plays its one-off animations. See
 -- docs/design/pocket-camp.md.
 
 local _, ns = ...
@@ -33,7 +34,7 @@ local FPS = 6
 local HOP_FOR = 0.7
 -- How long each one-off animation plays (band:Animate), in seconds: a
 -- quick opening, then a tail long enough to notice at a glance.
-local ANIMATION_FOR = { ding = 10, maxLevel = 10, death = 10, rareFind = 10, goal = 10 }
+local ANIMATION_FOR = { ding = 10, maxLevel = 10, death = 10, rareFind = 10, goal = 10, quest = 6 }
 -- The openings: a ding's star rises for this long, and a death's smoke
 -- rises while the figure flickers. A max level's burst repeats this often.
 local STAR_RISES_FOR = 1.2
@@ -52,14 +53,33 @@ local ROW = {
 -- by a seated figure's head, or on a sleeper's blanket, so even the short
 -- band never crops it.
 local OFFSET = { seat = -1, flower = 2, seatedSpark = 9, asleepSpark = 11 }
--- A tool in an upright figure's hand, from the figure's left edge and its
--- bottom row: the sword over the raised right hand, and the rod from the
--- hand nearer the fire (mirrored on the fire's right).
-local SWORD = { x = 8, row = 12 }
-local ROD = { x = 10, mirroredX = -5, row = 3 }
+-- How each pose but "seated" is drawn (docs/design/pocket-camp.md).
+-- standing: on its feet with its arms up, and no seat. lift: rows the
+-- figure is raised, with no seat either. tool (in its hand), back (behind
+-- it) and front (over it) are sprites: { name, x from the figure's left
+-- edge, rows from its bottom row, whether it turns to face the fire }. One
+-- that turns is drawn mirrored on the fire's right, at the same distance
+-- from the figure's other edge. flap is front's other frame. The griffin
+-- reaches as far past the figure as Core keeps clear for it
+-- (LAYOUT.griffinFore and griffinAft).
+local POSE = {
+  adventuring = { standing = true, tool = { "torch", 6, 11 }, back = { "arch", -2, 0 }, raid = "archRaid" },
+  fighting = { standing = true, tool = { "blade", 6, 12 } },
+  crafting = { standing = true, tool = { "hammer", 5, 11 }, front = { "anvil", 5, -1, true } },
+  gathering = { standing = true, tool = { "pick", 3, 11 } },
+  fishing = { tool = { "rod", 10, 3, true } },
+  vendor = { front = { "bag", 7, -2, true } },
+  auction = { front = { "coins", 8, -2, true } },
+  resting = { back = { "innSign", -1, -1, true } },
+  flying = { lift = 9, back = { "griffin", -4, -7, true }, front = { "griffinWing", -6, -3, true },
+    flap = "griffinWingUp" },
+}
+-- A griffin's wing is up for this many ticks, then down for twice as many.
+local FLAP_TICKS = 3
 -- What plays over a figure's head, from the figure's left edge: a ding's
 -- star and a death's smoke rise this many rows, a rare find's fish is held.
 local STAR = { x = 3, rise = 3 }
+local QUEST = { x = 3 }
 local FISH = { x = 2 }
 local SMOKE = { x = 2, row = -4, rise = 6 }
 -- A max level's burst: sparks fly this far out from the figure's middle,
@@ -215,20 +235,35 @@ local function celebrating(scene, actor, f)
   return (ding or playing(scene, "maxLevel", actor.memberId)) ~= nil and bounced(f)
 end
 
+-- A mark's bottom row: `row`, or as near under it as keeps the mark inside
+-- a band of a set height (the Pocket Camp's), where a raised figure's head
+-- is close to the top.
+local function markRow(scene, name, row)
+  local rows = scene.view.rows
+  if not rows then return row end
+  return math.min(row, rows - Sheet.sprites[name][4])
+end
+
 -- Draws what plays over one upright actor: a ding's star, a rare find's
--- fish held up, a death's smoke and flicker, and a max level's bursts.
+-- fish held up, a handed-in quest's mark, a death's smoke and flicker, and
+-- a max level's bursts.
 -- row is the figure's bottom row and top the row above its head.
 local function drawAnimations(scene, parts, actor, f, row, top)
   local unit, x, id = scene.unit, actor.x, actor.memberId
   local ding, fish, death = playing(scene, "ding", id), playing(scene, "rareFind", id), playing(scene, "death", id)
+  local quest = playing(scene, "quest", id)
   local smoke = death and death < SMOKE_FOR and death / SMOKE_FOR
   if fish then
     setSprite(parts.mark, "fish", unit)
-    put(scene, parts.mark, x + FISH.x, top + 1 + (bounced(f) and 1 or 0))
+    put(scene, parts.mark, x + FISH.x, markRow(scene, "fish", top + 1 + (bounced(f) and 1 or 0)))
   elseif ding then
     -- The star rises, then stays over the head while the figure bounces.
     setSprite(parts.mark, "star", unit)
-    put(scene, parts.mark, x + STAR.x, top + 1 + math.floor(math.min(1, ding / STAR_RISES_FOR) * STAR.rise))
+    put(scene, parts.mark, x + STAR.x,
+      markRow(scene, "star", top + 1 + math.floor(math.min(1, ding / STAR_RISES_FOR) * STAR.rise)))
+  elseif quest then
+    setSprite(parts.mark, "quest", unit)
+    put(scene, parts.mark, x + QUEST.x, markRow(scene, "quest", top + 1 + (bounced(f) and 1 or 0)))
   elseif smoke then
     setSprite(parts.mark, smoke < 0.5 and "smoke1" or "smoke2", unit)
     put(scene, parts.mark, x + SMOKE.x, top + SMOKE.row + math.floor(smoke * SMOKE.rise))
@@ -256,19 +291,31 @@ local function drawAnimations(scene, parts, actor, f, row, top)
   end
 end
 
--- Draws one actor's figure, seat or sleep marks, tool, spark and name, for
--- the animation frame f. Upright poses: "seated", "fishing" (seated, a rod
--- out to the fire) and "adventuring" (standing, a sword raised). After a
--- death the figure is a skeleton for a while, whatever its pose.
+-- Shows one of a pose's sprites (POSE) on a texture, for a figure whose
+-- bottom row is `row`. name is the sprite to show in its place, if given.
+local function posePart(scene, t, actor, part, row, name)
+  name = name or part[1]
+  local mirrored = part[4] and actor.x > 0 or false
+  setSprite(t, name, scene.unit, mirrored)
+  local x = part[2]
+  if mirrored then x = LAYOUT.seated - x - Sheet.sprites[name][3] end
+  put(scene, t, actor.x + x, row + part[3])
+end
+
+-- Draws one actor's figure, seat or sleep marks, what its pose adds, spark
+-- and name, for the animation frame f. Upright poses: "seated" and the
+-- Pocket Camp's (POSE). After a death the figure is a skeleton for a
+-- while, whatever its pose.
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
   local top
   if actor.pose ~= "asleep" then
     local dead = playing(scene, "death", actor.memberId) ~= nil
-    local standing = actor.pose == "adventuring"
+    local pose = not dead and POSE[actor.pose] or {}
+    local standing = pose.standing == true
     local hop = not dead and celebrating(scene, actor, f)
-    local row = (standing and ROW.standing or ROW.seated) + (hop and ROW.hop - ROW.seated or 0)
-    if standing then
+    local row = (standing and ROW.standing or ROW.seated) + (pose.lift or 0) + (hop and ROW.hop - ROW.seated or 0)
+    if standing or pose.lift then
       parts.seat:Hide()
     else
       setSprite(parts.seat, "seat", scene.unit)
@@ -285,24 +332,26 @@ local function drawActor(scene, parts, actor, f)
     put(scene, parts.cloth, x, row)
     put(scene, parts.skin, x, row)
     for _, z in ipairs(parts.sleep) do z:Hide() end
+    -- Marks play over the head, in front of whatever the pose holds up.
     top = row + Sheet.sprites.seated[4]
-    if dead then
-      parts.tool:Hide()
-    elseif standing then
-      setSprite(parts.tool, "sword", scene.unit)
-      put(scene, parts.tool, x + SWORD.x, row + SWORD.row)
-      top = row + SWORD.row + Sheet.sprites.sword[4]
-    elseif actor.pose == "fishing" then
-      local mirrored = x > 0
-      setSprite(parts.tool, "rod", scene.unit, mirrored)
-      put(scene, parts.tool, x + (mirrored and ROD.mirroredX or ROD.x), row + ROD.row)
+    if pose.tool then posePart(scene, parts.tool, actor, pose.tool, row) else parts.tool:Hide() end
+    if pose.back then
+      posePart(scene, parts.back, actor, pose.back, row, actor.raid and pose.raid or nil)
     else
-      parts.tool:Hide()
+      parts.back:Hide()
+    end
+    if pose.front then
+      local flapping = pose.flap and math.floor(f / FLAP_TICKS) % 3 == 0
+      posePart(scene, parts.front, actor, pose.front, row, flapping and pose.flap or nil)
+    else
+      parts.front:Hide()
     end
     drawAnimations(scene, parts, actor, f, row, top)
   else
     parts.seat:Hide()
     parts.tool:Hide()
+    parts.back:Hide()
+    parts.front:Hide()
     parts.mark:Hide()
     parts.cloth:SetAlpha(1)
     parts.skin:SetAlpha(1)
@@ -441,6 +490,7 @@ function CampScene.new(parent, options)
     texture = function(layer, sublevel) return texture(band.art, layer, sublevel) end,
     actorParts = pool(function()
       return {
+        back = texture(band.art, "ARTWORK", -1),
         seat = texture(band.art, "ARTWORK", 0),
         cloth = texture(band.art, "ARTWORK", 1),
         skin = texture(band.art, "ARTWORK", 2),
@@ -450,6 +500,7 @@ function CampScene.new(parent, options)
           texture(band.art, "ARTWORK", 2),
         },
         tool = texture(band.art, "ARTWORK", 3),
+        front = texture(band.art, "ARTWORK", 4),
         spark = texture(band.art, "OVERLAY", 0),
         mark = texture(band.art, "OVERLAY", 1),
         label = shadowed(nameLabel(band.art)),

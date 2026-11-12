@@ -6,7 +6,9 @@
 -- and one by the fire leaves two graves. Also the dev
 -- console (/bffdev, opened by /bff sim too): buttons that make each
 -- simulated Member ding, die, move, fish (a Catch, or now and then an
--- unlisted one), react to your newest entry, offer a
+-- unlisted one), step through what they're doing (a vendor, the auction
+-- house, fighting, resting, flying), hand in a quest, react to your newest
+-- entry, offer a
 -- test Spare, Claim your newest one or log out,
 -- one that plays out a stretch of you being away so While you were away
 -- shows (with Reactions to your entries), one that reaches the next Crew
@@ -435,6 +437,10 @@ local function skillUp(client)
   end
 end
 
+-- What the console's Doing button steps a simulated Member through, as
+-- Snapshot.doing would report each.
+local DOING = { { vendor = true }, { auction = true }, { combat = true }, { resting = true }, { flying = true } }
+
 -- What each console button does to a simulated Member's client.
 local ACTIONS = {
   skill = skillUp,
@@ -459,6 +465,12 @@ local ACTIONS = {
   end,
   react = function(client) reactToYou(client, yourId) end,
   fish = fishUp,
+  -- Steps through what a Member can be doing, then back to nothing.
+  doing = function(client)
+    client.doingStep = (client.doingStep or 0) % (#DOING + 1) + 1
+    client.core:doing(DOING[client.doingStep] or {})
+  end,
+  quest = function(client) client.core:questHandedIn() end,
   offer = function(client, i) offer(client, i) end,
   claim = function(client) claimYours(client, yourId) end,
   online = function(client)
@@ -683,7 +695,8 @@ local TRACE = "e0a070"
 -- The console buttons on each simulated Member's row, left to right.
 local BUTTONS = {
   { "ding", "Ding" }, { "xp", "XP" }, { "die", "Die" }, { "zone", "Zone" },
-  { "alt", "Alt" }, { "max", "Max" }, { "skill", "Skill" }, { "fish", "Fish" }, { "react", "React" }, { "offer", "Offer" },
+  { "alt", "Alt" }, { "max", "Max" }, { "skill", "Skill" }, { "fish", "Fish" }, { "doing", "Doing" }, { "quest", "Quest" },
+  { "react", "React" }, { "offer", "Offer" },
   { "claim", "Claim" }, { "online", "Log out" },
 }
 

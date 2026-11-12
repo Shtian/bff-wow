@@ -21,7 +21,9 @@ local DAY = 24 * 60 * 60
 -- each edge of the band. The tent, `tent` wide, only shows when there's
 -- room. UI reads the same table to draw it. The panel's band is between
 -- `minColumns` and `maxColumns` wide; the popup's is `awayColumns`. The
--- Pocket Camp is always `pocketColumns` wide and `pocketRows` high.
+-- Pocket Camp is always `pocketColumns` wide and `pocketRows` high; a
+-- flying figure's griffin takes `griffinFore` more towards the fire and
+-- `griffinAft` away from it.
 local LAYOUT = {
   fire = 9,
   seated = 12,
@@ -36,6 +38,8 @@ local LAYOUT = {
   awayColumns = 120,
   pocketColumns = 112,
   pocketRows = 34,
+  griffinFore = 8,
+  griffinAft = 6,
 }
 Camp.LAYOUT = LAYOUT
 
@@ -91,10 +95,11 @@ end
 
 -- Places a slot (a figure and its graves) on one side of the fire, if it
 -- fits. A side is { sign, used, limit }; the figure is nearest the fire,
--- its graves outward.
-local function placeOn(side, figure, graveCount)
-  local width = figure + graveCount * (LAYOUT.graveGap + LAYOUT.grave)
-  local start = side.used == 0 and LAYOUT.fire or side.used + LAYOUT.gap
+-- its graves outward. fore and aft (default 0) keep that much more clear
+-- of the figure towards the fire and away from it.
+local function placeOn(side, figure, graveCount, fore, aft)
+  local width = figure + (aft or 0) + graveCount * (LAYOUT.graveGap + LAYOUT.grave)
+  local start = (side.used == 0 and LAYOUT.fire or side.used + LAYOUT.gap) + (fore or 0)
   if start + width > side.limit then return nil end
   side.used = start + width
   local x
@@ -140,8 +145,9 @@ end
 -- and Feed's entries (newest first, as Feed:describe gives them), at time
 -- now. options.tent false leaves the tent out; options.onlineOnly leaves
 -- out sleepers and graves, and options.moreText words the count of who
--- didn't fit (default "+%d more"). Returns { columns, actors, graves,
--- tent, more }; see Core:camp().
+-- didn't fit (default "+%d more"), and options.room(row) gives the room a
+-- row's figure needs beyond itself: towards the fire, and away from it.
+-- Returns { columns, actors, graves, tent, more }; see Core:camp().
 function Camp.view(rows, entries, now, columns, options)
   options = options or {}
   columns = math.max(1, math.floor(columns))
@@ -157,13 +163,15 @@ function Camp.view(rows, entries, now, columns, options)
     local seated = row.own or row.online
     local figure = seated and LAYOUT.seated or LAYOUT.asleep
     local own = not options.onlineOnly and graves[row.memberId] or {}
+    local fore, aft
+    if options.room then fore, aft = options.room(row) end
     -- A slot that won't fit with its graves may fit without them.
     local first, second = roomier(left, right)
     local x, graveXs, side
     for _, count in ipairs({ #own, 0 }) do
       for _, tried in ipairs({ first, second }) do
         if not x then
-          x, graveXs = placeOn(tried, figure, count)
+          x, graveXs = placeOn(tried, figure, count, fore, aft)
           side = x and tried
         end
       end
@@ -201,18 +209,53 @@ function Camp.view(rows, entries, now, columns, options)
   return view
 end
 
+-- A pose in words, but "adventuring", which names its instance.
+local STATUS = {
+  seated = "by the fire", fishing = "fishing", crafting = "crafting", gathering = "gathering",
+  fighting = "fighting", vendor = "at a vendor", auction = "at the auction house", resting = "resting",
+  flying = "flying",
+}
+
+-- The instances that are raids, by name.
+local RAIDS = {}
+for _, dungeon in ipairs(ns.Together.DUNGEONS) do
+  if dungeon.kind == "raid" then RAIDS[dungeon.name] = true end
+end
+
+-- What a row's Member is shown doing. In an instance (the record says
+-- so, and it's newer than anything said before going in) it's that,
+-- unless a spell of fishing or of a profession is on. Elsewhere what they
+-- said they chose to do (flying, the auction house, a vendor) comes
+-- first, then such a spell, fighting, resting, and by the fire.
+local function poseOf(row, doing)
+  local id = row.memberId
+  local said = not row.instance and doing.said[id] or nil
+  if said == "flying" or said == "auction" or said == "vendor" then return said end
+  if doing.fishing[id] then return "fishing" end
+  if doing.working[id] then return doing.working[id] end
+  if row.instance then return "adventuring" end
+  return said or "seated"
+end
+
 -- The Pocket Camp: the fire and the online Members, you first, as many as
--- fit, at LAYOUT.pocketColumns by LAYOUT.pocketRows. fishing is the set
--- of Member ids fishing now. Each actor is as in view(), with pose
--- ("fishing" while fishing, else "adventuring" while the Character being
--- played is in an instance, else "seated"), instance (its name, while in
--- one), status (the pose in words) and row (the Member's Roster row, for
--- the tooltip over the figure). Members that didn't fit are counted
--- in more ("+2"). tooltip lists who is doing what: { title, lines }. See
--- Core:pocketCamp().
-function Camp.pocket(rows, entries, now, fishing)
-  local view = Camp.view(rows, entries, now, LAYOUT.pocketColumns,
-    { tent = false, onlineOnly = true, moreText = "+%d" })
+-- fit, at LAYOUT.pocketColumns by LAYOUT.pocketRows. doing is what they're
+-- up to, each by Member id: said (what they last said they're doing, as
+-- Doing gives it), fishing (true while fishing) and working ("crafting"
+-- or "gathering" while at a profession). Each actor is as in view(), with
+-- pose (see Core:pocketCamp()), instance (its name, while in one), raid
+-- (true if that's a raid), status (the pose in words) and row (the
+-- Member's Roster row, for the tooltip over the figure). A flying figure
+-- takes its griffin's room. Members that didn't fit are counted in more
+-- ("+2"). tooltip lists who is doing what: { title, lines }.
+function Camp.pocket(rows, entries, now, doing)
+  local poses = {}
+  for _, row in ipairs(rows) do poses[row.memberId] = poseOf(row, doing) end
+  local view = Camp.view(rows, entries, now, LAYOUT.pocketColumns, {
+    tent = false, onlineOnly = true, moreText = "+%d",
+    room = function(row)
+      if poses[row.memberId] == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
+    end,
+  })
   view.rows = LAYOUT.pocketRows
   view.graves = nil
   local byMember = {}
@@ -221,12 +264,12 @@ function Camp.pocket(rows, entries, now, fishing)
   for i, actor in ipairs(view.actors) do
     actor.row = byMember[actor.memberId]
     actor.instance = actor.row.instance
-    if fishing[actor.memberId] then
-      actor.pose, actor.status = "fishing", "fishing"
-    elseif actor.instance then
-      actor.pose, actor.status = "adventuring", "in " .. actor.instance
+    actor.pose = poses[actor.memberId]
+    if actor.pose == "adventuring" then
+      actor.raid = RAIDS[actor.instance] or nil
+      actor.status = "in " .. actor.instance
     else
-      actor.status = "by the fire"
+      actor.status = STATUS[actor.pose]
     end
     lines[i] = ("%s: %s"):format(actor.label, actor.status)
   end

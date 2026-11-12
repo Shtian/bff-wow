@@ -85,6 +85,9 @@ local function sentLine(self, message, size, to)
       message.partial and " (more in turn)" or "", size, traceVersions(self, message.versions))
   end
   if message.type == "WHERE" then return ("send WHERE · %d B"):format(size) end
+  if message.type == "DOING" then
+    return ("send DOING · %s · %d B"):format(message.doing or "nothing", size)
+  end
   local records = {}
   for i, record in ipairs(type(message.records) == "table" and message.records or {}) do
     records[i] = traceRecord(self, record)
@@ -154,6 +157,11 @@ function Core.new(deps)
     -- Who the Pocket Camp shows fishing: Member id to when it ends. Kept
     -- in memory only.
     fishing = {},
+    -- Who it shows at a profession: Member id to { kind ("crafting" or
+    -- "gathering"), ends }. In memory only too.
+    working = {},
+    -- What each Member is doing right now (Doing).
+    doings = ns.Doing.new(deps.now),
   }, Core)
   local itemLink = type(deps.itemLink) == "function" and deps.itemLink or nil
   local itemLook = type(deps.itemLook) == "function" and deps.itemLook or nil
@@ -241,28 +249,50 @@ end
 -- The Pocket Camp as Camp.pocket gives it.
 local function pocketView(self)
   local now = self.now()
-  local fishing = {}
-  for id, ends in pairs(self.fishing) do
-    if ends > now then fishing[id] = true end
+  local rows = ns.Roster.rows(self.ledger, now)
+  local doing = { said = {}, fishing = {}, working = {} }
+  for _, row in ipairs(rows) do
+    local id = row.memberId
+    if row.own then doing.said[id] = self.doings:state() else doing.said[id] = self.doings:of(id) end
   end
-  return ns.Camp.pocket(ns.Roster.rows(self.ledger, now), self.log:since(now - ns.Camp.RECENT), now, fishing)
+  for id, ends in pairs(self.fishing) do
+    if ends > now then doing.fishing[id] = true end
+  end
+  for id, work in pairs(self.working) do
+    if work.ends > now then doing.working[id] = work.kind end
+  end
+  return ns.Camp.pocket(rows, self.log:since(now - ns.Camp.RECENT), now, doing)
 end
 
--- How long the Pocket Camp shows a Member fishing after a catch.
-local FISHING_FOR = 60
+-- How long the Pocket Camp shows a Member fishing after a catch, or at a
+-- profession after its skill grew.
+local SPELL_FOR = 60
 
 -- A Member's catches were seen to grow: the Pocket Camp shows them fishing
 -- from now, starting over if they already were.
 local function startFishing(self, id)
-  self.fishing[id] = self.now() + FISHING_FOR
+  self.fishing[id] = self.now() + SPELL_FOR
 end
 
--- Drops the fishing spells that are over. Returns true if any ended.
-local function fishingEnded(self)
+-- A Member's profession skill was seen to grow: the Pocket Camp shows them
+-- crafting or gathering from now, starting over if they already were.
+local function startWorking(self, id, kind)
+  if kind then self.working[id] = { kind = kind, ends = self.now() + SPELL_FOR } end
+end
+
+-- Drops the spells of fishing and of a profession that are over. Returns
+-- true if any ended.
+local function spellsEnded(self)
   local now, ended = self.now(), false
   for id, ends in pairs(self.fishing) do
     if ends <= now then
       self.fishing[id] = nil
+      ended = true
+    end
+  end
+  for id, work in pairs(self.working) do
+    if work.ends <= now then
+      self.working[id] = nil
       ended = true
     end
   end
@@ -272,23 +302,28 @@ end
 -- The Feed kinds the Pocket Camp plays a one-off animation for.
 local ANIMATED = { ding = true, maxLevel = true, death = true, rareFind = true, goal = true }
 
+-- The Pocket Camp, while it shows the Member by its fire, plays the
+-- animation of this kind on their figure.
+local function animateMember(self, kind, memberId)
+  if not pocketCampOn(self) then return end
+  for _, actor in ipairs(pocketView(self).actors) do
+    if actor.memberId == memberId then
+      self.listener("pocketCampAnimation", { kind = kind, memberId = memberId })
+    end
+  end
+end
+
 -- New Feed entries, made while running: the Pocket Camp, while it shows,
 -- plays an animation for each that has one (pocketCampAnimation), on the
 -- Member's figure if they're by its fire, or on the fire for a Crew goal.
 -- Whatever the chat-line and toast settings are; nothing is marked seen.
 local function animate(self, entries)
-  if #entries == 0 or not pocketCampOn(self) then return end
-  local view
+  if not pocketCampOn(self) then return end
   for _, entry in ipairs(entries) do
     if entry.kind == "goal" then
       self.listener("pocketCampAnimation", { kind = "goal" })
     elseif ANIMATED[entry.kind] then
-      view = view or pocketView(self)
-      for _, actor in ipairs(view.actors) do
-        if actor.memberId == entry.memberId then
-          self.listener("pocketCampAnimation", { kind = entry.kind, memberId = entry.memberId })
-        end
-      end
+      animateMember(self, entry.kind, entry.memberId)
     end
   end
 end
@@ -356,6 +391,8 @@ function Core:updateOwn(character)
     -- Your own events go into the Feed only while in a Crew.
     local entries = self.db.crew and self.log:ownChanged(before, character.guid) or {}
     animate(self, entries)
+    local after = self.ledger:own().characters[character.guid]
+    startWorking(self, self.ledger:memberId(), before and ns.Professions.practised(before.professions, after.professions))
     -- Feed news goes out now, even a professions-only change.
     self.gossip:ownChanged(#entries > 0 and "now" or ns.Gossip.urgency(before, character))
     -- Professions first known change who counts, as for others.
@@ -419,6 +456,26 @@ function Core:encounterEnded(encounter)
     self.listener("changed")
   end
   return name
+end
+
+-- What the Character being played is doing right now, as the game says
+-- it: { combat, vendor (a vendor's window is open), auction (the auction
+-- house's is), resting, flying }, each true or not. App reports it every
+-- second; Core picks the one to show (flying, the auction house, a vendor,
+-- fighting, which lasts 20 s past the end of combat, then resting), shows
+-- it on your figure in the Pocket Camp and tells the Crew when it changes
+-- (a DOING: see Doing). Nothing in your record changes.
+function Core:doing(facts)
+  self.doings:set(type(facts) == "table" and facts or {})
+  if self.doings:noteState() and pocketCampOn(self) then self.listener("changed") end
+end
+
+-- A quest was handed in (QUEST_TURNED_IN): the Pocket Camp plays its
+-- animation on your figure, and the Crew's play it on theirs.
+function Core:questHandedIn()
+  if not self.db.crew then return end
+  self.doings:questHandedIn()
+  animateMember(self, "quest", self.ledger:memberId())
 end
 
 -- Something was fished (LOOT_READY): the loot as Catches.read gives it
@@ -675,17 +732,22 @@ end
 -- { columns, rows, actors, more, moreText, tooltip, opacity, locked,
 -- hideInCombat, position }. actors are the online Members only, you
 -- first, as many as fit, each as in camp() plus pose ("seated",
--- "adventuring": the Character being played is in an instance, or
+-- "adventuring": the Character being played is in an instance,
 -- "fishing": for a minute after their catches were seen to grow, or yours
--- did), instance (its name, while in one) and status (the pose in words:
--- "by the fire", "in The Deadmines", "fishing"). No sleepers, graves or
--- tent; more counts the online Members that didn't fit ("+2"). tooltip is
+-- did, "crafting" or "gathering": for a minute after a profession's skill
+-- was, or what they're doing right now, as doing() reports it and a DOING
+-- tells: "fighting", "vendor", "auction", "resting" or "flying"), instance
+-- (its name, while in one), raid (true if it's a raid) and status (the
+-- pose in words: "by the fire", "in The Deadmines", "at a vendor"). A
+-- flying figure's griffin reaches CAMP_LAYOUT.griffinFore past it towards
+-- the fire and griffinAft away from it. No sleepers, graves or tent; more
+-- counts the online Members that didn't fit ("+2"). tooltip is
 -- { title, lines ("Bob: in The Deadmines", one per actor), hint }. The
 -- rest is how UI shows it: opacity (the backdrop's, 0 to 1), locked (it
 -- can't be dragged), hideInCombat and position ({ x, y }: its bottom left
 -- corner from the screen's, or nil where it hasn't been moved). Derived on
--- read, from what the Roster and Feed know: it can lag, and nothing is
--- sent. See docs/design/pocket-camp.md.
+-- read, from what the Roster, Feed and Doing know: it can lag, and reading
+-- it sends nothing. See docs/design/pocket-camp.md.
 function Core:pocketCamp()
   if not pocketCampOn(self) then return nil end
   local view = pocketView(self)
@@ -715,10 +777,17 @@ local function onlineChanged(self)
   local online = ns.Roster.online(self.ledger, self.now())
   local differs = false
   for id in pairs(online) do
-    if not self.online[id] then differs = true end
+    if not self.online[id] then
+      differs = true
+      -- They haven't heard what you're doing.
+      if id ~= self.ledger:memberId() then self.doings:newcomer() end
+    end
   end
   for id in pairs(self.online) do
-    if not online[id] then differs = true end
+    if not online[id] then
+      differs = true
+      self.doings:forget(id)
+    end
   end
   self.online = online
   return differs
@@ -780,14 +849,29 @@ end
 -- Called once a second. Core decides what is due.
 -- While moving with others online, a WHERE goes out to everyone (Where),
 -- only while Gossip talks: never paused, out of a Crew or with the link down.
-local function shareWhere(self)
+-- Who a WHERE or a DOING would reach: whether Gossip talks (never paused,
+-- out of a Crew or with the link down), and how many other Members are
+-- online.
+local function audience(self)
   local talking = self.gossip.open == true and not (self.db.crew and self.db.crew.leaving)
   local others = 0
   for id in pairs(self.online) do
     if id ~= self.ledger:memberId() then others = others + 1 end
   end
+  return talking, others
+end
+
+local function shareWhere(self)
+  local talking, others = audience(self)
   local own = self.ledger:own()
   local message = self.where:tick(talking, others, self.ledger:playing(), own and own.version)
+  if message then sendMessage(self, message) end
+end
+
+-- What you're doing goes out to everyone when it changes (Doing), under
+-- the same conditions as a WHERE.
+local function shareDoing(self)
+  local message = self.doings:tick(audience(self))
   if message then sendMessage(self, message) end
 end
 
@@ -797,6 +881,7 @@ function Core:tick()
   sharePlayTimes(self)
   self.gossip:tick()
   shareWhere(self)
+  shareDoing(self)
   if self.log:tick() then awaySummary(self) end
   if self.db.crew and self.crewGoals:tick() then
     -- A Crew's first sync: what it has isn't news to you, as for its goals.
@@ -805,8 +890,12 @@ function Core:tick()
   end
   if self.db.crew then self.spareLife:tick() end
   offerTip(self)
-  -- A fishing spell ended: the Pocket Camp redraws.
-  if fishingEnded(self) and pocketCampOn(self) then self.listener("changed") end
+  -- A spell of fishing or of a profession ended, what someone was doing
+  -- ran out, or your fighting did: the Pocket Camp redraws.
+  local ended = spellsEnded(self)
+  ended = self.doings:expire() or ended
+  ended = self.doings:noteState() or ended
+  if ended and pocketCampOn(self) then self.listener("changed") end
   checkOnline(self)
 end
 
@@ -1707,6 +1796,8 @@ function Core:removeMember(id)
   self.spareLife:memberRemoved()
   self.online[id] = nil
   self.fishing[id] = nil
+  self.working[id] = nil
+  self.doings:forget(id)
   checkGoals(self, true)
   self.listener("changed")
   return true
@@ -1750,6 +1841,8 @@ local function finishLeaving(self)
   self.db.catchTypesTold = nil
   self.online = {}
   self.fishing = {}
+  self.working = {}
+  self.doings:clear()
   self.listener("crewChanged")
   self.listener("notice", "leftCrew")
 end
@@ -1814,6 +1907,13 @@ local function dataReceived(self, records, from)
         and ns.Catches.total(record) > ns.Catches.total(before) then
         startFishing(self, record.id)
       end
+      -- A profession's skill above the copy held: they're at it.
+      if before and not record.left and self.log:isSettled() then
+        for guid, character in pairs(record.characters) do
+          local was = before.characters[guid]
+          startWorking(self, record.id, was and ns.Professions.practised(was.professions, character.professions))
+        end
+      end
       local entries, reactions = self.log:recordChanged(before, record)
       announce(self, entries, reactions, self.spareLife:recordChanged(before, record))
       -- A Member first seen, leaving or back, or professions first shared,
@@ -1865,6 +1965,16 @@ function Core:received(message)
       self.trace(("receive WHERE from %s · %s"):format(traceName(self, decoded.from), kept and "ok" or "ignored"))
     end
     if kept then self.listener("moved") end
+  elseif decoded.type == "DOING" then
+    local kept, quest = false, false
+    if not self.ledger:isRemoved(decoded.from) then kept, quest = self.doings:heard(decoded.from, decoded) end
+    if self.trace then
+      self.trace(("receive DOING from %s · %s"):format(traceName(self, decoded.from), kept and "ok" or "ignored"))
+    end
+    if kept and pocketCampOn(self) then
+      changed = true
+      if quest and self.log:isSettled() then animateMember(self, "quest", decoded.from) end
+    end
   elseif decoded.type == "DIGEST" and type(decoded.versions) == "table" then
     local partial = decoded.partial == true
     if self.trace then

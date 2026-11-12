@@ -36,6 +36,7 @@ Core/Camp.lua
 Core/Clears.lua
 Core/Goals.lua
 Core/Where.lua
+Core/Doing.lua
 Core/Core.lua
 
 Game/Snapshot.lua

@@ -149,6 +149,28 @@ function Professions.same(a, b)
   return true
 end
 
+-- The professions that gather, by skill line: herbalism, mining, skinning.
+local GATHERING = { [182] = true, [186] = true, [393] = true }
+local FISHING = 356
+
+-- What a Character was at between its stored list as it was and as it is:
+-- "gathering" or "crafting" if a profession's skill grew (gathering first),
+-- else nil. Fishing doesn't count: catches tell of that. Nil when either
+-- list is unknown or malformed.
+function Professions.practised(before, after)
+  if not valid(before) or not valid(after) then return nil end
+  local had = {}
+  for _, entry in ipairs(before) do had[entry.id] = entry.k end
+  local found
+  for _, entry in ipairs(after) do
+    if entry.id ~= FISHING and had[entry.id] and entry.k > had[entry.id] then
+      if GATHERING[entry.id] then return "gathering" end
+      found = "crafting"
+    end
+  end
+  return found
+end
+
 -- The skills that are Feed news, lowest first: each rank's cap, the last
 -- (Professions.CAP) being maxed.
 Professions.MILESTONES = {}
