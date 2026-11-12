@@ -338,6 +338,20 @@ describe("Roster", function()
   end)
 
   describe("Remove", function()
+    -- How many copies of a Member's record `from` sent in DATA since `mark`.
+    local function copiesSent(net, ns, mark, from, id)
+      local count = 0
+      for i = mark + 1, #net.wire do
+        local message = ns.Codec.decode(net.wire[i].message)
+        if net.wire[i].from == from and message.type == "DATA" then
+          for _, record in ipairs(message.records) do
+            if record.id == id then count = count + 1 end
+          end
+        end
+      end
+      return count
+    end
+
     it("hides a Member locally only, and stops relaying them", function()
       local net, clients, ns = crew({ "Ann", "Bob", "Cid" })
       local a, b, c = clients[1], clients[2], clients[3]
@@ -395,6 +409,46 @@ describe("Roster", function()
           assert.are_not.equal("DIGEST", ns.Codec.decode(net.wire[k].message).type)
         end
       end
+    end)
+
+    it("lists the Member in DIGESTs, so peers don't send them back to you", function()
+      local net, clients, ns = crew({ "Ann", "Bob", "Cid" })
+      local a, b = clients[1], clients[2]
+      a.core:removeMember(b.memberId)
+
+      -- Several DIGEST rounds from Ann: nobody owes her Bob. Bob's own
+      -- sends are his to make, so only Cid's copies count.
+      local mark = #net.wire
+      net:run(5 * 60)
+      assert.equal(0, copiesSent(net, ns, mark, "Cid", b.memberId))
+
+      -- Bob dings and logs out: Ann notes the version of the copy she
+      -- refuses, and her DIGESTs list it, so Cid doesn't send it again.
+      b:play({ level = 11 })
+      net:run(5)
+      b:logout()
+      mark = #net.wire
+      net:run(5 * 60)
+      assert.equal(0, copiesSent(net, ns, mark, "Cid", b.memberId))
+      assert.is_nil(a:rowFor(b))
+    end)
+
+    it("gets a Member removed before versions were kept sent once more, then quiet", function()
+      local net, clients, ns = crew({ "Ann", "Bob", "Cid" })
+      local a, b = clients[1], clients[2]
+      a.core:removeMember(b.memberId)
+      b:logout()
+      -- Saved by an older BFF: no version for the removed Member.
+      a.db.removed[b.memberId].version = nil
+      a:reload()
+
+      local mark = #net.wire
+      net:run(2 * 60)
+      assert.equal(1, copiesSent(net, ns, mark, "Cid", b.memberId))
+      mark = #net.wire
+      net:run(5 * 60)
+      assert.equal(0, copiesSent(net, ns, mark, "Cid", b.memberId))
+      assert.is_nil(a:rowFor(b))
     end)
 
     it("keeps the Member out across a reload, even when others relay them", function()

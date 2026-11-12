@@ -3,7 +3,8 @@
 -- which only this client writes, and copies of everyone else's. The version
 -- is the owner's clock at the last write and always moves forward, so a
 -- higher version wins (docs/adr/0001). Also when each Member was last heard,
--- who each copy came from, and the Members removed from your own view.
+-- who each copy came from, and the Members removed from your own view,
+-- with the last version seen of each.
 
 local _, ns = ...
 
@@ -275,18 +276,20 @@ function Ledger:forgetOthers()
 end
 
 -- Removes a Member from your own view: their record is dropped, and later
--- copies are too. Returns false for yourself or a Member not held.
+-- copies are too. The version is kept, so the DIGEST still lists them and
+-- nobody owes them to you. Returns false for yourself or a Member not held.
 function Ledger:remove(id)
   local record = self.db.records[id]
   if not record or id == self.db.memberId then return false end
-  self.db.removed[id] = { displayName = record.displayName }
+  self.db.removed[id] = { displayName = record.displayName, version = record.version }
   self.db.records[id] = nil
   self.db.heard[id] = nil
   self.db.via[id] = nil
   return true
 end
 
--- Takes a Member off the Remove list. Returns false if they weren't on it.
+-- Takes a Member off the Remove list, and forgets their version, so their
+-- record is fetched again. Returns false if they weren't on it.
 function Ledger:readd(id)
   if not self.db.removed[id] then return false end
   self.db.removed[id] = nil
@@ -297,7 +300,7 @@ function Ledger:isRemoved(id)
   return self.db.removed[id] ~= nil
 end
 
--- The removed Members: for id, { displayName } in ledger:removed().
+-- The removed Members: for id, { displayName, version } in ledger:removed().
 function Ledger:removed()
   return pairs(self.db.removed)
 end
@@ -313,9 +316,10 @@ function Ledger:record(id)
   return self.db.records[id]
 end
 
--- The version held for a Member id, 0 if none.
+-- The version held for a Member id: for a removed Member the last one
+-- seen (0 if removed before versions were kept), and 0 if none.
 function Ledger:version(id)
-  local record = self.db.records[id]
+  local record = self.db.records[id] or self.db.removed[id]
   return record and record.version or 0
 end
 
@@ -326,7 +330,8 @@ end
 
 -- Up to `limit` Member ids and versions: the own one first, then each id in
 -- `ask` (a set of ids, listed with the version held, 0 if none, so whoever
--- holds them newer replies), then the other records in turn by id, starting
+-- holds them newer replies), then the other records and the removed
+-- Members (with the last version seen) in turn by id, starting
 -- after the id `after`. Returns the versions, whether any record was left
 -- out, and the last id listed in turn (`after` again if none was), to pass
 -- as `after` next time, so every record is listed within a few DIGESTs.
@@ -349,6 +354,7 @@ function Ledger:digest(limit, after, ask)
   for id, record in pairs(self.db.records) do
     if record ~= own then ids[#ids + 1] = id end
   end
+  for id in pairs(self.db.removed) do ids[#ids + 1] = id end
   table.sort(ids)
   local start = 1
   if after then
@@ -362,7 +368,7 @@ function Ledger:digest(limit, after, ask)
         partial = true
         break
       end
-      add(id, self.db.records[id].version)
+      add(id, self:version(id))
       last = id
     end
   end
@@ -425,11 +431,16 @@ local function wellFormed(record)
 end
 
 -- Keeps a copy of someone else's record, sent by the Member id `from`, if
--- it is newer than the one held and the Member isn't removed. Returns true
--- if it was kept, and the copy held before (nil on first sight).
+-- it is newer than the one held and the Member isn't removed. A removed
+-- Member's copy is refused, but a newer version is noted. Returns true if
+-- it was kept, and the copy held before (nil on first sight).
 function Ledger:merge(record, from)
   if not wellFormed(record) or record.id == self.db.memberId then return false end
-  if self:isRemoved(record.id) then return false end
+  local removed = self.db.removed[record.id]
+  if removed then
+    if record.version > self:version(record.id) then removed.version = record.version end
+    return false
+  end
   if record.version <= self:version(record.id) then return false end
   if not record.characters then record.characters = {} end
   local before = self.db.records[record.id]
