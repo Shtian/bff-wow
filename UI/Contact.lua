@@ -36,8 +36,11 @@ local function linkBox(parent, url)
       self:HighlightText()
     end
   end)
-  box:SetScript("OnEditFocusGained", box.HighlightText)
-  box:SetScript("OnMouseUp", box.HighlightText)
+  -- Wrapped: the scripts' own arguments would reach HighlightText as its
+  -- start and stop.
+  local function selectAll(self) self:HighlightText() end
+  box:SetScript("OnEditFocusGained", selectAll)
+  box:SetScript("OnMouseUp", selectAll)
   box:SetScript("OnEditFocusLost", function(self)
     self:HighlightText(0, 0)
     self:SetCursorPosition(0)
