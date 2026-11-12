@@ -14,14 +14,16 @@ local INSET = 14
 local INTRO = "Found a bug, or have a question or an idea? Open an issue on GitHub, "
   .. "or leave a comment on CurseForge. Press Ctrl+C to copy a link."
 
-Contact.LINKS = {
+local LINKS = {
   { label = "GitHub issues", url = "https://github.com/Shtian/bff-wow/issues" },
   { label = "CurseForge", url = "https://www.curseforge.com/wow/addons/bff-best-friends-in-forever" },
 }
 
 local frame
 
--- A read-only box holding a link: clicking or typing selects all of it.
+-- A read-only box holding a link: clicking or typing selects all of it
+-- (the click that focuses it places the cursor after OnEditFocusGained, so
+-- OnMouseUp selects it again).
 local function linkBox(parent, url)
   local box = ns.Skin.editBox(parent, WIDTH - 2 * INSET)
   box:SetFontObject(ns.Skin.fonts.small)
@@ -34,6 +36,7 @@ local function linkBox(parent, url)
     end
   end)
   box:SetScript("OnEditFocusGained", box.HighlightText)
+  box:SetScript("OnMouseUp", box.HighlightText)
   box:SetScript("OnEditFocusLost", function(self)
     self:HighlightText(0, 0)
     self:SetCursorPosition(0)
@@ -47,7 +50,7 @@ local function create()
   frame = Skin.window("BFFContact", WIDTH, "Get in touch")
   frame:SetPoint("CENTER")
 
-  local intro = Skin.label(frame, "body", Skin.TEXT)
+  local intro = Skin.label(frame, "small", Skin.MUTED)
   intro:SetPoint("TOPLEFT", INSET, -Skin.HEADER_HEIGHT - INSET)
   intro:SetWidth(WIDTH - 2 * INSET)
   intro:SetJustifyH("LEFT")
@@ -55,7 +58,7 @@ local function create()
   intro:SetText(INTRO)
 
   local above, gap = intro, 12
-  for _, link in ipairs(Contact.LINKS) do
+  for _, link in ipairs(LINKS) do
     local label = Skin.label(frame, "small", Skin.MUTED)
     label:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -gap)
     label:SetText(link.label)
@@ -63,6 +66,7 @@ local function create()
     box:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -4)
     above, gap = box, 10
   end
+  frame.lastBox = above
 
   local close = Skin.button(frame, CLOSE, function() frame:Hide() end, true)
   close:SetPoint("BOTTOMRIGHT", -INSET, INSET)
@@ -72,17 +76,13 @@ local function create()
   end)
   report:SetWidth(110)
   report:SetPoint("RIGHT", close, "LEFT", -8, 0)
-
-  frame.intro = intro
 end
 
--- Opens the window.
+-- Opens the window, as tall as its links plus the buttons under them.
 function Contact.show()
   if not frame then create() end
-  local Skin = ns.Skin
-  -- The intro, two link rows (label 14 + 4 + box 24, 12 and 10 apart), the
-  -- buttons and the insets.
-  frame:SetHeight(Skin.HEADER_HEIGHT + INSET + math.ceil(frame.intro:GetStringHeight())
-    + 12 + 42 + 10 + 42 + 18 + 24 + INSET)
+  frame:SetHeight(1)
   frame:Show()
+  local linksBottom = frame:GetTop() - frame.lastBox:GetBottom()
+  frame:SetHeight(math.ceil(linksBottom) + 18 + 24 + INSET)
 end

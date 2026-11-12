@@ -313,13 +313,14 @@ Quiet and flat. Components are faint fills and hairlines, so the content and the
 - **Disabled:** primary or secondary, the secondary plate with Dusk Dim text and no hover. Never faded gold, which reads as a second primary.
 - **Hover:** an additive white wash: 18% on primary, 6% on secondary.
 - **Close:** a 22px square with a desaturated grey X and a 5% hover wash.
+- **Header button:** the same 22px square holding a small flat glyph drawn from rectangles, Smoke Muted (Ash Text on hover), with a one-line tooltip. Only the panel's header has them: Report a bug and Get in touch, left of the close button.
 
 ### Chips
 - **Navigation chip:** the selected tab gets an 8% white chip and the hovered one a 4% chip, inset 6px×2px with 2px stepped corners.
 - **Badge:** a 14px-high plate at 8% white with Small text, for levels. At least as wide as it is tall, and hidden when there's no value (no "-"). Unseen counts on tabs use a gold plate with near-black Tiny text. The minimap button's online count sits on a Night Window plate with Ash Tiny text, off the icon's rings.
 
 ### Cards / Containers
-- **Window:** Night Window at 95%, 1px Border all round, a 30px Header Plate with a Hairline under it, a gold Friz title 12px in, and close and status on the right. Movable, closes on Escape.
+- **Window:** Night Window at 95%, 1px Border all round, a 30px Header Plate with a Hairline under it, a gold Friz title 12px in, and close and status on the right (the panel adds its header buttons between them). Movable, closes on Escape.
 - **Rows:** separated by top Hairlines, no backgrounds; hover gets a 5% wash. Your own Roster row has a 5% gold wash. No coloured side stripes on rows.
 
 ### Section label
@@ -385,5 +386,5 @@ A 2px line fading in from gold, meeting a teal line at a small white spark: the 
 - **Don't** add shadows, gradients or glows to in-game frames (The Flat Ledger Rule), outside the Camp (The Lit Camp Rule).
 - **Don't** introduce a third typeface.
 - **Don't** fade a gold button to show it's disabled, or mark a row with a coloured side stripe.
-- **Don't** put icons in the sidebar or box a label in a chip. The panel's header holds the only icon buttons: Report a bug and Get in touch, small flat Smoke Muted glyphs (Ash Text on hover) left of the close button.
+- **Don't** put icons in the sidebar or box a label in a chip.
 - **Don't** set text smaller than 11px.
