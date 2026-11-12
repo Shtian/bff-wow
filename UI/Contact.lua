@@ -12,7 +12,8 @@ ns.Contact = Contact
 local WIDTH = 380
 local INSET = 14
 local INTRO = "Found a bug, or have a question or an idea? Open an issue on GitHub, "
-  .. "or leave a comment on CurseForge. Press Ctrl+C to copy a link."
+  .. "or leave a comment on CurseForge. Click a link and press Ctrl+C to copy it. "
+  .. "For a bug, also paste in the bug report: Report a bug shows it, ready to copy."
 
 local LINKS = {
   { label = "GitHub issues", url = "https://github.com/Shtian/bff-wow/issues" },

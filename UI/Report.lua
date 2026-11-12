@@ -12,7 +12,8 @@ ns.Report = Report
 local WIDTH = 560
 local HEIGHT = 420
 local INSET = 14
-local INTRO = "For a bug report: press Ctrl+C to copy this, then paste it where you were asked. "
+local INTRO = "To report a bug: press Ctrl+C to copy all of this, then paste it into your GitHub issue "
+  .. "or CurseForge comment (or wherever you were asked), and say what you did and what went wrong. "
   .. "It includes your Crew's Character names."
 
 local function yesNo(value)
