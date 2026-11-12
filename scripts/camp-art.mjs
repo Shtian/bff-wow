@@ -19,7 +19,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PAL = {
   K: "#0b0a12", S: "#e8b890", s: "#b98465", W: "#fff3c4", Y: "#ffe9a0", G: "#ffd14a", O: "#f0a21c",
   R: "#c9481c", B: "#5a3a24", b: "#3a2518", T: "#8c8796", t: "#5d5966", L: "#70e370", P: "#f2b8d0",
-  Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8", N: "#ece8d8",
+  Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8", N: "#ece8d8", A: "#c89a5a", a: "#8f6a3a", r: "#5a1620",
 };
 // Cloth tones: a white C and a 62% D, tinted by the class colour in game.
 // Sleepers' cloth is 55% of that, as the prototype shaded bedrolls.
@@ -49,8 +49,6 @@ const SLEEP = [
 // A fishing rod held out from a seated figure's hand, its line and bobber
 // hanging from the tip; drawn mirrored on the fire's right.
 const ROD = [".....B.", "....B.Z", "....B.Z", "...B..Z", "...B..Z", "..B...Z", "..B...Z", ".B....Z", ".B....R", "B......"];
-// A sword raised in a standing figure's hand: adventuring.
-const SWORD = [".W.", ".Z.", ".Z.", ".Z.", ".Z.", "GGG", ".B."];
 // A ding's gold star, a rare find's fish held up, and a death's smoke.
 const STAR = ["..G..", "GGYGG", ".GYG.", ".G.G.", "G...G"];
 const FISH = [".FFF...F", "FFKFFFFF", "FfffFFFF", ".fff...f"];
@@ -61,9 +59,77 @@ const SMOKE = [
 // A figure as a skeleton, for a while after a death: the seated figure's
 // outline in bone: a skull, a spine, ribs and a pelvis. One layer, untinted.
 const SKELETON = ["....KKKK....", "...KNNNNK...", "..KNNNNNNK..", "..KNKNNKNK..", "..KNKNNKNK..", "..KNNNNNNK..", "...KNNNNK...", "...KKNNKK...", ".KNNNNNNNNK.", ".KNKKNNKKNK.", ".KKNNNNNNKK.", "..KNKKKKNK..", "..KKK..KKK.."];
+// A dark outline round a grid's shape, one pixel on every side (corners
+// too), so a tool still reads with the game world behind it.
+function outlined(rows) {
+  const w = rows[0].length + 2, h = rows.length + 2;
+  const at = (x, y) => (rows[y - 1] && rows[y - 1][x - 1] && rows[y - 1][x - 1] !== "." ? rows[y - 1][x - 1] : null);
+  const out = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) {
+      const own = at(x, y);
+      if (own) { line += own; continue; }
+      let near = false;
+      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (at(x + i, y + j)) near = true;
+      line += near ? "K" : ".";
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+// What a Member is doing, for the Pocket Camp (docs/design/pocket-camp.md).
+// Held in a standing figure's raised hand: a blade (fighting), a torch (in
+// a dungeon or raid), a hammer (crafting) and a pick (gathering).
+const BLADE = outlined(["..W..", ".WZt.", ".WZt.", ".WZt.", ".WZt.", ".WZt.", ".WZt.", "GGGGG", "..B..", "..G.."]);
+const TORCH = outlined(["..R..", ".RO..", ".ROR.", "ROYOR", "ROYOR", ".OGO.", ".aAa.", "..A..", "..A..", "..a.."]);
+const HAMMER = outlined(["ZZZZZt", "ZNZZZt", "ZZZZZt", "..Aa..", "..Aa..", "..Aa..", "..Aa..", "..Aa.."]);
+const PICK = outlined(["..ZZZZZZ..", ".ZZtAatZZ.", "ZZ..Aa..ZZ", "Z...Aa...Z", "....Aa....", "....Aa....", "....Aa....", "....Aa...."]);
+// An anvil at a crafter's feet.
+const ANVIL = outlined(["ZZZZZZZZZ", "TZZZZZZZt", ".TTTTTtt.", "...TTt...", "..TTTTt..", ".TTTTTTt."]);
+// A doorway of stone behind a figure in a dungeon, and a raid's with a
+// skull for a keystone.
+const ARCH = [
+  ".....TTTTTT.....", "...TTTTTTTTTt...", "..TTTttttttTTt..", ".TTTtKKKKKKtTTt.", ".TTtKKKKKKKKtTt.", "TTTtKKKKKKKKtTTt",
+  "TTtKKKKKKKKKKtTt", "TttKKKKKKKKKKtTt", "TTtKKKKKKKKKKttt", "TTtKKKKKKKKKKtTt", "TTtKKKKKKKKKKtTt", "tttKKKKKKKKKKtTt",
+  "TTtKKKKKKKKKKtTt", "TTtKKKKKKKKKKttt", "TttKKKKKKKKKKtTt", "TTtKKKKKKKKKKtTt", "TTtKKKKKKKKKKtTt",
+];
+const ARCH_RAID = [
+  ".....NNNNNN.....", "....NNNNNNNN....", "...TNRRNNRRNT...", "..TTNNNKKNNNTT..", ".TTTtNKNNKNtTTt.",
+  ...ARCH.slice(4).map((row) => row.replaceAll("K", "r")),
+];
+// At a seated figure's feet: a vendor's coin bag and the auction house's
+// stacked gold.
+const BAG = outlined(["..A.A..", "...a...", "..AAA..", ".AAAAA.", "AAAGAAa", "AAGGGAa", "AAAGAAa", ".AAAAa."]);
+const COINS = outlined([".GYYG.", "GYWWYG", "OGYYGO", "GOGGOG", "OGYYGO", "GOGGOG", "OGYYGO", ".OGGO."]);
+// An inn's sign over a resting figure's head: a post on the side away from
+// the fire (mirrored on its right), and a tankard on a board hung by chains.
+const INN_SIGN = [
+  "aAAAAAAAAAAA", "Aa...Z...Z..", "Aa...Z...Z..", "Aa.TTTTTTTTT", "Aa.TbNNNNbbt", "Aa.TbGGGGZbt", "Aa.TbGOGGbZt", "Aa.TbGOGGbZt",
+  "Aa.TbGOGGZbt", "Aa.TbGGGGbbt", "Aa.Ttttttttt", ...Array(15).fill("Aa.........."),
+];
+// A quest handed in: the gold question mark, over the head.
+const QUEST = outlined([".GGG.", "GYYGG", "G..GG", "...GG", "..GG.", "..GG.", ".....", "..GG.", "..GG."]);
+// A griffin under a flying figure, facing the fire (mirrored on its right).
+// The rider sits on its columns 3 to 14, their bottom row on its sixth. The
+// wing is drawn over the rider's legs, its right end on the griffin's
+// column 14 and its top two rows above the back; the raised one is its
+// other frame, a row taller.
+const GRIFFIN = outlined([
+  "...............NNNNN..", "................NKNOO.", "................NNNOR.", "...............NNNNN..", "................NNNN..",
+  "......AAAAAAAAAaNNNN..", ".aaa.AAAAAAAAAAAaNNA..", "a...aAAAAAAAAAAAAAAA..", "a....AAAaAAAAAAAAAA...", ".a..aAAa.....aAAAa....",
+  "..aa.AAa......OO......", ".....AAAa.....OOO.....",
+]);
+const GRIFFIN_WING = outlined(["NNNNNNNNNNNNNNNNN", "...ZNNNNNNNNNNNNN", "......ZNNNNNZNNNN", ".........ZNNNNNNN", "............ZNNNN"]);
+const GRIFFIN_WING_UP = outlined([
+  "NNNN.............", "ZNNNNNNNN........", "...ZNNNNNNNNNNNNN", "......ZNNNNNZNNNN", ".........ZNNNNNNN", "............ZNNNN",
+]);
 // The fire flaring for a Crew goal: each flame frame with its upper rows
-// doubled, so it stands taller on the same logs.
+// doubled, so it stands taller on the same logs, and burning purple: the
+// flame's reds to yellows as deep purple to pale lilac.
 const flare = (rows) => rows.flatMap((row, j) => (j < 8 ? [row, row] : [row]));
+const FLARE_PAL = { R: "#5b2a9e", O: "#8a45d6", G: "#b77bf2", Y: "#dcc0ff", W: "#f6ecff" };
 const EMBER = ["G"];
 const EMBER_COOL = ["R"];
 
@@ -107,9 +173,14 @@ const SPRITES = [
   ["logs", skin(LOGS)], ["seat", skin(SEAT)], ["sleep1", skin(SLEEP[0])], ["sleep2", skin(SLEEP[1])], ["sleep3", skin(SLEEP[2])],
   ["ember", skin(EMBER)], ["emberCool", skin(EMBER_COOL)],
   ["tent", tent()],
-  ["rod", skin(ROD)], ["sword", skin(SWORD)], ["star", skin(STAR)], ["fish", skin(FISH)],
+  ["rod", skin(ROD)], ["star", skin(STAR)], ["fish", skin(FISH)],
   ["smoke1", skin(SMOKE[0])], ["smoke2", skin(SMOKE[1])], ["skeleton", skin(SKELETON)],
-  ["flare1", skin(flare(FIRE[0]))], ["flare2", skin(flare(FIRE[1]))], ["flare3", skin(flare(FIRE[2]))],
+  ["flare1", paint(flare(FIRE[0]), FLARE_PAL)], ["flare2", paint(flare(FIRE[1]), FLARE_PAL)],
+  ["flare3", paint(flare(FIRE[2]), FLARE_PAL)],
+  ["blade", skin(BLADE)], ["torch", skin(TORCH)], ["hammer", skin(HAMMER)], ["pick", skin(PICK)], ["anvil", skin(ANVIL)],
+  ["arch", skin(ARCH)], ["archRaid", skin(ARCH_RAID)],
+  ["bag", skin(BAG)], ["coins", skin(COINS)], ["innSign", skin(INN_SIGN)], ["quest", skin(QUEST)],
+  ["griffin", skin(GRIFFIN)], ["griffinWing", skin(GRIFFIN_WING)], ["griffinWingUp", skin(GRIFFIN_WING_UP)],
 ];
 
 function hex(color) {

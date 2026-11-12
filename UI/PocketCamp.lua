@@ -1,6 +1,6 @@
 -- PocketCamp: the small on-screen Camp you can keep up while playing. It
 -- draws Core's pocketCamp() with a CampScene band of its own: the fire and
--- the online Members, each seated, adventuring or fishing, over a
+-- the online Members, each doing what Core says they're doing, over a
 -- soft-edged backdrop of the opacity Core gives. It shows no names: the mouse over a figure
 -- shows that Member's Roster tooltip, and over the fire who is doing what.
 -- A click toggles the panel (not in combat), a drag moves it unless Core

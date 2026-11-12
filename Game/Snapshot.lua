@@ -196,6 +196,50 @@ function Snapshot.requiredLevel(link)
   return (select(5, getItemInfo(link)))
 end
 
+-- What the Character is doing right now, for Core's doing(): in combat,
+-- at a vendor or the auction house (their windows, kept from their show
+-- and close events), resting, and flying (a flight path, or a flying
+-- mount where the client has them). A value that reads secret is false,
+-- and so is one whose function the client doesn't have.
+local windows = { vendor = false, auction = false }
+local function flag(ask, ...)
+  if not ask then return false end
+  local value = ask(...)
+  if issecretvalue and issecretvalue(value) then return false end
+  return value and true or false
+end
+
+function Snapshot.doing()
+  return {
+    combat = flag(InCombatLockdown),
+    vendor = windows.vendor,
+    auction = windows.auction,
+    resting = flag(IsResting),
+    flying = flag(UnitOnTaxi, "player") or flag(IsFlying),
+  }
+end
+
+local WINDOW_EVENTS = {
+  MERCHANT_SHOW = { "vendor", true }, MERCHANT_CLOSED = { "vendor", false },
+  AUCTION_HOUSE_SHOW = { "auction", true }, AUCTION_HOUSE_CLOSED = { "auction", false },
+}
+
+-- Keeps the windows doing() reports, and tells Core of each quest handed
+-- in. Core hears what the Character is doing from App, every second.
+local function watchDoing(core)
+  local frame = CreateFrame("Frame")
+  for event in pairs(WINDOW_EVENTS) do frame:RegisterEvent(event) end
+  frame:RegisterEvent("QUEST_TURNED_IN")
+  frame:SetScript("OnEvent", function(_, event)
+    local window = WINDOW_EVENTS[event]
+    if window then
+      windows[window[1]] = window[2]
+    elseif event == "QUEST_TURNED_IN" then
+      core:questHandedIn()
+    end
+  end)
+end
+
 function Snapshot.start(core)
   BFF_CharacterDB = BFF_CharacterDB or {}
   BFF_CharacterDB.deaths = BFF_CharacterDB.deaths or 0
@@ -218,4 +262,5 @@ function Snapshot.start(core)
     update()
   end)
   update()
+  watchDoing(core)
 end

@@ -243,7 +243,10 @@ local function start(isInitialLogin)
   ns.Toasts.start(ns.core)
   ns.Settings.start(ns.core)
   ns.Snapshot.start(ns.core)
-  C_Timer.NewTicker(1, function() ns.core:tick() end)
+  C_Timer.NewTicker(1, function()
+    ns.core:doing(ns.Snapshot.doing())
+    ns.core:tick()
+  end)
   if isInitialLogin and not ns.core:crew() then
     say("type /bff to start or join a Crew.")
   end

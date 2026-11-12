@@ -10,8 +10,8 @@ BFF is for a small group of friends who don't always play at the same time. It s
 - **Gather round the fire:** the Camp, a small pixel campsite at the top of the panel and in While you were away. Friends who are online sit by the fire and the rest sleep in bedrolls. A recent death leaves a grave, respects put a flower on it, and a fresh max level gets a spark. You can switch it off in Settings.
 - **Keep the fire on screen:** the Pocket Camp, an optional small Camp you can keep up while you play.
   - Shows the fire and every friend who's online, you included.
-  - Each friend is shown doing what they're doing: sitting by the fire, standing with a sword raised while in a dungeon or raid, or holding a fishing rod after a catch.
-  - Reacts to news for about 10 seconds: a ding gets a gold star and a bounce, a max level bursts into sparks, a death turns the figure into a skeleton, a rare find is held up, and a crew goal makes the fire flare.
+  - Each friend is shown doing what they're doing: sitting by the fire, fighting with a sword raised, holding a torch in a dungeon or raid doorway, at a vendor or the auction house, resting under an inn's sign, flying on a griffin, crafting, gathering, or holding a fishing rod after a catch.
+  - Reacts to news for about 10 seconds: a ding gets a gold star and a bounce, a max level bursts into sparks, a death turns the figure into a skeleton, a rare find is held up, a handed-in quest pops a gold question mark, and a crew goal makes the fire flare purple.
   - Hover a friend to see their character, level, zone and professions. Hover the fire to see who's doing what.
   - Click it to open BFF. Drag it anywhere on screen.
   - Its own Settings section: backdrop opacity from see-through to solid, lock its position, and hide it in combat.
@@ -64,3 +64,11 @@ BFF has no server. Each player's addon keeps their own data and passes it to the
 ## Feedback
 
 Bugs and ideas are welcome on [GitHub](https://github.com/Shtian/bff-wow/issues).
+
+## Thanks
+
+Some of BFF came from ideas players left in the comments on CurseForge:
+
+- **kayloohoo** asked for a small campfire to keep on screen, with little animations for what friends are doing. That became the Pocket Camp.
+- **absolutezabba12** asked for a setting to turn the map location off, more accurate positions, and the Camp's characters on the map in place of dots. That became the map pin setting, live positions and the Camp figures as map pins.
+- **TheDolmenDuke** asked for the Pocket Camp to show a friend at a shop or the auction house, in combat and handing in a quest, and for a dungeon icon of its own. That became the Pocket Camp's poses for what each friend is doing right now.
