@@ -58,6 +58,12 @@ function FakeNet.new(options)
     -- doesn't arrive, and the sender's Core hears sendFailed(to's
     -- Character name), as from the channel link.
     fail = nil,
+    -- chunked(chunks, from, to) returns the chunks of a message that reach
+    -- one client, in the order they arrive: leave one out to lose it, or
+    -- hand them back in another order. A message left incomplete is
+    -- reported lost by the receiver's Framing, and its Core hears
+    -- sendFailed(from's Character name), as from the channel link.
+    chunked = nil,
   }, FakeNet)
 end
 
@@ -83,10 +89,11 @@ end
 
 -- Puts a message on the wire; it reaches every client whose link is up at
 -- the next step, the sender included, as on the real channel. With `to` (a
--- Character name) it reaches only that client, as a whisper.
+-- Character name) it reaches only that client, as a whisper. It travels as
+-- the chunks the channel link would whisper (Link/Framing.lua).
 function FakeNet:broadcast(from, message, to)
   self.wire[#self.wire + 1] = { from = from.name, message = message, time = self.clock, to = to }
-  self.queue[#self.queue + 1] = { from = from, message = message, to = to }
+  self.queue[#self.queue + 1] = { from = from, message = message, to = to, chunks = from.framing:split(message) }
 end
 
 local function isListening(client)
@@ -95,6 +102,29 @@ end
 
 local function characterName(client)
   return client.character and client.character.name or client.name
+end
+
+-- A client's Framing: it splits what the client sends and puts together
+-- what it receives, per sender's Character name.
+local function newFraming(client)
+  local net = client.net
+  return ns.Framing.new({
+    now = function() return net.clock end,
+    lost = function(sender)
+      if client.core then client.core:sendFailed(sender) end
+    end,
+  })
+end
+
+-- The chunks of a message reach a client, which hears the message once
+-- they are all in.
+local function receive(self, item, client)
+  local chunks = item.chunks
+  if self.chunked then chunks = self.chunked(chunks, item.from.name, client.name) end
+  for _, chunk in ipairs(chunks) do
+    local message = client.framing:receive(characterName(item.from), chunk)
+    if message then client.core:received(message) end
+  end
 end
 
 local function deliver(self, item)
@@ -106,7 +136,7 @@ local function deliver(self, item)
         if client ~= item.from and self.fail and self.fail(item.message, item.from.name, client.name) then
           if item.from.core then item.from.core:sendFailed(characterName(client)) end
         elseif not (self.drop and self.drop(item.message, item.from.name, client.name)) then
-          client.core:received(item.message)
+          receive(self, item, client)
         end
       end
     end
@@ -121,6 +151,7 @@ function FakeNet:step(time)
   self.queue = {}
   for _, item in ipairs(queue) do deliver(self, item) end
   for _, client in ipairs(self.clients) do
+    if client.core then client.framing:tick() end
     if client.core and client.ticks then client.core:tick() end
   end
 end
@@ -169,6 +200,7 @@ end
 -- own sends reach them.
 function FakeNet:attach(core, name)
   local client = setmetatable({ net = self, name = name or "you", core = core, linkUp = true }, Client)
+  client.framing = newFraming(client)
   self.clients[#self.clients + 1] = client
   return client
 end
@@ -184,6 +216,8 @@ end
 
 local function newCore(client, initialLogin)
   local net = client.net
+  -- A new session: whatever was half received is gone.
+  client.framing = newFraming(client)
   client.core = ns.Core.new({
     db = client.db,
     now = function() return net.clock end,

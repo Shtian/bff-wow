@@ -2,8 +2,10 @@
 -- channel, keeps it and its system notices out of chat, and tells Core when
 -- the link is up or down. The channel only says who is online: on WoW:
 -- Forever addon messages sent to a custom channel are accepted and never
--- delivered, so every message goes out with AceComm as an addon whisper to
--- each other Character in the channel.
+-- delivered, so every message goes out as addon whispers to each other
+-- Character in the channel: in BFF's own chunks (Link/Framing.lua), handed
+-- to ChatThrottleLib a chunk at a time. AceComm only receives: it registers
+-- the prefix and still puts an older BFF's multipart messages together.
 -- See docs/design/code-structure.md (the link port), docs/design/joining-a-crew.md
 -- and docs/research/channel-spike.md.
 
@@ -54,9 +56,15 @@ local lastChannelUpdate
 -- Who is in the channel and can be whispered (Link/Presence.lua). Made
 -- below, once what it calls is defined.
 local presence
--- Whispers still in the send queue: key -> how many messages. Presence is
--- told while there are any.
-local queued = {}
+-- Splits messages into chunks and puts the chunks received back together,
+-- per sender's peer key. Made below, like presence.
+local framing
+-- What is still to send, per peer: key -> { name, flying (chunks handed to
+-- ChatThrottleLib and not yet out), busy (the long message one of them
+-- belongs to, or false), messages (each { chunks, next }, the multi-chunk messages
+-- in order) }. ChatThrottleLib gets one chunk of these at a time, so the
+-- rest can be dropped when the peer leaves or the link goes down.
+local outbox = {}
 -- Whether (and which type of) instance the player was last seen in, for
 -- the trace.
 local instanceType
@@ -121,6 +129,20 @@ local function isSelf(name)
   return readable(last) and last ~= "" and key == (first .. " " .. last):lower()
 end
 
+-- Drops the chunks not yet handed to ChatThrottleLib for a peer. One
+-- already there can't be taken back.
+local function dropUnsent(key, why)
+  local box = outbox[key]
+  if not box then return end
+  local unsent = 0
+  for _, message in ipairs(box.messages) do unsent = unsent + #message.chunks - message.next + 1 end
+  -- The first message's next chunk is the one already handed over.
+  if box.busy and box.busy == box.messages[1] then unsent = unsent - 1 end
+  box.messages = {}
+  if box.flying == 0 then outbox[key] = nil end
+  if trace and unsent > 0 then trace(("  dropped %d unsent chunks to %s (%s)"):format(unsent, box.name, why)) end
+end
+
 -- Why the link is down, or nil while it can be up.
 local function downReason()
   if not target then return "no Crew" end
@@ -140,6 +162,12 @@ local function update(cause)
   isUp = up
   presence:listening(up)
   if trace then trace(up and ("link up (%s)"):format(cause or "ready") or ("link down (%s)"):format(reason)) end
+  -- Nothing gets through while it is down, and Core starts over with a
+  -- DIGEST when it comes up: half-sent and half-received messages go.
+  if not up then
+    for key in pairs(outbox) do dropUnsent(key, "link down") end
+    framing:clear()
+  end
   if up then core:up() else core:down() end
 end
 
@@ -418,23 +446,79 @@ local function onFailed(name)
   if presence:has(name) then core:sendFailed(Ambiguate(name, "none")) end
 end
 
--- AceComm's callback, once per chunk, with the name whispered to, the
--- bytes sent so far and in all. Through AceComm, ChatThrottleLib's didSend
--- arrives fourth: false for any failure but a throttle, which
--- ChatThrottleLib queues again itself, so that one never gets here.
--- Handled on the next frame, since it can run inside Core's own send.
-local function onSent(name, sent, total, didSend)
+-- Whether anything for a peer is still to go out.
+local function isQueued(key)
+  return outbox[key] ~= nil
+end
+
+local pump
+
+-- ChatThrottleLib's callback, once per chunk handed to it: whether it went
+-- out, and the game's result code (Enum.SendAddonMessageResult). A
+-- throttle never gets here: ChatThrottleLib queues that chunk again itself.
+-- A failure is handled on the next frame, since this can run inside Core's
+-- own send.
+local function onSent(flight, didSend, result)
+  local key, name, message = flight.key, flight.name, flight.message
+  local refused = didSend == false
   if trace then
-    trace(("  chunk to %s: %s/%s B %s"):format(tostring(name), tostring(sent), tostring(total),
-      didSend == false and "failed" or "sent"))
+    trace(("  chunk %d/%d to %s · %d B · %s"):format(flight.index, #message.chunks, name, #message.chunks[flight.index],
+      refused and ("failed (result %s)"):format(tostring(result)) or "sent"))
   end
-  local key = peerKey(name)
-  if sent == total then
-    local left = (queued[key] or 1) - 1
-    queued[key] = left > 0 and left or nil
+  local box = outbox[key]
+  box.flying = box.flying - 1
+  if #message.chunks > 1 then
+    box.busy = false
+    -- Still the first message, unless the peer left meanwhile.
+    if box.messages[1] == message then
+      message.next = flight.index + 1
+      -- The rest of a message is no use without the chunk that failed.
+      if refused and message.next <= #message.chunks then
+        if trace then
+          trace(("  dropped %d unsent chunks to %s (a chunk failed)"):format(#message.chunks - flight.index, name))
+        end
+        message.next = #message.chunks + 1
+      end
+      if message.next > #message.chunks then table.remove(box.messages, 1) end
+    end
   end
-  presence:chunk(name, queued[key] ~= nil, didSend == false)
-  if didSend == false then C_Timer.After(0, function() onFailed(name) end) end
+  if box.flying == 0 and #box.messages == 0 then outbox[key] = nil end
+  presence:chunk(name, isQueued(key), refused)
+  if refused then C_Timer.After(0, function() onFailed(name) end) end
+  pump(key)
+end
+
+local function sendChunk(box, key, message, index, priority)
+  box.flying = box.flying + 1
+  -- A queue per peer, so ChatThrottleLib takes turns between them.
+  ChatThrottleLib:SendAddonMessage(priority, PREFIX, message.chunks[index], "WHISPER", box.name, PREFIX .. key,
+    onSent, { key = key, name = box.name, message = message, index = index })
+end
+
+-- Hands ChatThrottleLib the next chunk of a peer's first multi-chunk
+-- message, unless one is still there.
+function pump(key)
+  local box = outbox[key]
+  if not box or box.busy or #box.messages == 0 then return end
+  local message = box.messages[1]
+  box.busy = message
+  sendChunk(box, key, message, message.next, "NORMAL")
+end
+
+-- A whisper from a peer (Presence held it if they weren't one yet): one of
+-- BFF's chunks, delivered once its message is whole, or a whole protocol 1
+-- message, which AceComm put together.
+local function onWhisper(text, name)
+  if not ns.Framing.isChunk(text) then
+    core:received(text)
+    return
+  end
+  local message, chunks = framing:receive(peerKey(name), text)
+  if not message then return end
+  if trace and chunks > 1 then
+    trace(("  message from %s whole · %d B · %d chunks"):format(name, #message, chunks))
+  end
+  core:received(message)
 end
 
 -- A message only counts from someone in the Crew channel: over the channel
@@ -444,7 +528,7 @@ end
 local function onComm(_, message, distribution, sender)
   if trace then trace(("%s from %s · %d B"):format(distribution, tostring(sender), #message)) end
   if distribution == "CHANNEL" then
-    core:received(message)
+    if readable(sender) then onWhisper(message, sender) end
     return
   end
   if distribution ~= "WHISPER" or not target or not readable(sender) or isSelf(sender) then return end
@@ -455,7 +539,7 @@ presence = ns.Presence.new({
   now = GetTime,
   key = peerKey,
   trace = function(line) if trace then trace(line) end end,
-  deliver = function(message) core:received(message) end,
+  deliver = onWhisper,
   ready = update,
   -- A Character found in the channel while the link is up: Core hears down
   -- and straight back up, so it sends them a fresh DIGEST. isUp stays as
@@ -467,8 +551,26 @@ presence = ns.Presence.new({
     core:down()
     core:up()
   end,
-  gone = function(name) core:gone(Ambiguate(name, "none")) end,
+  gone = function(name)
+    dropUnsent(peerKey(name), "gone")
+    framing:forget(peerKey(name))
+    core:gone(Ambiguate(name, "none"))
+  end,
   askList = askList,
+})
+
+framing = ns.Framing.new({
+  now = GetTime,
+  random = math.random,
+  -- A message from a peer stayed incomplete: Core asks them again, as
+  -- after a failed send to them.
+  lost = function(key, got, total)
+    local name = presence:peer(key) or key
+    if trace then
+      trace(("message from %s lost: %d of %d chunks after %d s"):format(name, got, total, ns.Framing.LOST_AFTER))
+    end
+    onFailed(name)
+  end,
 })
 
 -- Starts the link. core gets up(), down(), gone(name) and received(message); notice
@@ -492,7 +594,10 @@ function ChannelLink.start(theCore, notice)
   frame:SetScript("OnEvent", function(_, event, ...) events[event](...) end)
   C_Timer.After(SETTLE_FALLBACK, settle)
   C_Timer.NewTicker(LIST_REFRESH, askList)
-  C_Timer.NewTicker(1, function() presence:tick() end)
+  C_Timer.NewTicker(1, function()
+    presence:tick()
+    framing:tick()
+  end)
 end
 
 -- Follows Core's crew(): joins its channel, or leaves the old one.
@@ -513,13 +618,6 @@ function ChannelLink.setCrew(crew)
   tryJoin()
 end
 
--- How many chunks AceComm splits a message into: one up to 255 bytes,
--- else 254 bytes each (one goes to the part marker).
-local function chunks(size)
-  if size <= 255 then return 1 end
-  return math.ceil(size / 254)
-end
-
 -- Sets the sync trace: trace(line), lines without a timestamp, or nil for
 -- none.
 function ChannelLink.setTrace(fn)
@@ -536,16 +634,25 @@ function ChannelLink.state()
   }
 end
 
-local function whisper(name, message)
-  -- A one-chunk message (every DIGEST) can jump the queue: it bypasses
-  -- AceComm's reassembly. Longer ones all keep one priority, so chunks of
-  -- two messages to the same peer never interleave.
-  local priority = chunks(#message) == 1 and "ALERT" or "NORMAL"
-  if trace then trace(("  to %s · %d B · %d chunks"):format(name, #message, chunks(#message))) end
+-- Queues a message's chunks for a peer. A one-chunk message (every DIGEST)
+-- jumps the queue: it goes to ChatThrottleLib at once, at ALERT. A longer
+-- one waits its turn behind the peer's other long ones, a chunk at a time.
+local function whisper(name, chunks, size)
+  if trace then trace(("  to %s · %d B · %d chunks"):format(name, size, #chunks)) end
   local key = peerKey(name)
-  queued[key] = (queued[key] or 0) + 1
+  local box = outbox[key]
+  if not box then
+    box = { name = name, flying = 0, busy = false, messages = {} }
+    outbox[key] = box
+  end
   presence:whispered(name)
-  ChannelLink:SendCommMessage(PREFIX, message, "WHISPER", name, priority, onSent, name)
+  local message = { chunks = chunks, next = 1 }
+  if #chunks == 1 then
+    sendChunk(box, key, message, 1, "ALERT")
+  else
+    box.messages[#box.messages + 1] = message
+    pump(key)
+  end
 end
 
 -- Best-effort: dropped while the link is down, and reaches only the
@@ -567,5 +674,7 @@ function ChannelLink.send(message, to)
         or "  not sent: no one else in the channel")
     end
   end
-  for _, name in ipairs(names) do whisper(name, message) end
+  if #names == 0 then return end
+  local chunks = framing:split(message)
+  for _, name in ipairs(names) do whisper(name, chunks, #message) end
 end

@@ -48,8 +48,8 @@ local function nothing() end
 --   key(name): what makes two spellings the same Character ("Name-Realm"
 --     and "name"); lower case if left out
 --   trace(line): the sync trace
---   deliver(message): a held message whose sender turned out to be a peer,
---     or a message from a peer
+--   deliver(message, name): a held message whose sender turned out to be a
+--     peer, or a message from a peer, with the name it was whispered by
 --   ready(why): the first member list since start() is in, or the wait ran out
 --   arrived(): a member list showed a new peer while ready
 --   gone(name): a peer is gone
@@ -131,7 +131,7 @@ local function deliverHeld(self, key)
   self.strangers[key] = nil
   if not waiting then return end
   self.trace(("  delivering %d held whispers from %s"):format(#waiting.messages, self.peers[key]))
-  for _, message in ipairs(waiting.messages) do self.on.deliver(message) end
+  for _, message in ipairs(waiting.messages) do self.on.deliver(message, waiting.name) end
 end
 
 -- Returns true if the name is new. why is for the trace.
@@ -209,7 +209,7 @@ function Presence:heard(name, message)
       self.silent[key] = nil
       self.trace(("peer heard again: %s"):format(self.peers[key]))
     end
-    self.on.deliver(message)
+    self.on.deliver(message, name)
     return
   end
   local waiting = self.strangers[key]
@@ -296,6 +296,12 @@ end
 
 function Presence:has(name)
   return self.peers[self.key(name)] ~= nil
+end
+
+-- The name a peer is whispered by, however this one spells them, or nil
+-- if they aren't a peer.
+function Presence:peer(name)
+  return self.peers[self.key(name)]
 end
 
 function Presence:count()

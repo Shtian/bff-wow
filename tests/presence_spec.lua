@@ -3,16 +3,19 @@ local load = require("tests.load")
 local Presence = load().Presence
 
 -- A Presence with its own clock, recording what it reports: every held or
--- peer message delivered, each ready (with why), how often a peer arrived,
+-- peer message delivered and who whispered it, each ready (with why), how often a peer arrived,
 -- who is gone, how often it asked for a member list, and the trace.
 local function newPresence()
-  local world = { time = 100, delivered = {}, ready = {}, arrived = 0, gone = {}, asked = 0, lines = {} }
+  local world = { time = 100, delivered = {}, from = {}, ready = {}, arrived = 0, gone = {}, asked = 0, lines = {} }
   world.presence = Presence.new({
     now = function() return world.time end,
     -- As the channel link's key does: "Name-Realm" and "name" are one.
     key = function(name) return (name:gsub("%-.*$", "")):lower() end,
     trace = function(line) world.lines[#world.lines + 1] = line end,
-    deliver = function(message) world.delivered[#world.delivered + 1] = message end,
+    deliver = function(message, name)
+      world.delivered[#world.delivered + 1] = message
+      world.from[#world.from + 1] = name
+    end,
     ready = function(why) world.ready[#world.ready + 1] = why end,
     arrived = function() world.arrived = world.arrived + 1 end,
     gone = function(name) world.gone[#world.gone + 1] = name end,
@@ -132,11 +135,18 @@ describe("Presence", function()
     end)
   end)
 
+  it("knows a peer by any spelling of their name", function()
+    local _, presence = withPeers()
+    assert.equal("Cat-Realm", presence:peer("cat"))
+    assert.is_nil(presence:peer("Dan"))
+  end)
+
   describe("a whisper", function()
     it("from a peer is delivered at once", function()
       local world, presence = withPeers()
       presence:heard("Bob", "one")
       assert.same({ "one" }, world.delivered)
+      assert.same({ "Bob" }, world.from)
       assert.equal(0, world.asked)
     end)
 
@@ -151,6 +161,7 @@ describe("Presence", function()
       assert.same({ "one", "two" }, world.delivered)
       presence:heard("Dan", "three")
       assert.same({ "one", "two", "three" }, world.delivered)
+      assert.same({ "Dan", "Dan", "Dan" }, world.from)
     end)
 
     it("from a stranger is dropped when no member list shows them within 10 s", function()

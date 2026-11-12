@@ -24,14 +24,15 @@ end
 -- link up.
 local function linked()
   local game = wow()
-  local link = game.load("Game/ChannelLink.lua", {}).ChannelLink
+  local ns = game.load("Game/ChannelLink.lua", {})
+  local link = ns.ChannelLink
   local core = fakeCore()
   link.start(core, function() end)
   link.setCrew({ channel = CHANNEL, password = "pw" })
   game.advance(11)
   game.fire("CHAT_MSG_CHANNEL_LIST", "*Bob, Cat-Realm", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
   assert.equal(1, core.count("up"))
-  return game, link, core
+  return game, link, core, ns
 end
 
 -- Who each whisper since `mark` went to.
@@ -42,15 +43,9 @@ local function targets(game, mark)
   return names
 end
 
--- The game's AceComm callback for a whisper: one chunk failed.
-local function fail(whisper)
-  whisper.callback(whisper.arg, #whisper.text, #whisper.text, false)
-end
-
--- The same callback for a chunk that went out: `sent` bytes so far (the
--- whole message if left out).
-local function sent(whisper, bytes)
-  whisper.callback(whisper.arg, bytes or #whisper.text, #whisper.text, true)
+-- The chunks another BFF would whisper for a message.
+local function chunksOf(ns, message)
+  return ns.Framing.new({ now = function() return 0 end }):split(message)
 end
 
 describe("The channel link", function()
@@ -90,11 +85,187 @@ describe("The channel link", function()
     assert.equal("NORMAL", game.whispers[2].priority)
   end)
 
+  describe("sending", function()
+    local long = "1|" .. ("x"):rep(600)
+
+    it("hands ChatThrottleLib one chunk of a long message at a time, in a queue per peer", function()
+      local game, link = linked()
+      link.send(long)
+      assert.same({ "Bob", "Cat-Realm" }, targets(game))
+      assert.are_not.equal(game.whispers[1].queue, game.whispers[2].queue)
+
+      game.sent(game.whispers[1])
+      assert.same({ "Bob" }, targets(game, 2))
+      game.sent(game.whispers[3])
+      assert.same({ "Bob" }, targets(game, 3))
+      game.sent(game.whispers[4])
+      assert.equal(4, #game.whispers)
+      for _, whisper in ipairs(game.whispers) do assert.is_true(#whisper.text <= 255) end
+    end)
+
+    it("sends chunks another BFF puts back together", function()
+      local game, link, _, ns = linked()
+      link.send(long, "Bob")
+      local receiver = ns.Framing.new({ now = function() return 0 end })
+      local whole
+      for i = 1, 3 do
+        whole = receiver:receive("Me", game.whispers[i].text)
+        game.sent(game.whispers[i])
+      end
+      assert.equal(long, whole)
+    end)
+
+    it("sends every chunk in order when ChatThrottleLib sends each at once", function()
+      local game, link, _, ns = linked()
+      game.instant = true
+      link.send(long)
+      link.send("1|digest")
+      link.send(long, "Bob")
+      assert.equal(11, #game.whispers)
+      local receiver = ns.Framing.new({ now = function() return 0 end })
+      local whole = {}
+      for _, whisper in ipairs(game.whispers) do
+        if whisper.target == "Bob" then whole[#whole + 1] = receiver:receive("Me", whisper.text) end
+      end
+      assert.same({ long, "1|digest", long }, whole)
+      -- Nothing is left queued for anyone.
+      game.fire("CHAT_MSG_CHANNEL_LEAVE", "", "Bob", nil, "5. " .. CHANNEL, nil, nil, nil, 5, CHANNEL)
+      game.advance(31)
+      assert.is_false(game.filters.CHAT_MSG_SYSTEM(nil, "CHAT_MSG_SYSTEM", "No player named 'Bob' is currently playing."))
+    end)
+
+    it("sends a second long message to a peer only after the first", function()
+      local game, link = linked()
+      link.send(long, "Bob")
+      link.send(long, "Bob")
+      for i = 1, 6 do
+        assert.equal(i, #game.whispers)
+        game.sent(game.whispers[i])
+      end
+      assert.equal(6, #game.whispers)
+    end)
+
+    it("lets a one-chunk message jump the queue", function()
+      local game, link = linked()
+      link.send(long, "Bob")
+      link.send("1|digest", "Bob")
+      assert.equal(2, #game.whispers)
+      assert.equal("ALERT", game.whispers[2].priority)
+    end)
+
+    it("drops a peer's unsent chunks when they leave", function()
+      local game, link = linked()
+      local lines = {}
+      link.setTrace(function(line) lines[#lines + 1] = line end)
+      link.send(long)
+      game.fire("CHAT_MSG_CHANNEL_LEAVE", "", "Bob", nil, "5. " .. CHANNEL, nil, nil, nil, 5, CHANNEL)
+      game.sent(game.whispers[1])
+      assert.same({}, targets(game, 2))
+      assert.truthy(table.concat(lines, "\n"):find("\n  dropped 2 unsent chunks to Bob (gone)\n", 1, true))
+
+      -- Cat's go on.
+      game.sent(game.whispers[2])
+      assert.same({ "Cat-Realm" }, targets(game, 2))
+    end)
+
+    it("drops everyone's unsent chunks when the link goes down", function()
+      local game, link = linked()
+      link.send(long)
+      game.lockdown = true
+      game.fire("ADDON_RESTRICTION_STATE_CHANGED", 1, 1)
+      game.sent(game.whispers[1])
+      game.sent(game.whispers[2])
+      assert.equal(2, #game.whispers)
+    end)
+
+    it("drops the rest of a message when a chunk of it fails, and tells Core", function()
+      local game, link, core = linked()
+      local lines = {}
+      link.setTrace(function(line) lines[#lines + 1] = line end)
+      link.send(long, "Bob")
+      link.send(long, "Bob")
+      game.failed(game.whispers[1], 7)
+      game.advance(0)
+      assert.equal(1, core.count("sendFailed", "Bob"))
+      assert.equal("  chunk 1/3 to Bob · 255 B · failed (result 7)", lines[3])
+      assert.equal("  dropped 2 unsent chunks to Bob (a chunk failed)", lines[4])
+
+      -- The next message starts from its first chunk.
+      assert.equal(2, #game.whispers)
+      game.sent(game.whispers[2])
+      assert.equal("  chunk 1/3 to Bob · 255 B · sent", lines[#lines])
+      assert.equal(3, #game.whispers)
+    end)
+  end)
+
+  describe("receiving", function()
+    local long = "2|" .. ("y"):rep(700)
+
+    local function whisperFrom(game, sender, message)
+      game.onComm("BFF", message, "WHISPER", sender)
+    end
+
+    it("delivers a message once all its chunks are in, in any order", function()
+      local game, _, core, ns = linked()
+      local chunks = chunksOf(ns, long)
+      assert.equal(3, #chunks)
+      whisperFrom(game, "Bob", chunks[3])
+      whisperFrom(game, "Bob", chunks[1])
+      assert.equal(0, core.count("received"))
+      whisperFrom(game, "Bob", chunks[2])
+      assert.equal(1, core.count("received", long))
+    end)
+
+    it("delivers a one-chunk message at once", function()
+      local game, _, core, ns = linked()
+      whisperFrom(game, "Bob", chunksOf(ns, "2|digest")[1])
+      assert.equal(1, core.count("received", "2|digest"))
+    end)
+
+    it("still reads a protocol 1 message AceComm put together", function()
+      local game, _, core = linked()
+      local older = "1|" .. ("y"):rep(700)
+      whisperFrom(game, "Bob", older)
+      whisperFrom(game, "Bob", "1|digest")
+      assert.equal(1, core.count("received", older))
+      assert.equal(1, core.count("received", "1|digest"))
+    end)
+
+    it("asks a peer again when a message from them stays incomplete for 30 s", function()
+      local game, link, core, ns = linked()
+      local lines = {}
+      link.setTrace(function(line) lines[#lines + 1] = line end)
+      local chunks = chunksOf(ns, long)
+      whisperFrom(game, "Cat-Realm", chunks[1])
+      whisperFrom(game, "Cat-Realm", chunks[3])
+      game.advance(29)
+      assert.equal(0, core.count("sendFailed"))
+      game.advance(1)
+      assert.equal(1, core.count("sendFailed", "Cat"))
+      assert.equal(0, core.count("received"))
+      assert.equal("message from Cat-Realm lost: 2 of 3 chunks after 30 s", lines[#lines])
+    end)
+
+    it("forgets a half-received message when its sender leaves or the link goes down", function()
+      local game, _, core, ns = linked()
+      local chunks = chunksOf(ns, long)
+      whisperFrom(game, "Bob", chunks[1])
+      whisperFrom(game, "Cat-Realm", chunks[1])
+      game.fire("CHAT_MSG_CHANNEL_LEAVE", "", "Bob", nil, "5. " .. CHANNEL, nil, nil, nil, 5, CHANNEL)
+      game.lockdown = true
+      game.fire("ADDON_RESTRICTION_STATE_CHANGED", 1, 1)
+      game.lockdown = false
+      game.fire("ADDON_RESTRICTION_STATE_CHANGED", 1, 0)
+      game.advance(60)
+      assert.equal(0, core.count("sendFailed"))
+    end)
+  end)
+
   it("keeps the link up after a failed send, and tells Core who it failed to", function()
     local game, link, core = linked()
     link.send("1|data")
     for _, whisper in ipairs(game.whispers) do
-      if whisper.target == "Cat-Realm" then fail(whisper) end
+      if whisper.target == "Cat-Realm" then game.failed(whisper) end
     end
     game.advance(0)
     assert.equal(0, core.count("down"))
@@ -110,7 +281,7 @@ describe("The channel link", function()
     local game, link, core = linked()
     link.send("1|data")
     for _, whisper in ipairs(game.whispers) do
-      if whisper.target == "Bob" then fail(whisper) end
+      if whisper.target == "Bob" then game.failed(whisper) end
     end
     game.advance(0)
     game.advance(1)
@@ -126,7 +297,7 @@ describe("The channel link", function()
   it("keeps everyone when Player is offline follows failures to several peers", function()
     local game, link, core = linked()
     link.send("1|data")
-    for _, whisper in ipairs(game.whispers) do fail(whisper) end
+    for _, whisper in ipairs(game.whispers) do game.failed(whisper) end
     game.advance(0)
     game.fire("CHAT_MSG_SYSTEM", "Player is offline.")
     assert.equal(0, core.count("gone"))
@@ -136,7 +307,7 @@ describe("The channel link", function()
   it("keeps everyone after a Player is offline with no failed send near it", function()
     local game, link, core = linked()
     link.send("1|data")
-    fail(game.whispers[1])
+    game.failed(game.whispers[1])
     game.advance(10)
     game.fire("CHAT_MSG_SYSTEM", "Player is offline.")
     assert.equal(0, core.count("gone"))
@@ -151,7 +322,7 @@ describe("The channel link", function()
     local game, link, core = linked()
     link.send("1|data", "Bob")
     game.fire("CHAT_MSG_SYSTEM", "No player named 'Bob' is currently playing.")
-    fail(game.whispers[1])
+    game.failed(game.whispers[1])
     game.advance(0)
     assert.equal(1, core.count("gone", "Bob"))
     assert.equal(0, core.count("sendFailed"))
@@ -261,23 +432,22 @@ describe("The channel link", function()
       local game, link = linked()
       link.send("1|data", "Bob")
       left(game)
-      sent(game.whispers[1])
+      game.sent(game.whispers[1])
       game.advance(5)
       assert.is_true(hidden(game))
       game.advance(30)
       assert.is_false(hidden(game))
     end)
 
-    it("keeps hiding it until the last chunk of a long message went out", function()
+    it("keeps hiding it until the chunk already handed over went out", function()
       local game, link = linked()
       link.send("1|" .. ("x"):rep(600), "Bob")
       left(game)
-      local whisper = game.whispers[1]
-      sent(whisper, 254)
-      sent(whisper, 508)
       game.advance(120)
       assert.is_true(hidden(game))
-      sent(whisper)
+      -- The one chunk ChatThrottleLib already had; the rest never go.
+      game.sent(game.whispers[1])
+      assert.equal(1, #game.whispers)
       game.advance(31)
       assert.is_false(hidden(game))
     end)
@@ -287,10 +457,10 @@ describe("The channel link", function()
       link.send("1|one", "Bob")
       link.send("1|two", "Bob")
       left(game)
-      sent(game.whispers[1])
+      game.sent(game.whispers[1])
       game.advance(120)
       assert.is_true(hidden(game))
-      sent(game.whispers[2])
+      game.sent(game.whispers[2])
       game.advance(31)
       assert.is_false(hidden(game))
     end)
@@ -299,7 +469,7 @@ describe("The channel link", function()
       local game, link = linked()
       link.send("1|data", "Bob")
       left(game)
-      fail(game.whispers[1])
+      game.failed(game.whispers[1])
       game.advance(31)
       assert.is_false(hidden(game))
     end)

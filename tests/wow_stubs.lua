@@ -7,8 +7,9 @@ return function()
   local game = {
     time = 100,
     timers = {},
-    -- Every SendCommMessage: { prefix, text, distribution, target, priority,
-    -- callback, arg }.
+    -- Every chunk handed to ChatThrottleLib: { prefix, text, distribution,
+    -- target, priority, queue, callback, arg }. It stays "in the send queue"
+    -- until a test calls game.sent or game.failed for it.
     whispers = {},
     frames = {},
     lockdown = false,
@@ -16,6 +17,9 @@ return function()
     -- What UnitName("player") returns. On Forever a Character's last name
     -- comes second, where retail puts the realm.
     player = { "Me" },
+    -- Whether ChatThrottleLib sends a chunk at once, calling back inside
+    -- SendAddonMessage, as it does while it has bandwidth to spare.
+    instant = false,
     -- What IsInInstance() returns.
     instance = { false, "none" },
   }
@@ -62,6 +66,11 @@ return function()
     game.time = stop
   end
 
+  -- ChatThrottleLib's callback for a chunk: it went out, or the game
+  -- refused it with this result code (Enum.SendAddonMessageResult).
+  function game.sent(whisper) whisper.callback(whisper.arg, true, 0) end
+  function game.failed(whisper, result) whisper.callback(whisper.arg, false, result or 9) end
+
   -- Fires a game event at every frame registered for it.
   function game.fire(event, ...)
     for _, frame in ipairs(game.frames) do
@@ -74,12 +83,6 @@ return function()
       return {
         Embed = function(_, target)
           function target.RegisterComm(_, _, fn) game.onComm = fn end
-          function target.SendCommMessage(_, prefix, text, distribution, to, priority, callback, arg)
-            game.whispers[#game.whispers + 1] = {
-              prefix = prefix, text = text, distribution = distribution, target = to,
-              priority = priority, callback = callback, arg = arg,
-            }
-          end
         end,
       }
     end,
@@ -88,7 +91,16 @@ return function()
       After = function(delay, fn) schedule(delay, fn) end,
       NewTicker = function(interval, fn) return schedule(interval, fn, interval) end,
     },
-    ChatThrottleLib = { bQueueing = false },
+    ChatThrottleLib = {
+      bQueueing = false,
+      SendAddonMessage = function(_, priority, prefix, text, distribution, to, queue, callback, arg)
+        game.whispers[#game.whispers + 1] = {
+          prefix = prefix, text = text, distribution = distribution, target = to,
+          priority = priority, queue = queue, callback = callback, arg = arg,
+        }
+        if game.instant then callback(arg, true, 0) end
+      end,
+    },
     GetTime = function() return game.time end,
     GetChannelName = function(name) return game.channels[name:upper()] or 0 end,
     GetChannelList = function() return end,
