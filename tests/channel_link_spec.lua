@@ -222,6 +222,15 @@ describe("The channel link", function()
       assert.equal(1, core.count("received", "2|digest"))
     end)
 
+    it("tells Core the sender's bare Character name with each message", function()
+      local game, _, core, ns = linked()
+      local chunks = chunksOf(ns, long)
+      for _, chunk in ipairs(chunks) do whisperFrom(game, "Cat-Realm", chunk) end
+      whisperFrom(game, "Bob", "1|digest")
+      assert.same({ "received", long, "Cat" }, core.calls[#core.calls - 1])
+      assert.same({ "received", "1|digest", "Bob" }, core.calls[#core.calls])
+    end)
+
     it("still reads a protocol 1 message AceComm put together", function()
       local game, _, core = linked()
       local older = "1|" .. ("y"):rep(700)

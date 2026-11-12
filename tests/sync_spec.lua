@@ -146,7 +146,7 @@ describe("Two Members", function()
 end)
 
 describe("Gossip", function()
-  it("lets C learn A's ding from B while D stays quiet", function()
+  it("lets C learn A's ding from B and D, who send it to C only", function()
     local net, clients, ns = crew({ "Ann", "Bob", "Cat", "Dan" }, {
       Bob = { random = fixed(0) },
       Dan = { random = fixed(0.99) },
@@ -166,10 +166,138 @@ describe("Gossip", function()
 
     assert.equal(11, c:rowFor(a).level)
     assert.is_false(c:rowFor(a).online)
-    assert.same({}, sentSince(net, ns, mark, "Dan", "DATA"))
-    local fromB = sentSince(net, ns, mark, "Bob", "DATA")
-    assert.equal(1, #fromB)
-    assert.equal("DATA", fromB[1].type)
+    -- Bob's reply, which Dan never sees, doesn't cancel Dan's.
+    for _, name in ipairs({ "Bob", "Dan" }) do
+      local data = sentSince(net, ns, mark, name, "DATA")
+      assert.equal(1, #data, name)
+      assert.equal("Cat", data[1].to, name)
+    end
+  end)
+
+  it("keeps an own change that can wait for everyone, whoever sends a DIGEST meanwhile", function()
+    local net, clients, ns = crew({ "Ann", "Bob", "Cat" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    net:run(60)
+
+    local mark = #net.wire
+    a:play({ xp = 500 })
+    b:relink()
+    net:run(10)
+    -- Nobody is sent it early, and Ann's DIGESTs don't show it, so nobody
+    -- asks for it.
+    assert.same({}, sentSince(net, ns, mark, "Ann", "DATA"))
+    for _, digest in ipairs(sentSince(net, ns, mark)) do assert.is_nil(digest.to, digest.sender) end
+
+    net:run(60)
+    local data = sentSince(net, ns, mark, "Ann", "DATA")
+    assert.equal(1, #data)
+    assert.is_nil(data[1].to)
+    assert.equal(500, b:rowFor(a).xp)
+    assert.equal(500, c:rowFor(a).xp)
+  end)
+
+  it("sends an own change that could wait to everyone, once a friend lacks what went out before it", function()
+    local net, clients, ns = crew({ "Ann", "Bob", "Cat" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    net:run(60)
+
+    net.drop = function(_, from, to) return from == "Ann" and to == "Bob" end
+    a:play({ level = 11 })
+    net:run(2)
+    net.drop = nil
+    local mark = #net.wire
+    a:play({ xp = 500 })
+    b:relink()
+    net:run(6)
+    local data = sentSince(net, ns, mark, "Ann", "DATA")
+    assert.equal(1, #data)
+    assert.is_nil(data[1].to)
+    assert.equal(500, b:rowFor(a).xp)
+    assert.equal(500, c:rowFor(a).xp)
+
+    -- It went out: not again when it would have been due, and nobody
+    -- sends Ann her own record back.
+    net:run(70)
+    assert.equal(1, #sentSince(net, ns, mark, "Ann", "DATA"))
+    for _, message in ipairs(sentSince(net, ns, mark, nil, "DATA")) do
+      assert.is_true(message.to ~= "Ann", message.sender)
+    end
+  end)
+
+  it("still sends own DATA and the DIGESTs on link up, after own DATA and every minute to everyone", function()
+    local net, clients, ns = crew({ "Ann", "Bob", "Cat" })
+    local a = clients[1]
+    net:run(60)
+
+    local mark = #net.wire
+    a:relink()
+    a:play({ level = 11 })
+    net:run(3 * 60)
+    local data, digests = sentSince(net, ns, mark, "Ann", "DATA"), sentSince(net, ns, mark, "Ann", "DIGEST")
+    assert.is_true(#data >= 1)
+    -- Link up, confirming the ding, and one a minute.
+    assert.is_true(#digests >= 4, "DIGESTs: " .. #digests)
+    for _, message in ipairs(data) do assert.is_nil(message.to) end
+    for _, message in ipairs(digests) do assert.is_nil(message.to) end
+  end)
+
+  it("owes nothing to a friend who logged out before the reply was due", function()
+    local net, clients, ns = crew({ "Ann", "Bob", "Cat" }, { Ann = { random = fixed(0.99) } })
+    local a, b, c = clients[1], clients[2], clients[3]
+    net:run(60)
+    c:logout()
+    net:run(1)
+    b:play({ level = 11 })
+    net:run(2)
+
+    -- Cat's DIGEST on logging in shows Bob's ding missing, and Bob's own
+    -- shows Ann something newer; then Cat and Bob are gone.
+    local mark = #net.wire
+    c:login()
+    net:step()
+    a.core:received(ns.Codec.encode({
+      type = "DIGEST", from = b.memberId, turns = true, versions = { [b.memberId] = net:now() + 100 },
+    }), "Bob")
+    c:logout()
+    b:logout()
+    net:run(10)
+    for _, message in ipairs(sentSince(net, ns, mark, "Ann")) do assert.is_nil(message.to) end
+  end)
+
+  it("asks only the sender of a DIGEST for what it shows newer", function()
+    local net, clients, ns = crew({ "Ann", "Bob", "Cat" })
+    local a, b = clients[1], clients[2]
+    net:run(60)
+
+    local mark = #net.wire
+    local version = net:now() + 100
+    a.core:received(ns.Codec.encode({
+      type = "DIGEST", from = b.memberId, turns = true, versions = { [b.memberId] = version },
+    }), "Bob")
+    net:run(5)
+    local digests = sentSince(net, ns, mark, "Ann", "DIGEST")
+    assert.equal(1, #digests)
+    assert.equal("Bob", digests[1].to)
+  end)
+
+  it("replies to everyone when the link doesn't say who sent a DIGEST", function()
+    local net, clients, ns = crew({ "Ann", "Bob", "Cat" })
+    local a, b = clients[1], clients[2]
+    net:run(60)
+
+    -- A DIGEST showing Bob's record newer and Cat's missing.
+    local mark = #net.wire
+    a.core:received(ns.Codec.encode({
+      type = "DIGEST", from = b.memberId, turns = true,
+      versions = { [b.memberId] = net:now() + 100 },
+    }))
+    net:run(5)
+    local digests = sentSince(net, ns, mark, "Ann", "DIGEST")
+    assert.equal(1, #digests)
+    assert.is_nil(digests[1].to)
+    local data = sentSince(net, ns, mark, "Ann", "DATA")
+    assert.equal(1, #data)
+    assert.is_nil(data[1].to)
   end)
 
   it("drops messages during lockdown and catches up with a DIGEST after it", function()

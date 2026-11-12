@@ -122,8 +122,9 @@ local function receive(self, item, client)
   local chunks = item.chunks
   if self.chunked then chunks = self.chunked(chunks, item.from.name, client.name) end
   for _, chunk in ipairs(chunks) do
-    local message = client.framing:receive(characterName(item.from), chunk)
-    if message then client.core:received(message) end
+    local sender = characterName(item.from)
+    local message = client.framing:receive(sender, chunk)
+    if message then client.core:received(message, sender) end
   end
 end
 

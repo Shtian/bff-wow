@@ -1890,7 +1890,9 @@ function Core:sendFailed(name)
   if type(name) == "string" then self.gossip:sendFailed(name) end
 end
 
-local function dataReceived(self, records, from)
+-- from is the Member id the DATA carries; whispered says the link named
+-- the Character who sent it.
+local function dataReceived(self, records, from, whispered)
   local changed = false
   for _, record in ipairs(records) do
     local kept, before = self.ledger:merge(record, from)
@@ -1921,7 +1923,10 @@ local function dataReceived(self, records, from)
       if ns.Goals.countedChanged(before, record) then checkGoals(self, true) end
     end
     if type(record) == "table" and type(record.id) == "string" and type(record.version) == "number" then
-      self.gossip:recordSeen(record.id, record.version)
+      -- A Member's own record mostly goes to everyone (their reply to one
+      -- Character looks the same, and is rare). Anyone else's is a reply:
+      -- to one Character, unless the link doesn't say who sends what.
+      self.gossip:recordSeen(record.id, record.version, record.id == from or not whispered)
     end
   end
   if changed then
@@ -1934,8 +1939,11 @@ local function dataReceived(self, records, from)
 end
 
 -- A message from the link. Your own, echoed back by the channel, and
--- anything arriving outside a Crew are dropped.
-function Core:received(message)
+-- anything arriving outside a Crew are dropped. from is the name of the
+-- Character who sent it, as send(string, to) takes it: only where a reply
+-- goes, never who it is from (that is the Member id inside). Without it
+-- replies go to everyone.
+function Core:received(message, from)
   if type(message) ~= "string" or not self.db.crew then return end
   local decoded, reason = ns.Codec.decode(message)
   if self.trace and reason then
@@ -1981,9 +1989,9 @@ function Core:received(message)
       self.trace(("receive DIGEST from %s · ok%s · %s"):format(traceName(self, decoded.from),
         partial and " (more in turn)" or "", traceVersions(self, decoded.versions)))
     end
-    self.gossip:digestReceived(decoded.versions, partial, decoded.turns == true)
+    self.gossip:digestReceived(decoded.versions, partial, decoded.turns == true, from)
   elseif decoded.type == "DATA" and type(decoded.records) == "table" then
-    changed = dataReceived(self, decoded.records, decoded.from)
+    changed = dataReceived(self, decoded.records, decoded.from, type(from) == "string")
   elseif self.trace then
     self.trace(("receive %s from %s · ignored (unknown)"):format(tostring(decoded.type), traceName(self, decoded.from)))
   end
