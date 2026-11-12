@@ -47,6 +47,12 @@ local function fail(whisper)
   whisper.callback(whisper.arg, #whisper.text, #whisper.text, false)
 end
 
+-- The same callback for a chunk that went out: `sent` bytes so far (the
+-- whole message if left out).
+local function sent(whisper, bytes)
+  whisper.callback(whisper.arg, bytes or #whisper.text, #whisper.text, true)
+end
+
 describe("The channel link", function()
   it("never whispers to your own Character when it has a last name", function()
     local game = wow()
@@ -151,6 +157,81 @@ describe("The channel link", function()
     assert.equal(0, core.count("sendFailed"))
   end)
 
+  -- #160: a peer's leaving doesn't cancel the whispers queued for them.
+  describe("after a peer left the channel", function()
+    local NOT_FOUND = "No player named 'Bob' is currently playing."
+
+    local function hidden(game)
+      return game.filters.CHAT_MSG_SYSTEM(nil, "CHAT_MSG_SYSTEM", NOT_FOUND)
+    end
+
+    local function left(game)
+      game.fire("CHAT_MSG_CHANNEL_LEAVE", "", "Bob", nil, "5. " .. CHANNEL, nil, nil, nil, 5, CHANNEL)
+    end
+
+    it("hides No player named while a whisper to them is still queued, however long", function()
+      local game, link, core = linked()
+      link.send("1|data", "Bob")
+      left(game)
+      assert.equal(1, core.count("gone", "Bob"))
+      game.advance(120)
+      assert.is_true(hidden(game))
+    end)
+
+    it("hides it for a while after their last chunk went out, then no longer", function()
+      local game, link = linked()
+      link.send("1|data", "Bob")
+      left(game)
+      sent(game.whispers[1])
+      game.advance(5)
+      assert.is_true(hidden(game))
+      game.advance(30)
+      assert.is_false(hidden(game))
+    end)
+
+    it("keeps hiding it until the last chunk of a long message went out", function()
+      local game, link = linked()
+      link.send("1|" .. ("x"):rep(600), "Bob")
+      left(game)
+      local whisper = game.whispers[1]
+      sent(whisper, 254)
+      sent(whisper, 508)
+      game.advance(120)
+      assert.is_true(hidden(game))
+      sent(whisper)
+      game.advance(31)
+      assert.is_false(hidden(game))
+    end)
+
+    it("keeps hiding it until every message queued for them went out", function()
+      local game, link = linked()
+      link.send("1|one", "Bob")
+      link.send("1|two", "Bob")
+      left(game)
+      sent(game.whispers[1])
+      game.advance(120)
+      assert.is_true(hidden(game))
+      sent(game.whispers[2])
+      game.advance(31)
+      assert.is_false(hidden(game))
+    end)
+
+    it("counts a message whose last chunk failed as out of the queue", function()
+      local game, link = linked()
+      link.send("1|data", "Bob")
+      left(game)
+      fail(game.whispers[1])
+      game.advance(31)
+      assert.is_false(hidden(game))
+    end)
+
+    it("shows it when nothing was whispered to them", function()
+      local game = linked()
+      left(game)
+      assert.is_false(hidden(game))
+    end)
+  end)
+
   describe("trace", function()
     -- Starts the trace: the lines it reports.
     local function traced(link)
@@ -173,6 +254,15 @@ describe("The channel link", function()
       game.fire("CHAT_MSG_SYSTEM", "No player named 'Dan Smith' is currently playing.")
       assert.same({ "notice: No player named Dan Smith · not a peer (peers: bob, cat)" }, lines)
       assert.equal(0, core.count("gone"))
+    end)
+
+    it("reports a No player named for a peer who left with a whisper queued as already gone", function()
+      local game, link = linked()
+      local lines = traced(link)
+      link.send("1|data", "Bob")
+      game.fire("CHAT_MSG_CHANNEL_LEAVE", "", "Bob", nil, "5. " .. CHANNEL, nil, nil, nil, 5, CHANNEL)
+      game.fire("CHAT_MSG_SYSTEM", "No player named 'Bob' is currently playing.")
+      assert.equal(1, #containing(lines, "notice: No player named Bob (already gone)"))
     end)
 
     it("still reports a No player named for a peer as before", function()

@@ -83,6 +83,12 @@ local missed = {}
 -- chat filter hides it whether it runs before or after the event.
 local failedAt = {}
 local offlineMatched
+-- Whispers still in the send queue: key -> how many messages, and key ->
+-- GetTime() of the last chunk that left. A peer's leaving cancels neither,
+-- so a "No player named ..." for them can still come (#160). Never cleared
+-- with the peers: the queue outlives them.
+local queued = {}
+local lastChunk = {}
 -- GetTime() of the last whisper sent, and whether (and which type of)
 -- instance the player was last seen in, for the trace.
 local lastWhisper
@@ -351,8 +357,10 @@ local function notFound(text)
   local name = notFoundName(text)
   if not name then return nil end
   local key = peerKey(name)
-  local since = missed[key]
+  local since, chunk = missed[key], lastChunk[key]
   if peers[key] or (since and GetTime() - since < NOT_FOUND_HIDE) then return name end
+  -- A peer who left with whispers to them still queued, or just sent.
+  if queued[key] or (chunk and GetTime() - chunk < NOT_FOUND_HIDE) then return name end
   return nil
 end
 
@@ -566,8 +574,14 @@ local function onSent(name, sent, total, didSend)
     trace(("  chunk to %s: %s/%s B %s"):format(tostring(name), tostring(sent), tostring(total),
       didSend == false and "failed" or "sent"))
   end
+  local key = peerKey(name)
+  lastChunk[key] = GetTime()
+  if sent == total then
+    local left = (queued[key] or 1) - 1
+    queued[key] = left > 0 and left or nil
+  end
   if didSend == false then
-    failedAt[peerKey(name)] = GetTime()
+    failedAt[key] = GetTime()
     C_Timer.After(0, function() onFailed(name) end)
   end
 end
@@ -686,6 +700,8 @@ local function whisper(name, message)
   local priority = chunks(#message) == 1 and "ALERT" or "NORMAL"
   if trace then trace(("  to %s · %d B · %d chunks"):format(name, #message, chunks(#message))) end
   lastWhisper = GetTime()
+  local key = peerKey(name)
+  queued[key] = (queued[key] or 0) + 1
   ChannelLink:SendCommMessage(PREFIX, message, "WHISPER", name, priority, onSent, name)
 end
 
