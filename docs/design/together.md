@@ -1,10 +1,10 @@
-# Together
+# Dungeons
 
-Answers [Together tab: friends and dungeons on a level line](https://github.com/Shtian/bff-wow/issues/111) and [click a friend for shared dungeons, and a Show menu](https://github.com/Shtian/bff-wow/issues/112), part of [Overlap finder](https://github.com/Shtian/bff-wow/issues/110), the level-overlap finder #1 left for v2. Domain vocabulary from `CONTEXT.md` (**Together**, **Can play**, **Fits**). The look was picked from the prototype on branch `prototype/overlap-finder` (`prototypes/overlap-finder.html`, variant A, round 2).
+Answers [Together tab: friends and dungeons on a level line](https://github.com/Shtian/bff-wow/issues/111) and [click a friend for shared dungeons, and a Show menu](https://github.com/Shtian/bff-wow/issues/112), part of [Overlap finder](https://github.com/Shtian/bff-wow/issues/110), the level-overlap finder #1 left for v2. Domain vocabulary from `CONTEXT.md` (**Dungeons**, **Can play**, **Fits**). The look was picked from the prototype on branch `prototype/overlap-finder` (`prototypes/overlap-finder.html`, variant A, round 2).
 
 ## The idea in one line
 
-A **Together** tab answers "who can I play with, and where?": the Crew's Characters and the game's dungeons sit on one 1–60 level line. The line itself is the answer: friends above the axis, every dungeon below it, and the overview strip for the whole span. An answer line in words was tried and dropped (#109 playtest): it repeated what the line and overview show.
+A **Dungeons** tab answers "who can I play with, and where?": the Crew's Characters and the game's dungeons sit on one 1–60 level line. The line itself is the answer: friends above the axis, every dungeon below it, and the overview strip for the whole span. An answer line in words was tried and dropped (#109 playtest): it repeated what the line and overview show.
 
 ## Rules
 
@@ -63,7 +63,7 @@ Then a key (Fits your level, Attunement, New in WoW: Forever, Friends who fit it
 `UI/TogetherTab.lua`, a sidebar tab after Professions; `/bff together` opens it. It keeps to the panel's size, redrawn when a resize ends:
 
 - **Type:** a step larger than the rest of the panel, since the line is read at a glance: Skin's Text (14) where Core measures `small`, and Small (12) where it measures `tiny`.
-- **Toolbar** (32px): "As Gahzuria 24" in class colour, an "alt" tag when you're on an Alt, and at the right the hidden note, Clear while friends are picked, and a "Show" button with a filter icon before it (Skin's drawn icons: Arial Narrow has no such glyphs, nor ▾). The When tab's "Show:" picker has the same icon, and the Roster's sort button an up and down arrow. The button opens the Show menu under it: 240px, checkboxes as the Settings page's, each change redrawing the line straight away. Escape or a click outside closes it.
+- **Toolbar** (32px): "As Gahzuria 24" in class colour, an "alt" tag when you're on an Alt, and at the right the hidden note, Clear while friends are picked, and a "Show" button with a filter icon before it (Skin's drawn icons: Arial Narrow has no such glyphs, nor ▾). The Play Times tab's "Show:" picker has the same icon, and the Roster's sort button an up and down arrow. The button opens the Show menu under it: 240px, checkboxes as the Settings page's, each change redrawing the line straight away. Escape or a click outside closes it.
 - **Picking:** a click (a press that moves under 4px) on a friend's dot or label picks them; shift adds. Clear, Escape, or a click on the line's empty space clears it. Picked-out friends and dungeons fade to 30%; shared dungeons get a 1px light outline. Hovering a friend lights up the other labels of the Members in it. The tab takes the keyboard only while the menu is open or friends are picked, and never in combat, so Escape otherwise closes the panel as before.
 - **Empty stretch:** while the whole visible window is in one of `empty.spans`, "No dungeons shown at these levels · Show all levels" sits over the lanes; Show all levels turns the filter off and centres the line on you again.
 - **The line** scrolls sideways (drag or mouse wheel) and opens centred on the Character you play. When the lanes are taller than the window, dragging pans up and down too. Ticks every level, numbers every 5, at 1 and at your level. The can-play band has 1px gold edges, a 4% gold fill and a "can play" label.

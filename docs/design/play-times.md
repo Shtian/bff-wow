@@ -4,7 +4,7 @@ Answers [When people play: Play times heatmap](https://github.com/Shtian/bff-wow
 
 ## The idea in one line
 
-Each client counts when in the week its own Member plays, shares a 168-character summary in their record, and the When tab turns the summaries into a heatmap in the viewer's local time.
+Each client counts when in the week its own Member plays, shares a 168-character summary in their record, and the Play Times tab turns the summaries into a heatmap in the viewer's local time.
 
 ## Collecting (own client only)
 
@@ -26,9 +26,9 @@ The own record gains `playTimes = { since, week, slots }`:
 
 **Size:** encoded with the real Codec, a DATA message carrying a typical two-Character record grows by about 43 bytes with no hours played yet and about 57 bytes with a regular evening pattern (282 → 339 bytes). A pathological random pattern adds 154. DATA was already over 255 bytes and split by AceComm.
 
-## Showing: the When tab
+## Showing: the Play Times tab
 
-A fourth tab in the sidebar, under Goals, within the panel's fixed height. `/bff when` opens it. From `Core:playTimes(memberId?)`:
+A fourth tab in the sidebar, under Trophies, within the panel's fixed height. `/bff when` opens it. From `Core:playTimes(memberId?)`:
 
 - **The Crew** (default): a 7 × 24 grid, Monday to Sunday, 00 to 23, each cell shaded by how many Members **usually play** then (played in at least 2 of the last 4 weeks), out of every Member your Roster shows: you, and everyone not Left, not Removed and not hidden by the 30-day rule. The count is in each cell's tooltip.
 - **One Member:** picked from the "Show:" menu, or with "When does <display name> play?" on their row's right-click menu. Cells shaded by weeks played, 0 to 4.

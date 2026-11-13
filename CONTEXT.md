@@ -95,12 +95,12 @@ _Avoid_: Toast (for a Tip), notice, announcement, what's new
 The hours of the week a Member usually plays, from the last 4 weeks of their own client's counting, across all their Characters. A Member **usually plays** an hour they played at least 10 minutes in, in at least 2 of those weeks.
 _Avoid_: Schedule, availability, activity
 
-**Together (tab)**:
+**Dungeons (tab)**:
 The panel's view of who a Member can play with, and where: the Crew's Characters and the game's dungeons on one level line.
-_Avoid_: Overlap finder (the feature's working name), level line (when meaning the tab)
+_Avoid_: Overlap finder (the feature's working name), level line (when meaning the tab), Together (the tab's old name)
 
 **Can play**:
-A Character is within 3 levels of the Character you play, so you can play together. The Roster and Together share the rule.
+A Character is within 3 levels of the Character you play, so you can play together. The Roster and the Dungeons tab share the rule.
 _Avoid_: In range, near, fits
 
 **Fits (a dungeon)**:
@@ -118,12 +118,24 @@ A target the whole Crew reaches together, where every Member's progress counts a
 _Avoid_: Challenge, quest, achievement, milestone
 
 **Trophy**:
-A Crew goal rung the Crew has reached, or an instance it has cleared (the Crew's first Clear of it), kept as a medal on the Goals tab with when. It's **fresh** for 3 days, while it's still news. The **trophy cabinet** is every trophy: the dungeons and raids, cleared or not, then the goal rungs by track.
+A Crew goal rung the Crew has reached, an instance it has cleared (the Crew's first Clear of it), or a Rare it has slain (the Crew's first Rare kill of it), kept as a medal on the Trophies tab with when. It's **fresh** for 3 days, while it's still news. The **trophy cabinet** is every trophy: the dungeons and raids, cleared or not, the Rares, slain or not, then the goal rungs by track.
 _Avoid_: Achievement, badge, award
 
 **Clear**:
 A dungeon or raid run to its final boss's death, recorded by each Member in the party, with the Members who were there. Only a final boss counts; strangers in the party aren't named. The Crew's first Clear of an instance is its Trophy, and everyone in any party that cleared it is credited.
 _Avoid_: Kill (when meaning the whole run), completion, run
+
+**Rare**:
+A named mob on BFF's shipped list of noteworthy rares, each one the game classifies as rare. The list is data, keyed by NPC ID; a mob the game calls rare but that isn't on the list isn't a Rare.
+_Avoid_: Bounty, quarry, rare spawn, rare mob (when meaning one on the list)
+
+**Rare kill**:
+A Member's first kill of a Rare, kept in their own record: when, where, and on which Character. Only the Member whose client saw the kill is credited, not the rest of the party. The Crew's first Rare kill of each Rare is its Trophy, credited to whoever made it earliest.
+_Avoid_: Rare find (a Catch), slay, hunt
+
+**Unlisted rare**:
+A mob the game classifies as rare that a Member killed but isn't on BFF's list, kept in the record anyway (up to a cap) so the list can grow. Never counted; adding it to the list later is one row of data.
+_Avoid_: Unknown rare
 
 **Crew levels**:
 The sum, over the Crew's Members, of each Member's highest Character level. Alts don't add to it.
