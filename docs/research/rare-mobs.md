@@ -2,7 +2,7 @@
 
 For a possible **rare trophy** idea: a Crew Trophy for killing one of a curated list of noteworthy rare mobs. It belongs to the Crew, not to a person: any Member's kill earns it. Three questions: where can a list of Forever's rares come from, which rares are worth a trophy, and how can an addon tell that someone in the Crew killed one under Forever's restricted API.
 
-**Status (2026-11-13): desk research only, no Forever rare kill logged yet.** The API answers come from Forever's own UI source and are solid. RareScanner's Forever build suggests a corpse's GUID is readable when looting, which would make loot the main signal. That, whether an NPC's GUID is readable out of combat, and how tapping works on Forever, needs a person with a client (see section 5). The list of rares comes from Wowhead's Forever database, which is crowd-sourced.
+**Status (2026-11-13): desk research, plus one retail 12.x test with BFF's Rare logger (section 5); no Forever rare kill logged yet.** The API answers come from Forever's own UI source and are solid. RareScanner's Forever build suggests a corpse's GUID is readable when looting, which would make loot the main signal. That, whether an NPC's GUID is readable out of combat, and how tapping works on Forever, needs a person with a client (see section 5). The list of rares comes from Wowhead's Forever database, which is crowd-sourced.
 
 How sure each answer is:
 
@@ -160,6 +160,21 @@ Guard every unit read with `issecretvalue`, as RareScanner does.
 - Forever may restrict a whole zone as a **Map** (`Enum.AddOnRestrictionType`, see `fishing-catches.md`). No rare zone is known to be one.
 
 ## 5. To check in game
+
+### Retail 12.x results (2026-11-13)
+
+One test on retail with BFF's dev Rare logger (`/bffdev rares`), solo, out of combat. A normal NPC (Theramore Marine, 3385) was put on the list for the test, since the list decides what counts, not `UnitClassification`.
+
+- **Q1, loot:** `GetLootSourceInfo` on the corpse during `LOOT_READY` read **not secret**, and its NPC ID matched. Loot works as the main signal.
+- **Q2, unit identity out of combat:** `UnitGUID` read **not secret** on `target`, `mouseover` and `nameplate1`–`4`. The GUID was `Creature-0-1471-1-66-3385-000076EDF5`, the documented format, with the NPC ID in the 6th field.
+- **Q4, `PLAYER_TARGET_DIED`:** fired for a solo kill. Target, dead and tap state all read, and the kill was found.
+- **Q5, `PARTY_KILL`:** fired for a solo kill, with `targetGUID` **not secret**, against the expectation in section 4. It came first and recorded the kill.
+- `PLAYER_REGEN_ENABLED` right after found no target: the dead target was gone by then. Harmless, since the kill was already in.
+- Each signal after the first logged `had`, so one kill is recorded once.
+
+Still open: Q3 (a GUID first read in combat), Q7 (a mob another player tagged should read `UnitIsTapDenied`), whether a party member's or pet's killing blow fires `PARTY_KILL` (Q5), and everything on Forever itself, which may restrict more than retail.
+
+### The questions
 
 On **retail 12.x** (the dev client) for the API, and on **Forever** for anything Forever-specific. In order of importance:
 
