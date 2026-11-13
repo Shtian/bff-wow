@@ -125,6 +125,7 @@ Skin.TROPHY_HUES = {
   crewSkill = SPARE,
   everyoneRank = SPARE,
   catches = CREW,
+  rares = DEATH,
 }
 -- A trophy's tier, in WoW's item quality colours (Core says which): on a
 -- medal's edge and foot. Rare is lifted from the game's #0070dd so it
@@ -177,6 +178,7 @@ Skin.GOAL_ICONS = {
   crewSkill = "Interface\\Icons\\INV_Pick_02",
   everyoneRank = "Interface\\Icons\\INV_Misc_Note_06",
   catches = "Interface\\Icons\\INV_Misc_Fish_18",
+  rares = "Interface\\Icons\\Ability_Hunter_SniperShot",
 }
 
 -- A clear's medal icon, by kind: a dungeon's and a raid's (DESIGN.md,
@@ -185,6 +187,10 @@ Skin.CLEAR_ICONS = {
   dungeon = "Interface\\Icons\\INV_Misc_Head_Human_01",
   raid = "Interface\\Icons\\INV_Misc_Head_Dragon_Black",
 }
+
+-- A Rare kill's medal icon (DESIGN.md, Medal). A classic icon, so Forever
+-- has it.
+Skin.RARE_ICON = "Interface\\Icons\\INV_Misc_MonsterClaw_04"
 
 -- A square picture `size` wide: an opaque back (so a line behind it is
 -- covered), the edge, and the icon inset 1px with its own bevel cropped.

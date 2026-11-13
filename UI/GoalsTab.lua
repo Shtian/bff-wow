@@ -1,10 +1,11 @@
 -- GoalsTab: the panel's Goals tab as a trophy cabinet, drawn from Core's
 -- trophies() and goals(). On top the latest win in a gold plate, then the
 -- trophy shelf (the newest medals and a See all tile), then Working on: a
--- tile per track with its progress. Trophies are Crew goal rungs and
--- dungeon and raid clears. See all opens the full cabinet in the same tab:
--- a slot per dungeon and per raid, lit once cleared, then every track's
--- medals oldest first; Back returns. Before the
+-- tile per track with its progress. Trophies are Crew goal rungs, dungeon
+-- and raid clears and Rare kills. See all opens the full cabinet in the
+-- same tab: a slot per dungeon and per raid, lit once cleared, a slot per
+-- Rare, lit once slain, then every track's medals oldest first; Back
+-- returns. Before the
 -- baseline has settled, or with nothing reached, a composed empty state
 -- takes the latest win's and the shelf's place. Track hues and medal tiers
 -- are Skin's trophy colours; Core decides which tier and what is fresh.
@@ -127,17 +128,32 @@ local function drawHeading(text, count, y)
   return y - HEADING
 end
 
--- A trophy's icon: a profession's own, a goal track's, or a clear's.
+-- A trophy's icon: a profession's own, a goal track's, a clear's or a
+-- Rare kill's.
 local function iconOf(trophy)
+  if trophy.track == "rareKills" then return Skin.RARE_ICON end
   return trophy.icon or Skin.GOAL_ICONS[trophy.track] or Skin.CLEAR_ICONS[trophy.kind]
 end
 
+-- A Rare's level and kind, and where: "Level 37 Rare Elite · Badlands".
+local function rareLine(rare)
+  return ("Level %d %s · %s"):format(rare.level, rare.elite and "Rare Elite" or "Rare", rare.zone)
+end
+
 -- A goal rung: the track, the value and the date. A clear: the instance,
--- the date and who was there. An empty slot: the instance, its levels.
+-- the date and who was there. A Rare kill: the Rare, its level and zone,
+-- the date and whose kill it was. An empty slot: the instance and its
+-- levels, or the Rare, its level and zone.
 local function showMedalTooltip(medal)
   local trophy, slot = medal.trophy, medal.slot
   if not (trophy or slot) then return end
   GameTooltip:SetOwner(medal, "ANCHOR_RIGHT")
+  if not trophy and slot.kind == "rare" then
+    GameTooltip:AddLine(slot.name, TEXT[1], TEXT[2], TEXT[3])
+    GameTooltip:AddLine(rareLine(slot), MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:AddLine("Not slain yet", DIM[1], DIM[2], DIM[3])
+    return GameTooltip:Show()
+  end
   if not trophy then
     GameTooltip:AddLine(slot.name, TEXT[1], TEXT[2], TEXT[3])
     GameTooltip:AddLine("Levels " .. slot.levels, MUTED[1], MUTED[2], MUTED[3])
@@ -151,6 +167,13 @@ local function showMedalTooltip(medal)
     if #trophy.party > 0 then
       GameTooltip:AddLine(table.concat(trophy.party, ", "), TEXT[1], TEXT[2], TEXT[3], true)
     end
+  elseif trophy.track == "rareKills" then
+    GameTooltip:AddLine(trophy.label, quality[1], quality[2], quality[3])
+    GameTooltip:AddLine(rareLine(trophy), MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:AddLine("Slain " .. trophy.date, MUTED[1], MUTED[2], MUTED[3])
+    local by = trophy.by
+    if trophy.character and trophy.character ~= by then by = ("%s (%s)"):format(by, trophy.character) end
+    GameTooltip:AddLine("By " .. by, TEXT[1], TEXT[2], TEXT[3], true)
   else
     GameTooltip:AddLine(trophy.title, TEXT[1], TEXT[2], TEXT[3])
     GameTooltip:AddLine(trophy.label, quality[1], quality[2], quality[3])
@@ -207,13 +230,13 @@ local function drawMedal(trophy, width)
   return medal
 end
 
--- A dungeon or raid slot in the cabinet: its clear's medal, or greyed
--- with its name and level range until cleared.
+-- A dungeon, raid or Rare slot in the cabinet: its trophy's medal, or
+-- greyed with its name and level (range) until cleared or slain.
 local function drawSlot(slot, width)
   if slot.trophy then return drawMedal(slot.trophy, width) end
   local medal = newMedal(width)
   medal.trophy, medal.slot = nil, slot
-  medal.picture:SetPicture(Skin.CLEAR_ICONS[slot.kind], Skin.BORDER)
+  medal.picture:SetPicture(slot.kind == "rare" and Skin.RARE_ICON or Skin.CLEAR_ICONS[slot.kind], Skin.BORDER)
   medal.picture.picture:SetDesaturated(true)
   medal.picture.picture:SetAlpha(0.35)
   medal.foot:Hide()
@@ -495,9 +518,14 @@ local function drawCabinet(trophies, width)
   cabinetHead:SetPoint("RIGHT", view.content, "RIGHT")
   cabinetHead:Show()
   local y = -CABINET_HEAD - 4
-  for _, grid in ipairs({ { "DUNGEONS CLEARED", trophies.dungeons }, { "RAIDS CLEARED", trophies.raids } }) do
+  local grids = {
+    { "DUNGEONS CLEARED", trophies.dungeons, trophies.dungeons.cleared },
+    { "RAIDS CLEARED", trophies.raids, trophies.raids.cleared },
+    { "RARES SLAIN", trophies.rares, trophies.rares.slain },
+  }
+  for _, grid in ipairs(grids) do
     local slots = grid[2]
-    y = drawHeading(grid[1], ("%d / %d"):format(slots.cleared, slots.total), y)
+    y = drawHeading(grid[1], ("%d / %d"):format(grid[3], slots.total), y)
     local medals = {}
     for i, slot in ipairs(slots.slots) do medals[i] = drawSlot(slot, CABINET_MEDAL) end
     y = flow(medals, CABINET_MEDAL, CABINET_GAP, y, width) - TRACK_GAP

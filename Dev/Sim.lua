@@ -12,12 +12,15 @@
 -- test Spare, Claim your newest one or log out,
 -- one that plays out a stretch of you being away so While you were away
 -- shows (with Reactions to your entries), one that reaches the next Crew
--- deaths goal, one where simulated Members clear the next dungeon, and a
+-- deaths goal, one where simulated Members clear the next dungeon, one
+-- where a simulated Member slays the next Rare, and a
 -- live log of what your Core sends, receives and fires (and the sync
 -- trace, with its Sync trace box). /bffdev toast [n]
 -- shows sample toasts. Also the encounter logger: every ENCOUNTER_END is
 -- printed and saved with what the game and BFF made of it, for
--- docs/research/boss-kills.md (/bffdev encounters). Left out of releases;
+-- docs/research/boss-kills.md (/bffdev encounters), and the Rare logger:
+-- every read that could tell a Rare kill, with what BFF made of it, for
+-- docs/research/rare-mobs.md (/bffdev rares). Left out of releases;
 -- it lives here, not in a file of its own, so the .toc (a shipped file)
 -- stays as it is.
 
@@ -616,6 +619,29 @@ function Sim.clear(core, kind)
   return target.name
 end
 
+-- One online simulated Member slays the first Rare the Crew hasn't, as
+-- their client would record it from the loot window. The trophy's Feed
+-- entry and toast follow once their record reaches you. Returns the
+-- Member's Character name and the Rare's, or nil and "notRunning",
+-- "nobodyOnline" or "allSlain".
+function Sim.rare(core)
+  if not net then return nil, "notRunning" end
+  local online = {}
+  for _, member in ipairs(members) do
+    if member.core then online[#online + 1] = member end
+  end
+  if #online == 0 then return nil, "nobodyOnline" end
+  local target
+  for _, slot in ipairs(core:trophies().rares.slots) do
+    if not slot.slain then target = target or slot end
+  end
+  if not target then return nil, "allSlain" end
+  local rare = ns.Rares.byId(target.npcId)
+  local client = online[math.random(#online)]
+  client.core:rareKilled({ npcId = rare.id, signal = "loot", zone = rare.zone })
+  return client.character.name, rare.name
+end
+
 -- Logs the simulated Members out; you see them go offline. abandoned (you
 -- left the sim's Crew) drops whatever is still on the wire instead, so
 -- none of it reaches you.
@@ -677,7 +703,7 @@ ns.Console = Console
 
 local Skin = ns.Skin
 
-local WIDTH = 868
+local WIDTH = 930
 local HEIGHT = 480
 local INSET = 12
 local ROW_HEIGHT = 28
@@ -933,10 +959,21 @@ local function create()
     end
   end)
   frame.dungeon:SetPoint("LEFT", frame.goal, "RIGHT", 6, 0)
+  frame.rare = Skin.button(frame, "Rare", function()
+    local name, rare = Sim.rare(watched)
+    if name then
+      log(color(DIM, ("sim  %s slays %s"):format(name, rare)))
+    elseif rare == "nobodyOnline" then
+      log(color(DIM, "sim  log a simulated Member in first"))
+    elseif rare == "allSlain" then
+      log(color(DIM, "sim  the Crew has slain every Rare"))
+    end
+  end)
+  frame.rare:SetPoint("LEFT", frame.dungeon, "RIGHT", 6, 0)
   local changed = Skin.checkbox(frame, "Log every \"changed\"", function(self)
     showChanged = self:GetChecked()
   end)
-  changed:SetPoint("LEFT", frame.dungeon, "RIGHT", 12, 0)
+  changed:SetPoint("LEFT", frame.rare, "RIGHT", 12, 0)
   frame.trace = Skin.checkbox(frame, "Sync trace", function(self)
     ns.setSyncTrace(self:GetChecked())
     log(color(DIM, ns.isSyncTraceOn() and "sync trace on" or "sync trace off"))
@@ -1007,6 +1044,7 @@ local SAMPLE_TOASTS = {
   { kind = "goal", text = "The Crew reached 300 Crew levels!", highlight = true },
   { kind = "goal", text = "The Crew has an Engineer now!", highlight = true },
   { kind = "goal", text = "The Crew cleared The Deadmines!", highlight = true },
+  { kind = "goal", text = "Simone slew Rak'shiri!", highlight = true },
   { kind = "claimed", text = "Simone claimed [Cruel Barb] for Simonette", opens = "spares" },
   { kind = "given", text = "Simbad sent you [Staff of Westfall]. Check Simonette's mailbox.", opens = "spares" },
   { kind = "gave", text = "Simbad gave Simone [Staff of Westfall]" },
@@ -1105,16 +1143,89 @@ local function showEncounters(rest)
   end
 end
 
+-- The Rare logger: every read that could tell a Rare kill (loot, the
+-- target dying, PARTY_KILL, and units seen that are rare or whose
+-- identity read secret), printed and saved in BFF_DB.devRares (the newest
+-- RARE_LOG_MAX), with the values read ("<secret>" for a secret one), which
+-- were secret, what the watch made of them and what Core did with each
+-- kill. Snapshot hands each read to ns.rareSink. For
+-- docs/research/rare-mobs.md, section 5.
+local RARE_LOG_MAX = 300
+
+-- Whether a read is worth keeping: every kill signal, and a unit seen
+-- only when it's a rare or its identity read secret (the target only:
+-- nameplates in combat would flood it).
+local function worthLogging(info)
+  if info.signal ~= "seen" then return true end
+  if info.result == "secret" then return info.unit == "target" end
+  return info.result ~= "notRare" and info.result ~= "notCreature"
+end
+
+ns.rareSink = function(info, kills, results)
+  if not worthLogging(info) then return end
+  local entry = {
+    time = GetServerTime(), signal = info.signal, event = info.event, unit = info.unit,
+    read = info.read, secret = info.secret, result = info.result, error = info.error, kills = {},
+  }
+  for i, kill in ipairs(kills) do
+    local rare = ns.Rares.byId(kill.npcId)
+    entry.kills[i] = {
+      npcId = kill.npcId, name = rare and rare.name or kill.name, unlisted = kill.unlisted, core = results[i],
+    }
+  end
+  BFF_DB.devRares = BFF_DB.devRares or {}
+  local saved = BFF_DB.devRares
+  saved[#saved + 1] = entry
+  while #saved > RARE_LOG_MAX do table.remove(saved, 1) end
+
+  local made = {}
+  for i, kill in ipairs(entry.kills) do made[i] = ("%s %s: %s"):format(tostring(kill.npcId), tostring(kill.name), tostring(kill.core)) end
+  local line = ("%s%s%s: %s; secret: %s%s"):format(entry.signal, entry.unit and (" " .. entry.unit) or "",
+    entry.event and (" (" .. entry.event .. ")") or "", tostring(entry.result),
+    #entry.secret > 0 and table.concat(entry.secret, ", ") or "none",
+    #made > 0 and ("; BFF: " .. table.concat(made, ", ")) or "")
+  print("BFF dev: rare " .. line)
+  log(color(EVENT, "rare  ") .. line)
+end
+
+-- /bffdev rares: how many reads are saved and the last few, with what was
+-- read; with "clear", empties the log.
+local function showRares(rest)
+  if rest == "clear" then
+    BFF_DB.devRares = nil
+    return print("BFF dev: rare log cleared.")
+  end
+  local saved = BFF_DB.devRares or {}
+  print(("BFF dev: %d rare reads saved in BFF_DB.devRares (written to SavedVariables on /reload or logout)."):format(#saved))
+  for i = math.max(1, #saved - 7), #saved do
+    local e = saved[i]
+    local values = {}
+    for name, value in pairs(e.read or {}) do values[#values + 1] = name .. "=" .. tostring(value) end
+    table.sort(values)
+    local kills = {}
+    for j, kill in ipairs(e.kills or {}) do kills[j] = ("%s %s: %s"):format(tostring(kill.npcId), tostring(kill.name), tostring(kill.core)) end
+    print(("  %s %s%s: %s [%s]%s"):format(date("%d %b %H:%M", e.time), e.signal, e.unit and (" " .. e.unit) or "",
+      tostring(e.result), table.concat(values, ", "), #kills > 0 and (" BFF: " .. table.concat(kills, ", ")) or ""))
+  end
+end
+
 -- /bffdev toggles the console; /bffdev toast [n] shows n sample toasts
 -- (default 1), straight to the toasts and not through Core; /bffdev purge
 -- runs Sim.purge; /bffdev clear [raid] makes the simulated Members online
--- clear the next dungeon (or raid); /bffdev encounters [clear] shows (or
--- empties) the encounter log.
+-- clear the next dungeon (or raid); /bffdev rare makes one slay the
+-- next Rare; /bffdev encounters [clear] and /bffdev rares [clear] show
+-- (or empty) the encounter and Rare logs.
 SlashCmdList.BFFDEV = function(input)
   if not ns.core then return end
   local command, count = (input or ""):match("^%s*(%S*)%s*(%d*)")
   local rest = (input or ""):match("^%s*%S*%s*(.-)%s*$")
   if command == "encounters" then return showEncounters(rest) end
+  if command == "rares" then return showRares(rest) end
+  if command == "rare" then
+    local name, rare = Sim.rare(ns.core)
+    print(name and ("BFF dev: %s slays %s."):format(name, rare) or ("BFF dev: no Rare kill (%s)."):format(rare))
+    return
+  end
   if command == "clear" then
     local name, reason = Sim.clear(ns.core, rest == "raid" and "raid" or nil)
     print(name and ("BFF dev: the simulated Members online clear %s."):format(name)

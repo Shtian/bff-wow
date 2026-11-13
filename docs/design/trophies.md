@@ -42,6 +42,10 @@ Each client keeps its own; nothing about the Crew's trophies is synced beyond th
 - **Encounter logger:** in a dev checkout every `ENCOUNTER_END` is printed and saved in `BFF_DB.devEncounters`; `/bffdev encounters` shows it (`docs/research/boss-kills.md`).
 - **Simulated clear:** the console's **Dungeon** button, or `/bffdev clear [raid]`, makes the simulated Members online clear the first dungeon (or raid) the Crew hasn't, in one party, through their own `encounterEnded()`. The sim's Cores know a made-up final boss for every instance (`finalBosses`, a `Core.new` option for tests and the sim). `/bffdev toast` includes a sample clear toast.
 
+## Rare kills
+
+A Rare the Crew has slain is a trophy too, kept and shown the same way: the Crew's first Rare kill of each Rare, a "RARES SLAIN n / N" grid after the dungeons and raids, and a Rares slain goal track. See `docs/design/rares.md`.
+
 ## Not in this
 
 Per-boss progress for instances started but not cleared ("Halfway through"); whether kills from different runs add up is undecided. Difficulty levels, clear times, and naming strangers.

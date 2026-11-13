@@ -4,7 +4,8 @@
 -- profession in the Crew (the twelve, each had by some Character), Crew
 -- skill (every profession's base skill, summed), Everyone a Journeyman
 -- (every Member has a profession at a rank's skill on some Character) and
--- Types caught (the counted types of Catch anyone has caught).
+-- Types caught (the counted types of Catch anyone has caught) and Rares
+-- slain (the listed Rares anyone has killed).
 -- All but Every profession are a ladder of rungs; its rungs are the
 -- professions. Progress is worked out from the Ledger's records of the
 -- Members your Roster shows (not Left; Removed ones aren't held), so it is
@@ -14,7 +15,9 @@
 -- its own. Nothing here names a Member.
 -- Also the Crew's dungeon and raid clears (from the records, by Clears),
 -- kept as trophies the same way: each instance's first clear, which does
--- name its party. See docs/design/goals.md and docs/design/trophies.md.
+-- name its party; and the Crew's Rare kills (by Rares), each Rare's first
+-- kill, which names whose it was. See docs/design/goals.md,
+-- docs/design/trophies.md and docs/design/rares.md.
 
 local _, ns = ...
 
@@ -22,7 +25,7 @@ local Goals = {}
 Goals.__index = Goals
 ns.Goals = Goals
 
-Goals.TRACKS = { "crewLevels", "everyone", "deaths", "professions", "crewSkill", "everyoneRank", "catches" }
+Goals.TRACKS = { "crewLevels", "everyone", "deaths", "professions", "crewSkill", "everyoneRank", "catches", "rares" }
 
 local CREW_LEVELS_STEP = 50
 local EVERYONE_STEP = 10
@@ -42,8 +45,11 @@ local PROFESSIONS_QUALITY = "rare"
 -- A clear's trophy: a dungeon's is epic, a raid's legendary.
 local CLEAR_QUALITIES = { dungeon = "epic", raid = "legendary" }
 local CLEAR_TITLES = { dungeon = "Dungeons cleared", raid = "Raids cleared" }
+-- A Rare kill's trophy: a rare's is rare, a rare elite's epic.
+local RARE_QUALITY, RARE_ELITE_QUALITY = "rare", "epic"
 
 local Clears = ns.Clears
+local Rares = ns.Rares
 
 -- The twelve, as Every profession in the Crew counts them.
 local PROFESSIONS = ns.Professions.ALL
@@ -168,6 +174,25 @@ local TRACK = {
       return rung >= ns.Catches.TOTAL and "Every type" or ("%d types"):format(rung)
     end,
   },
+  rares = {
+    name = "Rares slain",
+    -- Rares.STEPS: the last is every Rare.
+    next = function(after)
+      for _, step in ipairs(Rares.STEPS) do
+        if step > after then return step end
+      end
+      return nil
+    end,
+    value = function(progress) return progress.rares end,
+    title = function() return "Rares slain" end,
+    text = function(rung, top)
+      if top then return "The Crew has slain every Rare!" end
+      return ("The Crew has slain %d Rares!"):format(rung)
+    end,
+    label = function(rung)
+      return rung >= Rares.TOTAL and "Every Rare" or ("%d Rares"):format(rung)
+    end,
+  },
 }
 
 -- The first rung of a track above `after`, or nil past the last one.
@@ -192,8 +217,9 @@ end
 -- covered (skill line to { name, icon } for each one some Character has),
 -- skill (base skill over every profession of every Character), lowestBest
 -- (the lowest of the Members' best skills, 0 with none) and best (each
--- Member's best skill, in highest's order), and catches (how many counted
--- types someone has caught). A Character whose professions are unknown
+-- Member's best skill, in highest's order), catches (how many counted
+-- types someone has caught) and rares (how many listed Rares someone has
+-- slain). A Character whose professions are unknown
 -- adds nothing, so a Member none of whose are known has a best of 0:
 -- Everyone a Journeyman waits for everyone.
 function Goals.progress(records)
@@ -201,6 +227,7 @@ function Goals.progress(records)
     crewLevels = 0, deaths = 0, members = 0, lowest = 0, highest = {},
     covered = {}, skill = 0, lowestBest = 0, best = {},
     catches = ns.Catches.typesCaught(records),
+    rares = Rares.slain(records),
   }
   for _, record in ipairs(records) do
     local top, best = nil, 0
@@ -250,7 +277,10 @@ end
 -- rung to when it was reached), quiet (per track, the rungs reached
 -- without news: the baseline's, or by who counts changing), clears (per
 -- instance name, the Crew's clear: { time (the first), members (a set of
--- Member ids credited), quiet, seen (when it was first kept here) }), baselined (the silent baseline is done),
+-- Member ids credited), quiet, seen (when it was first kept here) }),
+-- rareKills (per NPC ID, the Crew's first kill of a Rare: { time,
+-- memberId (whose it was), character (its Character's GUID), quiet,
+-- seen }), baselined (the silent baseline is done),
 -- late (the tracks added after it, still waiting for their own: a set)
 -- and seen (when the Goals tab was last opened).
 function Goals.new(db, ledger, now, maxLevel)
@@ -265,6 +295,7 @@ function Goals:load()
   saved.reached = saved.reached or {}
   saved.quiet = saved.quiet or {}
   saved.clears = saved.clears or {}
+  saved.rareKills = saved.rareKills or {}
   for _, track in ipairs(Goals.TRACKS) do
     -- New since the baseline: what the Crew already has isn't news either.
     if saved.baselined and not saved.reached[track] then
@@ -407,7 +438,45 @@ local function recordClears(self, records, quiet)
   return entries
 end
 
--- Records every rung progress has passed, and every clear. Returns the
+-- Who made a Rare kill, by name: "You" for your own, else their Display
+-- name, or "Someone" for a Member no longer held.
+local function killer(self, memberId)
+  if memberId == self.ledger:memberId() then return "You" end
+  local held = self.ledger:record(memberId)
+  return held and ns.Roster.memberName(held, self.now()) or "Someone"
+end
+
+-- The Crew's Rare kills in the records: a first kill of a Rare is a new
+-- trophy, at the earliest kill's time; an earlier one arriving later
+-- moves the time back and credits its Member. Returns the new trophies
+-- as { track "rareKills", rung (the NPC ID), text }, in level order,
+-- unless quiet.
+local function recordRareKills(self, records, quiet)
+  local saved = self.db.goals.rareKills
+  local new = {}
+  for id, kill in pairs(Rares.collect(records)) do
+    local had = saved[id]
+    if had then
+      if kill.time < had.time then
+        had.time, had.memberId, had.character = kill.time, kill.memberId, kill.character
+      end
+    else
+      saved[id] = {
+        time = kill.time, memberId = kill.memberId, character = kill.character, quiet = quiet or nil, seen = self.now(),
+      }
+      if not quiet then new[#new + 1] = Rares.byId(id) end
+    end
+  end
+  table.sort(new, function(x, y) return x.index < y.index end)
+  local entries = {}
+  for i, r in ipairs(new) do
+    entries[i] = { track = "rareKills", rung = r.id, text = Rares.text(r.name, killer(self, saved[r.id].memberId)) }
+  end
+  return entries
+end
+
+-- Records every rung progress has passed, every clear and every Rare
+-- kill. Returns the
 -- newest per track, then the new clears, as { track, rung, text } (text:
 -- the Feed entry's), unless quiet. A track waiting for its late baseline
 -- is left for it.
@@ -423,6 +492,7 @@ local function record(self, quiet)
     end
   end
   for _, entry in ipairs(recordClears(self, records, quiet)) do reached[#reached + 1] = entry end
+  for _, entry in ipairs(recordRareKills(self, records, quiet)) do reached[#reached + 1] = entry end
   return reached
 end
 
@@ -620,6 +690,54 @@ local function clearTrophies(self)
   return list
 end
 
+-- The Crew's Rare kills as trophies, by NPC ID.
+local function rareKillTrophies(self)
+  local list = {}
+  for id, saved in pairs(self.db.goals.rareKills) do
+    local r = Rares.byId(id)
+    if r then
+      local quiet = saved.quiet == true
+      local held = self.ledger:record(saved.memberId)
+      local character = held and saved.character and type(held.characters) == "table" and held.characters[saved.character]
+      list[id] = {
+        track = "rareKills",
+        npcId = id,
+        title = TRACK.rares.name,
+        rung = r.index,
+        label = r.name,
+        zone = r.zone,
+        level = r.level,
+        elite = r.elite == true,
+        text = Rares.text(r.name, killer(self, saved.memberId)),
+        time = saved.time,
+        quality = r.elite and RARE_ELITE_QUALITY or RARE_QUALITY,
+        quiet = quiet,
+        -- Fresh from when it reached you: a kill can sync days late.
+        fresh = not quiet and self.now() - (saved.seen or saved.time) < FRESH,
+        by = killer(self, saved.memberId),
+        character = character and character.name or nil,
+      }
+    end
+  end
+  return list
+end
+
+-- The cabinet's Rares grid: a slot per Rare, in level order.
+local function rareGrid(trophies)
+  local result = { slain = 0, slots = {} }
+  for i, r in ipairs(Rares.LIST) do
+    local won = trophies[r.id]
+    result.slots[i] = {
+      npcId = r.id, name = r.name, label = r.name, kind = "rare", zone = r.zone, level = r.level,
+      levels = tostring(r.level),
+      elite = r.elite == true, slain = won ~= nil, trophy = won,
+    }
+    if won then result.slain = result.slain + 1 end
+  end
+  result.total = #result.slots
+  return result
+end
+
 -- A cabinet grid: a slot per instance of a kind, in level order.
 local function grid(kind, trophies)
   local result = { cleared = 0, slots = {} }
@@ -665,13 +783,21 @@ end
 -- (its place in the dungeon table), label ("Deadmines"), text, time (the
 -- Crew's first clear), quality (a dungeon's "epic", a raid's
 -- "legendary"), quiet, fresh, and party (who's credited, by name: "You"
--- first). Returns { settled (the baseline is taken; until then nothing is
+-- first). A Rare kill's has track "rareKills", npcId, title ("Rares
+-- slain"), rung (its place in the list), label (its name), zone, level,
+-- elite, text ("Ana slew Rak'shiri!"), time (the Crew's first kill),
+-- quality (a rare's "rare", a rare elite's "epic"), quiet, fresh, by
+-- (whose kill: "You", or their name) and character (the Character's
+-- name, nil once the record doesn't have it). Returns { settled (the baseline is taken; until then nothing is
 -- reached), count, goalsReached (how many of them are goal rungs), shelf
 -- (every trophy, newest first), cabinet (a group { track, title, trophies
 -- (oldest first) } per goal track with any, in Goals.TRACKS order),
 -- dungeons and raids (the cabinet's grids: { cleared, total, slots }, a
 -- slot per instance in level order: { name, label, kind, levels ("17–26"),
--- cleared, trophy (nil until cleared) }), latest (the newest trophy, or
+-- cleared, trophy (nil until cleared) }), rares (the cabinet's Rares
+-- grid: { slain, total, slots }, a slot per Rare in level order: { npcId,
+-- name, label, kind "rare", zone, level, levels ("37"), elite, slain, trophy
+-- (nil until slain) }), latest (the newest trophy, or
 -- nil) and sinceSeen (how many others were reached, not quietly, since
 -- the Goals tab was last opened: 0 if it never was) }.
 function Goals:trophies()
@@ -692,6 +818,10 @@ function Goals:trophies()
   for _, item in pairs(clears) do result.shelf[#result.shelf + 1] = item end
   result.dungeons = grid("dungeon", clears)
   result.raids = grid("raid", clears)
+  order.rareKills = #Goals.TRACKS + 2
+  local rareKills = rareKillTrophies(self)
+  for _, item in pairs(rareKills) do result.shelf[#result.shelf + 1] = item end
+  result.rares = rareGrid(rareKills)
   -- Newest first; rungs reached together by track, the highest first.
   table.sort(result.shelf, function(x, y)
     if x.time ~= y.time then return x.time > y.time end
