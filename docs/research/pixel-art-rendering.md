@@ -169,7 +169,7 @@ Survey of every image under the local `AddOns` folder, reading file headers:
 
 - **Texture count isn't a concern.** WowFC runs 61,440 one-pixel textures with a [row-per-frame split](https://github.com/huchang47/WowFC/blob/fde07b2f8baf8ad4e72059b2de548ca4e1065ac9/WowFC/UltraRenderer.lua#L5-L7), and Doom runs 64,000, noting "[without splitting it into parts WoW crashes](https://github.com/tna0y/wow-doom-within/blob/96a41b31db89f382f07ab2cd909984ee5f514b79/src/frame.lua#L74)". The Camp needs roughly 50–80 textures. **Inferred** count.
 - **Skip unchanged work.** WeakAuras, WowFC and Doom all only touch a texture when its value changed.
-- **`OnUpdate` against a ticker.** `OnUpdate` fires every drawn frame, so it needs a throttle ([Wiki](https://warcraft.wiki.gg/wiki/UIHANDLER_OnUpdate)); here that's one clock read and a compare. A `C_Timer.NewTicker` fires less often but runs while hidden unless cancelled. BFF's panel, toasts and Together tab already use `OnUpdate`.
+- **`OnUpdate` against a ticker.** `OnUpdate` fires every drawn frame, so it needs a throttle ([Wiki](https://warcraft.wiki.gg/wiki/UIHANDLER_OnUpdate)); here that's one clock read and a compare. A `C_Timer.NewTicker` fires less often but runs while hidden unless cancelled. BFF's panel, toasts and Dungeons tab already use `OnUpdate`.
 - **Hidden frames.** `OnUpdate` stops. `AnimationGroup`s need the handling in section 3.
 
 ## 7. Midnight restrictions and Forever

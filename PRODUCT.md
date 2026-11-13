@@ -29,7 +29,7 @@ It's built around people, not characters or guilds. A Member is one real person 
 
 ## Capabilities and Constraints
 
-- Shipped (1.0): Roster, Feed, While you were away, the Camp, Reactions (Cheer, Respects, Welcome), toasts with optional sound, Crew goals and trophies (including dungeon and raid clears), Spares (Claim and Give), Play times heatmap, Professions, Together (levels and dungeons you can run together), map pins, minimap button, settings.
+- Shipped (1.0): Roster, Feed, While you were away, the Camp, Reactions (Cheer, Respects, Welcome), toasts with optional sound, Crew goals and trophies (including dungeon and raid clears), Spares (Claim and Give), Play times heatmap, Professions, Dungeons (levels and dungeons you can run together), map pins, minimap button, settings.
 - Planned, not built: Competitions (ranked contests).
 - Terminology lives in `CONTEXT.md` (Crew, Member, Character, Feed, Crew goal, Spare, …). Crew goals deliberately name and rank nobody.
 - In-game UI is built from WoW frames, not web tech. Its look is set in `UI/Skin.lua`: dark windows, a gold accent, Friz Quadrata titles and Arial Narrow text, drawn with solid colour textures and long-standing game textures. It runs in Lua 5.1 under Midnight's addon restrictions.

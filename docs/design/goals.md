@@ -36,13 +36,13 @@ The profession tracks count Alts and every profession. A Character whose profess
 
 The first time a client has goals in a Crew (this feature's first run, or after joining a Crew), the rungs already passed are recorded as reached, with no Feed entry or toast. Like the first sight of a Member in the Feed.
 
-The baseline is taken once, **when the first sync has settled** (the Feed's rule: 10 s with no new DATA, or 30 s after the link came up; `Core/Settle.lua`). Until then nothing is recorded: right after joining, only part of the Crew's records may have arrived, and Everyone at level N would look reached when it isn't. The Goals tab shows nothing reached until then.
+The baseline is taken once, **when the first sync has settled** (the Feed's rule: 10 s with no new DATA, or 30 s after the link came up; `Core/Settle.lua`). Until then nothing is recorded: right after joining, only part of the Crew's records may have arrived, and Everyone at level N would look reached when it isn't. The Trophies tab shows nothing reached until then.
 
 **A track added later** takes its own baseline. A client whose baseline was taken before the track shipped has no saved rungs for it, so `Goals:load` marks it in `db.goals.late`. The track records nothing until sync next settles, then its rungs already passed are recorded quietly. The mark is saved, so a reload before that doesn't lose it. The other tracks go on as usual meanwhile. This keeps a Crew that already has catches from getting news when Types caught ships.
 
 **Leaving the Crew**, or starting or joining one, clears `db.goals`, so a new Crew gets its own baseline.
 
-## Goals tab
+## Trophies tab
 
 A third tab in the panel's sidebar, under Roster and Feed, drawn by `UI/GoalsTab.lua`. It scrolls within the panel's fixed height. `/bff goals` opens it. A **trophy cabinet** ([#119](https://github.com/Shtian/bff-wow/issues/119)): every rung reached stays visible, as a medal. Top to bottom:
 

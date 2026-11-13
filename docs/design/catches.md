@@ -53,7 +53,7 @@ The field travels with the rest of the record. The record itself isn't checked f
 
 ## The tab
 
-The **Catches** tab, after Together (Dungeons) in the sidebar, or `/bff catches`, is a field guide of the Crew's catches. `core:catchesTab(group, show)` words all of it over `catches()`; `UI/CatchesTab.lua` asks the game for each item's name, icon and quality and draws it.
+The **Catches** tab, after Dungeons in the sidebar, or `/bff catches`, is a field guide of the Crew's catches. `core:catchesTab(group, show)` words all of it over `catches()`; `UI/CatchesTab.lua` asks the game for each item's name, icon and quality and draws it.
 
 - **Top:** "25 of 46 types caught" (the number in Body, the rest in Small Smoke Muted) on one line with the **Group** and **Show** pickers (the app's small picker buttons, opening the game's menu, like the Roster's Sort). Under it a 4px bar with a tick at each trophy step (`Catches.STEPS`: 10, 20, 30, 40 and every type) and "Next trophy at 30 types: 5 more to catch". With every type caught the count and the bar turn gold ("All 46 types caught"). When the pickers don't fit beside the count (a narrow panel, as at the minimum size), they show only what's picked ("Where to fish", "All"; their icons say which is which), and only if that still doesn't fit do they go on a line of their own under it.
 - **Group:** Where to fish (default) or Type. **Show:** All, Fish, Rare catches, Extras or Not caught yet, each with how many tiles it shows. Under them the checkbox **Show names of fish not caught yet**, the `catchesNames` setting (off by default, saved in `BFF_DB`, so per Member); clicking it keeps the menu open. What Group and Show have picked is the UI's, like the Roster's sort, and resets on a reload.

@@ -28,7 +28,7 @@ The clear goes into the own record's `clears[instance]`: `t`, the first clear's 
 
 Each client keeps its own; nothing about the Crew's trophies is synced beyond the records.
 
-## On the Goals tab
+## On the Trophies tab
 
 `trophies()` gains clears (`docs/design/code-structure.md` has the fields):
 

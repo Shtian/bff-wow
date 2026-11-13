@@ -91,7 +91,7 @@ What the code assumes (`Core/SpareRules.lua`): fields after `item:` are 1 item I
 
 ### Recommended way to mark items
 
-**(c) Drag-and-drop onto a drop slot in the Spares tab.** It also takes a click while an item is on the cursor. Read `C_Cursor.GetCursorItem()` for the location, run the tradeability check, post, then `ClearCursor()`. Why: no hook into Blizzard code, so no taint risk to Midnight-era bag buttons. It works the same with the default bags, Bagnon, AdiBags and anything else that puts items on the cursor. It gets an `ItemLocation` directly. The cost is that the BFF panel has to be open.
+**(c) Drag-and-drop onto a drop slot in the Spare Items tab.** It also takes a click while an item is on the cursor. Read `C_Cursor.GetCursorItem()` for the location, run the tradeability check, post, then `ClearCursor()`. Why: no hook into Blizzard code, so no taint risk to Midnight-era bag buttons. It works the same with the default bags, Bagnon, AdiBags and anything else that puts items on the cursor. It gets an `ItemLocation` directly. The cost is that the BFF panel has to be open.
 
 **Fallback: keep `/bff spares add` + shift-click.** It already works and uses Blizzard's own CHATLINK path, with no hook. It only gives a link, so to check tradeability and store the GUID it has to find the item in the bags by matching the item string (first match).
 
@@ -175,5 +175,5 @@ The Forever beta is over, so these run on **retail (Midnight)**, the closest liv
 **Item links**
 
 17. Shift-click a plain item, an enchanted item and a random-suffix "of the X" item into chat, then `/dump` their links (`C_Container.GetContainerItemLink`). *Expect:* enchant in field 2, suffix (negative?) in field 7, unique ID in 8. Note whether the suffix item has **bonus IDs** after field 13 instead.
-18. For each, run `/bff spares add` and check the Spares tab after `/reload`. *Expect:* the same name (with "of the X"), quality colour and tooltip stats as the original.
+18. For each, run `/bff spares add` and check the Spare Items tab after `/reload`. *Expect:* the same name (with "of the X"), quality colour and tooltip stats as the original.
 19. On a second client that has never seen the item, open the tab. *Expect:* "Loading...", then the right link once `GET_ITEM_INFO_RECEIVED` fires.

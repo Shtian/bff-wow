@@ -95,12 +95,12 @@ _Avoid_: Toast (for a Tip), notice, announcement, what's new
 The hours of the week a Member usually plays, from the last 4 weeks of their own client's counting, across all their Characters. A Member **usually plays** an hour they played at least 10 minutes in, in at least 2 of those weeks.
 _Avoid_: Schedule, availability, activity
 
-**Together (tab)**:
+**Dungeons (tab)**:
 The panel's view of who a Member can play with, and where: the Crew's Characters and the game's dungeons on one level line.
-_Avoid_: Overlap finder (the feature's working name), level line (when meaning the tab)
+_Avoid_: Overlap finder (the feature's working name), level line (when meaning the tab), Together (the tab's old name)
 
 **Can play**:
-A Character is within 3 levels of the Character you play, so you can play together. The Roster and Together share the rule.
+A Character is within 3 levels of the Character you play, so you can play together. The Roster and the Dungeons tab share the rule.
 _Avoid_: In range, near, fits
 
 **Fits (a dungeon)**:
@@ -118,7 +118,7 @@ A target the whole Crew reaches together, where every Member's progress counts a
 _Avoid_: Challenge, quest, achievement, milestone
 
 **Trophy**:
-A Crew goal rung the Crew has reached, an instance it has cleared (the Crew's first Clear of it), or a Rare it has slain (the Crew's first Rare kill of it), kept as a medal on the Goals tab with when. It's **fresh** for 3 days, while it's still news. The **trophy cabinet** is every trophy: the dungeons and raids, cleared or not, the Rares, slain or not, then the goal rungs by track.
+A Crew goal rung the Crew has reached, an instance it has cleared (the Crew's first Clear of it), or a Rare it has slain (the Crew's first Rare kill of it), kept as a medal on the Trophies tab with when. It's **fresh** for 3 days, while it's still news. The **trophy cabinet** is every trophy: the dungeons and raids, cleared or not, the Rares, slain or not, then the goal rungs by track.
 _Avoid_: Achievement, badge, award
 
 **Clear**:
