@@ -19,6 +19,12 @@
 
 
 
+
+## 2.2.0
+<sub>2026-11-13</sub>
+
+- *(minor)* The Pocket Camp now shows when a friend is away (AFK): they sit by the fire with AFK over their head.
+
 ## 2.1.0
 <sub>2026-11-13</sub>
 
