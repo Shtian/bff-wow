@@ -72,6 +72,7 @@ stds.wow = {
     "IsFlying",
     "IsModifiedClick",
     "IsResting",
+    "UnitIsAFK",
     "IsShiftKeyDown",
     "IsMouseButtonDown",
     "IsInInstance",

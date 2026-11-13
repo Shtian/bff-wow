@@ -111,6 +111,8 @@ const INN_SIGN = [
 ];
 // A quest handed in: the gold question mark, over the head.
 const QUEST = outlined([".GGG.", "GYYGG", "G..GG", "...GG", "..GG.", "..GG.", ".....", "..GG.", "..GG."]);
+// "AFK" over an away figure's head, in 3 by 5 letters, outlined.
+const AFK = outlined([".W..WWW.W.W", "W.W.W...W.W", "WWW.WW..WW.", "W.W.W...W.W", "W.W.W...W.W"]);
 // A griffin under a flying figure, facing the fire (mirrored on its right).
 // The rider sits on its columns 3 to 14, their bottom row on its sixth. The
 // wing is drawn over the rider's legs, its right end on the griffin's
@@ -181,6 +183,7 @@ const SPRITES = [
   ["arch", skin(ARCH)], ["archRaid", skin(ARCH_RAID)],
   ["bag", skin(BAG)], ["coins", skin(COINS)], ["innSign", skin(INN_SIGN)], ["quest", skin(QUEST)],
   ["griffin", skin(GRIFFIN)], ["griffinWing", skin(GRIFFIN_WING)], ["griffinWingUp", skin(GRIFFIN_WING_UP)],
+  ["afk", skin(AFK)],
 ];
 
 function hex(color) {

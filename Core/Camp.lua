@@ -213,7 +213,7 @@ end
 local STATUS = {
   seated = "by the fire", fishing = "fishing", crafting = "crafting", gathering = "gathering",
   fighting = "fighting", vendor = "at a vendor", auction = "at the auction house", resting = "resting",
-  flying = "flying",
+  afk = "away", flying = "flying",
 }
 
 -- The instances that are raids, by name.
@@ -226,7 +226,7 @@ end
 -- so, and it's newer than anything said before going in) it's that,
 -- unless a spell of fishing or of a profession is on. Elsewhere what they
 -- said they chose to do (flying, the auction house, a vendor) comes
--- first, then such a spell, fighting, resting, and by the fire.
+-- first, then such a spell, fighting, away, resting, and by the fire.
 local function poseOf(row, doing)
   local id = row.memberId
   local said = not row.instance and doing.said[id] or nil

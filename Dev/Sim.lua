@@ -7,7 +7,7 @@
 -- console (/bffdev, opened by /bff sim too): buttons that make each
 -- simulated Member ding, die, move, fish (a Catch, or now and then an
 -- unlisted one), step through what they're doing (a vendor, the auction
--- house, fighting, resting, flying), hand in a quest, react to your newest
+-- house, fighting, away, resting, flying), hand in a quest, react to your newest
 -- entry, offer a
 -- test Spare, Claim your newest one or log out,
 -- one that plays out a stretch of you being away so While you were away
@@ -442,7 +442,8 @@ end
 
 -- What the console's Doing button steps a simulated Member through, as
 -- Snapshot.doing would report each.
-local DOING = { { vendor = true }, { auction = true }, { combat = true }, { resting = true }, { flying = true } }
+local DOING = { { vendor = true }, { auction = true }, { combat = true }, { afk = true }, { resting = true },
+  { flying = true } }
 
 -- What each console button does to a simulated Member's client.
 local ACTIONS = {

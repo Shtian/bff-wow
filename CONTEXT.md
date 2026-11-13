@@ -72,7 +72,7 @@ The scene of the Crew shown at the top of the panel and in While you were away: 
 _Avoid_: Scene (when meaning the Camp), campsite, diorama
 
 **Pocket Camp**:
-A small, movable on-screen Camp you can keep up while playing: the fire and the Members by it (online), with what they are doing: what the Roster and Feed know (in an instance, fishing, at a profession), and what each Member's game says they're doing right now (fighting, at a vendor or the auction house, resting, flying). It opens the panel on click.
+A small, movable on-screen Camp you can keep up while playing: the fire and the Members by it (online), with what they are doing: what the Roster and Feed know (in an instance, fishing, at a profession), and what each Member's game says they're doing right now (fighting, at a vendor or the auction house, away, resting, flying). It opens the panel on click.
 _Avoid_: mini Camp, overlay, widget, transparent fire
 
 **Grave**:
