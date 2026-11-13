@@ -272,7 +272,7 @@ end
 
 -- What the Character is doing right now, for Core's doing(): in combat,
 -- at a vendor or the auction house (their windows, kept from their show
--- and close events), resting, and flying (a flight path, or a flying
+-- and close events), away (AFK), resting, and flying (a flight path, or a flying
 -- mount where the client has them). A value that reads secret is false,
 -- and so is one whose function the client doesn't have.
 local windows = { vendor = false, auction = false }
@@ -288,6 +288,7 @@ function Snapshot.doing()
     combat = flag(InCombatLockdown),
     vendor = windows.vendor,
     auction = windows.auction,
+    afk = flag(UnitIsAFK, "player"),
     resting = flag(IsResting),
     flying = flag(UnitOnTaxi, "player") or flag(IsFlying),
   }

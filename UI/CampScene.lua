@@ -61,7 +61,8 @@ local OFFSET = { seat = -1, flower = 2, seatedSpark = 9, asleepSpark = 11 }
 -- that turns is drawn mirrored on the fire's right, at the same distance
 -- from the figure's other edge. flap is front's other frame. The griffin
 -- reaches as far past the figure as Core keeps clear for it
--- (LAYOUT.griffinFore and griffinAft).
+-- (LAYOUT.griffinFore and griffinAft). away shows "AFK" over the head
+-- (AWAY).
 local POSE = {
   adventuring = { standing = true, tool = { "torch", 6, 11 }, back = { "arch", -2, 0 }, raid = "archRaid" },
   fighting = { standing = true, tool = { "blade", 6, 12 } },
@@ -71,6 +72,7 @@ local POSE = {
   vendor = { front = { "bag", 7, -2, true } },
   auction = { front = { "coins", 8, -2, true } },
   resting = { back = { "innSign", -1, -1, true } },
+  afk = { away = true },
   flying = { lift = 9, back = { "griffin", -4, -7, true }, front = { "griffinWing", -6, -3, true },
     flap = "griffinWingUp" },
 }
@@ -92,6 +94,10 @@ local BURST = { x = 4, row = 5, reach = 9,
 -- SLEEP_STEP ticks; the name sits above the tallest.
 local SLEEP = { { x = 7, row = 0 }, { x = 12, row = 3 }, { x = 6, row = 5 } }
 local SLEEP_STEP = 4
+-- "AFK" over an away figure's head: x from its left edge (13 wide over
+-- the figure's 12, so half a pixel left of centre) and the row over the
+-- head; it bobs a row every AWAY.every ticks.
+local AWAY = { x = -1, row = 1, every = 6 }
 local SPARK_ROW = { seated = 13, asleep = 4 }
 -- The name's gap above a figure's head, in art rows.
 local LABEL_GAP = 1
@@ -246,9 +252,10 @@ end
 
 -- Draws what plays over one upright actor: a ding's star, a rare find's
 -- fish held up, a handed-in quest's mark, a death's smoke and flicker, and
--- a max level's bursts.
+-- a max level's bursts. With none of those over its head, an away
+-- figure's "AFK" is.
 -- row is the figure's bottom row and top the row above its head.
-local function drawAnimations(scene, parts, actor, f, row, top)
+local function drawAnimations(scene, parts, actor, f, row, top, away)
   local unit, x, id = scene.unit, actor.x, actor.memberId
   local ding, fish, death = playing(scene, "ding", id), playing(scene, "rareFind", id), playing(scene, "death", id)
   local quest = playing(scene, "quest", id)
@@ -267,6 +274,9 @@ local function drawAnimations(scene, parts, actor, f, row, top)
   elseif smoke then
     setSprite(parts.mark, smoke < 0.5 and "smoke1" or "smoke2", unit)
     put(scene, parts.mark, x + SMOKE.x, top + SMOKE.row + math.floor(smoke * SMOKE.rise))
+  elseif away then
+    setSprite(parts.mark, "afk", unit)
+    put(scene, parts.mark, x + AWAY.x, markRow(scene, "afk", top + AWAY.row + math.floor(f / AWAY.every) % 2))
   else
     parts.mark:Hide()
   end
@@ -346,7 +356,7 @@ local function drawActor(scene, parts, actor, f)
     else
       parts.front:Hide()
     end
-    drawAnimations(scene, parts, actor, f, row, top)
+    drawAnimations(scene, parts, actor, f, row, top, pose.away)
   else
     parts.seat:Hide()
     parts.tool:Hide()

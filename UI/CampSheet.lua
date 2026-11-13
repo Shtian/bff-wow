@@ -53,6 +53,7 @@ ns.CampSheet = {
     griffin = { 24, 76, 24, 14 },
     griffinWing = { 50, 76, 19, 7 },
     griffinWingUp = { 71, 76, 19, 8 },
+    afk = { 92, 76, 13, 7 },
   },
   -- The backdrop's file, its size in texels, and the column the fire's
   -- centre sits on.

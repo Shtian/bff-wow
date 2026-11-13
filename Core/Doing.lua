@@ -1,5 +1,5 @@
 -- Doing: what each Member is doing right now, for the Pocket Camp: at a
--- vendor or the auction house, fighting, flying or resting. Like a WHERE
+-- vendor or the auction house, fighting, flying, away (AFK) or resting. Like a WHERE
 -- it's told as it happens and is no part of a record: a small DOING goes out when what
 -- you're doing changes, { doing (nil for nothing), quest (true if a quest
 -- was just handed in), at (your clock) }, one chunk, never DATA, so
@@ -14,7 +14,7 @@ Doing.__index = Doing
 ns.Doing = Doing
 
 -- What can be done, the one shown first when several are true.
-local ORDER = { "flying", "auction", "vendor", "fighting", "resting" }
+local ORDER = { "flying", "auction", "vendor", "fighting", "afk", "resting" }
 local KNOWN = {}
 for _, state in ipairs(ORDER) do KNOWN[state] = true end
 
@@ -37,7 +37,7 @@ local QUEST_FOR = 90
 function Doing.new(now)
   return setmetatable({
     now = now,
-    -- What the game says is true now: combat, vendor, auction, resting, flying.
+    -- What the game says is true now: combat, vendor, auction, afk, resting, flying.
     facts = {},
     fightingUntil = -math.huge,
     -- What the last DOING said (false until this session has sent one,
@@ -57,13 +57,13 @@ function Doing.new(now)
   }, Doing)
 end
 
--- What the game says you're doing: { combat, vendor, auction, resting,
--- flying }, each true or not.
+-- What the game says you're doing: { combat, vendor, auction, afk,
+-- resting, flying }, each true or not.
 function Doing:set(facts)
   local was = self.facts.combat
   self.facts = {
     combat = facts.combat == true, vendor = facts.vendor == true, auction = facts.auction == true,
-    resting = facts.resting == true, flying = facts.flying == true,
+    afk = facts.afk == true, resting = facts.resting == true, flying = facts.flying == true,
   }
   if was and not self.facts.combat then self.fightingUntil = self.now() + FIGHTING_HOLD end
 end
@@ -72,7 +72,7 @@ end
 function Doing:state()
   local facts = self.facts
   local on = {
-    flying = facts.flying, auction = facts.auction, vendor = facts.vendor, resting = facts.resting,
+    flying = facts.flying, auction = facts.auction, vendor = facts.vendor, afk = facts.afk, resting = facts.resting,
     fighting = facts.combat or self.now() < self.fightingUntil,
   }
   for _, state in ipairs(ORDER) do

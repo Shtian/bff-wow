@@ -460,11 +460,12 @@ end
 
 -- What the Character being played is doing right now, as the game says
 -- it: { combat, vendor (a vendor's window is open), auction (the auction
--- house's is), resting, flying }, each true or not. App reports it every
--- second; Core picks the one to show (flying, the auction house, a vendor,
--- fighting, which lasts 20 s past the end of combat, then resting), shows
--- it on your figure in the Pocket Camp and tells the Crew when it changes
--- (a DOING: see Doing). Nothing in your record changes.
+-- house's is), afk (flagged away), resting, flying }, each true or not.
+-- App reports it every second; Core picks the one to show (flying, the
+-- auction house, a vendor, fighting, which lasts 20 s past the end of
+-- combat, then away, then resting), shows it on your figure in the Pocket
+-- Camp and tells the Crew when it changes (a DOING: see Doing). Nothing in
+-- your record changes.
 function Core:doing(facts)
   self.doings:set(type(facts) == "table" and facts or {})
   if self.doings:noteState() and pocketCampOn(self) then self.listener("changed") end
@@ -761,7 +762,7 @@ end
 -- "fishing": for a minute after their catches were seen to grow, or yours
 -- did, "crafting" or "gathering": for a minute after a profession's skill
 -- was, or what they're doing right now, as doing() reports it and a DOING
--- tells: "fighting", "vendor", "auction", "resting" or "flying"), instance
+-- tells: "fighting", "vendor", "auction", "afk", "resting" or "flying"), instance
 -- (its name, while in one), raid (true if it's a raid) and status (the
 -- pose in words: "by the fire", "in The Deadmines", "at a vendor"). A
 -- flying figure's griffin reaches CAMP_LAYOUT.griffinFore past it towards
