@@ -34,6 +34,7 @@ Core/Roster.lua
 Core/Together.lua
 Core/Camp.lua
 Core/Clears.lua
+Core/Rares.lua
 Core/Goals.lua
 Core/Where.lua
 Core/Doing.lua

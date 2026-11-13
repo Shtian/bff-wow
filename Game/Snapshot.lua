@@ -3,8 +3,9 @@
 -- loses that session's deaths (see docs/design/code-structure.md), and
 -- reads its professions (on PLAYER_ENTERING_WORLD and SKILL_LINES_CHANGED),
 -- where the Character stands for Core's locate(), item info for Spares,
--- a boss kill's payload with the party for Core's encounterEnded(), and
--- a fishing catch from the loot window for Core's caught().
+-- a boss kill's payload with the party for Core's encounterEnded(), a
+-- fishing catch from the loot window for Core's caught(), and Rare kills
+-- for Core's rareKilled(), through the watch (Rares.watch).
 
 local _, ns = ...
 
@@ -181,6 +182,79 @@ function Snapshot.catch()
   return ns.Catches.read(CATCH_API)
 end
 
+-- The game's reads the Rare kill watch needs (Rares.watch), each nil
+-- where the client hasn't the function, which the watch's guard turns
+-- into finding nothing.
+local function call(name)
+  return function(...)
+    local fn = _G[name]
+    if fn then return fn(...) end
+  end
+end
+local RARE_API = {
+  unitGUID = call("UnitGUID"),
+  unitName = call("UnitName"),
+  unitClassification = call("UnitClassification"),
+  unitIsDead = call("UnitIsDead"),
+  unitIsTapDenied = call("UnitIsTapDenied"),
+  getNumLootItems = call("GetNumLootItems"),
+  getLootSourceInfo = call("GetLootSourceInfo"),
+  zone = call("GetRealZoneText"),
+  subzone = call("GetSubZoneText"),
+  mapId = function() return C_Map.GetBestMapForUnit("player") end,
+  isSecret = issecretvalue,
+}
+
+-- What tells a Rare kill (docs/design/rares.md): units seen while their
+-- identity can be read (the target, mouseover, nameplates), the loot
+-- window (once per window, until LOOT_CLOSED), the target dying (and
+-- again when combat ends, when its identity may read again) and
+-- PARTY_KILL. Events this client doesn't have are skipped. Each kill goes
+-- to Core; what each read made of it goes to ns.rareSink(info, results)
+-- where a dev checkout sets one (the logger in Dev/Sim.lua).
+local RARE_EVENTS = {
+  "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED",
+  "LOOT_READY", "LOOT_CLOSED", "PLAYER_TARGET_DIED", "PLAYER_REGEN_ENABLED", "PARTY_KILL",
+}
+
+local function watchRares(core)
+  local watch = ns.Rares.watch(RARE_API)
+  local lootRead = false
+  local function report(kills, info)
+    local results = {}
+    for i, kill in ipairs(kills) do
+      local changed, reason = core:rareKilled(kill)
+      results[i] = changed and "recorded" or reason
+    end
+    if ns.rareSink then pcall(ns.rareSink, info, kills, results) end
+  end
+  local frame = CreateFrame("Frame")
+  for _, event in ipairs(RARE_EVENTS) do pcall(frame.RegisterEvent, frame, event) end
+  frame:SetScript("OnEvent", function(_, event, ...)
+    if event == "PLAYER_TARGET_CHANGED" then
+      report({}, watch:see("target"))
+    elseif event == "UPDATE_MOUSEOVER_UNIT" then
+      report({}, watch:see("mouseover"))
+    elseif event == "NAME_PLATE_UNIT_ADDED" then
+      local unit = ...
+      if type(unit) == "string" and not (issecretvalue and issecretvalue(unit)) then report({}, watch:see(unit)) end
+    elseif event == "LOOT_READY" then
+      if lootRead then return end
+      lootRead = true
+      report(watch:loot())
+    elseif event == "LOOT_CLOSED" then
+      lootRead = false
+    elseif event == "PLAYER_TARGET_DIED" or event == "PLAYER_REGEN_ENABLED" then
+      local kill, info = watch:targetDied()
+      info.event = event
+      report(kill and { kill } or {}, info)
+    elseif event == "PARTY_KILL" then
+      local kill, info = watch:partyKill(...)
+      report(kill and { kill } or {}, info)
+    end
+  end)
+end
+
 -- Item info, through C_Item where the client has it.
 local getItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
 
@@ -263,4 +337,5 @@ function Snapshot.start(core)
   end)
   update()
   watchDoing(core)
+  watchRares(core)
 end

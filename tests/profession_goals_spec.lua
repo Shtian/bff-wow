@@ -149,7 +149,7 @@ describe("Profession Crew goals", function()
     assert.equal(75, rows.everyoneRank.last.rung)
     assert.equal("Apprentice", rows.everyoneRank.last.label)
 
-    assert.same({ "crewLevels", "everyone", "deaths", "professions", "crewSkill", "everyoneRank", "catches" },
+    assert.same({ "crewLevels", "everyone", "deaths", "professions", "crewSkill", "everyoneRank", "catches", "rares" },
       (function()
         local tracks = {}
         for i, row in ipairs(clients[2].core:goals()) do tracks[i] = row.track end

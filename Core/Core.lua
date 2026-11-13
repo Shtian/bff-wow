@@ -504,6 +504,31 @@ function Core:caught(loot)
   return changed
 end
 
+-- A Rare was killed, as the watch tells it (Rares.watch): { npcId,
+-- unlisted, name (an unlisted rare's), zone, subzone, mapId }. The first
+-- kill of each goes into your record with when, where and the Character
+-- playing; nobody else in the party is named. An unlisted rare is kept
+-- too, up to Rares.UNLISTED_CAP, so the list can grow. Kept outside a
+-- Crew too, as catches are. In a Crew, the Crew's first kill of a Rare is
+-- a trophy and a Crew-wide Feed entry, like a clear's, and goes out now;
+-- an unlisted one rides the next send. Returns true if your record
+-- changed, else false and why not: "noRecord", "unreadable", "had" or
+-- "full".
+function Core:rareKilled(kill)
+  if not self.ledger:own() then return false, "noRecord" end
+  local now, character = self.now(), self.ledger:playing()
+  local changed, reason
+  self.ledger:changeOwn(function(record)
+    changed, reason = ns.Rares.add(record, kill, now, character)
+    return changed
+  end)
+  if not changed then return false, reason end
+  self.gossip:ownChanged(ns.Rares.byId(kill.npcId) and "now" or "later")
+  checkGoals(self)
+  self.listener("changed")
+  return true
+end
+
 -- The Crew's catches, over every Member held who hasn't left, you
 -- included: total (how many types count, Extras not among them), caught
 -- (how many of those someone has caught), title ("The Crew has caught 3

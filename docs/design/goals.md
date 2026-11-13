@@ -1,6 +1,6 @@
 # Crew goals
 
-Answers [Crew goals: built-in goal tracks, a Goals tab and a Feed entry when reached](https://github.com/Shtian/bff-wow/issues/51), with the profession tracks from [#100](https://github.com/Shtian/bff-wow/issues/100) and Types caught from [#139](https://github.com/Shtian/bff-wow/issues/139). Builds on the Feed (`docs/design/feed.md`) and toasts (`docs/design/toasts.md`). Domain vocabulary from `CONTEXT.md` (**Crew goal**, **Crew levels**).
+Answers [Crew goals: built-in goal tracks, a Goals tab and a Feed entry when reached](https://github.com/Shtian/bff-wow/issues/51), with the profession tracks from [#100](https://github.com/Shtian/bff-wow/issues/100) Types caught from [#139](https://github.com/Shtian/bff-wow/issues/139) and Rares slain from [#190](https://github.com/Shtian/bff-wow/issues/190). Builds on the Feed (`docs/design/feed.md`) and toasts (`docs/design/toasts.md`). Domain vocabulary from `CONTEXT.md` (**Crew goal**, **Crew levels**).
 
 ## The idea in one line
 
@@ -17,6 +17,7 @@ Each client works out seven built-in goal tracks from the Member records it alre
 | **Crew skill** | Base skill over every profession of every Character, summed. | 500, 1000, 2500, 5000, 10000, … for ever |
 | **Everyone a Journeyman** | Like Everyone at level N: the lowest, over Members, of each Member's best base skill in any profession on any Character. | 75 Apprentice, 150 Journeyman, 225 Expert, then 300 Artisan, and the track is complete |
 | **Types caught** | The counted types of Catch anyone has caught (`docs/design/catches.md`). Extras and unlisted catches never count. | 10, 20, 30, 40, then every type (46), and the track is complete. The steps are fixed; only the last follows the list |
+| **Rares slain** | The listed Rares anyone has slain (`docs/design/rares.md`). Unlisted rares never count. | 5, 10, 20, then every Rare (30), and the track is complete. The steps are fixed; only the last follows the list |
 
 The profession tracks count Alts and every profession. A Character whose professions are unknown (its client never shared them) adds nothing, so a Member none of whose professions are known has a best of 0: Everyone a Journeyman waits for them rather than being reached by whoever shared first.
 
@@ -51,11 +52,11 @@ A third tab in the panel's sidebar, under Roster and Feed, drawn by `UI/GoalsTab
 - **Working on:** a tile per track, in the order below: its icon, name, big progress numbers ("212 / 250", "3 / 5 Members" for the Everyone tracks: a count, so no Member's own level shows), a bar towards the next rung, and "2 reached · last 3 Nov" or "Not reached yet". Two columns, one below 400px of content (the panel's minimum, 460×380). Everyone at level N once max level is reached, Everyone a Journeyman at 300 and Every profession with all twelve show "Complete" and a full gold bar. Every profession's tile names the professions nobody has yet on hover.
 - **Trophy cabinet**, opened from See all in the same tab, with a Back button: "Goals reached N", then each track that has reached rungs, its medals oldest first, so a track reads as a progression. Leaving the tab closes it.
 
-Track names: "Crew levels", "Everyone at level 30" (the next rung; "Everyone at a level" in the cabinet), "Crew deaths", "Every profession in the Crew", "Crew skill", "Everyone a Journeyman" (the next rank; "Everyone at a rank" in the cabinet), "Types of fish caught" ("Types caught" in the cabinet). Its medals read "30 types" and "Every type".
+Track names: "Crew levels", "Everyone at level 30" (the next rung; "Everyone at a level" in the cabinet), "Crew deaths", "Every profession in the Crew", "Crew skill", "Everyone a Journeyman" (the next rank; "Everyone at a rank" in the cabinet), "Types of fish caught" ("Types caught" in the cabinet), "Rares slain". Their medals read "30 types" and "Every type", "5 Rares" and "Every Rare".
 
 **Empty state.** Before the silent baseline has settled, the tab shows "Counting up the Crew" where the latest win and shelf would be; with it settled and nothing reached, "No trophies yet". Working on shows either way.
 
-**Colour** (DESIGN.md, the Trophy Colours Rule): track hues reuse the Feed kinds (green for Crew levels and Everyone at level N, red for Crew deaths, violet for the profession tracks, blue for Types caught) on the track icon's edge and the bar. A medal's tier is WoW's item quality by how many rungs its track has reached: 1st–2nd uncommon, 3rd–4th rare, 5th–6th epic, 7th on legendary; Every profession's are all rare. Gold stays news: the latest-win plate, and the value of a rung reached in the last 3 days (**fresh**). A rung recorded quietly (the silent baseline, or who counts changing) is never fresh, and isn't counted in "since you last looked"; which rungs were quiet is kept in `db.goals.quiet`.
+**Colour** (DESIGN.md, the Trophy Colours Rule): track hues reuse the Feed kinds (green for Crew levels and Everyone at level N, red for Crew deaths, violet for the profession tracks, blue for Types caught, red for Rares slain) on the track icon's edge and the bar. A medal's tier is WoW's item quality by how many rungs its track has reached: 1st–2nd uncommon, 3rd–4th rare, 5th–6th epic, 7th on legendary; Every profession's are all rare. Gold stays news: the latest-win plate, and the value of a rung reached in the last 3 days (**fresh**). A rung recorded quietly (the silent baseline, or who counts changing) is never fresh, and isn't counted in "since you last looked"; which rungs were quiet is kept in `db.goals.quiet`.
 
 ## In Core
 
