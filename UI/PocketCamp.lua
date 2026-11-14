@@ -62,41 +62,62 @@ local function fit(scale)
   frame:SetSize(frame.band:Fit(view.columns, view.rows))
 end
 
--- The scale the grip is dragged to: the frame's top left stays put and its
--- right edge follows the mouse, within Core's limits.
-local function draggedScale()
-  local x = GetCursorPosition() / frame:GetEffectiveScale()
-  local usual = view.columns * ns.CampScene.FIGURE_TARGET
-  local scale = (x - frame:GetLeft()) / usual
-  return math.max(ns.Core.POCKET_CAMP_MIN_SCALE / 100, math.min(ns.Core.POCKET_CAMP_MAX_SCALE / 100, scale))
+local function cursorX()
+  return GetCursorPosition() / frame:GetEffectiveScale()
+end
+
+-- Its top left in UI units from the screen's bottom left.
+local function pinTopLeft(left, top)
+  frame:ClearAllPoints()
+  frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+end
+
+-- The scale the grip is dragged to: the width grows or shrinks by as much
+-- as the mouse has moved since the press, in whole percents, within Core's
+-- limits.
+local function draggedScale(drag)
+  local width = drag.width + cursorX() - drag.x
+  local percent = math.floor(drag.from * width / drag.width * 100 + 0.5)
+  return math.max(ns.Core.POCKET_CAMP_MIN_SCALE, math.min(ns.Core.POCKET_CAMP_MAX_SCALE, percent)) / 100
 end
 
 -- Ends a drag of the grip and saves the scale, and where its corner is.
-local function scaled()
-  if not frame.scaling then return end
+-- A press that didn't change the scale saves nothing.
+local function endScaling()
+  local drag = frame.scaling
+  if not drag then return end
   frame.scaling = nil
-  -- A press that didn't scale it leaves it where it was.
-  if not view or frame.scale == view.scale then return end
-  local left, bottom, scale = frame:GetLeft(), frame:GetBottom(), frame.scale
+  if drag.scale == drag.from then return end
+  local left, bottom = frame:GetLeft(), frame:GetBottom()
   core:setPocketCampPosition(left, bottom)
-  core:setPocketCampScale(scale)
+  core:setPocketCampScale(drag.scale)
 end
 
 -- The grip follows the mouse: shown over the Pocket Camp while it isn't
 -- locked, and while it's being dragged, it redraws at the scale it's
--- dragged to.
+-- dragged to, its top left where it was at the press (read once, so the
+-- screen's clamp can't feed back into the scale).
 local function updateGrip()
-  local grip = frame.grip
-  grip:SetShown(frame.scaling or (view and not view.locked and not frame.moving and frame:IsMouseOver()) or false)
-  if not (frame.scaling and view) then return end
-  local scale = draggedScale()
-  if scale == frame.scale then return end
-  frame.scale = scale
-  local left, top = frame:GetLeft(), frame:GetTop()
+  local drag = frame.scaling
+  frame.grip:SetShown(drag or (view and not view.locked and not frame.moving and frame:IsMouseOver()) or false)
+  if not (drag and view) then return end
+  local scale = draggedScale(drag)
+  if scale == drag.scale then return end
+  drag.scale = scale
+  local width = frame:GetWidth()
   fit(scale)
-  frame:ClearAllPoints()
-  frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
-  frame.band:Draw(view)
+  pinTopLeft(drag.left, drag.top)
+  -- The art pixel steps, so many scales draw the same.
+  if frame:GetWidth() ~= width then frame.band:Draw(view) end
+end
+
+-- Back to the usual size, keeping its top left where it is, as a drag does.
+local function usualSize()
+  if not view or view.scale == 1 then return end
+  local left, top = frame:GetLeft(), frame:GetTop()
+  fit(1)
+  core:setPocketCampPosition(left, top - frame:GetHeight())
+  core:setPocketCampScale(nil)
 end
 
 local function createGrip()
@@ -110,12 +131,16 @@ local function createGrip()
   grip:SetScript("OnMouseDown", function(_, button)
     if button == "LeftButton" and view and not view.locked then
       GameTooltip:Hide()
-      frame.scaling = true
-      frame.scale = view.scale
+      frame.scaling = {
+        left = frame:GetLeft(), top = frame:GetTop(), width = frame:GetWidth(), x = cursorX(),
+        from = view.scale, scale = view.scale,
+      }
     end
   end)
-  grip:SetScript("OnMouseUp", scaled)
-  grip:SetScript("OnDoubleClick", function() core:setPocketCampScale(nil) end)
+  grip:SetScript("OnMouseUp", endScaling)
+  grip:SetScript("OnDoubleClick", function()
+    if view and not view.locked then usualSize() end
+  end)
   grip:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:AddLine("Drag to scale")
@@ -179,7 +204,7 @@ local function create()
   -- Hidden mid-drag (combat began): the drag still saves where it got to.
   frame:SetScript("OnHide", function()
     dropped()
-    scaled()
+    endScaling()
   end)
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)

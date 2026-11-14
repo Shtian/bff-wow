@@ -1308,7 +1308,7 @@ local function percent(field, default, low, high)
     read = function(db)
       local value = db[field]
       if type(value) ~= "number" then return default end
-      return value
+      return math.max(low, math.min(high, value))
     end,
     write = function(db, value)
       if type(value) ~= "number" then value = default end
