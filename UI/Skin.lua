@@ -19,17 +19,53 @@ Skin.OFFLINE = { 0.33, 0.32, 0.37 }
 -- space.
 Skin.WINDOW = { 0.055, 0.051, 0.078, 0.97 }
 Skin.HEADER = { 0.1, 0.095, 0.13, 1 }
-Skin.SIDEBAR = { 0, 0, 0, 0.25 }
+-- Washes and hairlines are in the firelight's cream, not pure white, so
+-- the window feels lit by the Camp's fire (DESIGN.md, the Firelit Window
+-- Rule). Skin.warm(alpha) is one at any strength.
+Skin.WARM = { 1, 0.925, 0.784 }
+-- A colour's RGB at another alpha.
+function Skin.alpha(color, alpha)
+  return { color[1], color[2], color[3], alpha }
+end
+function Skin.warm(alpha)
+  return Skin.alpha(Skin.WARM, alpha)
+end
+Skin.SIDEBAR = { 0.03, 0.02, 0.024, 0.3 }
 Skin.RAISED = { 0.106, 0.102, 0.137, 1 }
-Skin.LINE = { 1, 1, 1, 0.07 }
-Skin.BORDER = { 1, 1, 1, 0.1 }
-Skin.HOVER = { 1, 1, 1, 0.05 }
+Skin.LINE = Skin.warm(0.075)
+Skin.BORDER = Skin.warm(0.1)
+Skin.HOVER = Skin.warm(0.05)
+-- The selected sidebar tab's chip, and a hovered one's.
+Skin.CHIP = Skin.warm(0.09)
+Skin.CHIP_HOVER = Skin.warm(0.04)
+-- A section label's rule: this strong by the label, fading out to its end.
+Skin.RULE = Skin.warm(0.11)
+-- The Feed's timeline: this strong at the top, fading to the end as the
+-- entries get older.
+Skin.TIMELINE_NEW = Skin.warm(0.16)
+Skin.TIMELINE_OLD = Skin.warm(0.03)
 -- Every bar: a faint track and a neutral fill. Colour on a bar means
 -- something (levels gained, a goal complete).
-Skin.TRACK = { 1, 1, 1, 0.08 }
+Skin.TRACK = Skin.warm(0.08)
 Skin.BAR = { 1, 1, 1, 0.3 }
 -- A secondary button's plate: the small buttons and the Skin buttons.
-Skin.SECONDARY = { 1, 1, 1, 0.06 }
+Skin.SECONDARY = Skin.warm(0.06)
+-- Ember Gold Deep, the Camp's deep gold: the arms of the spark that opens
+-- a section label.
+Skin.EMBER_DEEP = { 0.94, 0.635, 0.11 }
+-- The night settling at the panel's foot, away from the fire: this dark
+-- at the very bottom, clear at the top of its rise.
+Skin.SETTLE = { 0.016, 0.012, 0.031, 0.55 }
+-- News catching the light: a gold wash this strong at its left, where
+-- the news starts, fading to the right. Your own rows take LIT_FROM and
+-- LIT_TO; the latest-win plate is brighter, with its edge brighter along
+-- the top.
+Skin.LIT_FROM = Skin.alpha(Skin.GOLD, 0.1)
+Skin.LIT_TO = Skin.alpha(Skin.GOLD, 0.02)
+Skin.LIT_PLATE_FROM = Skin.alpha(Skin.GOLD, 0.15)
+Skin.LIT_PLATE_TO = Skin.alpha(Skin.GOLD, 0.03)
+Skin.LIT_PLATE_EDGE = Skin.alpha(Skin.GOLD, 0.3)
+Skin.LIT_PLATE_TOP = Skin.alpha(Skin.GOLD, 0.55)
 -- The Professions tab's tiles: neutral washes by rank (gold is news, not a
 -- scale here), a lighter plate at 300, and a faint one for none.
 Skin.RANK_SHADES = {
@@ -366,6 +402,32 @@ function Skin.chip(frame, color, x, y, radius, layer)
   return chip
 end
 
+-- Shades a texture from one colour to another: left to right
+-- ("HORIZONTAL") or bottom to top ("VERTICAL"). Set a white colour
+-- texture first; the gradient tints it.
+function Skin.gradient(texture, orientation, from, to)
+  texture:SetGradient(orientation, CreateColor(from[1], from[2], from[3], from[4] or 1),
+    CreateColor(to[1], to[2], to[3], to[4] or 1))
+end
+
+-- A gold wash on `frame` that's strongest at its left, for news that
+-- catches the fire's light: your own row and the latest win.
+function Skin.litWash(frame, from, to)
+  local texture = Skin.fill(frame, { 1, 1, 1, 1 })
+  Skin.gradient(texture, "HORIZONTAL", from or Skin.LIT_FROM, to or Skin.LIT_TO)
+  return texture
+end
+
+-- A section label's rule, from the label to whatever ends it: a hairline
+-- that fades out as it goes. Place it with SetPoint; its height is set.
+function Skin.rule(parent)
+  local line = parent:CreateTexture(nil, "ARTWORK")
+  line:SetColorTexture(1, 1, 1, 1)
+  Skin.gradient(line, "HORIZONTAL", Skin.RULE, Skin.alpha(Skin.RULE, 0))
+  line:SetHeight(1)
+  return line
+end
+
 -- A 1px line along one edge of `frame`.
 function Skin.edge(frame, side, color, layer)
   local line = frame:CreateTexture(nil, layer or "BORDER")
@@ -455,6 +517,43 @@ local function layOutIcon(icon)
   end
 end
 
+-- The spark that opens a section label, like one off the Camp's fire: a
+-- 5-unit cross in faint ember with a gold heart, laid out in whole screen
+-- pixels like the icons.
+local SPARK = { width = 5, height = 5, rects = { { 2, 0, 1, 5 }, { 0, 2, 5, 1 }, { 2, 2, 1, 1 } } }
+local SPARK_ARMS = 0.45
+local SPARK_GAP = 6
+
+local function spark(parent)
+  local icon = CreateFrame("Frame", nil, parent)
+  icon.spec = SPARK
+  icon.parts = {}
+  for i = 1, #SPARK.rects do
+    local part = icon:CreateTexture(nil, "ARTWORK", nil, i == #SPARK.rects and 1 or 0)
+    part:SetColorTexture(1, 1, 1, 1)
+    icon.parts[i] = part
+  end
+  local arms = Skin.alpha(Skin.EMBER_DEEP, SPARK_ARMS)
+  Skin.color(icon.parts[1], arms)
+  Skin.color(icon.parts[2], arms)
+  Skin.color(icon.parts[3], Skin.GOLD)
+  layOutIcon(icon)
+  icon:SetScript("OnShow", layOutIcon)
+  return icon
+end
+
+-- A section label (Label font, Dusk Dim) behind the spark that opens it,
+-- the spark at x, y from the parent's `point` (default "LEFT") and the
+-- label level with it. Set its text in capitals.
+function Skin.sectionLabel(parent, x, y, point)
+  local label = Skin.label(parent, "label", Skin.DIM)
+  local lead = spark(parent)
+  lead:SetPoint(point or "LEFT", x, y)
+  label:SetPoint("LEFT", lead, "RIGHT", SPARK_GAP, 0)
+  label.spark = lead
+  return label
+end
+
 -- An icon by kind (a key of ICONS) in a colour; :SetColor recolours it.
 function Skin.icon(parent, kind, color)
   local icon = CreateFrame("Frame", nil, parent)
@@ -491,7 +590,7 @@ end
 function Skin.badge(parent, fontName, textColor, plateColor)
   local plate = CreateFrame("Frame", nil, parent)
   plate:SetHeight(14)
-  Skin.fill(plate, plateColor or { 1, 1, 1, 0.08 })
+  Skin.fill(plate, plateColor or Skin.warm(0.08))
   plate.label = Skin.label(plate, fontName or "small", textColor or Skin.TEXT)
   plate.label:SetPoint("CENTER", 0, 0)
   function plate:SetText(text)
@@ -549,7 +648,7 @@ function Skin.button(parent, text, onClick, primary)
   button.primary = primary == true
   button.background = Skin.fill(button, Skin.SECONDARY)
   button.lines = Skin.border(button, Skin.BORDER)
-  button.hover = Skin.fill(button, { 1, 1, 1, 0.06 }, "HIGHLIGHT")
+  button.hover = Skin.fill(button, Skin.warm(0.06), "HIGHLIGHT")
   button.hover:SetBlendMode("ADD")
   button.label = Skin.label(button, "text")
   button.label:SetPoint("CENTER")

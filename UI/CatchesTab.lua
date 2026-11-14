@@ -283,8 +283,8 @@ local function createView(parent)
   view.recent:SetPoint("BOTTOMLEFT")
   view.recent:SetPoint("BOTTOMRIGHT")
   Skin.edge(view.recent, "TOP", Skin.LINE)
-  view.recent.label = Skin.label(view.recent, "label", DIM)
-  view.recent.label:SetPoint("TOPLEFT", INSET, -7)
+  -- Its spark sits level with the label's middle, which tops out 7 down.
+  view.recent.label = Skin.sectionLabel(view.recent, INSET, -10, "TOPLEFT")
 
   view.scroller = CreateFrame("ScrollFrame", nil, view)
   view.scroller:EnableMouseWheel(true)
