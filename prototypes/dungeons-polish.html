@@ -1,0 +1,573 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Question: the Dungeons tab reads flat and unfinished. How far should a polish go?
+  Three takes on the same tab, same data, switch with the buttons or keys 1–3:
+    A  Today: the shipped tab, recreated as a baseline (4 fixed label rows, content-wide bars, plain overview).
+    B  Finished ledger (restrained): true-range bars with end caps (a name that runs past the range is unplated),
+       decade columns, label rows that collapse so the lanes get the room, a hover level guide on the axis,
+       an overview strip that's a minimap of the lanes, outlevelled bars sink back.
+    C  By the fire (flair): B, plus Camp heads as friend pins (the Lit Camp Rule's small figures), the can-play
+       band lit by the fire, Crew clears as crossed swords on bars (epic, as the Trophies tab's dungeon clears).
+  Click a friend to pick them (shift adds), drag or scroll to move, hover anything. "Size" toggles 640×520 / 460×380.
+  Crew data is fake. Run: open the file in a browser.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dungeons tab polish</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;600&family=Cinzel:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold:#ffd14a; --gold-rgb:255,209,74; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99;
+    --online:#70e370; --offline:#54525e; --window:#0e0d14; --header:#1a1821; --raised:#1b1a23;
+    --warm:255,236,200; --hair:rgba(var(--warm),.075); --border:rgba(var(--warm),.10);
+    --fill:rgba(255,255,255,.30); --track:rgba(var(--warm),.08); --epic:#b55cf5;
+    --narrow:"Arial Narrow","Archivo Narrow",sans-serif; --friz:"Friz Quadrata TT","Friz Quadrata",Cinzel,Georgia,serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; color:var(--text); font:14px/1.2 var(--narrow);
+    background:radial-gradient(ellipse at 30% 20%, #6b4a33 0%, #2b2219 45%, #0d0b09 100%); }
+  .bar-top { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center; padding:16px; }
+  .bar-top button { font:13px var(--narrow); color:var(--text); background:rgba(14,13,20,.85); border:1px solid rgba(255,255,255,.14);
+    padding:5px 12px; cursor:pointer; }
+  .bar-top button.on { background:var(--gold); color:#1a1400; border-color:var(--gold); }
+  .bar-top .sep { width:12px; }
+  .note { text-align:center; color:#d9cbb8; font-size:14px; max-width:760px; margin:0 auto 12px; padding:0 16px; min-height:36px; }
+  .stage { display:flex; justify-content:center; padding:0 16px 40px; }
+  .zoom { zoom:1.5; }
+  @media (max-width:1000px){ .zoom { zoom:1; } }
+
+  /* Panel chrome */
+  .panel { position:relative; background:rgba(14,13,20,.97); border:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+  .head { height:30px; flex:none; background:var(--header); border-bottom:1px solid var(--hair); display:flex; align-items:center; padding:0 8px 0 12px; }
+  .head .t { font-family:var(--friz); color:var(--gold); font-size:13px; flex:1; }
+  .head .s { color:var(--muted); font-size:12px; margin-right:10px; }
+  .head .s i { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--online); margin-right:5px; vertical-align:1px; }
+  .head .x { color:#8a8a8a; width:22px; text-align:center; }
+  .camp { height:120px; flex:none; position:relative; overflow:hidden;
+    background:linear-gradient(#0b0c1e 0%, #141530 60%, #1d1726 100%); }
+  .camp .hills { position:absolute; left:0; right:0; bottom:22px; height:40px; background:#0d0e1a;
+    clip-path:polygon(0 70%,5% 40%,8% 60%,12% 20%,15% 55%,22% 35%,27% 65%,33% 25%,38% 50%,45% 30%,52% 60%,58% 20%,63% 50%,70% 35%,76% 60%,82% 25%,88% 55%,94% 30%,100% 50%,100% 100%,0 100%); }
+  .camp .ground { position:absolute; left:0; right:0; bottom:0; height:24px; background:#1c1611; }
+  .camp .glow { position:absolute; left:50%; bottom:0; width:340px; height:70px; transform:translateX(-50%);
+    background:radial-gradient(ellipse at 50% 100%, rgba(240,140,40,.45), rgba(240,140,40,0) 70%); }
+  .camp .fire { position:absolute; left:50%; bottom:12px; transform:translateX(-50%); width:22px; height:24px;
+    background:radial-gradient(ellipse at 50% 80%, #fff3c4 0 18%, #ffd14a 30%, #f0a21c 50%, #c9481c 68%, transparent 72%); }
+  .camp .star { position:absolute; width:2px; height:2px; background:#c8c8e8; }
+  .camp .fig { position:absolute; bottom:12px; }
+  .camp .nm { position:absolute; font-size:12px; transform:translateX(-50%); white-space:nowrap; }
+  .body { flex:1; display:flex; min-height:0; position:relative; }
+  .side { width:124px; flex:none; background:rgba(20,15,12,.30); border-right:1px solid var(--hair); padding:6px; display:flex; flex-direction:column; position:relative; z-index:2; }
+  .side div { height:30px; line-height:30px; padding:0 8px; color:var(--muted); font-size:14px; }
+  .side .sel { background:rgba(var(--warm),.09); color:var(--text); }
+  .side .grow { flex:1; }
+  .side .ver { height:18px; line-height:18px; font-size:11px; color:var(--dim); }
+  .firelight { position:absolute; left:0; right:0; top:0; height:300px; pointer-events:none;
+    background:radial-gradient(ellipse 42% 100% at 50% 0%, rgba(240,140,40,.13), rgba(240,140,40,0) 100%); }
+  .settle { position:absolute; left:0; right:0; bottom:0; height:200px; pointer-events:none;
+    background:linear-gradient(rgba(4,3,8,0), rgba(4,3,8,.55)); }
+
+  .content { flex:1; min-width:0; display:flex; flex-direction:column; position:relative; z-index:1; }
+  .tool { height:32px; flex:none; display:flex; align-items:center; gap:8px; padding:0 8px 0 12px; border-bottom:1px solid var(--hair); }
+  .tool .as { font-size:15px; white-space:nowrap; }
+  .tool .as .lv { color:var(--muted); margin-left:4px; }
+  .tool .grow { flex:1; }
+  .tool .hid { color:var(--muted); font-size:14px; white-space:nowrap; }
+  .sbtn { height:20px; padding:0 8px; font:14px var(--narrow); color:var(--text); background:rgba(255,255,255,.06);
+    border:1px solid var(--border); cursor:pointer; display:flex; align-items:center; gap:5px; }
+  .sbtn:hover { background:rgba(255,255,255,.12); }
+  .funnel { width:9px; height:8px; background:var(--muted); clip-path:polygon(0 0,100% 0,62% 50%,62% 100%,38% 85%,38% 50%); }
+
+  .linewrap { position:relative; flex:1; min-height:0; }
+  .lscroll { position:absolute; inset:0; overflow:hidden; cursor:grab; }
+  .lscroll.drag { cursor:grabbing; }
+  .track { position:absolute; left:0; top:0; height:100%; }
+  .abs { position:absolute; }
+
+  .decade { position:absolute; top:0; bottom:0; background:rgba(var(--warm),.022); pointer-events:none; }
+
+  .band { position:absolute; top:0; bottom:0; border-left:1px solid rgba(var(--gold-rgb),.55); border-right:1px solid rgba(var(--gold-rgb),.55);
+    background:rgba(var(--gold-rgb),.04); pointer-events:none; }
+  .band span { position:absolute; top:3px; left:5px; font-size:12px; color:var(--gold); white-space:nowrap; }
+  .band.lit { background:linear-gradient(rgba(var(--gold-rgb),.10), rgba(var(--gold-rgb),.035) 45%, rgba(var(--gold-rgb),.015)); border-color:rgba(var(--gold-rgb),.5); }
+  .band.lit::before { content:""; position:absolute; left:-1px; right:-1px; top:0; height:2px; background:rgba(var(--gold-rgb),.7); }
+
+  .axis { position:absolute; left:0; height:20px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); background:rgba(0,0,0,.18); }
+  .axis.b { background:rgba(10,8,12,.55); }
+  .tick { position:absolute; top:0; width:1px; height:3px; background:rgba(var(--warm),.18); }
+  .tick.big { height:6px; background:rgba(var(--warm),.42); }
+  .tnum { position:absolute; top:5px; font-size:12px; color:var(--muted); transform:translateX(-50%); pointer-events:none; }
+  .tnum.me { color:var(--text); }
+  .meflag { position:absolute; top:2px; height:15px; line-height:15px; font-size:12px; padding:0 4px; transform:translateX(-50%);
+    background:var(--text); color:#0e0d14; pointer-events:none; }
+  .rangeshade { position:absolute; top:0; bottom:0; background:rgba(255,255,255,.10); pointer-events:none; display:none; }
+  .rangeshade::before, .rangeshade::after { content:""; position:absolute; top:0; bottom:0; width:1px; background:rgba(255,255,255,.55); }
+  .rangeshade::before { left:0; } .rangeshade::after { right:0; }
+
+  .meline { position:absolute; width:1px; background:rgba(var(--warm),.28); pointer-events:none; }
+  .guide { position:absolute; top:0; bottom:0; width:1px; background:rgba(var(--warm),.16); pointer-events:none; display:none; }
+  .guidetag { position:absolute; height:15px; line-height:15px; font-size:12px; padding:0 4px; background:#2a2733; color:var(--text);
+    transform:translateX(-50%); pointer-events:none; white-space:nowrap; display:none; border:1px solid var(--border); }
+
+  .rail { position:absolute; left:0; height:1px; background:rgba(var(--warm),.10); }
+  .stem { position:absolute; width:1px; background:rgba(var(--warm),.16); pointer-events:none; }
+  .pdot { position:absolute; width:11px; height:11px; border-radius:50%; border:2px solid var(--offline); box-shadow:0 0 0 1px #0e0d14; cursor:pointer; margin:-5.5px 0 0 -5.5px; }
+  .pdot.on { border-color:var(--online); }
+  .pdot.me { outline:1px solid rgba(255,255,255,.75); outline-offset:2px; }
+  .head-pin { position:absolute; cursor:pointer; image-rendering:pixelated; }
+  .head-pin svg { display:block; }
+  .head-pin .gnd { position:absolute; left:3px; right:3px; bottom:-4px; height:2px; background:var(--offline); }
+  .head-pin.on .gnd { background:var(--online); }
+  .head-pin.me .gnd { background:var(--text); }
+  .head-pin .cnt { position:absolute; left:100%; top:-2px; margin-left:1px; font-size:11px; color:var(--text); background:#2a2733; padding:0 3px; line-height:13px; }
+  .plab { position:absolute; height:19px; line-height:19px; white-space:nowrap; font-size:14px; color:var(--text); cursor:pointer; padding:0 4px; margin-left:-4px; }
+  .plab:hover, .plab.kin { background:rgba(var(--warm),.08); }
+  .plab .lv { color:var(--muted); font-size:12px; margin-left:4px; }
+  .plab .more { color:var(--muted); font-size:12px; margin-left:3px; }
+  .plab .od { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--online); margin-right:4px; vertical-align:2px; }
+  .atag { font-size:12px; color:var(--muted); background:rgba(var(--warm),.08); padding:0 3px; margin-left:4px; line-height:14px; display:inline-block; }
+  .faded { opacity:.3; }
+
+  /* Bars */
+  .dbar { position:absolute; height:20px; line-height:20px; font-size:14px; white-space:nowrap; display:flex; align-items:center; gap:5px;
+    padding:0 5px; color:var(--dim); background:rgba(255,255,255,.05); cursor:default; }
+  .dbar.fit { background:rgba(255,255,255,.12); color:var(--text); box-shadow:inset 0 -2px 0 var(--fill); }
+  .dbar.attune { background:transparent; outline:1px dashed rgba(255,255,255,.25); outline-offset:-1px; }
+  .dbar.shared { outline:1px solid rgba(255,255,255,.6); outline-offset:-1px; }
+  .mdots { display:flex; gap:3px; }
+  .mdots i { width:6px; height:6px; border-radius:50%; display:block; }
+  .plus { font-size:12px; color:var(--muted); }
+  .inf { width:18px; height:9px; flex:none; }
+  .diamond { width:7px; height:7px; transform:rotate(45deg); background:var(--fill); flex:none; margin:0 2px; }
+
+  /* B/C bars: plate = true range, name may run past it */
+  .rbar { position:absolute; height:20px; cursor:default; }
+  .rbar .plate { position:absolute; left:0; top:0; bottom:0; background:rgba(255,255,255,.045); }
+  .rbar .plate::before, .rbar .plate::after { content:""; position:absolute; top:0; bottom:0; width:2px; background:rgba(255,255,255,.14); }
+  .rbar .plate::before { left:0; } .rbar .plate::after { right:0; }
+  .rbar .lab { position:absolute; left:0; top:0; height:20px; line-height:20px; padding:0 6px 0 7px; display:flex; align-items:center; gap:5px;
+    white-space:nowrap; font-size:14px; color:var(--dim); }
+  .rbar.fit .plate { background:rgba(255,255,255,.12); box-shadow:inset 0 -2px 0 var(--fill); }
+  .rbar.fit .plate::before, .rbar.fit .plate::after { background:rgba(255,255,255,.45); }
+  .rbar.fit .lab { color:var(--text); }
+  .rbar.past .lab { color:#6d6b78; }
+  .rbar.past .plate { background:rgba(255,255,255,.025); }
+  .rbar.past .plate::before, .rbar.past .plate::after { background:rgba(255,255,255,.07); }
+  .rbar.attune .plate { background:transparent; outline:1px dashed rgba(255,255,255,.28); outline-offset:-1px; }
+  .rbar.attune .plate::before, .rbar.attune .plate::after { display:none; }
+  .rbar.shared .plate { outline:1px solid rgba(255,255,255,.65); outline-offset:-1px; }
+  .rbar:hover .plate { background:rgba(255,255,255,.16); }
+  .rbar.fit:hover .plate { background:rgba(255,255,255,.2); }
+  .medal { width:11px; height:11px; flex:none; display:block; }
+
+  /* Overview */
+  .ov { height:22px; flex:none; border-top:1px solid var(--hair); position:relative; margin:0 12px; cursor:pointer; }
+  .ov .f { position:absolute; top:3px; bottom:3px; border:1px solid rgba(var(--warm),.35); background:rgba(var(--warm),.04); }
+  .ov .t { position:absolute; width:2px; height:6px; top:8px; }
+  .ov .y { position:absolute; width:2px; top:4px; bottom:4px; background:var(--gold); }
+  .ov .l { position:absolute; height:1px; background:rgba(255,255,255,.22); }
+  .ov .l.fit { background:rgba(255,255,255,.6); }
+  .ov .bd { position:absolute; top:3px; bottom:3px; background:rgba(var(--gold-rgb),.12); border-left:1px solid rgba(var(--gold-rgb),.5); border-right:1px solid rgba(var(--gold-rgb),.5); }
+  .ov .pt { position:absolute; width:3px; height:3px; top:4px; border-radius:50%; }
+  .ov .dt { position:absolute; top:3px; bottom:3px; width:1px; background:rgba(var(--warm),.12); }
+  .ov .dn { position:absolute; top:4px; font-size:11px; line-height:13px; color:rgba(var(--warm),.3); pointer-events:none; }
+  .jump { position:absolute; top:4px; font-size:12px; color:var(--text); background:#2a2733; padding:0 5px; line-height:14px; cursor:pointer; border:1px solid var(--border); }
+
+  /* Tooltip, the game's GameTooltip shape */
+  .tip { position:fixed; z-index:20; background:rgba(8,8,16,.94); border:1px solid #5a5a6a; border-radius:3px; padding:6px 9px; font:13px/1.35 var(--narrow);
+    color:var(--text); pointer-events:none; display:none; max-width:280px; box-shadow:0 0 0 1px #000; }
+  .tip .tt { font-size:15px; color:#fff; }
+  .tip .d { color:var(--dim); } .tip .m { color:var(--muted); } .tip .g { color:var(--gold); } .tip .o { color:var(--online); }
+  .tip .row { display:flex; justify-content:space-between; gap:16px; }
+  .tip .ep { color:var(--epic); }
+</style>
+</head>
+<body>
+<div class="bar-top">
+  <button data-v="A">A · Today</button>
+  <button data-v="B">B · Finished ledger</button>
+  <button data-v="C">C · By the fire</button>
+  <span class="sep"></span>
+  <button id="size">Size: 640×520</button>
+  <button id="me">Playing: 24</button>
+</div>
+<div class="note" id="note"></div>
+<div class="stage"><div class="zoom"><div class="panel" id="panel">
+  <div class="head"><span class="t">Best Friends in Forever</span><span class="s"><i></i>3 of 6 by the fire</span><span class="x">✕</span></div>
+  <div class="camp" id="camp"><div class="hills"></div><div class="ground"></div><div class="glow"></div><div class="fire"></div></div>
+  <div class="body">
+    <div class="firelight"></div><div class="settle"></div>
+    <div class="side"><div>Roster</div><div>Feed</div><div>Trophies</div><div>When</div><div>Spares</div><div>Professions</div><div class="sel">Dungeons</div><div class="grow"></div><div>Settings</div><div class="ver">v1.4.0</div></div>
+    <div class="content">
+      <div class="tool" id="tool"></div>
+      <div class="linewrap"><div class="lscroll" id="scroll"><div class="track" id="track"></div></div></div>
+      <div class="ov" id="ov"></div>
+    </div>
+  </div>
+</div></div></div>
+<div class="tip" id="tip"></div>
+
+<script>
+const NOTES = {
+  A: "The shipped tab, recreated. Four label rows are always reserved, so a small Crew leaves a dead band over the axis. Bars are as wide as their content, so a range reads wrong, and every bar has the same weight.",
+  B: "Restrained. The plate is the true range with end caps; a name that runs past it goes unplated. Label rows collapse to what's used and the lanes get the room. Decade columns, a hover guide that names the level, outlevelled dungeons sink back, the overview is a minimap of the lanes.",
+  C: "With flair. B, plus the Crew's Camp heads as pins (green underfoot while played), the can-play band lit by the fire, crossed swords in epic on dungeons the Crew has cleared (hover says when and who). New rule asks: heads extend the Lit Camp Rule; the medal borrows the Trophy Colours Rule outside its tab.",
+};
+const CLS = { MAGE:"#3FC7EB", WARRIOR:"#C69B6D", ROGUE:"#FFF468", DRUID:"#FF7C0A", PRIEST:"#FFFFFF", HUNTER:"#AAD372", WARLOCK:"#8788EE", PALADIN:"#F48CBA", SHAMAN:"#0070DD" };
+
+const DUNGEONS = [
+  ["Ragefire Chasm",13,18],["Hall of Thanes",13,18,1],["Ruins of Lordaeron",15,20,1],["Wailing Caverns",17,24],["The Deadmines",17,26],
+  ["Shadowfang Keep",22,30],["Blackfathom Deeps",24,32],["The Stockade",24,32],["Excavation Site",24,29,1],["SM Graveyard",28,38],
+  ["City of Dalaran",28,33,1],["Gnomeregan",29,38],["SM Library",29,39],["Razorfen Kraul",30,40],["SM Armory",32,42],["SM Cathedral",35,45],
+  ["The Drowned City",35,40,1],["Razorfen Downs",40,50],["Krol'dok Stronghold",40,45,1],["Uldaman",42,52],["Zul'Farrak",44,54],["Maraudon",46,55],
+  ["Alcaz Prison",48,53,1],["Sunken Temple",50,60],["Blackrock Depths",52,60],["Lower Blackrock Spire",55,60],["Blackmaw Hold",55,60,1],
+  ["Onyxia attunement",55,60,0,"attunement"],["Dire Maul",56,60],["Scholomance",58,60],["Stratholme",58,60],["Upper Blackrock Spire",58,60],["Shaper's Terrace",58,60,1],
+].map(([name,from,to,forever,kind]) => ({ name, from, to, forever:!!forever, kind: kind || "dungeon" }));
+const CLEARED = { "Ragefire Chasm":"2 Nov · Simone, Simbad, You", "Wailing Caverns":"9 Nov · Mirelle, Simone, Torvald", "The Deadmines":"11 Nov · Simbad, You, Torvald", "Hall of Thanes":"4 Nov · Simone, You" };
+
+// Members and Characters. "me" is a Character of member 0.
+const CREW = [
+  { id:0, member:"You", chars:[{ name:"Hugh Storaker", cls:"WARRIOR", level:24, main:true, online:true, own:true }, { name:"Hugh Pell", cls:"PRIEST", level:12, alt:true, own:true }] },
+  { id:1, member:"Simone", chars:[{ name:"Simone Ashvale", cls:"MAGE", level:22, main:true, online:true }] },
+  { id:2, member:"Simbad", chars:[{ name:"Simbad", cls:"ROGUE", level:27, main:true }, { name:"Simbad Tarn", cls:"HUNTER", level:13, alt:true }] },
+  { id:3, member:"Simba", chars:[{ name:"Simba Reed", cls:"DRUID", level:33, main:true }] },
+  { id:4, member:"Mirelle", chars:[{ name:"Mirelle", cls:"PRIEST", level:19, main:true, online:true }] },
+  { id:5, member:"Torvald", chars:[{ name:"Torvald Grimm", cls:"PALADIN", level:25, main:true }] },
+];
+const ME_LEVELS = [24, 41, 12];
+
+const state = { v:"A", small:false, meIdx:0, selected:new Set(), scroll:null };
+const L = { level:24, left:16, right:90, levels:60, rowGap:6, laneGap:3 };
+const TRACK_W = L.left + L.levels * L.level + L.right;
+const xOf = lv => L.left + (lv - 1) * L.level + L.level / 2;
+
+const $ = id => document.getElementById(id);
+const el = (cls, css, html) => { const d = document.createElement("div"); if (cls) d.className = cls; if (css) Object.assign(d.style, css); if (html != null) d.innerHTML = html; return d; };
+const measurer = document.createElement("canvas").getContext("2d");
+const tw = (t, size = 14) => { measurer.font = `${size}px "Arial Narrow","Archivo Narrow",sans-serif`; return Math.ceil(measurer.measureText(t).width); };
+
+// The Camp's seated figure, rows 0–6: a hooded head, for pins.
+const HEAD = ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK..."];
+function headSVG(cls, px = 2) {
+  const tint = CLS[cls];
+  const mul = (hex, f) => { const n = parseInt(hex.slice(1), 16); const c = [n >> 16, n >> 8 & 255, n & 255].map(v => Math.round(v * f)); return `rgb(${c})`; };
+  const pal = { K:"#0b0a12", S:"#e8b890", s:"#b98465", C:tint, D:mul(tint, .62) };
+  let r = "";
+  HEAD.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== ".") r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${pal[ch]}"/>`; }));
+  return `<svg width="${12 * px}" height="${7 * px}" viewBox="0 0 12 7" shape-rendering="crispEdges">${r}</svg>`;
+}
+// Crossed swords, pixel-drawn, in the epic colour: "the Crew has cleared this".
+const SWORDS = (() => { const g = ["K.......K", ".W.....W.", "..W...W..", "...W.W...", "....W....", "...W.W...", ".HW...WH.", "..H...H..", ".H.....H."];
+  let r = ""; g.forEach((row, y) => [...row].forEach((c, x) => { if (c !== ".") r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${c === "H" ? "#7a3aa8" : c === "K" ? "#e8d4ff" : "#b55cf5"}"/>`; }));
+  return `<svg class="medal" viewBox="0 0 9 9" shape-rendering="crispEdges">${r}</svg>`; })();
+const INF = `<svg class="inf" viewBox="0 0 18 9"><path d="M9 4.5C7 1 2.5 1 2.5 4.5S7 8 9 4.5 16 1 16 4.5 11 8 9 4.5Z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>`;
+
+function model() {
+  const meLevel = ME_LEVELS[state.meIdx];
+  const chars = [];
+  CREW.forEach(m => m.chars.forEach(c => chars.push({ ...c, memberId:m.id, member:m.member, level: c.own && c.main ? meLevel : c.level })));
+  const me = chars.find(c => c.own && c.main);
+  // Shown: other Members' Mains (+ played), your played Character. Alts hidden (Show menu default).
+  const shown = chars.filter(c => c.main);
+  const groups = {};
+  shown.forEach(c => { (groups[c.level] = groups[c.level] || []).push(c); });
+  const glist = Object.keys(groups).map(Number).sort((a, b) => a - b).map(level => {
+    const cs = groups[level].sort((a, b) => (b.own - a.own) || (b.online - a.online));
+    return { level, chars:cs, lead:cs[0], memberIds:cs.filter(c => !c.own).map(c => c.memberId), online:cs.some(c => c.online), own:cs.some(c => c.own) };
+  });
+  // Label rows (4), you first, then online, then nearest.
+  const order = [...glist].sort((a, b) => (b.own - a.own) || (b.online - a.online) || (Math.abs(a.level - meLevel) - Math.abs(b.level - meLevel)));
+  const rows = [[], [], [], []];
+  order.forEach(g => {
+    const text = g.own ? "You" : g.lead.member;
+    const w = (g.online && !g.own ? 10 : 0) + tw(text) + 4 + tw(String(g.level), 12) + (g.chars.length > 1 ? 18 : 0) + 8;
+    const left = xOf(g.level) - 4, right = left + w;
+    for (let r = 0; r < 4; r++) {
+      if (rows[r].every(o => right + L.rowGap <= o.left || left >= o.right + L.rowGap)) { rows[r].push({ left, right }); g.row = r; g.text = text; break; }
+    }
+  });
+  const rowsUsed = Math.max(1, ...glist.map(g => g.row == null ? 0 : g.row + 1));
+  // Bars.
+  const others = chars.filter(c => !c.own);
+  const bars = DUNGEONS.map(d => {
+    const fits = me.level >= d.from && me.level <= d.to;
+    const byMember = {};
+    others.filter(c => c.level >= d.from && c.level <= d.to).forEach(c => {
+      const prev = byMember[c.memberId];
+      if (!prev || Math.abs(c.level - me.level) < Math.abs(prev.level - me.level)) byMember[c.memberId] = c;
+    });
+    const fitters = Object.values(byMember).sort((a, b) => b.online - a.online);
+    const almost = others.filter(c => c.main && c.level < d.from && d.from - c.level <= 3);
+    const left = xOf(d.from) - L.level / 2, rangeW = (d.to - d.from + 1) * L.level;
+    const contentW = 7 + tw(d.name) + (d.forever ? 23 : 0) + (fitters.length ? 5 + Math.min(4, fitters.length) * 9 : 0) + (fitters.length > 4 ? 18 : 0) + (CLEARED[d.name] ? 15 : 0) + 8;
+    return { ...d, fits, fitters, almost, left, rangeW, contentW, past: me.level > d.to, ahead: me.level < d.from };
+  });
+  const sorted = [...bars].sort((a, b) => (b.fits - a.fits) || (b.fitters.length - a.fitters.length) || (a.from - b.from));
+  const lanes = [];
+  sorted.forEach(b => {
+    const w = Math.max(b.rangeW, b.contentW), l = b.left, r = l + w;
+    let i = lanes.findIndex(lane => lane.every(o => r + L.laneGap <= o.l || l >= o.r + L.laneGap));
+    if (i < 0) { lanes.push([]); i = lanes.length - 1; }
+    lanes[i].push({ l, r }); b.lane = i; b.w = w;
+  });
+  // Selection.
+  const sel = state.selected;
+  if (sel.size) bars.forEach(b => {
+    const ok = b.fits && [...sel].every(id => chars.some(c => c.memberId === id && c.level >= b.from && c.level <= b.to));
+    b.shared = ok; b.faded = !ok;
+  });
+  if (sel.size) glist.forEach(g => { g.faded = !g.own && !g.memberIds.some(id => sel.has(id)); });
+  return { me, glist, rowsUsed, bars, lanes:lanes.length, chars };
+}
+
+let M, geo;
+function render() {
+  M = model();
+  const v = state.v, refined = v !== "A";
+  document.querySelectorAll("[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  $("note").textContent = NOTES[v];
+  $("panel").style.width = (state.small ? 460 : 640) + "px";
+  $("panel").style.height = (state.small ? 380 : 520) + "px";
+  $("camp").style.height = (state.small ? 78 : 120) + "px";
+  $("size").textContent = "Size: " + (state.small ? "460×380" : "640×520");
+  $("me").textContent = "Playing: " + M.me.level;
+  drawCamp();
+
+  // Toolbar
+  const tool = $("tool"); tool.innerHTML = "";
+  tool.append(el("as", null, `<span style="color:var(--muted)">As </span><span style="color:${CLS[M.me.cls]}">${M.me.name}</span><span class="lv">${M.me.level}</span>`));
+  tool.append(el("grow"));
+  tool.append(el("hid", null, "2 alts hidden"));
+  if (state.selected.size) { const c = el("sbtn", null, "Clear"); c.onclick = () => { state.selected.clear(); render(); }; tool.append(c); }
+  tool.append(el("sbtn", null, `<span class="funnel"></span>Show`));
+
+  // Geometry
+  const H = $("scroll").clientHeight;
+  const ROW = 21, AXIS = 20, LANE = 23;
+  let rowsTop, rows;
+  if (refined) { rows = M.rowsUsed; rowsTop = 22; }
+  else { rows = 4; rowsTop = 20; }
+  const rowY = r => rowsTop + (rows - 1 - r) * ROW;
+  const railY = rowsTop + rows * ROW + (v === "C" ? 22 : 6);
+  const axisY = railY + (v === "C" ? 8 : 14);
+  const laneY = l => axisY + AXIS + 6 + l * LANE;
+  geo = { H, axisY };
+
+  const track = $("track"); track.innerHTML = ""; track.style.width = TRACK_W + "px";
+  const me = M.me;
+
+  // Decades
+  if (refined) for (let d = 1; d <= 51; d += 10) {
+    if (((d - 1) / 10) % 2 === 1) track.append(el("decade", { left:(xOf(d) - 12) + "px", width:(10 * L.level) + "px" }));
+  }
+  // Can-play band
+  const band = el("band" + (v === "C" ? " lit" : ""), { left:(xOf(me.level - 3) - 12) + "px", width:(7 * L.level) + "px" }, "<span>can play</span>");
+  track.append(band);
+
+  // Your level, down through the lanes: a bar it crosses is one you fit.
+  if (refined) track.append(el("meline", { left:xOf(me.level) + "px", top:(axisY + 20) + "px", bottom:"0" }));
+
+  // Axis
+  const axis = el("axis" + (refined ? " b" : ""), { top:axisY + "px", width:TRACK_W + "px" });
+  for (let lv = 1; lv <= 60; lv++) {
+    const big = lv % 5 === 0 || lv === 1;
+    axis.append(el("tick" + (big ? " big" : ""), { left:xOf(lv) + "px" }));
+    if (refined && lv === me.level) continue;
+    if (big || lv === me.level) axis.append(el("tnum" + (lv === me.level ? " me" : ""), { left:xOf(lv) + "px" }, lv));
+  }
+  if (refined) axis.append(el("meflag", { left:xOf(me.level) + "px" }, me.level));
+  const shade = el("rangeshade"); axis.append(shade); geo.shade = shade;
+  track.append(axis);
+
+  // Rail + friends
+  if (v !== "C") track.append(el("rail", { top:railY + "px", width:TRACK_W + "px" }));
+  M.glist.forEach(g => {
+    const x = xOf(g.level);
+    const fade = g.faded ? " faded" : "";
+    if (g.row != null) {
+      const y = rowY(g.row);
+      track.append(el("stem" + fade, { left:x + "px", top:(y + 19) + "px", height:(railY - y - 19 - (v === "C" ? 15 : 5)) + "px" }));
+      const lab = el("plab" + fade, { left:x + "px", top:y + "px" },
+        `${g.online && !g.own ? '<span class="od"></span>' : ""}${g.text}<span class="lv">${g.level}</span>${g.chars.length > 1 ? `<span class="more">+${g.chars.length - 1}</span>` : ""}`);
+      hook(lab, g, "group"); track.append(lab);
+    }
+    if (v === "C") {
+      const pin = el("head-pin" + (g.online && !g.own ? " on" : "") + (g.own ? " me" : "") + fade, { left:(x - 12) + "px", top:(railY - 14) + "px" }, headSVG(g.lead.cls) + '<span class="gnd"></span>' + (g.row == null && g.chars.length > 1 ? `<span class="cnt">${g.chars.length}</span>` : ""));
+      hook(pin, g, "group"); track.append(pin);
+    } else {
+      const dot = el("pdot" + (g.online ? " on" : "") + (g.own ? " me" : "") + fade, { left:x + "px", top:railY + "px", background:CLS[g.lead.cls] });
+      hook(dot, g, "group"); track.append(dot);
+    }
+  });
+
+  // Bars
+  M.bars.forEach(b => {
+    const top = laneY(b.lane);
+    const dots = b.fitters.slice(0, 4).map(c => `<i style="background:${CLS[c.cls]}"></i>`).join("");
+    const extras = `${b.forever ? INF : ""}${b.fitters.length ? `<span class="mdots">${dots}</span>` : ""}${b.fitters.length > 4 ? `<span class="plus">+${b.fitters.length - 4}</span>` : ""}`;
+    const name = b.kind === "raids" ? `<span class="diamond"></span>${b.name}` : b.name;
+    let node;
+    if (!refined) {
+      node = el("dbar" + (b.fits ? " fit" : "") + (b.kind === "attunement" ? " attune" : "") + (b.shared ? " shared" : "") + (b.faded ? " faded" : ""),
+        { left:b.left + "px", top:top + "px", width:b.w + "px" }, name + extras);
+    } else {
+      node = el("rbar" + (b.fits ? " fit" : "") + (b.past ? " past" : "") + (b.kind === "attunement" ? " attune" : "") + (b.shared ? " shared" : "") + (b.faded ? " faded" : ""),
+        { left:b.left + "px", top:top + "px", width:b.w + "px" });
+      node.append(el("plate", { width:b.rangeW + "px" }));
+      const medal = v === "C" && CLEARED[b.name] ? SWORDS : "";
+      const lab = el("lab", null, medal + name + extras);
+      node.append(lab); b.labNode = lab;
+    }
+    b.node = node; hook(node, b, "bar"); track.append(node);
+  });
+
+  // Hover guide
+  geo.guide = el("guide"); track.append(geo.guide);
+  geo.gtag = el("guidetag", { top:(axisY + 2) + "px" }); track.append(geo.gtag);
+
+  track.style.height = Math.max(H, laneY(M.lanes) + 8) + "px";
+  if (state.scroll == null) state.scroll = xOf(me.level) - $("scroll").clientWidth / 2;
+  scrollTo(state.scroll);
+}
+
+function drawCamp() {
+  const camp = $("camp");
+  camp.querySelectorAll(".star,.fig,.nm").forEach(n => n.remove());
+  const w = state.small ? 460 : 640, h = state.small ? 78 : 120;
+  for (let i = 0; i < 26; i++) { const s = el("star", { left:((i * 97) % w) + "px", top:((i * 53) % (h - 50)) + "px", opacity:.25 + (i % 4) * .15 }); camp.append(s); }
+  const seats = [[-110,"Simone","MAGE"],[-70,"You","WARRIOR"],[50,"Mirelle","PRIEST"]];
+  seats.forEach(([dx, n, cls]) => {
+    const f = el("fig", { left:(w / 2 + dx - 12) + "px" }, headSVG(cls, 2).replace('height="14"', 'height="14"'));
+    camp.append(f);
+    camp.append(el("nm", { left:(w / 2 + dx) + "px", bottom:"32px", color:n === "You" ? "var(--text)" : CLS[cls] }, n));
+  });
+}
+
+// Scrolling, sticky names, overview
+function scrollTo(x) {
+  const sc = $("scroll"); const max = Math.max(0, TRACK_W - sc.clientWidth);
+  state.scroll = Math.min(max, Math.max(0, x));
+  $("track").style.transform = `translate(${-state.scroll}px, ${-(state.vscroll || 0)}px)`;
+  M.bars.forEach(b => {
+    const inner = b.labNode || b.node; if (!inner) return;
+    const off = Math.max(0, Math.min(state.scroll - b.left, b.w - (b.labNode ? b.labNode.offsetWidth : b.contentW)));
+    if (b.labNode) b.labNode.style.transform = `translateX(${off}px)`; else b.node.style.paddingLeft = (5 + off) + "px";
+  });
+  drawOverview();
+}
+function drawOverview() {
+  const ov = $("ov"); ov.innerHTML = "";
+  const W = ov.clientWidth, k = W / TRACK_W, sc = $("scroll"), v = state.v;
+  if (v !== "A") {
+    for (let d = 10; d <= 60; d += 10) { ov.append(el("dt", { left:(xOf(d) * k) + "px" })); ov.append(el("dn", { left:(xOf(d) * k + 3) + "px" }, d)); }
+    ov.append(el("bd", { left:((xOf(M.me.level - 3) - 12) * k) + "px", width:(7 * L.level * k) + "px" }));
+    const lanes = Math.max(1, M.lanes), span = 12;
+    M.bars.forEach(b => ov.append(el("l" + (b.fits ? " fit" : ""), { left:(b.left * k) + "px", width:Math.max(1, b.rangeW * k - 1) + "px", top:(8 + Math.round(b.lane / lanes * span)) + "px" })));
+    M.glist.forEach(g => { if (!g.own) ov.append(el("pt", { left:(xOf(g.level) * k - 1) + "px", background:CLS[g.lead.cls] })); });
+  } else {
+    M.glist.forEach(g => ov.append(el("t", { left:(xOf(g.level) * k) + "px", background:g.own ? "var(--gold)" : "rgba(255,255,255,.5)" })));
+  }
+  ov.append(el("y", { left:(xOf(M.me.level) * k - 1) + "px" }));
+  ov.append(el("f", { left:(state.scroll * k) + "px", width:(sc.clientWidth * k) + "px" }));
+  const mx = xOf(M.me.level);
+  if (mx < state.scroll) { const j = el("jump", { left:"0" }, "‹ You"); j.onclick = e => { e.stopPropagation(); scrollTo(mx - sc.clientWidth / 2); }; ov.append(j); }
+  if (mx > state.scroll + sc.clientWidth) { const j = el("jump", { right:"0" }, "You ›"); j.onclick = e => { e.stopPropagation(); scrollTo(mx - sc.clientWidth / 2); }; ov.append(j); }
+}
+$("ov").addEventListener("mousedown", e => {
+  const ov = $("ov"), sc = $("scroll");
+  const go = ev => { const r = ov.getBoundingClientRect(); scrollTo(((ev.clientX - r.left) / r.width) * TRACK_W - sc.clientWidth / 2); };
+  go(e);
+  const up = () => { removeEventListener("mousemove", go); removeEventListener("mouseup", up); };
+  addEventListener("mousemove", go); addEventListener("mouseup", up);
+});
+
+// Drag, click and wheel on the line
+let drag = null;
+$("scroll").addEventListener("mousedown", e => { drag = { x:e.clientX, y:e.clientY, s:state.scroll, moved:false, target:e.target }; $("scroll").classList.add("drag"); });
+addEventListener("mousemove", e => {
+  if (drag) {
+    const z = parseFloat(getComputedStyle(document.querySelector(".zoom")).zoom) || 1;
+    const dx = (e.clientX - drag.x) / z;
+    if (Math.abs(dx) > 4) drag.moved = true;
+    if (drag.moved) scrollTo(drag.s - dx);
+  }
+});
+addEventListener("mouseup", () => {
+  if (!drag) return;
+  $("scroll").classList.remove("drag");
+  if (!drag.moved) {
+    const pickEl = drag.target.closest("[data-pick]");
+    if (pickEl) clickGroup(pickEl._item, drag.shift);
+    else if (state.selected.size) { state.selected.clear(); render(); }
+  }
+  drag = null;
+});
+$("scroll").addEventListener("mousedown", e => { if (drag) drag.shift = e.shiftKey; }, true);
+$("scroll").addEventListener("wheel", e => { e.preventDefault(); scrollTo(state.scroll + (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY)); }, { passive:false });
+$("scroll").addEventListener("mousemove", e => {
+  if (state.v === "A" || drag?.moved) return;
+  const r = $("scroll").getBoundingClientRect();
+  const z = parseFloat(getComputedStyle(document.querySelector(".zoom")).zoom) || 1;
+  const x = (e.clientX - r.left) / z + state.scroll;
+  const lv = Math.max(1, Math.min(60, Math.round((x - L.left - L.level / 2) / L.level) + 1));
+  const fits = M.bars.filter(b => lv >= b.from && lv <= b.to).length;
+  geo.guide.style.display = "block"; geo.guide.style.left = xOf(lv) + "px";
+  if (lv !== M.me.level) { geo.gtag.style.display = "block"; geo.gtag.style.left = xOf(lv) + "px"; geo.gtag.textContent = `${lv} · ${fits} dungeon${fits === 1 ? "" : "s"}`; }
+  else geo.gtag.style.display = "none";
+});
+$("scroll").addEventListener("mouseleave", () => { if (geo) { geo.guide.style.display = "none"; geo.gtag.style.display = "none"; } });
+
+function clickGroup(g, add) {
+  if (!g.memberIds.length) return;
+  const same = !add && g.memberIds.length === state.selected.size && g.memberIds.every(id => state.selected.has(id));
+  if (same) state.selected.clear();
+  else { if (!add) state.selected.clear(); g.memberIds.forEach(id => state.selected.add(id)); }
+  render();
+}
+
+// Tooltips
+const tip = $("tip");
+function hook(node, item, kind) {
+  node._item = item;
+  if (kind === "group") node.dataset.pick = "1";
+  node.addEventListener("mouseenter", e => {
+    tip.innerHTML = kind === "group" ? groupTip(item) : barTip(item);
+    tip.style.display = "block"; place(e);
+    if (kind === "bar" && geo.shade && state.v !== "A") { geo.shade.style.display = "block"; geo.shade.style.left = item.left + "px"; geo.shade.style.width = item.rangeW + "px"; }
+  });
+  node.addEventListener("mousemove", place);
+  node.addEventListener("mouseleave", () => { tip.style.display = "none"; if (geo.shade) geo.shade.style.display = "none"; });
+}
+function place(e) { tip.style.left = (e.clientX + 18) + "px"; tip.style.top = (e.clientY + 8) + "px"; }
+function groupTip(g) {
+  return g.chars.map(c => {
+    const d = c.level - M.me.level;
+    const apart = c.own ? "" : Math.abs(d) <= 3 ? `<span class="g">can play</span>` : `<span class="d">${Math.abs(d)} ${d > 0 ? "ahead" : "behind"}</span>`;
+    return `<div class="row"><span><span style="color:${CLS[c.cls]}">${c.name}</span> <span class="m">${c.level}</span> ${c.online && !c.own ? '<span class="o">online</span> ' : ""}${apart}</span><span class="d">${c.member}</span></div>`;
+  }).join("");
+}
+function barTip(b) {
+  let h = `<div class="tt">${b.name}</div><div class="d">Dungeon · ${b.from}–${b.to}</div>`;
+  if (b.forever) h += `<div class="m">New in WoW: Forever</div>`;
+  if (state.v === "C" && CLEARED[b.name]) h += `<div><span class="ep">Crew cleared</span> <span class="d">${CLEARED[b.name]}</span></div>`;
+  h += `<div class="${b.fits ? "" : "d"}">${b.fits ? "You fit" : b.past ? "You've outlevelled it" : `You need ${b.from - M.me.level} more levels`}</div>`;
+  b.fitters.forEach(c => { const far = Math.abs(c.level - M.me.level) > 3 ? ` <span class="d">· fits, but ${Math.abs(c.level - M.me.level)} levels from you</span>` : ""; h += `<div class="row"><span><span style="color:${CLS[c.cls]}">${c.name}</span> <span class="m">${c.level}</span>${c.online ? ' <span class="o">online</span>' : ""}${far}</span><span class="d">${c.member}</span></div>`; });
+  if (!b.fitters.length) h += `<div class="d">No friend fits it yet</div>`;
+  if (b.almost.length) h += `<div class="d">Almost: ${b.almost.map(c => `${c.member} (${b.from - c.level} short)`).join(", ")}</div>`;
+  return h;
+}
+
+document.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { state.v = b.dataset.v; render(); });
+$("size").onclick = () => { state.small = !state.small; state.scroll = null; requestAnimationFrame(render); };
+$("me").onclick = () => { state.meIdx = (state.meIdx + 1) % ME_LEVELS.length; state.scroll = null; state.selected.clear(); render(); };
+addEventListener("keydown", e => {
+  if (e.key >= "1" && e.key <= "3") { state.v = "ABC"[e.key - 1]; render(); }
+  if (e.key === "Escape" && state.selected.size) { state.selected.clear(); render(); }
+});
+const qs = new URLSearchParams(location.search); if (qs.get("variant")) state.v = qs.get("variant").toUpperCase();
+document.fonts.ready.then(render); render();
+</script>
+</body>
+</html>
