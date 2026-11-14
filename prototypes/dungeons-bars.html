@@ -1,0 +1,817 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Two questions on the Dungeons tab as built (B with Camp heads, decades now tick to tick):
+    1. The bars are grey on grey on grey. Which treatment separates "you fit", "ahead of you" and "outlevelled"?
+       Today · Three shapes · Friends' colours · Your place in it · Ledger rules   (keys 1–5)
+    2. The overview's grey lane lines don't read. What should the strip be?
+       Today · Density · Crew                                                         (keys Q W E)
+  Inside the game's limits: solid colour textures only, no gradients or shadows, gold only for "can play" and you,
+  class colours only for people. Click a friend to pick them, drag or scroll, hover anything. Crew data is fake.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dungeon bars</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;600&family=Cinzel:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold:#ffd14a; --gold-rgb:255,209,74; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99;
+    --online:#70e370; --offline:#54525e; --window:#0e0d14; --header:#1a1821; --raised:#1b1a23;
+    --warm:255,236,200; --hair:rgba(var(--warm),.075); --border:rgba(var(--warm),.10);
+    --fill:rgba(255,255,255,.30); --track:rgba(var(--warm),.08); --epic:#b55cf5;
+    --narrow:"Arial Narrow","Archivo Narrow",sans-serif; --friz:"Friz Quadrata TT","Friz Quadrata",Cinzel,Georgia,serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; color:var(--text); font:14px/1.2 var(--narrow);
+    background:radial-gradient(ellipse at 30% 20%, #6b4a33 0%, #2b2219 45%, #0d0b09 100%); }
+  .bar-top { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center; padding:16px; }
+  .bar-top button { font:13px var(--narrow); color:var(--text); background:rgba(14,13,20,.85); border:1px solid rgba(255,255,255,.14);
+    padding:5px 12px; cursor:pointer; }
+  .bar-top button.on { background:var(--gold); color:#1a1400; border-color:var(--gold); }
+  .bar-top .sep { width:12px; }
+  .bar-top + .bar-top { padding-top:0; }
+  .bar-top .lbl { color:#d9cbb8; font-size:13px; width:64px; text-align:right; margin-right:4px; }
+  .note.sub { min-height:20px; margin-top:-6px; color:#bfb2a0; }
+  .note { text-align:center; color:#d9cbb8; font-size:14px; max-width:760px; margin:0 auto 12px; padding:0 16px; min-height:36px; }
+  .stage { display:flex; justify-content:center; padding:0 16px 40px; }
+  .zoom { zoom:1.5; }
+  @media (max-width:1000px){ .zoom { zoom:1; } }
+
+  /* Panel chrome */
+  .panel { position:relative; background:rgba(14,13,20,.97); border:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+  .head { height:30px; flex:none; background:var(--header); border-bottom:1px solid var(--hair); display:flex; align-items:center; padding:0 8px 0 12px; }
+  .head .t { font-family:var(--friz); color:var(--gold); font-size:13px; flex:1; }
+  .head .s { color:var(--muted); font-size:12px; margin-right:10px; }
+  .head .s i { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--online); margin-right:5px; vertical-align:1px; }
+  .head .x { color:#8a8a8a; width:22px; text-align:center; }
+  .camp { height:120px; flex:none; position:relative; overflow:hidden;
+    background:linear-gradient(#0b0c1e 0%, #141530 60%, #1d1726 100%); }
+  .camp .hills { position:absolute; left:0; right:0; bottom:22px; height:40px; background:#0d0e1a;
+    clip-path:polygon(0 70%,5% 40%,8% 60%,12% 20%,15% 55%,22% 35%,27% 65%,33% 25%,38% 50%,45% 30%,52% 60%,58% 20%,63% 50%,70% 35%,76% 60%,82% 25%,88% 55%,94% 30%,100% 50%,100% 100%,0 100%); }
+  .camp .ground { position:absolute; left:0; right:0; bottom:0; height:24px; background:#1c1611; }
+  .camp .glow { position:absolute; left:50%; bottom:0; width:340px; height:70px; transform:translateX(-50%);
+    background:radial-gradient(ellipse at 50% 100%, rgba(240,140,40,.45), rgba(240,140,40,0) 70%); }
+  .camp .fire { position:absolute; left:50%; bottom:12px; transform:translateX(-50%); width:22px; height:24px;
+    background:radial-gradient(ellipse at 50% 80%, #fff3c4 0 18%, #ffd14a 30%, #f0a21c 50%, #c9481c 68%, transparent 72%); }
+  .camp .star { position:absolute; width:2px; height:2px; background:#c8c8e8; }
+  .camp .fig { position:absolute; bottom:12px; }
+  .camp .nm { position:absolute; font-size:12px; transform:translateX(-50%); white-space:nowrap; }
+  .body { flex:1; display:flex; min-height:0; position:relative; }
+  .side { width:124px; flex:none; background:rgba(20,15,12,.30); border-right:1px solid var(--hair); padding:6px; display:flex; flex-direction:column; position:relative; z-index:2; }
+  .side div { height:30px; line-height:30px; padding:0 8px; color:var(--muted); font-size:14px; }
+  .side .sel { background:rgba(var(--warm),.09); color:var(--text); }
+  .side .grow { flex:1; }
+  .side .ver { height:18px; line-height:18px; font-size:11px; color:var(--dim); }
+  .firelight { position:absolute; left:0; right:0; top:0; height:300px; pointer-events:none;
+    background:radial-gradient(ellipse 42% 100% at 50% 0%, rgba(240,140,40,.13), rgba(240,140,40,0) 100%); }
+  .settle { position:absolute; left:0; right:0; bottom:0; height:200px; pointer-events:none;
+    background:linear-gradient(rgba(4,3,8,0), rgba(4,3,8,.55)); }
+
+  .content { flex:1; min-width:0; display:flex; flex-direction:column; position:relative; z-index:1; }
+  .tool { height:32px; flex:none; display:flex; align-items:center; gap:8px; padding:0 8px 0 12px; border-bottom:1px solid var(--hair); }
+  .tool .as { font-size:15px; white-space:nowrap; }
+  .tool .as .lv { color:var(--muted); margin-left:4px; }
+  .tool .grow { flex:1; }
+  .tool .hid { color:var(--muted); font-size:14px; white-space:nowrap; }
+  .sbtn { height:20px; padding:0 8px; font:14px var(--narrow); color:var(--text); background:rgba(255,255,255,.06);
+    border:1px solid var(--border); cursor:pointer; display:flex; align-items:center; gap:5px; }
+  .sbtn:hover { background:rgba(255,255,255,.12); }
+  .funnel { width:9px; height:8px; background:var(--muted); clip-path:polygon(0 0,100% 0,62% 50%,62% 100%,38% 85%,38% 50%); }
+
+  .linewrap { position:relative; flex:1; min-height:0; }
+  .lscroll { position:absolute; inset:0; overflow:hidden; cursor:grab; }
+  .lscroll.drag { cursor:grabbing; }
+  .track { position:absolute; left:0; top:0; height:100%; }
+  .abs { position:absolute; }
+
+  .decade { position:absolute; top:0; bottom:0; background:rgba(var(--warm),.022); pointer-events:none; }
+
+  .band { position:absolute; top:0; bottom:0; border-left:1px solid rgba(var(--gold-rgb),.55); border-right:1px solid rgba(var(--gold-rgb),.55);
+    background:rgba(var(--gold-rgb),.04); pointer-events:none; }
+  .band span { position:absolute; top:3px; left:5px; font-size:12px; color:var(--gold); white-space:nowrap; }
+  .band.lit { background:linear-gradient(rgba(var(--gold-rgb),.10), rgba(var(--gold-rgb),.035) 45%, rgba(var(--gold-rgb),.015)); border-color:rgba(var(--gold-rgb),.5); }
+  .band.lit::before { content:""; position:absolute; left:-1px; right:-1px; top:0; height:2px; background:rgba(var(--gold-rgb),.7); }
+
+  .axis { position:absolute; left:0; height:20px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); background:rgba(0,0,0,.18); }
+  .axis.b { background:rgba(10,8,12,.55); }
+  .tick { position:absolute; top:0; width:1px; height:3px; background:rgba(var(--warm),.18); }
+  .tick.big { height:6px; background:rgba(var(--warm),.42); }
+  .tnum { position:absolute; top:5px; font-size:12px; color:var(--muted); transform:translateX(-50%); pointer-events:none; }
+  .tnum.me { color:var(--text); }
+  .meflag { position:absolute; top:2px; height:15px; line-height:15px; font-size:12px; padding:0 4px; transform:translateX(-50%);
+    background:var(--text); color:#0e0d14; pointer-events:none; }
+  .rangeshade { position:absolute; top:0; bottom:0; background:rgba(255,255,255,.10); pointer-events:none; display:none; }
+  .rangeshade::before, .rangeshade::after { content:""; position:absolute; top:0; bottom:0; width:1px; background:rgba(255,255,255,.55); }
+  .rangeshade::before { left:0; } .rangeshade::after { right:0; }
+
+  .meline { position:absolute; width:1px; transform-origin:top; background:rgba(var(--warm),.28); pointer-events:none; }
+  .guide { position:absolute; top:0; bottom:0; width:1px; background:rgba(var(--warm),.16); pointer-events:none; display:none; }
+  .guidetag { position:absolute; height:15px; line-height:15px; font-size:12px; padding:0 4px; background:#2a2733; color:var(--text);
+    transform:translateX(-50%); pointer-events:none; white-space:nowrap; display:none; border:1px solid var(--border); }
+
+  .rail { position:absolute; left:0; height:1px; background:rgba(var(--warm),.10); }
+  .stem { position:absolute; width:1px; background:rgba(var(--warm),.16); pointer-events:none; }
+  .pdot { position:absolute; width:11px; height:11px; border-radius:50%; border:2px solid var(--offline); box-shadow:0 0 0 1px #0e0d14; cursor:pointer; margin:-5.5px 0 0 -5.5px; }
+  .pdot.on { border-color:var(--online); }
+  .pdot.me { outline:1px solid rgba(255,255,255,.75); outline-offset:2px; }
+  .head-pin { position:absolute; cursor:pointer; image-rendering:pixelated; }
+  .head-pin svg { display:block; }
+  .head-pin .gnd { position:absolute; left:3px; right:3px; bottom:-4px; height:2px; background:var(--offline); }
+  .head-pin.on .gnd { background:var(--online); }
+  .head-pin.me .gnd { background:var(--text); }
+  .head-pin { z-index:1; }
+  .trail { position:absolute; height:0; border-top:2px dotted rgba(var(--warm),.28); pointer-events:none; }
+  .ghost { position:absolute; width:6px; height:6px; margin:-3px 0 0 -3px; box-shadow:inset 0 0 0 1px rgba(var(--warm),.35); border-radius:50%; pointer-events:none; }
+  .spark { position:absolute; width:10px; height:10px; pointer-events:none; animation:twinkle 2.6s steps(1) infinite; }
+  @keyframes twinkle { 0%,100% { opacity:1; } 45% { opacity:.55; } 55% { opacity:1; } 80% { opacity:.75; } }
+  .gain { color:var(--muted); font-size:12px; margin-left:3px; }
+  .idle .head-pin.on svg, .idle .head-pin.me svg { animation:bob 4.2s steps(1) infinite; animation-delay:var(--d); }
+  @keyframes bob { 0%,88%,100% { transform:translateY(0); } 90%,96% { transform:translateY(-2px); } }
+  .linking .rbar, .linking .head-pin, .linking .plab, .linking .stem { transition:opacity .15s ease-out; }
+  .linking .rbar:not(.lit), .linking .head-pin:not(.lit), .linking .plab:not(.lit), .linking .stem:not(.lit) { opacity:.3; }
+  .linking .stem.lit { background:rgba(var(--warm),.5); }
+  .head-pin .cnt { position:absolute; left:100%; top:-2px; margin-left:1px; font-size:11px; color:var(--text); background:#2a2733; padding:0 3px; line-height:13px; }
+  .plab { position:absolute; height:19px; line-height:19px; white-space:nowrap; font-size:14px; color:var(--text); cursor:pointer; padding:0 4px; margin-left:-4px; }
+  .plab:hover, .plab.kin { background:rgba(var(--warm),.08); }
+  .plab .lv { color:var(--muted); font-size:12px; margin-left:4px; }
+  .plab .more { color:var(--muted); font-size:12px; margin-left:3px; }
+  .plab .od { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--online); margin-right:4px; vertical-align:2px; }
+  .atag { font-size:12px; color:var(--muted); background:rgba(var(--warm),.08); padding:0 3px; margin-left:4px; line-height:14px; display:inline-block; }
+  .faded { opacity:.3; }
+
+  /* Bars */
+  .dbar { position:absolute; height:20px; line-height:20px; font-size:14px; white-space:nowrap; display:flex; align-items:center; gap:5px;
+    padding:0 5px; color:var(--dim); background:rgba(255,255,255,.05); cursor:default; }
+  .dbar.fit { background:rgba(255,255,255,.12); color:var(--text); box-shadow:inset 0 -2px 0 var(--fill); }
+  .dbar.attune { background:transparent; outline:1px dashed rgba(255,255,255,.25); outline-offset:-1px; }
+  .dbar.shared { outline:1px solid rgba(255,255,255,.6); outline-offset:-1px; }
+  .mdots { display:flex; gap:3px; }
+  .mdots i { width:6px; height:6px; border-radius:50%; display:block; }
+  .plus { font-size:12px; color:var(--muted); }
+  .inf { width:18px; height:9px; flex:none; }
+  .diamond { width:7px; height:7px; transform:rotate(45deg); background:var(--fill); flex:none; margin:0 2px; }
+
+  /* B/C bars: plate = true range, name may run past it */
+  .rbar { position:absolute; height:20px; cursor:default; }
+  .rbar .plate { position:absolute; left:0; top:0; bottom:0; background:rgba(255,255,255,.045); }
+  .rbar .plate::before, .rbar .plate::after { content:""; position:absolute; top:0; bottom:0; width:2px; background:rgba(255,255,255,.14); }
+  .rbar .plate::before { left:0; } .rbar .plate::after { right:0; }
+  .rbar .lab { position:absolute; left:0; top:0; height:20px; line-height:20px; padding:0 6px 0 7px; display:flex; align-items:center; gap:5px;
+    white-space:nowrap; font-size:14px; color:var(--dim); }
+  .rbar.fit .plate { background:rgba(255,255,255,.12); box-shadow:inset 0 -2px 0 var(--fill); }
+  .rbar.fit .plate::before, .rbar.fit .plate::after { background:rgba(255,255,255,.45); }
+  .rbar.fit .lab { color:var(--text); }
+  .rbar.past .lab { color:#6d6b78; }
+  .rbar.past .plate { background:rgba(255,255,255,.025); }
+  .rbar.past .plate::before, .rbar.past .plate::after { background:rgba(255,255,255,.07); }
+  .rbar.attune .plate { background:transparent; outline:1px dashed rgba(255,255,255,.28); outline-offset:-1px; }
+  .rbar.attune .plate::before, .rbar.attune .plate::after { display:none; }
+  .rbar.shared .plate { outline:1px solid rgba(255,255,255,.65); outline-offset:-1px; }
+  .rbar:hover .plate { background:rgba(255,255,255,.16); }
+  .rbar.fit:hover .plate { background:rgba(255,255,255,.2); }
+  .medal { width:11px; height:11px; flex:none; display:block; }
+  .rbar .seg, .rbar .done { display:none; }
+
+  /* 2 · Three shapes: fit is a solid plate, ahead is hollow, outlevelled is only a baseline. Form, not three greys. */
+  .vb-shapes .rbar .plate { background:transparent; box-shadow:inset 0 0 0 1px rgba(var(--warm),.22); }
+  .vb-shapes .rbar .plate::before, .vb-shapes .rbar .plate::after { display:none; }
+  .vb-shapes .rbar .lab { color:var(--muted); }
+  .vb-shapes .rbar.fit .plate { background:rgba(var(--warm),.20); box-shadow:none; }
+  .vb-shapes .rbar.fit .plate::before, .vb-shapes .rbar.fit .plate::after { display:block; background:rgba(255,255,255,.75); }
+  .vb-shapes .rbar.fit .lab { color:var(--text); }
+  .vb-shapes .rbar.past .plate { background:transparent; box-shadow:inset 0 -1px 0 rgba(var(--warm),.16); }
+  .vb-shapes .rbar.past .lab { color:#6d6b78; }
+  .vb-shapes .rbar.attune .plate { box-shadow:none; outline:1px dashed rgba(255,255,255,.3); outline-offset:-1px; }
+  .vb-shapes .rbar:hover .plate { background:rgba(var(--warm),.08); }
+  .vb-shapes .rbar.fit:hover .plate { background:rgba(var(--warm),.26); }
+
+  /* 3 · Friends' colours: a 3px foot split into the class colours of the friends who fit. Colour means people. */
+  .vb-friends .rbar .plate { background:rgba(255,255,255,.04); }
+  .vb-friends .rbar.fit .plate { background:rgba(255,255,255,.11); box-shadow:inset 0 -1px 0 rgba(255,255,255,.3); }
+  .vb-friends .rbar.past .plate { background:rgba(255,255,255,.02); }
+  .vb-friends .rbar .mdots, .vb-friends .rbar .plus { display:none; }
+  .vb-friends .rbar .seg { display:flex; position:absolute; left:2px; right:2px; bottom:0; height:3px; gap:1px; }
+  .vb-friends .rbar .seg i { flex:1; display:block; }
+  .vb-friends .rbar.past .seg { opacity:.45; }
+
+  /* 4 · Your place in it: a fit bar is filled up to your level, so you see how much of it is left. */
+  .vb-place .rbar .plate { background:transparent; box-shadow:inset 0 0 0 1px rgba(var(--warm),.16); }
+  .vb-place .rbar .plate::before, .vb-place .rbar .plate::after { display:none; }
+  .vb-place .rbar .lab { color:var(--muted); }
+  .vb-place .rbar.fit .plate { background:rgba(var(--warm),.07); box-shadow:none; }
+  .vb-place .rbar.fit .done { display:block; position:absolute; left:0; top:0; bottom:0; background:rgba(var(--warm),.22);
+    box-shadow:inset 0 -2px 0 rgba(255,255,255,.7); }
+  .vb-place .rbar.fit .lab { color:var(--text); }
+  .vb-place .rbar.past .plate { background:rgba(var(--warm),.04); box-shadow:none; }
+  .vb-place .rbar.past .lab { color:#6d6b78; }
+  .vb-place .rbar.attune .plate { box-shadow:none; outline:1px dashed rgba(255,255,255,.3); outline-offset:-1px; }
+  .vb-place .rbar:hover .plate { box-shadow:inset 0 0 0 1px rgba(var(--warm),.4); }
+
+  /* 5 · Ledger rules: no plates. A range rule with end ticks under the name; weight and type carry the state. */
+  .vb-rules .rbar .plate { background:transparent; box-shadow:none; }
+  .vb-rules .rbar .plate::before, .vb-rules .rbar .plate::after { width:1px; top:auto; height:7px; bottom:0; background:rgba(var(--warm),.35); }
+  .vb-rules .rbar .seg { display:block; position:absolute; left:0; right:0; bottom:0; height:1px; background:rgba(var(--warm),.35); }
+  .vb-rules .rbar .seg i { display:none; }
+  .vb-rules .rbar .lab { color:var(--muted); top:-2px; }
+  .vb-rules .rbar.fit .seg { height:3px; background:rgba(var(--warm),.85); }
+  .vb-rules .rbar.fit .plate::before, .vb-rules .rbar.fit .plate::after { width:2px; height:9px; background:rgba(var(--warm),.85); }
+  .vb-rules .rbar.fit .lab { color:var(--text); }
+  .vb-rules .rbar.past .seg { background:none; border-bottom:1px dashed rgba(var(--warm),.22); height:0; }
+  .vb-rules .rbar.past .plate::before, .vb-rules .rbar.past .plate::after { background:rgba(var(--warm),.16); }
+  .vb-rules .rbar.past .lab { color:#6d6b78; }
+  .vb-rules .rbar.attune .seg { background:none; border-bottom:1px dashed rgba(255,255,255,.4); height:0; }
+  .vb-rules .rbar:hover .plate { background:rgba(var(--warm),.06); }
+  .vb-rules .rbar.shared .plate { outline:none; background:rgba(255,255,255,.08); }
+
+  /* Overview */
+  .ov { height:22px; flex:none; border-top:1px solid var(--hair); position:relative; margin:0 12px; cursor:pointer; }
+  .ov .f { position:absolute; top:3px; bottom:3px; border:1px solid rgba(var(--warm),.35); background:rgba(var(--warm),.04); }
+  .ov .t { position:absolute; width:2px; height:6px; top:8px; }
+  .ov .y { position:absolute; width:2px; top:4px; bottom:4px; background:var(--gold); }
+  .ov .l { position:absolute; height:1px; background:rgba(255,255,255,.22); }
+  .ov .l.fit { background:rgba(255,255,255,.6); }
+  .ov .bd { position:absolute; top:3px; bottom:3px; background:rgba(var(--gold-rgb),.12); border-left:1px solid rgba(var(--gold-rgb),.5); border-right:1px solid rgba(var(--gold-rgb),.5); }
+  .ov .pt { position:absolute; width:3px; height:3px; top:4px; border-radius:50%; }
+  .ov .dt { position:absolute; top:3px; bottom:3px; width:1px; background:rgba(var(--warm),.12); }
+  .ov .dn { position:absolute; top:4px; font-size:11px; line-height:13px; color:rgba(var(--warm),.3); pointer-events:none; }
+  .ov .col { position:absolute; bottom:3px; background:rgba(var(--warm),.2); }
+  .ov .col.near { background:rgba(var(--warm),.55); }
+  .ov .base { position:absolute; bottom:3px; height:1px; background:rgba(var(--warm),.12); }
+  .ov .fp { position:absolute; bottom:0; height:2px; }
+  .ov .dw { position:absolute; top:3px; bottom:3px; background:rgba(var(--warm),.05); }
+  .ov .pin { position:absolute; width:3px; top:9px; height:9px; }
+  .ov .pin.off { opacity:.5; height:6px; top:12px; }
+  .jump { position:absolute; top:4px; font-size:12px; color:var(--text); background:#2a2733; padding:0 5px; line-height:14px; cursor:pointer; border:1px solid var(--border); }
+
+  /* Tooltip, the game's GameTooltip shape */
+  .tip { position:fixed; z-index:20; background:rgba(8,8,16,.94); border:1px solid #5a5a6a; border-radius:3px; padding:6px 9px; font:13px/1.35 var(--narrow);
+    color:var(--text); pointer-events:none; display:none; max-width:280px; box-shadow:0 0 0 1px #000; }
+  .tip .tt { font-size:15px; color:#fff; }
+  .tip .d { color:var(--dim); } .tip .m { color:var(--muted); } .tip .g { color:var(--gold); } .tip .o { color:var(--online); }
+  .tip .row { display:flex; justify-content:space-between; gap:16px; }
+  .tip .ep { color:var(--epic); }
+</style>
+</head>
+<body>
+<div class="bar-top">
+  <span class="lbl">Bars</span>
+  <button data-b="today">1 · Today</button>
+  <button data-b="dither">2 · Dithered</button>
+  <button data-b="banners">3 · Banners</button>
+  <button data-b="gates">4 · Gates</button>
+  <button data-b="stone">5 · Stone</button>
+  <span class="sep"></span>
+  <button id="ruled">Ruled lanes: on</button>
+</div>
+<div class="bar-top">
+  <span class="lbl">Overview</span>
+  <button data-o="today">Q · Today</button>
+  <button data-o="density">W · Density</button>
+  <button data-o="crew">E · Crew</button>
+  <span class="sep"></span>
+  <button id="size">Size: 640×520</button>
+  <button id="me">Playing: 24</button>
+</div>
+<div class="bar-top">
+  <span class="lbl">Alive</span>
+  <button id="trails">Away trails: on</button>
+  <button id="idle">Idle heads: on</button>
+  <button id="links">Hover links: on</button>
+  <button id="replay">Replay opening</button>
+</div>
+<div class="note" id="note"></div>
+<div class="note sub" id="onote"></div>
+<div class="stage"><div class="zoom"><div class="panel" id="panel">
+  <div class="head"><span class="t">Best Friends in Forever</span><span class="s"><i></i>3 of 6 by the fire</span><span class="x">✕</span></div>
+  <div class="camp" id="camp"><div class="hills"></div><div class="ground"></div><div class="glow"></div><div class="fire"></div></div>
+  <div class="body">
+    <div class="firelight"></div><div class="settle"></div>
+    <div class="side"><div>Roster</div><div>Feed</div><div>Trophies</div><div>When</div><div>Spares</div><div>Professions</div><div class="sel">Dungeons</div><div class="grow"></div><div>Settings</div><div class="ver">v1.4.0</div></div>
+    <div class="content">
+      <div class="tool" id="tool"></div>
+      <div class="linewrap"><div class="lscroll" id="scroll"><div class="track" id="track"></div></div></div>
+      <div class="ov" id="ov"></div>
+    </div>
+  </div>
+</div></div></div>
+<div class="tip" id="tip"></div>
+
+<script>
+const BAR_NOTES = {
+  today: "As built: three plates at 12%, 5% and 2.5% white on near-black. Fit, ahead and outlevelled differ only in how grey they are.",
+  shapes: "Three shapes. You fit: a solid cream plate with bright caps. Ahead of you: hollow, a 1px outline. Outlevelled: no plate, only a faint baseline. You tell them apart by form, before tone.",
+  friends: "Friends' colours. A 3px foot along the bar, split into the class colours of the friends who fit it (it replaces the dots). Bars nobody fits stay grey, so colour marks where people are. Needs the class-colour rule to cover this.",
+  place: "Your place in it. A fit bar is filled up to your level, so you see how much of it you have left before you outlevel it. Ahead is hollow, outlevelled a faint full plate.",
+  rules: "Ledger rules. No plates at all: a range rule with end ticks under each name, 3px bright where you fit, 1px where you don't, dashed once outlevelled. The lightest page; the type does the work.",
+};
+Object.assign(BAR_NOTES, {
+  dither: "Dithered, in the Camp's own pixel language (2-unit pixels, as on Roster rows). You fit: a solid plate. Ahead of you: a 50% checker. Outlevelled: a sparse 25% dither. Corners are stepped, not square. In game: two tiny tiled textures, filtered NEAREST.",
+  banners: "Banners. Each bar is a pennant: a peg at the start of its range and a swallowtail notch at the end, so the line reads as flags planted along the road rather than boxes. Fit is a pale banner, ahead a dark one, outlevelled a ghost. In game: a notch cap sprite.",
+  gates: "Gates. Each bar opens with a pixel-art glyph on a dark tile: an arch for a dungeon, a key for an attunement. It's bright where you fit and dim where you've outlevelled. The glyphs give the column a rhythm of shapes on the left.",
+  stone: "Stone. A tablet per dungeon: a speckled fill, a lit top edge and a dark foot (flat 1px lines, no gradient), stepped corners. Fit tablets are pale stone, ahead dark slate, outlevelled worn and faint. The most textured, and the furthest from the Flat Ledger Rule.",
+});
+const OV_NOTES = {
+  today: "Overview as built, without the level numbers: each dungeon a 1px grey line in its lane.",
+  density: "Density: a column per level, as tall as how many dungeons fit it, brighter in your can-play band, Friends as class-colour feet along the bottom. No numbers.",
+  crew: "Crew: the strip only says where people are. Class-colour pins (short while offline), you in gold. No numbers.",
+};
+const CLS = { MAGE:"#3FC7EB", WARRIOR:"#C69B6D", ROGUE:"#FFF468", DRUID:"#FF7C0A", PRIEST:"#FFFFFF", HUNTER:"#AAD372", WARLOCK:"#8788EE", PALADIN:"#F48CBA", SHAMAN:"#0070DD" };
+
+const DUNGEONS = [
+  ["Ragefire Chasm",13,18],["Hall of Thanes",13,18,1],["Ruins of Lordaeron",15,20,1],["Wailing Caverns",17,24],["The Deadmines",17,26],
+  ["Shadowfang Keep",22,30],["Blackfathom Deeps",24,32],["The Stockade",24,32],["Excavation Site",24,29,1],["SM Graveyard",28,38],
+  ["City of Dalaran",28,33,1],["Gnomeregan",29,38],["SM Library",29,39],["Razorfen Kraul",30,40],["SM Armory",32,42],["SM Cathedral",35,45],
+  ["The Drowned City",35,40,1],["Razorfen Downs",40,50],["Krol'dok Stronghold",40,45,1],["Uldaman",42,52],["Zul'Farrak",44,54],["Maraudon",46,55],
+  ["Alcaz Prison",48,53,1],["Sunken Temple",50,60],["Blackrock Depths",52,60],["Lower Blackrock Spire",55,60],["Blackmaw Hold",55,60,1],
+  ["Onyxia attunement",55,60,0,"attunement"],["Dire Maul",56,60],["Scholomance",58,60],["Stratholme",58,60],["Upper Blackrock Spire",58,60],["Shaper's Terrace",58,60,1],
+].map(([name,from,to,forever,kind]) => ({ name, from, to, forever:!!forever, kind: kind || "dungeon" }));
+const CLEARED = { "Ragefire Chasm":"2 Nov · Simone, Simbad, You", "Wailing Caverns":"9 Nov · Mirelle, Simone, Torvald", "The Deadmines":"11 Nov · Simbad, You, Torvald", "Hall of Thanes":"4 Nov · Simone, You" };
+
+// Members and Characters. "me" is a Character of member 0.
+const CREW = [
+  { id:0, member:"You", chars:[{ name:"Hugh Storaker", cls:"WARRIOR", level:24, main:true, online:true, own:true }, { name:"Hugh Pell", cls:"PRIEST", level:12, alt:true, own:true }] },
+  { id:1, member:"Simone", chars:[{ name:"Simone Ashvale", cls:"MAGE", level:22, was:21, main:true, online:true }] },
+  { id:2, member:"Simbad", chars:[{ name:"Simbad", cls:"ROGUE", level:27, was:24, main:true }, { name:"Simbad Tarn", cls:"HUNTER", level:13, alt:true }] },
+  { id:3, member:"Simba", chars:[{ name:"Simba Reed", cls:"DRUID", level:33, main:true }] },
+  { id:4, member:"Mirelle", chars:[{ name:"Mirelle", cls:"PRIEST", level:19, was:17, main:true, online:true }] },
+  { id:5, member:"Torvald", chars:[{ name:"Torvald Grimm", cls:"PALADIN", level:25, main:true }] },
+];
+const ME_LEVELS = [24, 41, 12];
+
+const state = { trails:false, idle:true, links:true, ruled:true, b:"dither", o:"density", v:"C", small:false, meIdx:0, selected:new Set(), scroll:null };
+const L = { level:24, left:16, right:90, levels:60, rowGap:6, laneGap:3 };
+const TRACK_W = L.left + L.levels * L.level + L.right;
+const xOf = lv => L.left + (lv - 1) * L.level + L.level / 2;
+
+const $ = id => document.getElementById(id);
+const el = (cls, css, html) => { const d = document.createElement("div"); if (cls) d.className = cls; if (css) Object.assign(d.style, css); if (html != null) d.innerHTML = html; return d; };
+const measurer = document.createElement("canvas").getContext("2d");
+const tw = (t, size = 14) => { measurer.font = `${size}px "Arial Narrow","Archivo Narrow",sans-serif`; return Math.ceil(measurer.measureText(t).width); };
+
+// The Camp's seated figure, rows 0–6: a hooded head, for pins.
+const HEAD = ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK..."];
+function headSVG(cls, px = 2) {
+  const tint = CLS[cls];
+  const mul = (hex, f) => { const n = parseInt(hex.slice(1), 16); const c = [n >> 16, n >> 8 & 255, n & 255].map(v => Math.round(v * f)); return `rgb(${c})`; };
+  const pal = { K:"#0b0a12", S:"#e8b890", s:"#b98465", C:tint, D:mul(tint, .62) };
+  let r = "";
+  HEAD.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== ".") r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${pal[ch]}"/>`; }));
+  return `<svg width="${12 * px}" height="${7 * px}" viewBox="0 0 12 7" shape-rendering="crispEdges">${r}</svg>`;
+}
+// Crossed swords, pixel-drawn, in the epic colour: "the Crew has cleared this".
+const SWORDS = (() => { const g = ["K.......K", ".W.....W.", "..W...W..", "...W.W...", "....W....", "...W.W...", ".HW...WH.", "..H...H..", ".H.....H."];
+  let r = ""; g.forEach((row, y) => [...row].forEach((c, x) => { if (c !== ".") r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${c === "H" ? "#7a3aa8" : c === "K" ? "#e8d4ff" : "#b55cf5"}"/>`; }));
+  return `<svg class="medal" viewBox="0 0 9 9" shape-rendering="crispEdges">${r}</svg>`; })();
+// The Camp's spark: a cross of ember with a gold heart. The one gold mark on a person: they levelled while you were away.
+const SPARK = (() => { const g = ["..e..", ".eGe.", "eGGGe", ".eGe.", "..e.."]; let r = "";
+  g.forEach((row, y) => [...row].forEach((c, x) => { if (c !== ".") r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${c === "G" ? "#ffd14a" : "rgba(240,162,28,.75)"}"/>`; }));
+  return `<svg width="10" height="10" viewBox="0 0 5 5" shape-rendering="crispEdges">${r}</svg>`; })();
+// Gates: 7×7 pixel glyphs, at 2 UI units a pixel. S is the glyph, D its dark inside.
+const ARCH = ["..SSS..", ".SDDDS.", "SDDDDDS", "SDDDDDS", "SDDDDDS", "SDDDDDS", "SSDDDSS"];
+const KEY  = ["..SSS..", ".SD.DS.", ".SDDDS.", "..SSS..", "...S...", "...SS..", "...SS.."];
+const glyph = rows => { let r = ""; rows.forEach((row, y) => [...row].forEach((c, x) => {
+  if (c === "S") r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="currentColor"/>`;
+  if (c === "D") r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="rgba(0,0,0,.55)"/>`; }));
+  return `<svg width="14" height="14" viewBox="0 0 7 7" shape-rendering="crispEdges">${r}</svg>`; };
+// Pixel patterns, in 2-unit pixels.
+const pat = (w, h, rects, c) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' shape-rendering='crispEdges'>${rects.map(([x, y, a, b]) => `<rect x='${x}' y='${y}' width='${a}' height='${b}' fill='${c}'/>`).join("")}</svg>`)}")`;
+const CHECK = a => pat(4, 4, [[0, 0, 2, 2], [2, 2, 2, 2]], `rgba(255,236,200,${a})`);
+const SPARSE = a => pat(4, 4, [[0, 0, 2, 2]], `rgba(255,236,200,${a})`);
+const SPECK = a => pat(10, 10, [[0, 0, 2, 2], [6, 2, 1, 1], [3, 6, 2, 1], [8, 7, 1, 2]], `rgba(255,236,200,${a})`);
+const STEP = "polygon(0 2px,2px 2px,2px 0,calc(100% - 2px) 0,calc(100% - 2px) 2px,100% 2px,100% calc(100% - 2px),calc(100% - 2px) calc(100% - 2px),calc(100% - 2px) 100%,2px 100%,2px calc(100% - 2px),0 calc(100% - 2px))";
+const tex = document.createElement("style");
+tex.textContent = `
+  .lanerow { position:absolute; left:0; height:23px; background:rgba(var(--warm),.022); pointer-events:none; }
+  /* 2 · Dithered */
+  .vb-dither .rbar .plate { clip-path:${STEP}; background:${CHECK(.13)}; background-size:4px 4px; box-shadow:none; image-rendering:pixelated; }
+  .vb-dither .rbar .plate::before, .vb-dither .rbar .plate::after { background:rgba(var(--warm),.22); }
+  .vb-dither .rbar .lab { color:var(--muted); }
+  .vb-dither .rbar.fit .plate { background:rgba(var(--warm),.2); }
+  .vb-dither .rbar.fit .plate::before, .vb-dither .rbar.fit .plate::after { background:rgba(255,255,255,.75); }
+  .vb-dither .rbar.fit .lab { color:var(--text); }
+  .vb-dither .rbar.past .plate { background:${SPARSE(.09)}; background-size:4px 4px; }
+  .vb-dither .rbar.past .plate::before, .vb-dither .rbar.past .plate::after { display:none; }
+  .vb-dither .rbar.past .lab { color:#6d6b78; }
+  .vb-dither .rbar.attune .plate { clip-path:none; background:${SPARSE(.16)}; background-size:4px 4px; outline:1px dashed rgba(255,255,255,.3); outline-offset:-1px; }
+  .vb-dither .rbar:hover .plate { background-color:rgba(var(--warm),.06); }
+  .vb-dither .rbar.shared .plate { clip-path:none; }
+  /* 3 · Banners */
+  .vb-banners .rbar .plate { clip-path:polygon(0 0,100% 0,calc(100% - 7px) 50%,100% 100%,0 100%); background:rgba(var(--warm),.075); box-shadow:none; }
+  .vb-banners .rbar .plate::before { background:rgba(var(--warm),.3); }
+  .vb-banners .rbar .plate::after { display:none; }
+  .vb-banners .rbar .peg { position:absolute; left:0; top:-2px; bottom:-2px; width:2px; background:rgba(var(--warm),.3); }
+  .vb-banners .rbar .lab { color:var(--muted); }
+  .vb-banners .rbar.fit .plate { background:rgba(var(--warm),.24); }
+  .vb-banners .rbar.fit .peg { background:rgba(255,255,255,.85); }
+  .vb-banners .rbar.fit .plate::before { background:rgba(255,255,255,.85); }
+  .vb-banners .rbar.fit .lab { color:var(--text); }
+  .vb-banners .rbar.past .plate { background:rgba(var(--warm),.03); }
+  .vb-banners .rbar.past .peg, .vb-banners .rbar.past .plate::before { background:rgba(var(--warm),.12); }
+  .vb-banners .rbar.past .lab { color:#6d6b78; }
+  .vb-banners .rbar.attune .plate { clip-path:none; background:transparent; outline:1px dashed rgba(255,255,255,.3); outline-offset:-1px; }
+  .vb-banners .rbar:hover .plate { background:rgba(var(--warm),.13); }
+  .vb-banners .rbar.fit:hover .plate { background:rgba(var(--warm),.3); }
+  /* 4 · Gates */
+  .vb-gates .rbar .plate { background:rgba(255,255,255,.05); }
+  .vb-gates .rbar.fit .plate { background:rgba(var(--warm),.15); box-shadow:inset 0 -2px 0 rgba(255,255,255,.35); }
+  .vb-gates .rbar .plate::before { display:none; }
+  .vb-gates .rbar .lab { padding-left:0; color:var(--muted); }
+  .vb-gates .gate { width:20px; height:20px; flex:none; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.4); color:rgba(var(--warm),.5); margin-right:2px; }
+  .vb-gates .rbar.fit .gate { color:#f2ead8; background:rgba(0,0,0,.5); }
+  .vb-gates .rbar.fit .lab { color:var(--text); }
+  .vb-gates .rbar.past .gate { color:rgba(var(--warm),.2); background:rgba(0,0,0,.25); }
+  .vb-gates .rbar.past .plate { background:rgba(255,255,255,.02); }
+  .vb-gates .rbar.past .lab { color:#6d6b78; }
+  /* 5 · Stone */
+  .vb-stone .rbar .plate { clip-path:${STEP}; background:${SPECK(.07)} rgba(var(--warm),.05); background-size:10px 10px;
+    box-shadow:inset 0 1px 0 rgba(var(--warm),.16), inset 0 -2px 0 rgba(0,0,0,.45); image-rendering:pixelated; }
+  .vb-stone .rbar .plate::before, .vb-stone .rbar .plate::after { display:none; }
+  .vb-stone .rbar .lab { color:var(--muted); }
+  .vb-stone .rbar.fit .plate { background:${SPECK(.12)} rgba(var(--warm),.19); background-size:10px 10px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.45), inset 0 -2px 0 rgba(0,0,0,.5); }
+  .vb-stone .rbar.fit .lab { color:var(--text); }
+  .vb-stone .rbar.past .plate { background:${SPECK(.05)} rgba(var(--warm),.015); background-size:10px 10px; box-shadow:inset 0 -1px 0 rgba(0,0,0,.35); }
+  .vb-stone .rbar.past .lab { color:#6d6b78; }
+  .vb-stone .rbar.attune .plate { clip-path:none; background:transparent; box-shadow:none; outline:1px dashed rgba(255,255,255,.3); outline-offset:-1px; }
+  .vb-stone .rbar:hover .plate { background-color:rgba(var(--warm),.1); }
+  .vb-stone .rbar.shared .plate, .vb-dither .rbar.shared .plate { clip-path:none; }
+`;
+document.head.append(tex);
+const INF = `<svg class="inf" viewBox="0 0 18 9"><path d="M9 4.5C7 1 2.5 1 2.5 4.5S7 8 9 4.5 16 1 16 4.5 11 8 9 4.5Z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>`;
+
+function model() {
+  const meLevel = ME_LEVELS[state.meIdx];
+  const chars = [];
+  CREW.forEach(m => m.chars.forEach(c => chars.push({ ...c, memberId:m.id, member:m.member, level: c.own && c.main ? meLevel : c.level })));
+  const me = chars.find(c => c.own && c.main);
+  // Shown: other Members' Mains (+ played), your played Character. Alts hidden (Show menu default).
+  const shown = chars.filter(c => c.main);
+  const groups = {};
+  shown.forEach(c => { (groups[c.level] = groups[c.level] || []).push(c); });
+  const glist = Object.keys(groups).map(Number).sort((a, b) => a - b).map(level => {
+    const cs = groups[level].sort((a, b) => (b.own - a.own) || (b.online - a.online));
+    return { level, chars:cs, lead:cs[0], memberIds:cs.filter(c => !c.own).map(c => c.memberId), online:cs.some(c => c.online), own:cs.some(c => c.own) };
+  });
+  // Label rows (4), you first, then online, then nearest.
+  const order = [...glist].sort((a, b) => (b.own - a.own) || (b.online - a.online) || (Math.abs(a.level - meLevel) - Math.abs(b.level - meLevel)));
+  const rows = [[], [], [], []];
+  order.forEach(g => {
+    const text = g.own ? "You" : g.lead.member;
+    const w = (g.online && !g.own ? 10 : 0) + tw(text) + 4 + tw(String(g.level), 12) + (g.chars.length > 1 ? 18 : 0) + 8;
+    const left = xOf(g.level) - 4, right = left + w;
+    for (let r = 0; r < 4; r++) {
+      if (rows[r].every(o => right + L.rowGap <= o.left || left >= o.right + L.rowGap)) { rows[r].push({ left, right }); g.row = r; g.text = text; break; }
+    }
+  });
+  const rowsUsed = Math.max(1, ...glist.map(g => g.row == null ? 0 : g.row + 1));
+  // Bars.
+  const others = chars.filter(c => !c.own);
+  const bars = DUNGEONS.map(d => {
+    const fits = me.level >= d.from && me.level <= d.to;
+    const byMember = {};
+    others.filter(c => c.level >= d.from && c.level <= d.to).forEach(c => {
+      const prev = byMember[c.memberId];
+      if (!prev || Math.abs(c.level - me.level) < Math.abs(prev.level - me.level)) byMember[c.memberId] = c;
+    });
+    const fitters = Object.values(byMember).sort((a, b) => b.online - a.online);
+    const almost = others.filter(c => c.main && c.level < d.from && d.from - c.level <= 3);
+    const left = xOf(d.from) - L.level / 2, rangeW = (d.to - d.from + 1) * L.level;
+    const contentW = (state.b === "gates" ? 22 : 0) + 7 + tw(d.name) + (d.forever ? 23 : 0) + (fitters.length ? 5 + Math.min(4, fitters.length) * 9 : 0) + (fitters.length > 4 ? 18 : 0) + (CLEARED[d.name] ? 15 : 0) + 8;
+    return { ...d, fits, fitters, almost, left, rangeW, contentW, past: me.level > d.to, ahead: me.level < d.from };
+  });
+  const sorted = [...bars].sort((a, b) => (b.fits - a.fits) || (b.fitters.length - a.fitters.length) || (a.from - b.from));
+  const lanes = [];
+  sorted.forEach(b => {
+    const w = Math.max(b.rangeW, b.contentW), l = b.left, r = l + w;
+    let i = lanes.findIndex(lane => lane.every(o => r + L.laneGap <= o.l || l >= o.r + L.laneGap));
+    if (i < 0) { lanes.push([]); i = lanes.length - 1; }
+    lanes[i].push({ l, r }); b.lane = i; b.w = w;
+  });
+  // Selection.
+  const sel = state.selected;
+  if (sel.size) bars.forEach(b => {
+    const ok = b.fits && [...sel].every(id => chars.some(c => c.memberId === id && c.level >= b.from && c.level <= b.to));
+    b.shared = ok; b.faded = !ok;
+  });
+  if (sel.size) glist.forEach(g => { g.faded = !g.own && !g.memberIds.some(id => sel.has(id)); });
+  return { me, glist, rowsUsed, bars, lanes:lanes.length, chars };
+}
+
+let M, geo;
+function render() {
+  M = model();
+  const v = state.v, refined = true;
+  document.querySelectorAll("[data-b]").forEach(b => b.classList.toggle("on", b.dataset.b === state.b));
+  document.querySelectorAll("[data-o]").forEach(b => b.classList.toggle("on", b.dataset.o === state.o));
+  $("note").textContent = BAR_NOTES[state.b];
+  $("onote").textContent = OV_NOTES[state.o];
+  $("track").className = "track vb-" + state.b + (state.idle ? " idle" : "");
+  for (const [id, key, name] of [["trails", "trails", "Away trails"], ["idle", "idle", "Idle heads"], ["links", "links", "Hover links"]]) $(id).textContent = name + ": " + (state[key] ? "on" : "off");
+  $("panel").style.width = (state.small ? 460 : 640) + "px";
+  $("panel").style.height = (state.small ? 380 : 520) + "px";
+  $("camp").style.height = (state.small ? 78 : 120) + "px";
+  $("size").textContent = "Size: " + (state.small ? "460×380" : "640×520");
+  $("me").textContent = "Playing: " + M.me.level;
+  drawCamp();
+
+  // Toolbar
+  const tool = $("tool"); tool.innerHTML = "";
+  tool.append(el("as", null, `<span style="color:var(--muted)">As </span><span style="color:${CLS[M.me.cls]}">${M.me.name}</span><span class="lv">${M.me.level}</span>`));
+  tool.append(el("grow"));
+  tool.append(el("hid", null, "2 alts hidden"));
+  if (state.selected.size) { const c = el("sbtn", null, "Clear"); c.onclick = () => { state.selected.clear(); render(); }; tool.append(c); }
+  tool.append(el("sbtn", null, `<span class="funnel"></span>Show`));
+
+  // Geometry
+  const H = $("scroll").clientHeight;
+  const ROW = 21, AXIS = 20, LANE = 23;
+  let rowsTop, rows;
+  if (refined) { rows = M.rowsUsed; rowsTop = 22; }
+  else { rows = 4; rowsTop = 20; }
+  const rowY = r => rowsTop + (rows - 1 - r) * ROW;
+  const railY = rowsTop + rows * ROW + (v === "C" ? 22 : 6);
+  const axisY = railY + (v === "C" ? 8 : 14);
+  const laneY = l => axisY + AXIS + 6 + l * LANE;
+  geo = { H, axisY };
+
+  const track = $("track"); track.innerHTML = ""; track.style.width = TRACK_W + "px";
+  const me = M.me;
+
+  // Decades
+  for (let d = 10; d <= 50; d += 20) track.append(el("decade", { left:xOf(d) + "px", width:(10 * L.level) + "px" }));
+  // Can-play band
+  const band = el("band", { left:(xOf(me.level - 3) - 12) + "px", width:(7 * L.level) + "px" }, "<span>can play</span>");
+  track.append(band);
+
+  // Your level, down through the lanes: a bar it crosses is one you fit.
+  if (refined) track.append(el("meline", { left:xOf(me.level) + "px", top:(axisY + 20) + "px", bottom:"0" }));
+
+  // Axis
+  const axis = el("axis" + (refined ? " b" : ""), { top:axisY + "px", width:TRACK_W + "px" });
+  for (let lv = 1; lv <= 60; lv++) {
+    const big = lv % 5 === 0 || lv === 1;
+    axis.append(el("tick" + (big ? " big" : ""), { left:xOf(lv) + "px" }));
+    if (refined && lv === me.level) continue;
+    if (big || lv === me.level) axis.append(el("tnum" + (lv === me.level ? " me" : ""), { left:xOf(lv) + "px" }, lv));
+  }
+  if (refined) axis.append(el("meflag", { left:xOf(me.level) + "px" }, me.level));
+  const shade = el("rangeshade"); axis.append(shade); geo.shade = shade;
+  track.append(axis);
+
+  // Rail + friends
+  if (v !== "C") track.append(el("rail", { top:railY + "px", width:TRACK_W + "px" }));
+  M.glist.forEach(g => {
+    const x = xOf(g.level);
+    const fade = g.faded ? " faded" : "";
+    if (g.row != null) {
+      const y = rowY(g.row);
+      g.stem = el("stem" + fade, { left:x + "px", top:(y + 19) + "px", height:(railY - y - 19 - (v === "C" ? 15 : 5)) + "px" });
+      track.append(g.stem);
+      const gain = state.trails && g.lead.was && !g.own ? `<span class="gain">+${g.level - g.lead.was}</span>` : "";
+      const lab = el("plab" + fade, { left:x + "px", top:y + "px" },
+        `${g.online && !g.own ? '<span class="od"></span>' : ""}${g.text}<span class="lv">${g.level}</span>${gain}${g.chars.length > 1 ? `<span class="more">+${g.chars.length - 1}</span>` : ""}`);
+      g.lab = lab; hook(lab, g, "group"); track.append(lab);
+    }
+    const was = g.lead.was;
+    if (state.trails && was && was < g.level && !g.own) {
+      track.append(el("trail", { left:(xOf(was) + 4) + "px", top:(railY + 3) + "px", width:(x - xOf(was) - 16) + "px" }));
+      track.append(el("ghost", { left:xOf(was) + "px", top:(railY + 4) + "px" }));
+      track.append(el("spark", { left:(x + 7) + "px", top:(railY - 22) + "px" }, SPARK));
+    }
+    if (v === "C") {
+      const pin = el("head-pin" + (g.online && !g.own ? " on" : "") + (g.own ? " me" : "") + fade, { left:(x - 12) + "px", top:(railY - 14) + "px" }, headSVG(g.lead.cls) + '<span class="gnd"></span>' + (g.row == null && g.chars.length > 1 ? `<span class="cnt">${g.chars.length}</span>` : ""));
+      pin.style.setProperty("--d", (-(g.level * 0.73) % 4.2) + "s");
+      g.pin = pin; hook(pin, g, "group"); track.append(pin);
+    } else {
+      const dot = el("pdot" + (g.online ? " on" : "") + (g.own ? " me" : "") + fade, { left:x + "px", top:railY + "px", background:CLS[g.lead.cls] });
+      hook(dot, g, "group"); track.append(dot);
+    }
+  });
+
+  // Ruled lanes: every other lane a faint band, as a ledger's rows.
+  $("ruled").textContent = "Ruled lanes: " + (state.ruled ? "on" : "off");
+  if (state.ruled) for (let i = 1; i < M.lanes; i += 2) track.append(el("lanerow", { top:(laneY(i) - 1.5) + "px", width:TRACK_W + "px" }));
+  // Bars
+  M.bars.forEach(b => {
+    const top = laneY(b.lane);
+    const dots = b.fitters.slice(0, 4).map(c => `<i style="background:${CLS[c.cls]}"></i>`).join("");
+    const extras = `${b.forever ? INF : ""}${b.fitters.length ? `<span class="mdots">${dots}</span>` : ""}${b.fitters.length > 4 ? `<span class="plus">+${b.fitters.length - 4}</span>` : ""}`;
+    const name = b.kind === "raids" ? `<span class="diamond"></span>${b.name}` : b.name;
+    let node;
+    if (!refined) {
+      node = el("dbar" + (b.fits ? " fit" : "") + (b.kind === "attunement" ? " attune" : "") + (b.shared ? " shared" : "") + (b.faded ? " faded" : ""),
+        { left:b.left + "px", top:top + "px", width:b.w + "px" }, name + extras);
+    } else {
+      node = el("rbar" + (b.fits ? " fit" : "") + (b.past ? " past" : "") + (b.kind === "attunement" ? " attune" : "") + (b.shared ? " shared" : "") + (b.faded ? " faded" : ""),
+        { left:b.left + "px", top:top + "px", width:b.w + "px" });
+      const plate = el("plate", { width:b.rangeW + "px" });
+      if (b.fits) plate.append(el("done", { width:Math.min(b.rangeW, (me.level - b.from + 1) * L.level) + "px" }));
+      plate.append(el("seg", null, b.fitters.map(c => `<i style="background:${CLS[c.cls]}"></i>`).join("")));
+      if (state.b === "friends" && !b.fitters.length) plate.lastChild.remove();
+      node.append(plate);
+      if (state.b === "banners") node.append(el("peg"));
+      const medal = state.b === "gates" ? `<span class="gate">${glyph(b.kind === "attunement" ? KEY : ARCH)}</span>` : "";
+      const lab = el("lab", null, medal + name + extras);
+      node.append(lab); b.labNode = lab;
+    }
+    b.node = node; hook(node, b, "bar"); track.append(node);
+  });
+
+  // Hover guide
+  geo.guide = el("guide"); track.append(geo.guide);
+  geo.gtag = el("guidetag", { top:(axisY + 2) + "px" }); track.append(geo.gtag);
+
+  track.style.height = Math.max(H, laneY(M.lanes) + 8) + "px";
+  if (state.scroll == null) state.scroll = xOf(me.level) - $("scroll").clientWidth / 2;
+  scrollTo(state.scroll);
+}
+
+function drawCamp() {
+  const camp = $("camp");
+  camp.querySelectorAll(".star,.fig,.nm").forEach(n => n.remove());
+  const w = state.small ? 460 : 640, h = state.small ? 78 : 120;
+  for (let i = 0; i < 26; i++) { const s = el("star", { left:((i * 97) % w) + "px", top:((i * 53) % (h - 50)) + "px", opacity:.25 + (i % 4) * .15 }); camp.append(s); }
+  const seats = [[-110,"Simone","MAGE"],[-70,"You","WARRIOR"],[50,"Mirelle","PRIEST"]];
+  seats.forEach(([dx, n, cls]) => {
+    const f = el("fig", { left:(w / 2 + dx - 12) + "px" }, headSVG(cls, 2).replace('height="14"', 'height="14"'));
+    camp.append(f);
+    camp.append(el("nm", { left:(w / 2 + dx) + "px", bottom:"32px", color:n === "You" ? "var(--text)" : CLS[cls] }, n));
+  });
+}
+
+// Scrolling, sticky names, overview
+function scrollTo(x) {
+  const sc = $("scroll"); const max = Math.max(0, TRACK_W - sc.clientWidth);
+  state.scroll = Math.min(max, Math.max(0, x));
+  $("track").style.transform = `translate(${-state.scroll}px, ${-(state.vscroll || 0)}px)`;
+  M.bars.forEach(b => {
+    const inner = b.labNode || b.node; if (!inner) return;
+    const off = Math.max(0, Math.min(state.scroll - b.left, b.w - (b.labNode ? b.labNode.offsetWidth : b.contentW)));
+    if (b.labNode) b.labNode.style.transform = `translateX(${off}px)`; else b.node.style.paddingLeft = (5 + off) + "px";
+  });
+  drawOverview();
+}
+function drawOverview() {
+  const ov = $("ov"); ov.innerHTML = "";
+  const W = ov.clientWidth, k = W / TRACK_W, sc = $("scroll"), o = state.o, me = M.me;
+  const washes = () => {};
+  if (o === "today") {
+    washes();
+    ov.append(el("bd", { left:((xOf(me.level - 3) - 12) * k) + "px", width:(7 * L.level * k) + "px" }));
+    const lanes = Math.max(1, M.lanes), span = 12;
+    M.bars.forEach(b => ov.append(el("l" + (b.fits ? " fit" : ""), { left:(b.left * k) + "px", width:Math.max(1, b.rangeW * k - 1) + "px", top:(8 + Math.round(b.lane / lanes * span)) + "px" })));
+    M.glist.forEach(g => { if (!g.own) ov.append(el("pt", { left:(xOf(g.level) * k - 1) + "px", background:CLS[g.lead.cls] })); });
+  } else if (o === "density") {
+    const counts = []; for (let lv = 1; lv <= 60; lv++) counts[lv] = M.bars.filter(b => b.kind === "dungeon" && lv >= b.from && lv <= b.to).length;
+    const max = Math.max(...counts.slice(1));
+    washes();
+    for (let lv = 1; lv <= 60; lv++) {
+      const h = counts[lv] ? 1 + Math.round(counts[lv] / max * 13) : 0;
+      const l = Math.round((xOf(lv) - 12) * k), r = Math.round((xOf(lv) + 12) * k);
+      if (h) ov.append(el("col" + (Math.abs(lv - me.level) <= 3 ? " near" : ""), { left:l + "px", width:(r - l) + "px", height:h + "px" }));
+    }
+    ov.append(el("base", { left:Math.round((xOf(1) - 12) * k) + "px", width:Math.round(60 * L.level * k) + "px" }));
+    M.glist.forEach(g => { if (!g.own) ov.append(el("fp", { left:Math.round((xOf(g.level) - 12) * k + 1) + "px", width:Math.max(2, Math.round(L.level * k) - 1) + "px", background:CLS[g.lead.cls], opacity:g.online ? 1 : .55 })); });
+  } else {
+    washes();
+    ov.append(el("bd", { left:((xOf(me.level - 3) - 12) * k) + "px", width:(7 * L.level * k) + "px", top:"9px", bottom:"3px" }));
+    M.glist.forEach(g => { if (!g.own) ov.append(el("pin" + (g.online ? "" : " off"), { left:(xOf(g.level) * k - 1) + "px", background:CLS[g.lead.cls] })); });
+  }
+  ov.append(el("y", { left:(xOf(me.level) * k - 1) + "px" }));
+  ov.append(el("f", { left:(state.scroll * k) + "px", width:(sc.clientWidth * k) + "px" }));
+  const mx = xOf(me.level);
+  if (mx < state.scroll) { const j = el("jump", { left:"0" }, "‹ You"); j.onclick = e => { e.stopPropagation(); scrollTo(mx - sc.clientWidth / 2); }; ov.append(j); }
+  if (mx > state.scroll + sc.clientWidth) { const j = el("jump", { right:"0" }, "You ›"); j.onclick = e => { e.stopPropagation(); scrollTo(mx - sc.clientWidth / 2); }; ov.append(j); }
+}
+$("ov").addEventListener("mousedown", e => {
+  const ov = $("ov"), sc = $("scroll");
+  const go = ev => { const r = ov.getBoundingClientRect(); scrollTo(((ev.clientX - r.left) / r.width) * TRACK_W - sc.clientWidth / 2); };
+  go(e);
+  const up = () => { removeEventListener("mousemove", go); removeEventListener("mouseup", up); };
+  addEventListener("mousemove", go); addEventListener("mouseup", up);
+});
+
+// Drag, click and wheel on the line
+let drag = null;
+$("scroll").addEventListener("mousedown", e => { drag = { x:e.clientX, y:e.clientY, s:state.scroll, moved:false, target:e.target }; $("scroll").classList.add("drag"); });
+addEventListener("mousemove", e => {
+  if (drag) {
+    const z = parseFloat(getComputedStyle(document.querySelector(".zoom")).zoom) || 1;
+    const dx = (e.clientX - drag.x) / z;
+    if (Math.abs(dx) > 4) drag.moved = true;
+    if (drag.moved) scrollTo(drag.s - dx);
+  }
+});
+addEventListener("mouseup", () => {
+  if (!drag) return;
+  $("scroll").classList.remove("drag");
+  if (!drag.moved) {
+    const pickEl = drag.target.closest("[data-pick]");
+    if (pickEl) clickGroup(pickEl._item, drag.shift);
+    else if (state.selected.size) { state.selected.clear(); render(); }
+  }
+  drag = null;
+});
+$("scroll").addEventListener("mousedown", e => { if (drag) drag.shift = e.shiftKey; }, true);
+$("scroll").addEventListener("wheel", e => { e.preventDefault(); scrollTo(state.scroll + (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY)); }, { passive:false });
+$("scroll").addEventListener("mousemove", e => {
+  if (state.v === "A" || drag?.moved) return;
+  const r = $("scroll").getBoundingClientRect();
+  const z = parseFloat(getComputedStyle(document.querySelector(".zoom")).zoom) || 1;
+  const x = (e.clientX - r.left) / z + state.scroll;
+  const lv = Math.max(1, Math.min(60, Math.round((x - L.left - L.level / 2) / L.level) + 1));
+  const fits = M.bars.filter(b => lv >= b.from && lv <= b.to).length;
+  geo.guide.style.display = "block"; geo.guide.style.left = xOf(lv) + "px";
+  if (lv !== M.me.level) { geo.gtag.style.display = "block"; geo.gtag.style.left = xOf(lv) + "px"; geo.gtag.textContent = `${lv} · ${fits} dungeon${fits === 1 ? "" : "s"}`; }
+  else geo.gtag.style.display = "none";
+});
+$("scroll").addEventListener("mouseleave", () => { if (geo) { geo.guide.style.display = "none"; geo.gtag.style.display = "none"; } });
+
+function clickGroup(g, add) {
+  if (!g.memberIds.length) return;
+  const same = !add && g.memberIds.length === state.selected.size && g.memberIds.every(id => state.selected.has(id));
+  if (same) state.selected.clear();
+  else { if (!add) state.selected.clear(); g.memberIds.forEach(id => state.selected.add(id)); }
+  render();
+}
+
+// Tooltips
+const tip = $("tip");
+function hook(node, item, kind) {
+  node._item = item;
+  if (kind === "group") node.dataset.pick = "1";
+  node.addEventListener("mouseenter", e => {
+    tip.innerHTML = kind === "group" ? groupTip(item) : barTip(item);
+    tip.style.display = "block"; place(e);
+    if (state.links) link(item, kind);
+    if (kind === "bar" && geo.shade && state.v !== "A") { geo.shade.style.display = "block"; geo.shade.style.left = item.left + "px"; geo.shade.style.width = item.rangeW + "px"; }
+  });
+  node.addEventListener("mousemove", place);
+  node.addEventListener("mouseleave", () => { unlink(); tip.style.display = "none"; if (geo.shade) geo.shade.style.display = "none"; });
+}
+// Hovering a dungeon lights the friends who fit it; hovering a friend lights the dungeons they fit.
+function link(item, kind) {
+  const track = $("track"); track.classList.add("linking");
+  const lightGroup = g => [g.pin, g.lab, g.stem].forEach(n => n && n.classList.add("lit"));
+  if (kind === "bar") {
+    item.node.classList.add("lit");
+    M.glist.forEach(g => { if (g.own ? item.fits : g.chars.some(c => c.level >= item.from && c.level <= item.to)) lightGroup(g); });
+  } else {
+    lightGroup(item);
+    M.bars.forEach(b => { if (b.node && b.from <= item.level && item.level <= b.to) b.node.classList.add("lit"); });
+  }
+}
+function unlink() { const t = $("track"); t.classList.remove("linking"); t.querySelectorAll(".lit").forEach(n => n.classList.remove("lit")); }
+function place(e) { tip.style.left = (e.clientX + 18) + "px"; tip.style.top = (e.clientY + 8) + "px"; }
+function groupTip(g) {
+  return g.chars.map(c => {
+    const d = c.level - M.me.level;
+    const apart = c.own ? "" : Math.abs(d) <= 3 ? `<span class="g">can play</span>` : `<span class="d">${Math.abs(d)} ${d > 0 ? "ahead" : "behind"}</span>`;
+    const gained = state.trails && c.was && !c.own ? ` <span class="d">· ${c.was} → ${c.level} since you were away</span>` : "";
+    return `<div class="row"><span><span style="color:${CLS[c.cls]}">${c.name}</span>${gained} <span class="m">${c.level}</span> ${c.online && !c.own ? '<span class="o">online</span> ' : ""}${apart}</span><span class="d">${c.member}</span></div>`;
+  }).join("");
+}
+function barTip(b) {
+  let h = `<div class="tt">${b.name}</div><div class="d">Dungeon · ${b.from}–${b.to}</div>`;
+  if (b.forever) h += `<div class="m">New in WoW: Forever</div>`;
+  if (false) h += `<div><span class="ep">Crew cleared</span> <span class="d">${CLEARED[b.name]}</span></div>`;
+  h += `<div class="${b.fits ? "" : "d"}">${b.fits ? "You fit" : b.past ? "You've outlevelled it" : `You need ${b.from - M.me.level} more levels`}</div>`;
+  b.fitters.forEach(c => { const far = Math.abs(c.level - M.me.level) > 3 ? ` <span class="d">· fits, but ${Math.abs(c.level - M.me.level)} levels from you</span>` : ""; h += `<div class="row"><span><span style="color:${CLS[c.cls]}">${c.name}</span> <span class="m">${c.level}</span>${c.online ? ' <span class="o">online</span>' : ""}${far}</span><span class="d">${c.member}</span></div>`; });
+  if (!b.fitters.length) h += `<div class="d">No friend fits it yet</div>`;
+  if (b.almost.length) h += `<div class="d">Almost: ${b.almost.map(c => `${c.member} (${b.from - c.level} short)`).join(", ")}</div>`;
+  return h;
+}
+
+// The opening: the line glides to you, your line drops through the lanes, the dungeons settle in lane by lane.
+function opening() {
+  const sc = $("scroll"), target = xOf(M.me.level) - sc.clientWidth / 2, from = target - 260, t0 = performance.now();
+  const ease = t => 1 - Math.pow(2, -10 * t);
+  const step = now => { const t = Math.min(1, (now - t0) / 700); scrollTo(from + (target - from) * ease(t)); if (t < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+  const line = document.querySelector(".meline");
+  if (line) line.animate([{ transform:"scaleY(0)" }, { transform:"scaleY(1)" }], { duration:500, delay:150, easing:"cubic-bezier(.16,1,.3,1)", fill:"backwards" });
+  M.bars.forEach(b => b.node && b.node.animate([{ opacity:0, transform:"translateX(-6px)" }, { opacity:b.faded ? .3 : 1, transform:"none" }],
+    { duration:320, delay:120 + b.lane * 35, easing:"cubic-bezier(.16,1,.3,1)", fill:"backwards" }));
+}
+$("trails").onclick = () => { state.trails = !state.trails; render(); };
+$("idle").onclick = () => { state.idle = !state.idle; render(); };
+$("links").onclick = () => { state.links = !state.links; render(); };
+$("replay").onclick = () => opening();
+document.querySelectorAll("[data-b]").forEach(b => b.onclick = () => { state.b = b.dataset.b; render(); });
+document.querySelectorAll("[data-o]").forEach(b => b.onclick = () => { state.o = b.dataset.o; render(); });
+$("ruled").onclick = () => { state.ruled = !state.ruled; render(); };
+$("size").onclick = () => { state.small = !state.small; state.scroll = null; requestAnimationFrame(render); };
+$("me").onclick = () => { state.meIdx = (state.meIdx + 1) % ME_LEVELS.length; state.scroll = null; state.selected.clear(); render(); };
+addEventListener("keydown", e => {
+  if (e.key >= "1" && e.key <= "5") { state.b = ["today","dither","banners","gates","stone"][e.key - 1]; render(); }
+  const ok = { q:"today", w:"density", e:"crew" }[e.key.toLowerCase()]; if (ok) { state.o = ok; render(); }
+  if (e.key === "Escape" && state.selected.size) { state.selected.clear(); render(); }
+});
+const qs = new URLSearchParams(location.search); if (qs.get("bars")) state.b = qs.get("bars"); if (qs.get("ov")) state.o = qs.get("ov");
+render(); document.fonts.ready.then(() => { render(); if (!qs.get("still")) opening(); });
+</script>
+</body>
+</html>
