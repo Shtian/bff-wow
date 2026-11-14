@@ -445,7 +445,7 @@ local function buildBars(dungeons, others, yourLevel, measure, chosen)
     local moreDots = math.max(#fitters - LAYOUT.dots, 0)
     -- The raids' entry starts a little left of 60, for its diamond.
     local raids = dungeon.kind == "raids"
-    local content = measure(dungeon.name, "small") + 10
+    local content = measure(dungeon.name, "small") + 12
       + (dungeon.forever and LAYOUT.foreverMark + 4 or 0)
       + (#dots > 0 and #dots * LAYOUT.dot + 6 or 0)
       + (moreDots > 0 and measure("+" .. moreDots, "tiny") + 4 or 0)
@@ -462,12 +462,17 @@ local function buildBars(dungeons, others, yourLevel, measure, chosen)
       count = #fitters,
       dots = dots,
       moreDots = moreDots,
+      past = yourLevel > dungeon.to,
       x = xOf(dungeon.from) - (raids and 6 or 0),
       width = math.max((dungeon.to - dungeon.from) * LAYOUT.level, content),
       tooltip = tooltip,
       shared = shared,
       faded = #chosen > 0 and not shared,
     }
+    -- The plate: the level range, from its first level's tick to its
+    -- last's. The raids' one level has no span, so its whole entry is.
+    local bar = bars[#bars]
+    bar.range = raids and bar.width or (dungeon.to - dungeon.from) * LAYOUT.level
   end
 
   local order = {}
@@ -558,6 +563,36 @@ local function hiddenNote(others, filters)
   return table.concat(parts, ", ") .. " hidden"
 end
 
+-- What hovering a level on the line says: "28 · 6 dungeons", counting
+-- the dungeons shown that it fits.
+local function levelTexts(bars)
+  local texts = {}
+  for level = 1, LAYOUT.levels do
+    local count = 0
+    for _, bar in ipairs(bars) do
+      if fits(level, bar) then count = count + 1 end
+    end
+    local amount = count == 0 and "no dungeons" or ("%d %s"):format(count, plural(count, "dungeon", "dungeons"))
+    texts[level] = ("%d · %s"):format(level, amount)
+  end
+  return texts
+end
+
+-- Every other ten levels, from 11, shaded so the long line has a rhythm.
+local function decades()
+  local list = {}
+  for from = 11, LAYOUT.levels, 20 do
+    local to = from + 9
+    list[#list + 1] = {
+      from = from,
+      to = to,
+      left = xOf(from) - LAYOUT.level / 2,
+      right = xOf(to) + LAYOUT.level / 2,
+    }
+  end
+  return list
+end
+
 -- Picking friends on the line: clicking a label or dot picks the Members
 -- in it (memberIds), shift-clicking (add) adds them, and clicking what's
 -- already picked clears it. No Members (your own dot) changes nothing.
@@ -621,6 +656,8 @@ function Together.view(rows, measure, options)
 
   local groups = buildGroups(members, yourLevel, measure, filters, chosen)
   placeLabels(groups, yourLevel)
+  local rowsUsed = 1
+  for _, group in ipairs(groups) do rowsUsed = math.max(rowsUsed, group.row or 0) end
   local bars, lanes = buildBars(shownDungeons(filters, yourLevel), others, yourLevel, measure, chosen)
 
   local ticks = {}
@@ -632,6 +669,7 @@ function Together.view(rows, measure, options)
       big = big,
       number = big or level == yourLevel,
       you = level == yourLevel,
+      decade = level % 10 == 0,
     }
   end
 
@@ -656,6 +694,9 @@ function Together.view(rows, measure, options)
       text = "can play",
     },
     ticks = ticks,
+    decades = decades(),
+    levels = levelTexts(bars),
+    rows = rowsUsed,
     groups = groups,
     bars = bars,
     lanes = lanes,
