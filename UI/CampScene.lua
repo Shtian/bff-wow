@@ -453,7 +453,9 @@ local function drawFrame(scene, f)
   hideRest(scene.graveParts)
 
   if view.tent then
-    setSprite(scene.tent, "tent", unit)
+    -- Its canvas is lit on the right, so on the fire's right it's mirrored
+    -- to face the fire.
+    setSprite(scene.tent, "tent", unit, view.tent.x > 0)
     local s = Sheet.sprites.tent
     put(scene, scene.tent, view.tent.x + math.floor((LAYOUT.tent - s[3]) / 2), ROW.tent)
   else
