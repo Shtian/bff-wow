@@ -5,7 +5,8 @@
 -- strip under it to jump along. In type a step larger than the rest of the
 -- panel, since it's read at a glance. Clicking friends picks them to see the dungeons you share,
 -- and the Show menu filters the line. With the Camp on, friends are their
--- Camp heads on the line rather than dots. Core places and words everything;
+-- Camp heads on the line rather than dots, the online ones hopping now and
+-- then. Opening the tab glides the line to you. Core places and words everything;
 -- this only draws it and keeps what's picked. See docs/design/together.md.
 
 local _, ns = ...
@@ -58,10 +59,16 @@ local MENU_PAD = 10
 local DECADE = Skin.warm(0.022)
 local YOU_LINE = Skin.warm(0.28)
 local GUIDE = Skin.warm(0.16)
--- A bar's plate: its fill and 2px end caps, by whether you fit it, have
--- outlevelled it or neither. What's outlevelled sinks back.
-local PLATE = { fits = 0.12, past = 0.025, other = 0.05 }
-local CAP = { fits = 0.45, past = 0.07, other = 0.14 }
+-- A bar's plate, in the Camp's dither (Media\Dither50 and Dither25, tiled
+-- at its art unit): a solid cream plate with light caps where you fit, a
+-- 50% checker with faint caps ahead of you, a sparse 25% dither once
+-- you've outlevelled it. Its corners are stepped by a cap's width.
+local PLATE = {
+  fits = { color = Skin.warm(0.2), cap = { 1, 1, 1, 0.75 } },
+  other = { dither = "half", color = Skin.warm(0.13), cap = Skin.warm(0.22) },
+  past = { dither = "quarter", color = Skin.warm(0.09) },
+  attunement = { dither = "quarter", color = Skin.warm(0.16) },
+}
 local CAP_WIDTH = 2
 -- A bar's name starts this far in, clear of its cap.
 local NAME_INSET = 6
@@ -72,16 +79,25 @@ local RANGE_EDGE = { 1, 1, 1, 0.55 }
 -- With the Camp on: a head stands on the rail, a 2px ground line under it.
 local HEAD_GAP = 4
 local GROUND = 2
--- The overview's minimap: decade marks and how far down the lanes go.
-local OVERVIEW_MARK = Skin.warm(0.12)
-local OVERVIEW_NUMBER = Skin.warm(0.3)
-local OVERVIEW_LANES = 9
-local STRIP_BAND = Skin.alpha(GOLD, 0.12)
-local STRIP_BAND_EDGE = Skin.alpha(GOLD, 0.5)
+-- The overview: a column per level as tall as how many dungeons fit it
+-- (the most, DENSITY_TALL), brighter in your can-play band, on a faint
+-- base line, and friends as class-colour feet under it.
+local DENSITY = Skin.warm(0.2)
+local DENSITY_NEAR = Skin.warm(0.55)
+local DENSITY_BASE = Skin.warm(0.12)
+local DENSITY_TALL = 12
+local FEET = 2
+local FOOT_OFFLINE = 0.55
 local STRIP_WINDOW = Skin.warm(0.04)
 local STRIP_WINDOW_EDGE = Skin.warm(0.35)
-local STRIP_LANE = { 1, 1, 1, 0.22 }
-local STRIP_LANE_FITS = { 1, 1, 1, 0.6 }
+-- Online friends' heads, and yours, hop an art pixel for HOP_FOR seconds
+-- every HOP_EVERY, each on its own beat.
+local HOP_EVERY = 4.2
+local HOP_FOR = 0.25
+-- Opening the tab glides the line GLIDE_FROM px to you over GLIDE_TIME
+-- seconds, easing out.
+local GLIDE_FROM = 260
+local GLIDE_TIME = 0.7
 
 local view
 local core
@@ -94,8 +110,7 @@ local selected = {}
 local barFrames = {}
 local labelFrames, dotFrames, stemTextures = {}, {}, {}
 local tickTextures, numberLabels, overviewTicks = {}, {}, {}
-local headFrames, decadeTextures, overviewLines = {}, {}, {}
-local overviewMarks, overviewNumbers = {}, {}
+local headFrames, decadeTextures, overviewColumns = {}, {}, {}
 
 local function classHex(classFilename)
   local r, g, b = Skin.classColor(classFilename)
@@ -260,6 +275,7 @@ local function scrollDownTo(y)
 end
 
 local function startDrag()
+  view.glide = nil
   view.dragFrom = cursorX()
   view.dragFromY = cursorY()
   view.pressFrom = view.dragFrom
@@ -285,6 +301,7 @@ local function passDrag(frame)
 end
 
 local function centreOnYou()
+  view.glide = nil
   if not view.data then return end
   scrollTo(view.data.you - view.scroller:GetWidth() / 2)
 end
@@ -344,17 +361,47 @@ local function lightOtherLabels(group)
   end
 end
 
--- A group's dot or label: a tooltip, lights up their other labels, and
--- picks them on click (shift adds).
+local function indexSet(list)
+  local set = {}
+  for _, i in ipairs(list) do set[i] = true end
+  return set
+end
+
+-- Hovering a bar lights the friends who fit it, and hovering a friend the
+-- bars they fit (Core's bar.groups and group.bars): the rest fade back
+-- until the mouse leaves. With nothing given, all are as drawn.
+local function linkUp(groupsLit, barsLit)
+  local data = view.data
+  if not data then return end
+  for i, group in ipairs(data.groups) do
+    local alpha = (group.faded or (groupsLit and not groupsLit[i])) and FADED or 1
+    local pin = (lit and headFrames or dotFrames)[i]
+    if pin then pin:SetAlpha(alpha) end
+    local label = labelFrames[i]
+    if label and label:IsShown() then
+      label:SetAlpha(alpha)
+      if label.stem then label.stem:SetAlpha(alpha) end
+    end
+  end
+  for i, bar in ipairs(data.bars) do
+    local frame = barFrames[i]
+    if frame then frame:SetAlpha((bar.faded or (barsLit and not barsLit[i])) and FADED or 1) end
+  end
+end
+
+-- A group's dot or label: a tooltip, lights up their other labels and the
+-- bars they fit, and picks them on click (shift adds).
 local function memberFrame()
   local frame = hoverable(view.track, groupTooltip)
   frame:SetScript("OnEnter", function(self)
     showTooltip(self)
     lightOtherLabels(self.group)
+    linkUp(indexSet({ self.index }), indexSet(self.group.bars))
   end)
   frame:SetScript("OnLeave", function()
     hideTooltip()
     lightOtherLabels(nil)
+    linkUp()
   end)
   frame.onClick = function(self) pick(self.group.memberIds, IsShiftKeyDown()) end
   return frame
@@ -546,16 +593,10 @@ local function createView(parent)
   view.strip:SetPoint("RIGHT", -INSET, 0)
   view.strip:SetHeight(OVERVIEW - 4)
   view.strip:EnableMouse(true)
-  -- The can-play band, as on the line.
-  view.stripBand = Skin.fill(view.strip, STRIP_BAND, "BACKGROUND", 1)
-  view.stripBand:ClearAllPoints()
-  view.stripBandEdges = {}
-  for i = 1, 2 do
-    local edge = Skin.fill(view.strip, STRIP_BAND_EDGE, "BORDER")
-    edge:ClearAllPoints()
-    edge:SetWidth(1)
-    view.stripBandEdges[i] = edge
-  end
+  -- The base line the level columns stand on.
+  view.stripBase = Skin.fill(view.strip, DENSITY_BASE, "BACKGROUND")
+  view.stripBase:ClearAllPoints()
+  view.stripBase:SetHeight(1)
   view.stripYou = Skin.fill(view.strip, GOLD, "OVERLAY")
   view.stripYou:ClearAllPoints()
   view.stripYou:SetSize(2, OVERVIEW - 8)
@@ -564,6 +605,7 @@ local function createView(parent)
   Skin.fill(view.stripWindow, STRIP_WINDOW)
   Skin.border(view.stripWindow, STRIP_WINDOW_EDGE)
   local function jump()
+    view.glide = nil
     local scale = view.strip:GetEffectiveScale()
     local x = GetCursorPosition() / scale - view.strip:GetLeft()
     local share = math.min(1, math.max(0, x / view.strip:GetWidth()))
@@ -591,11 +633,14 @@ local function createView(parent)
   view.track:SetSize(1, 1)
   view.scroller:SetScrollChild(view.track)
   view.scroller:SetScript("OnMouseWheel", function(self, delta)
+    view.glide = nil
     scrollTo(self:GetHorizontalScroll() - delta * WHEEL_STEP)
   end)
   passDrag(view.scroller)
   view.scroller.onClick = clearSelection
   view.scroller:SetScript("OnUpdate", function()
+    TogetherTab.glided()
+    TogetherTab.idle()
     TogetherTab.hovered()
     if not view.dragFrom then return end
     if not IsMouseButtonDown("LeftButton") then
@@ -862,6 +907,7 @@ local function drawGroups(data)
       if headFrames[i] then headFrames[i]:Hide() end
     end
     pin.group = group
+    pin.index = i
     pin.count:SetShown(group.row == nil and group.count > 1)
     pin.count:SetText(group.count)
     pin:SetAlpha(group.faded and FADED or 1)
@@ -870,6 +916,8 @@ local function drawGroups(data)
     local label = labelFrames[i] or createLabelFrame()
     labelFrames[i] = label
     label.group = group
+    label.index = i
+    label.stem = nil
     if group.row then
       local y = rowY(group.row)
       at(label, group.labelX, y, group.labelWidth)
@@ -908,6 +956,7 @@ local function drawGroups(data)
       at(stem, group.x, y + LABEL_HEIGHT - 2, 1, math.max(1, top - y - LABEL_HEIGHT))
       stem:SetAlpha(group.faded and FADED or 1)
       stem:Show()
+      label.stem = stem
     else
       label:Hide()
     end
@@ -936,32 +985,28 @@ local function createBarFrame()
     showTooltip(self)
     showRange(self)
     self.hover:Show()
+    linkUp(indexSet(self.bar.groups), indexSet({ self.index }))
   end)
   frame:SetScript("OnLeave", function(self)
     hideTooltip()
     view.rangeShade:Hide()
     self.hover:Hide()
+    linkUp()
   end)
   frame.plate = CreateFrame("Frame", nil, frame)
   frame.plate:SetPoint("TOPLEFT")
   frame.plate:SetHeight(BAR)
-  frame.background = Skin.fill(frame.plate, Skin.HOVER)
-  frame.underline = Skin.fill(frame.plate, Skin.BAR, "BORDER")
-  frame.underline:ClearAllPoints()
-  frame.underline:SetPoint("BOTTOMLEFT")
-  frame.underline:SetPoint("BOTTOMRIGHT")
-  frame.underline:SetHeight(2)
+  -- The fill between the caps, and the caps a corner short of the top and
+  -- bottom, so the plate's corners step.
+  frame.fill = frame.plate:CreateTexture(nil, "BACKGROUND")
   frame.caps = {}
-  for i, side in ipairs({ "LEFT", "RIGHT" }) do
-    local cap = frame.plate:CreateTexture(nil, "BORDER", nil, 1)
-    cap:SetPoint("TOP" .. side)
-    cap:SetPoint("BOTTOM" .. side)
-    cap:SetWidth(CAP_WIDTH)
-    frame.caps[i] = cap
-  end
+  for i = 1, 2 do frame.caps[i] = frame.plate:CreateTexture(nil, "BORDER", nil, 1) end
   -- The plate lights on hover; the plate takes no mouse itself, so the bar
   -- shows it.
   frame.hover = Skin.fill(frame.plate, Skin.HOVER, "BORDER", -1)
+  frame.hover:ClearAllPoints()
+  frame.hover:SetPoint("TOPLEFT", CAP_WIDTH, 0)
+  frame.hover:SetPoint("BOTTOMRIGHT", -CAP_WIDTH, 0)
   frame.hover:Hide()
   -- The 1px light outline of a dungeon you share with who's picked.
   frame.outline = Skin.border(frame.plate, SHARED)
@@ -981,19 +1026,45 @@ local function createBarFrame()
   return frame
 end
 
+-- Paints a piece of a plate, x from left to right and y from top to bottom
+-- in the plate: a solid colour, or the dither tiled at the Camp's art unit
+-- from the plate's corner, so its pieces line up.
+local function paint(texture, color, dither, left, right, top, bottom)
+  texture:ClearAllPoints()
+  texture:SetPoint("TOPLEFT", left, -top)
+  texture:SetSize(right - left, bottom - top)
+  if dither then
+    local Sheet = ns.CampSheet
+    local tile = Sheet.dither.size * ns.CampScene.artUnit(view, ns.CampScene.FIGURE_TARGET)
+    texture:SetTexture(Sheet.dither[dither], "REPEAT", "REPEAT", "NEAREST")
+    texture:SetTexCoord(left / tile, right / tile, top / tile, bottom / tile)
+    texture:SetVertexColor(unpack(color))
+  else
+    texture:SetColorTexture(unpack(color))
+    texture:SetTexCoord(0, 1, 0, 1)
+    texture:SetVertexColor(1, 1, 1, 1)
+  end
+  texture:Show()
+end
+
 local function drawBar(frame, bar)
   frame.bar = bar
   frame.plate.bar = bar
   at(frame, bar.x, laneY(bar.lane), bar.width, BAR)
   frame.plate:SetWidth(bar.range)
   local attunement = bar.kind == "attunement"
-  local state = bar.fits and "fits" or (bar.past and "past" or "other")
-  frame.background:SetShown(not attunement)
-  frame.background:SetColorTexture(1, 1, 1, PLATE[state])
-  frame.underline:SetShown(bar.fits)
-  for _, cap in ipairs(frame.caps) do
-    cap:SetColorTexture(1, 1, 1, CAP[state])
-    cap:SetShown(not attunement)
+  local look = PLATE[attunement and "attunement" or (bar.fits and "fits" or (bar.past and "past" or "other"))]
+  local range = bar.range
+  if attunement then
+    -- Its dashed edge is square, so its fill is too.
+    paint(frame.fill, look.color, look.dither, 0, range, 0, BAR)
+    for _, cap in ipairs(frame.caps) do cap:Hide() end
+  else
+    paint(frame.fill, look.color, look.dither, CAP_WIDTH, range - CAP_WIDTH, 0, BAR)
+    -- Caps where the plate has them, else the fill carries on into them.
+    local color, dither = look.cap or look.color, not look.cap and look.dither or nil
+    paint(frame.caps[1], color, dither, 0, CAP_WIDTH, CAP_WIDTH, BAR - CAP_WIDTH)
+    paint(frame.caps[2], color, dither, range - CAP_WIDTH, range, CAP_WIDTH, BAR - CAP_WIDTH)
   end
   if attunement then
     dashes(frame.plate, bar.range, BAR)
@@ -1051,6 +1122,7 @@ local function drawDungeons(data)
   for i, bar in ipairs(data.bars) do
     local frame = barFrames[i] or createBarFrame()
     barFrames[i] = frame
+    frame.index = i
     drawBar(frame, bar)
   end
   hideFrom(barFrames, #data.bars + 1)
@@ -1069,68 +1141,81 @@ local function stripTexture(list, i, layer)
   return texture
 end
 
--- The overview: the whole line as a minimap. Every tenth level's mark and
--- number, the can-play band, each dungeon as a 1px line in its lane
--- (brighter where you fit), a tick per friend at the top and you in gold.
+-- The overview: the whole line in a strip. A column per level as tall as
+-- how many dungeons fit it, brighter in your can-play band, friends as
+-- class-colour feet under their level and you in gold.
 local function drawOverview(data)
   local scale = view.strip:GetWidth() / data.width
-  local marks = 0
-  for _, tick in ipairs(data.ticks) do
-    if tick.decade then
-      marks = marks + 1
-      local mark = stripTexture(overviewMarks, marks, "BACKGROUND")
-      mark:SetColorTexture(unpack(OVERVIEW_MARK))
-      mark:SetPoint("TOPLEFT", view.strip, "TOPLEFT", tick.x * scale, 0)
-      mark:SetSize(1, view.strip:GetHeight())
-      local number = overviewNumbers[marks]
-      if not number then
-        number = Skin.label(view.strip, TINY, OVERVIEW_NUMBER, "BACKGROUND")
-        overviewNumbers[marks] = number
-      end
-      number:ClearAllPoints()
-      number:SetPoint("TOPLEFT", view.strip, "TOPLEFT", tick.x * scale + 3, 0)
-      number:SetText(tick.level)
-      number:Show()
+  local half = layout().level / 2
+  local function cell(level)
+    local x = data.ticks[level].x
+    local left = math.floor((x - half) * scale + 0.5)
+    return left, math.floor((x + half) * scale + 0.5) - left
+  end
+  local density = data.density
+  local columns = 0
+  for level, entry in ipairs(density.levels) do
+    if entry.count > 0 then
+      columns = columns + 1
+      local column = stripTexture(overviewColumns, columns)
+      column:SetColorTexture(unpack(entry.near and DENSITY_NEAR or DENSITY))
+      local left, width = cell(level)
+      local height = 1 + math.floor(entry.count / density.most * (DENSITY_TALL - 1) + 0.5)
+      column:SetPoint("BOTTOMLEFT", view.strip, "BOTTOMLEFT", left, FEET + 1)
+      column:SetSize(math.max(1, width), height)
     end
   end
-  hideFrom(overviewMarks, marks + 1)
-  hideFrom(overviewNumbers, marks + 1)
-
-  view.stripBand:ClearAllPoints()
-  view.stripBand:SetPoint("TOPLEFT", view.strip, "TOPLEFT", data.band.left * scale, 0)
-  view.stripBand:SetSize((data.band.right - data.band.left) * scale, view.strip:GetHeight())
-  for i, x in ipairs({ data.band.left, data.band.right - 1 }) do
-    local edge = view.stripBandEdges[i]
-    edge:ClearAllPoints()
-    edge:SetPoint("TOPLEFT", view.strip, "TOPLEFT", x * scale, 0)
-    edge:SetHeight(view.strip:GetHeight())
-  end
-
-  local spread = math.max(1, data.lanes - 1)
-  for i, bar in ipairs(data.bars) do
-    local lane = stripTexture(overviewLines, i)
-    lane:SetColorTexture(unpack(bar.fits and STRIP_LANE_FITS or STRIP_LANE))
-    local y = view.strip:GetHeight() - 2 - OVERVIEW_LANES + math.floor((bar.lane - 1) / spread * OVERVIEW_LANES + 0.5)
-    lane:SetPoint("TOPLEFT", view.strip, "TOPLEFT", bar.x * scale, -y)
-    lane:SetSize(math.max(1, bar.range * scale - 1), 1)
-  end
-  hideFrom(overviewLines, #data.bars + 1)
+  hideFrom(overviewColumns, columns + 1)
+  local first = cell(1)
+  local last, lastWidth = cell(#density.levels)
+  view.stripBase:ClearAllPoints()
+  view.stripBase:SetPoint("BOTTOMLEFT", view.strip, "BOTTOMLEFT", first, FEET + 1)
+  view.stripBase:SetWidth(last + lastWidth - first)
 
   -- Friends only: you are the gold mark.
-  local ticks = 0
+  local feet = 0
   for _, group in ipairs(data.groups) do
     if not group.own then
-      ticks = ticks + 1
-      local tick = stripTexture(overviewTicks, ticks, "OVERLAY")
-      tick:SetSize(2, 4)
+      feet = feet + 1
+      local foot = stripTexture(overviewTicks, feet, "OVERLAY")
+      local left, width = cell(group.level)
+      foot:SetPoint("BOTTOMLEFT", view.strip, "BOTTOMLEFT", left + 1, 0)
+      foot:SetSize(math.max(2, width - 1), FEET)
       local r, g, b = Skin.classColor(group.classFilename)
-      tick:SetVertexColor(r, g, b, group.online and 1 or 0.6)
-      tick:SetPoint("TOPLEFT", view.strip, "TOPLEFT", group.x * scale - 1, 0)
+      foot:SetVertexColor(r, g, b, group.online and 1 or FOOT_OFFLINE)
     end
   end
-  hideFrom(overviewTicks, ticks + 1)
+  hideFrom(overviewTicks, feet + 1)
   view.stripYou:ClearAllPoints()
   view.stripYou:SetPoint("CENTER", view.strip, "LEFT", data.you * scale, 0)
+end
+
+-- Opening the tab: the line glides to you, easing out, until a drag, the
+-- wheel or the overview takes over.
+function TogetherTab.glided()
+  local start = view.glide
+  if not start or not view.data then return end
+  local t = math.min(1, (GetTime() - start) / GLIDE_TIME)
+  local target = view.data.you - view.scroller:GetWidth() / 2
+  scrollTo(target - (t < 1 and GLIDE_FROM * 2 ^ (-10 * t) or 0))
+  if t >= 1 then view.glide = nil end
+end
+
+-- With the Camp on, the heads of who's online, and yours, hop an art pixel
+-- now and then, each on its own beat.
+function TogetherTab.idle()
+  if not lit then return end
+  local now = GetTime()
+  for _, pin in ipairs(headFrames) do
+    local group = pin.group
+    local up = pin:IsShown() and group ~= nil and (group.online or group.own)
+      and (now + group.level * 0.73) % HOP_EVERY < HOP_FOR or false
+    if up ~= pin.up then
+      pin.up = up
+      local unit = ns.CampScene.artUnit(view, ns.CampScene.FIGURE_TARGET)
+      pin.head:SetPoint("BOTTOM", 0, GROUND + 1 + (up and unit or 0))
+    end
+  end
 end
 
 -- The hover guide: while the cursor is over the line and not dragging it,
@@ -1259,9 +1344,10 @@ function TogetherTab.draw(parent, theCore, campOn)
   drawDungeons(data)
   drawOverview(data)
   if opening then
-    centreOnYou()
-    -- The line's width may not be laid out until the next frame.
-    C_Timer.After(0, centreOnYou)
+    -- The glide works out where you are each frame, as the line's width
+    -- may not be laid out until the next one.
+    scrollTo(data.you - view.scroller:GetWidth() / 2 - GLIDE_FROM)
+    view.glide = GetTime()
   else
     TogetherTab.scrolled()
   end

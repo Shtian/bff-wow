@@ -589,6 +589,37 @@ local function decades()
   return list
 end
 
+-- The overview's outline: how many dungeons shown fit each level, and
+-- whether it's in your can-play band; most is the largest count.
+local function density(bars, yourLevel)
+  local levels, most = {}, 0
+  for level = 1, LAYOUT.levels do
+    local count = 0
+    for _, bar in ipairs(bars) do
+      if fits(level, bar) then count = count + 1 end
+    end
+    levels[level] = { count = count, near = math.abs(level - yourLevel) <= CAN_PLAY }
+    most = math.max(most, count)
+  end
+  return { levels = levels, most = most }
+end
+
+-- Hovering a bar lights the friends on the line who fit it, and hovering a
+-- friend the bars they fit: each bar's groups and each group's bars, as
+-- indexes.
+local function link(groups, bars)
+  for _, group in ipairs(groups) do group.bars = {} end
+  for b, bar in ipairs(bars) do
+    bar.groups = {}
+    for g, group in ipairs(groups) do
+      if fits(group.level, bar) then
+        bar.groups[#bar.groups + 1] = g
+        group.bars[#group.bars + 1] = b
+      end
+    end
+  end
+end
+
 -- Picking friends on the line: clicking a label or dot picks the Members
 -- in it (memberIds), shift-clicking (add) adds them, and clicking what's
 -- already picked clears it. No Members (your own dot) changes nothing.
@@ -656,6 +687,8 @@ function Together.view(rows, measure, options)
   for _, group in ipairs(groups) do rowsUsed = math.max(rowsUsed, group.row or 0) end
   local bars, lanes = buildBars(shownDungeons(filters, yourLevel), others, yourLevel, measure, chosen)
 
+  link(groups, bars)
+
   local ticks = {}
   for level = 1, LAYOUT.levels do
     local big = level == 1 or level % 5 == 0
@@ -692,6 +725,7 @@ function Together.view(rows, measure, options)
     ticks = ticks,
     decades = decades(),
     levels = levelTexts(bars),
+    density = density(bars, yourLevel),
     rows = rowsUsed,
     groups = groups,
     bars = bars,

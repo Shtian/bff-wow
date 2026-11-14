@@ -78,6 +78,13 @@ ns.CampSheet = {
     width = 256,
     height = 128,
   },
+  -- The Dungeons tab's bar fills, white to tint, tiled: a texel is an art
+  -- pixel.
+  dither = {
+    half = "Interface\\AddOns\\BFF\\Media\\Dither50",
+    quarter = "Interface\\AddOns\\BFF\\Media\\Dither25",
+    size = 8,
+  },
   -- The sky's top colour, above the backdrop's art.
   sky = { 0.027, 0.039, 0.118 },
 }
