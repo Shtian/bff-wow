@@ -67,15 +67,16 @@ end
 local function contest(id, name)
   return { id = id, name = name, kind = "contest", waters = { W4 }, note = CONTEST, extra = "contest" }
 end
+-- Treasure is fished, but isn't a fish, so it's an Extra.
 local function treasure(id, name, waters, note)
-  return { id = id, name = name, kind = "treasure", waters = waters, note = note, extra = "unconfirmed" }
+  return { id = id, name = name, kind = "treasure", waters = waters, note = note, extra = "notFish" }
 end
 local function notFish(id, name, waters, note)
   return { id = id, name = name, kind = "notFish", waters = waters, note = note, extra = "notFish" }
 end
 
 Catches.TYPES = {
-  -- Fish (25 counted).
+  -- Fish (27 counted).
   fish(6291, "Raw Brilliant Smallfish", { W1, W2, W3 }),
   fish(6303, "Raw Slitherskin Mackerel", { W1, W2 }),
   fish(6289, "Raw Longjaw Mud Snapper", { W1, W2, W3 }),
@@ -86,6 +87,7 @@ Catches.TYPES = {
   fish(21071, "Raw Sagefish", { W2, W3 }),
   fish(6522, "Deviate Fish", { W2 }, "The Barrens, in the pools near Wailing Caverns"),
   fish(12238, "Darkshore Grouper", { W2 }, "Darkshore"),
+  fish(251524, "Whimsyfin", { W2 }, "New on Forever. Only in Redridge Mountains"),
   fish(6358, "Oily Blackmouth", { W3, W4, W5 }),
   fish(6359, "Firefin Snapper", { W3, W4, W5 }),
   fish(8365, "Raw Mithril Head Trout", { W4, W5, W6 }),
@@ -101,6 +103,7 @@ Catches.TYPES = {
   fish(13888, "Darkclaw Lobster", { W5, W6 }, "Azshara, Eastern Plaguelands"),
   fish(13757, "Lightning Eel", { W6 }),
   fish(13889, "Raw Whitescale Salmon", { W6 }),
+  fish(13890, "Raw Plated Armorfish", { W6 }, "Eastern Plaguelands"),
   -- Nat Pagle's quest fish (4).
   quest(16970, "Misty Reed Mahi Mahi", { W4 }, "Swamp of Sorrows"),
   quest(16968, "Sar'theris Striker", { W4 }, "Desolace"),
@@ -125,8 +128,9 @@ Catches.TYPES = {
   family("mightfish", "Mightfish (by weight)", "Mightfish", { 13914, 13915, 13916, 13917 }, { W5, W6 }),
   family("lobster", "Lobster (by weight)", "Lobster", { 13907, 13908, 13909, 13910, 13911, 13912, 13913 }, { W5, W6 }),
   family("salmon", "Salmon (by weight)", "Salmon", { 13901, 13902, 13903, 13904, 13905, 13906 }, { W6 }),
-  -- Extras: seasonal, the Sunday fishing contest, a quest item, not a fish,
-  -- and not confirmed on Forever yet.
+  -- Extras: seasonal, the Sunday fishing contest, a quest item and not a
+  -- fish (herbs, rum and treasure). Treasure's
+  -- waters are Wowhead Forever's "fished in" zones.
   fish(13756, "Raw Summer Bass", { W4, W5, W6 }, "Only in summer", "season"),
   fish(13755, "Raw Winter Squid", { W4, W5 }, "Only in winter", "season"),
   contest(19807, "Speckled Tastyfish"),
@@ -138,23 +142,20 @@ Catches.TYPES = {
   notFish(20709, "Rumsey Rum Light", { W2 }),
   notFish(21114, "Rumsey Rum Dark", { W3 }),
   notFish(21151, "Rumsey Rum Black Label", { W2, W4, W5 }),
-  fish(251524, "Whimsyfin", { W2 }, "New on Forever. Reported in Redridge Mountains", "unconfirmed"),
-  fish(13890, "Raw Plated Armorfish", { NEW }, "Forever adds a recipe for it. No one knows yet where it bites", "unconfirmed"),
-  treasure(6356, "Battered Chest", { W2, W3 }),
-  treasure(6351, "Dented Crate", { W2, W3 }),
-  treasure(6352, "Waterlogged Crate", { W2, W3 }),
-  treasure(6354, "Small Locked Chest", { W2, W3 }, LOCKED),
-  treasure(6357, "Sealed Crate", { W3, W4 }),
-  treasure(6355, "Sturdy Locked Chest", { W3, W4 }, LOCKED),
+  treasure(6356, "Battered Chest", { W1 }),
+  treasure(6351, "Dented Crate", { W2 }),
+  treasure(20708, "Tightly Sealed Trunk", { W2 }),
+  treasure(6307, "Message in a Bottle", { W2, W3 }),
+  treasure(6352, "Waterlogged Crate", { W3 }),
+  treasure(6354, "Small Locked Chest", { W3 }, LOCKED),
+  treasure(21113, "Watertight Trunk", { W3 }),
+  treasure(6357, "Sealed Crate", { W4 }),
+  treasure(6355, "Sturdy Locked Chest", { W4 }, LOCKED),
+  treasure(21150, "Iron Bound Trunk", { W4, NEW }),
   treasure(13874, "Heavy Crate", { W4, W5 }),
   treasure(13875, "Ironbound Locked Chest", { W4, W5 }, LOCKED),
-  treasure(21150, "Iron Bound Trunk", { W4, W5 }),
-  treasure(21113, "Watertight Trunk", { W4, W5 }),
   treasure(7973, "Big-mouth Clam", { W4, W5 }),
-  treasure(6307, "Message in a Bottle", { W4, W5 }),
-  treasure(13918, "Reinforced Locked Chest", { W5, W6 }, LOCKED),
-  treasure(21228, "Mithril Bound Trunk", { W5, W6 }),
-  treasure(20708, "Tightly Sealed Trunk", { W5, W6 }),
+  treasure(21228, "Mithril Bound Trunk", { W4, W5, NEW }),
 }
 
 -- Each type by id, each item ID to its type's id, and how many types count.

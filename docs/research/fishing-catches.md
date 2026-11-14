@@ -58,15 +58,15 @@ Wowhead's scrape doesn't cover these, but they exist in Forever data:
 
 | ID | Name | Quality | Source | How sure |
 |---|---|---|---|---|
-| 251524 | **Whimsyfin** (new on Forever) | 1 | Redridge Mountains, found by one beta tester ([classicwowforever](https://classicwowforever.com/professions/fishing/), *third party*). Cooks into Savory Whimsyfin Delight (251525). | **To confirm** |
-| 13890 | Raw Plated Armorfish | 1 | Forever adds a recipe (Plated Armorfish 286152, Cooking 225) ([classicwowforever](https://classicwowforever.com/professions/fishing/)). Forever data lists the raw fish as a **quest-class** item (class 12). Where it's caught is unknown. | **To confirm** |
+| 251524 | **Whimsyfin** (new on Forever) | 1 | Redridge Mountains, the only zone [Wowhead Forever](https://www.wowhead.com/forever/item=251524) lists (21). Cooks into Savory Whimsyfin Delight (251525). | **Seen on Forever** (2026-11-14) |
+| 13890 | Raw Plated Armorfish | 1 | Forever adds a recipe (Plated Armorfish 286152, Cooking 225) ([classicwowforever](https://classicwowforever.com/professions/fishing/)). Forever data lists the raw fish as a **quest-class** item (class 12). Wowhead Forever lists no fishing source (2026-11-14). | **Seen on Forever** (2026-11-14), fished in Eastern Plaguelands |
 | 12238 | Darkshore Grouper | 1 | Darkshore in classic | **Expected** |
 | 6299 | Sickly Looking Fish | 1 | Tirisfal Glades ([classicwowforever](https://classicwowforever.com/professions/fishing/), *third party*) | **Expected** |
-| 8959 | Raw Spinefin Halibut | 1 | Sold by Kilxx on Forever ([classicwowforever](https://classicwowforever.com/professions/fishing/)). In classic, it's fished in pools in the 50s. | **To confirm** |
+| 8959 | Raw Spinefin Halibut | 1 | Sold by Kilxx on Forever ([classicwowforever](https://classicwowforever.com/professions/fishing/)). In classic, it's fished in pools in the 50s. [Wowhead Forever](https://www.wowhead.com/forever/item=8959) lists only vendors, no fishing (2026-11-14). | **To confirm** |
 
 ### Uncommon "bloated" fish (open with a right-click)
 
-Forever data has **ten** of these at quality 2: 6643 Bloated Brilliant Smallfish, 6645 Bloated Mud Snapper, 6647 Bloated Bristle Whisker Catfish, 8366 Bloated Mithril Head Trout, 21162 Bloated Oily Blackmouth, 21163 Bloated Firefin Snapper, 21164 Bloated Rockscale Cod, 21243 Bloated Glossy Mightfish, 13881 Bloated Redgill, 13891 Bloated Whitescale Salmon. Guides say the ten are now uncommon and bind on pickup ([classicwowforever](https://classicwowforever.com/professions/fishing/), *third party*), which fits that count (**documented**). 6644 Bloated Mackerel and 6646 Bloated Albacore are still quality 1. They look like leftovers, but **to confirm**. Each comes from the waters of its base fish (**expected**).
+Forever data has **ten** of these at quality 2: 6643 Bloated Brilliant Smallfish, 6645 Bloated Mud Snapper, 6647 Bloated Bristle Whisker Catfish, 8366 Bloated Mithril Head Trout, 21162 Bloated Oily Blackmouth, 21163 Bloated Firefin Snapper, 21164 Bloated Rockscale Cod, 21243 Bloated Glossy Mightfish, 13881 Bloated Redgill, 13891 Bloated Whitescale Salmon. Guides say the ten are now uncommon and bind on pickup ([classicwowforever](https://classicwowforever.com/professions/fishing/), *third party*), which fits that count (**documented**). 6644 Bloated Mackerel and 6646 Bloated Albacore are still quality 1. They look like leftovers, but **to confirm**. Neither is on the list. Each comes from the waters of its base fish (**expected**).
 
 Forever's camp objects, the **Fishing Rack** (Fishing 140) and **Fishing Hut** (Fishing 300), give a buff that lets you catch "uncommon and rare fish" ([Warcraft Tavern](https://www.warcrafttavern.com/forever/guides/fishing/), *third party*). Which items those are is unknown. They may be these bloated fish, or something not yet seen (**to confirm**).
 
@@ -94,24 +94,28 @@ Trophy-weight fish (one item ID per weight, all quality 1, sold to vendors): Mud
 
 ### Treasure, clams and oddities
 
-None of these is in Wowhead's scrape. The containers and clams exist in Forever data, and the list is classic's set of fished containers (**expected**, every one **to confirm**):
+None of these is in GatherLite's scrape. Each item's [Wowhead Forever](https://www.wowhead.com/forever/item=20708) page (`/forever/item=<id>`) lists the zones it "can be fished in", with counts (read 2026-11-14, *third party*, crowd-sourced). The in-game column is what the Crew has fished on Forever (2026-11-14). Waters in Catches follow Wowhead's zones, leaving out stray low counts.
 
-| ID | Name | Quality | Notes |
-|---|---|---|---|
-| 6351 | Dented Crate | 1 | "Venture Company Supplies" |
-| 6352 | Waterlogged Crate | 1 | same |
-| 6357 | Sealed Crate | 1 | same |
-| 13874 | Heavy Crate | 1 | same (238985 is a different Heavy Crate, a quest item) |
-| 6356 | Battered Chest | 1 | |
-| 6354 / 6355 | Small / Sturdy Locked Chest | 1 | need lockpicking |
-| 13875 / 13918 | Ironbound / Reinforced Locked Chest | 1 | need lockpicking |
-| 21150 | Iron Bound Trunk | 1 | |
-| 21228 | Mithril Bound Trunk | 1 | |
-| 21113 | Watertight Trunk | 1 | |
-| 20708 | Tightly Sealed Trunk | 1 | |
-| 7973 | Big-mouth Clam | 1 | |
-| 5523 / 5524 / 15874 | Small Barnacled / Thick-shelled / Soft-shelled Clam | 1 | more often mob drops; whether they're fished is **to confirm** |
-| 6307 | Message in a Bottle | 1 | classic's old one |
+| ID | Name | Wowhead Forever: fished in (count) | Seen in game | How sure |
+|---|---|---|---|---|
+| 6356 | Battered Chest | Durotar 28, Teldrassil 13, Tirisfal Glades 9 | | **Confirmed** (Wowhead) |
+| 6351 | Dented Crate | Darkshore 45, Westfall 39, The Barrens 28, Silverpine Forest 21 | yes | **Seen on Forever** |
+| 20708 | Tightly Sealed Trunk | Darkshore 43, The Barrens 40, Loch Modan 30, Westfall 30, Silverpine Forest 18, Redridge Mountains 12 | yes | **Seen on Forever** |
+| 6307 | Message in a Bottle (classic's old one) | Wetlands 67, Darkshore 47, Hillsbrad Foothills 37, Westfall 37, The Barrens 25, Silverpine Forest 23, Ashenvale 19 | | **Confirmed** (Wowhead) |
+| 6352 | Waterlogged Crate | Wetlands 71, Hillsbrad Foothills 32, Ashenvale 19 | | **Confirmed** (Wowhead) |
+| 6354 | Small Locked Chest (lockpicking) | Wetlands 70, Hillsbrad Foothills 30, Ashenvale 18 | | **Confirmed** (Wowhead) |
+| 21113 | Watertight Trunk | Hillsbrad Foothills 55, Wetlands 39, Stonetalon Mountains 30, Ashenvale 26 | yes | **Seen on Forever** |
+| 6357 | Sealed Crate | Desolace 24, Arathi Highlands 13, Stranglethorn Vale 12, Swamp of Sorrows 12, Dustwallow Marsh 9 | | **Confirmed** (Wowhead) |
+| 6355 | Sturdy Locked Chest (lockpicking) | Desolace 23, Swamp of Sorrows 16, Dustwallow Marsh 14, Stranglethorn Vale 14, Arathi Highlands 13 | | **Confirmed** (Wowhead) |
+| 21150 | Iron Bound Trunk | Stranglethorn Vale 90, Dustwallow Marsh 33, Riverglades 33, Alterac Mountains 27, Desolace 27, Arathi Highlands 10, The Barrens 5 | | **Confirmed** (Wowhead) |
+| 13874 | Heavy Crate | Azshara 33, The Hinterlands 18, Feralas 16, Stranglethorn Vale 14, Tanaris 12 | | **Confirmed** (Wowhead) |
+| 13875 | Ironbound Locked Chest (lockpicking) | Feralas 17, Stranglethorn Vale 17, The Hinterlands 17, Azshara 13, Tanaris 12 | | **Confirmed** (Wowhead) |
+| 7973 | Big-mouth Clam | Azshara 238, Tanaris 57, Feralas 45, The Hinterlands 30, Stranglethorn Vale 16, Eastern Plaguelands 6 | | **Confirmed** (Wowhead) |
+| 21228 | Mithril Bound Trunk | Stranglethorn Vale 79, Tanaris 49, Azshara 42, Feralas 39, Riverglades 33 | yes | **Seen on Forever** |
+| 13918 | Reinforced Locked Chest (lockpicking) | none listed | | **To confirm**: no Forever fishing data yet. Dropped from the list for now |
+| 5523 / 5524 / 15874 | Small Barnacled / Thick-shelled / Soft-shelled Clam | none listed | | Not fished on Forever, as far as Wowhead knows. Not on the list |
+
+The waters differ from classic's guess: the trunks and crates are spread over lower zones than the first list had (Tightly Sealed Trunk is a 10–25 catch, not 50–60). Treasure isn't a fish, so in Catches it's an Extra with the `notFish` reason, like the rum.
 
 Possible Forever oddities, all **to confirm**:
 
@@ -190,9 +194,9 @@ Short answer: use **`LOOT_READY` + `IsFishingLoot()` + `GetLootSlotLink`/`GetLoo
 4. Opening a fished chest: is `isFromItem` true and `IsFishingLoot()` false?
 5. Are any fishing waters on a restricted **Map** (`C_RestrictedActions.IsAddOnRestrictionActive(Enum.AddOnRestrictionType.Map)`)?
 6. Log every fished item ID with `uiMapID` and subzone for a few sessions in different bands. That confirms which containers, clams, bloated fish and oddities are fishable, and where.
-7. Whimsyfin: Redridge only? Which waters, and what skill?
+7. ~~Whimsyfin: Redridge only?~~ Seen in game; Wowhead lists only Redridge Mountains. Which skill is still unknown.
 8. Fishing Rack and Fishing Hut buffs: which uncommon and rare items do they add?
-9. Is Raw Plated Armorfish fishable, and where?
+9. ~~Is Raw Plated Armorfish fishable, and where?~~ Yes: caught in Eastern Plaguelands (2026-11-14).
 10. Riverglades, Gilneas, Shen'dralas, Mount Hyjal, Shark-Infested Waters: what's caught there, and at what level and skill?
 11. Can you fish in City of Dalaran's fountain, and does it give the wishing coins?
 12. Are Summer Bass and Winter Squid still seasonal, and Nightfin and Sunscale still tied to time of day?

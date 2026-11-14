@@ -154,11 +154,11 @@ A fishing find a Member has caught, kept in their own record: per type, their fi
 _Avoid_: Fish (when meaning any find), loot, collection item
 
 **Type (of Catch)**:
-One entry in BFF's shipped list of what can be fished: a fish, a Nat Pagle quest fish, a bloated fish, or a family of fish sold by weight, where every weight ("19 Pound Catfish") counts as the one type ("Catfish (by weight)"). The list is data, keyed by item ID. "23 of 46 types caught" counts types, never Extras.
+One entry in BFF's shipped list of what can be fished: a fish, a Nat Pagle quest fish, a bloated fish, or a family of fish sold by weight, where every weight ("19 Pound Catfish") counts as the one type ("Catfish (by weight)"). The list is data, keyed by item ID. "23 of 48 types caught" counts types, never Extras.
 _Avoid_: Kind, species, entry
 
 **Extra (Catch)**:
-A type that's shown but never counted towards the types caught, because not everyone can catch it any time: seasonal fish, the Sunday fishing contest's fish, fish that drop only for a quest outside Nat Pagle's (Spotted Sunfish), what's fished but isn't a fish (Stranglekelp, rum), and anything not yet confirmed on Forever (treasure, Whimsyfin, Raw Plated Armorfish).
+A type that's shown but never counted towards the types caught, because not everyone can catch it any time: seasonal fish, the Sunday fishing contest's fish, fish that drop only for a quest outside Nat Pagle's (Spotted Sunfish), what's fished but isn't a fish (Stranglekelp, rum, chests, crates, trunks), and anything not yet confirmed on Forever (none right now).
 _Avoid_: Bonus, optional, rare
 
 **Unlisted catch**:

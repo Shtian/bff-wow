@@ -58,14 +58,14 @@ end
 
 describe("Catches", function()
   describe("the list", function()
-    it("counts 46 types and never the Extras", function()
+    it("counts 48 types and never the Extras", function()
       local ns = load()
       local counted, extras = 0, 0
       for _, t in ipairs(ns.Catches.TYPES) do
         if t.extra then extras = extras + 1 else counted = counted + 1 end
       end
-      assert.equal(46, counted)
-      assert.equal(46, ns.Catches.TOTAL)
+      assert.equal(48, counted)
+      assert.equal(48, ns.Catches.TOTAL)
       assert.is_true(extras > 0)
     end)
 
@@ -144,7 +144,7 @@ describe("Catches", function()
       assert.equal(first, t.first.time)
       assert.equal("1m ago", t.first.since)
       assert.equal("You, Westfall, The Jansen Stead, 1m ago", t.first.text)
-      assert.equal("The Crew has caught 1 of 46 types.", view.title)
+      assert.equal("The Crew has caught 1 of 48 types.", view.title)
       assert.equal("Westfall", t.first.zone)
       assert.equal("The Jansen Stead", t.first.subzone)
       assert.equal(1436, t.first.mapId)
@@ -153,7 +153,7 @@ describe("Catches", function()
       assert.equal("Ann", t.first.character)
       assert.equal("WARRIOR", t.first.classFilename)
       assert.equal(1, view.caught)
-      assert.equal(46, view.total)
+      assert.equal(48, view.total)
     end)
 
     it("are kept before you join a Crew", function()
