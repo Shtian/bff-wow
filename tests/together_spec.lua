@@ -291,9 +291,11 @@ describe("Together", function()
       local view = clients[1].core:together(function(text) return #text * 7 end)
       local layout = load().Core.TOGETHER_LAYOUT
       local keep = barFor(view, "Shadowfang Keep")
-      assert.equal((30 - 22) * layout.level, keep.range)
+      assert.equal((30 - 22 + 1) * layout.level, keep.range)
       local chasm = barFor(view, "Ragefire Chasm")
-      assert.equal((18 - 13) * layout.level, chasm.range)
+      assert.equal((18 - 13 + 1) * layout.level, chasm.range)
+      -- From its first level's left edge, as the can-play band's.
+      assert.equal(view.ticks[13].x - layout.level / 2, chasm.x)
       for _, bar in ipairs(view.bars) do
         assert.truthy(bar.range <= bar.width, bar.name)
       end

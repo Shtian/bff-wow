@@ -443,7 +443,6 @@ local function buildBars(dungeons, others, yourLevel, measure, chosen)
     local dots = {}
     for i = 1, math.min(#fitters, LAYOUT.dots) do dots[i] = fitters[i].classFilename end
     local moreDots = math.max(#fitters - LAYOUT.dots, 0)
-    -- The raids' entry starts a little left of 60, for its diamond.
     local raids = dungeon.kind == "raids"
     local content = measure(dungeon.name, "small") + 12
       + (dungeon.forever and LAYOUT.foreverMark + 4 or 0)
@@ -451,6 +450,7 @@ local function buildBars(dungeons, others, yourLevel, measure, chosen)
       + (moreDots > 0 and measure("+" .. moreDots, "tiny") + 4 or 0)
       + (raids and 12 or 0)
     local shared = sharedBy(dungeon, yourLevel, chosen)
+    local span = (dungeon.to - dungeon.from + 1) * LAYOUT.level
     bars[#bars + 1] = {
       name = dungeon.name,
       kind = dungeon.kind,
@@ -463,16 +463,16 @@ local function buildBars(dungeons, others, yourLevel, measure, chosen)
       dots = dots,
       moreDots = moreDots,
       past = yourLevel > dungeon.to,
-      x = xOf(dungeon.from) - (raids and 6 or 0),
-      width = math.max((dungeon.to - dungeon.from) * LAYOUT.level, content),
+      x = xOf(dungeon.from) - LAYOUT.level / 2,
+      width = math.max(span, content),
+      -- The plate: the level range's whole cells, as the can-play band
+      -- and the shaded decades. The raids' one level is too narrow for
+      -- its entry, so its whole entry is.
+      range = raids and math.max(span, content) or span,
       tooltip = tooltip,
       shared = shared,
       faded = #chosen > 0 and not shared,
     }
-    -- The plate: the level range, from its first level's tick to its
-    -- last's. The raids' one level has no span, so its whole entry is.
-    local bar = bars[#bars]
-    bar.range = raids and bar.width or (dungeon.to - dungeon.from) * LAYOUT.level
   end
 
   local order = {}

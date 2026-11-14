@@ -76,6 +76,12 @@ local GROUND = 2
 local OVERVIEW_MARK = Skin.warm(0.12)
 local OVERVIEW_NUMBER = Skin.warm(0.3)
 local OVERVIEW_LANES = 9
+local STRIP_BAND = Skin.alpha(GOLD, 0.12)
+local STRIP_BAND_EDGE = Skin.alpha(GOLD, 0.5)
+local STRIP_WINDOW = Skin.warm(0.04)
+local STRIP_WINDOW_EDGE = Skin.warm(0.35)
+local STRIP_LANE = { 1, 1, 1, 0.22 }
+local STRIP_LANE_FITS = { 1, 1, 1, 0.6 }
 
 local view
 local core
@@ -541,11 +547,11 @@ local function createView(parent)
   view.strip:SetHeight(OVERVIEW - 4)
   view.strip:EnableMouse(true)
   -- The can-play band, as on the line.
-  view.stripBand = Skin.fill(view.strip, Skin.alpha(GOLD, 0.12), "BACKGROUND", 1)
+  view.stripBand = Skin.fill(view.strip, STRIP_BAND, "BACKGROUND", 1)
   view.stripBand:ClearAllPoints()
   view.stripBandEdges = {}
   for i = 1, 2 do
-    local edge = Skin.fill(view.strip, Skin.alpha(GOLD, 0.5), "BORDER")
+    local edge = Skin.fill(view.strip, STRIP_BAND_EDGE, "BORDER")
     edge:ClearAllPoints()
     edge:SetWidth(1)
     view.stripBandEdges[i] = edge
@@ -555,8 +561,8 @@ local function createView(parent)
   view.stripYou:SetSize(2, OVERVIEW - 8)
   view.stripWindow = CreateFrame("Frame", nil, view.strip)
   view.stripWindow:SetHeight(OVERVIEW - 6)
-  Skin.fill(view.stripWindow, Skin.warm(0.04))
-  Skin.border(view.stripWindow, Skin.warm(0.35))
+  Skin.fill(view.stripWindow, STRIP_WINDOW)
+  Skin.border(view.stripWindow, STRIP_WINDOW_EDGE)
   local function jump()
     local scale = view.strip:GetEffectiveScale()
     local x = GetCursorPosition() / scale - view.strip:GetLeft()
@@ -897,7 +903,8 @@ local function drawGroups(data)
         stem:SetColorTexture(1, 1, 1, 0.14)
         stemTextures[stems] = stem
       end
-      local top = lit and rail - headHeight() - 2 or rail - 3
+      -- Down to 1px above the head, or the dot's ring.
+      local top = lit and rail - headHeight() + 1 or rail - 3
       at(stem, group.x, y + LABEL_HEIGHT - 2, 1, math.max(1, top - y - LABEL_HEIGHT))
       stem:SetAlpha(group.faded and FADED or 1)
       stem:Show()
@@ -1077,7 +1084,7 @@ local function drawOverview(data)
       mark:SetSize(1, view.strip:GetHeight())
       local number = overviewNumbers[marks]
       if not number then
-        number = Skin.label(view.strip, "tiny", OVERVIEW_NUMBER, "BACKGROUND")
+        number = Skin.label(view.strip, TINY, OVERVIEW_NUMBER, "BACKGROUND")
         overviewNumbers[marks] = number
       end
       number:ClearAllPoints()
@@ -1102,21 +1109,26 @@ local function drawOverview(data)
   local spread = math.max(1, data.lanes - 1)
   for i, bar in ipairs(data.bars) do
     local lane = stripTexture(overviewLines, i)
-    lane:SetColorTexture(1, 1, 1, bar.fits and 0.6 or 0.22)
-    local y = view.strip:GetHeight() - 2 - OVERVIEW_LANES + math.floor((bar.lane - 1) / spread * OVERVIEW_LANES)
+    lane:SetColorTexture(unpack(bar.fits and STRIP_LANE_FITS or STRIP_LANE))
+    local y = view.strip:GetHeight() - 2 - OVERVIEW_LANES + math.floor((bar.lane - 1) / spread * OVERVIEW_LANES + 0.5)
     lane:SetPoint("TOPLEFT", view.strip, "TOPLEFT", bar.x * scale, -y)
     lane:SetSize(math.max(1, bar.range * scale - 1), 1)
   end
   hideFrom(overviewLines, #data.bars + 1)
 
-  for i, group in ipairs(data.groups) do
-    local tick = stripTexture(overviewTicks, i, "OVERLAY")
-    tick:SetSize(2, 4)
-    local r, g, b = Skin.classColor(group.classFilename)
-    tick:SetVertexColor(r, g, b, group.online and 1 or 0.6)
-    tick:SetPoint("TOPLEFT", view.strip, "TOPLEFT", group.x * scale - 1, 0)
+  -- Friends only: you are the gold mark.
+  local ticks = 0
+  for _, group in ipairs(data.groups) do
+    if not group.own then
+      ticks = ticks + 1
+      local tick = stripTexture(overviewTicks, ticks, "OVERLAY")
+      tick:SetSize(2, 4)
+      local r, g, b = Skin.classColor(group.classFilename)
+      tick:SetVertexColor(r, g, b, group.online and 1 or 0.6)
+      tick:SetPoint("TOPLEFT", view.strip, "TOPLEFT", group.x * scale - 1, 0)
+    end
   end
-  hideFrom(overviewTicks, #data.groups + 1)
+  hideFrom(overviewTicks, ticks + 1)
   view.stripYou:ClearAllPoints()
   view.stripYou:SetPoint("CENTER", view.strip, "LEFT", data.you * scale, 0)
 end
@@ -1126,7 +1138,9 @@ end
 -- own level has its flag already.
 function TogetherTab.hovered()
   local data = view.data
-  if not data or view.dragFrom or not view.scroller:IsMouseOver() then
+  -- A press hides it only once it moves, as a drag.
+  local dragging = view.pressFrom and math.abs(cursorX() - view.pressFrom) >= CLICK_SLOP
+  if not data or dragging or not view.scroller:IsMouseOver() then
     view.guide:Hide()
     view.guideTag:Hide()
     return
@@ -1199,6 +1213,8 @@ function TogetherTab.draw(parent, theCore, campOn)
   local data = core:together(measure, selected)
   view.data = data
   view.guideTag.level = nil
+  -- A redraw may give the hovered bar's frame another dungeon.
+  view.rangeShade:Hide()
   if not data then
     view.scroller:Hide()
     view.as:SetText("")
