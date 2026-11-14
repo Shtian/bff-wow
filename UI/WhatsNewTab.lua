@@ -5,6 +5,7 @@
 -- update, naming those on an older BFF. Then a section per release (its
 -- version and date as a section label) with a row per change: its title in
 -- Body, and its detail in Small, cut to two lines; a click shows it whole.
+-- Changes after a release's first are split by a top Hairline, as rows are.
 -- Releases new on this visit carry the Unread dot on each change; the rest
 -- show titles only, in Smoke Muted, until clicked. Panel owns the scroll
 -- view; this fills its content. See docs/design/whats-new.md.
@@ -28,7 +29,7 @@ local PLATE_PAD_Y = 10
 local PLATE_GAP = 8
 -- A release's section label, as the Feed's day labels.
 local SECTION = 26
-local ENTRY_PAD = 5
+local ENTRY_PAD = 6
 local DETAIL_GAP = 2
 local DETAIL_LINES = 2
 -- The Unread dot, in the margin left of a change's title.
@@ -80,6 +81,9 @@ local function entry(index)
   if entries[index] then return entries[index] end
   local item = CreateFrame("Button", nil, view.content)
   Skin.fill(item, Skin.HOVER, "HIGHLIGHT")
+  -- Across the text column, not the dot's margin.
+  item.edge = Skin.edge(item, "TOP", Skin.LINE)
+  item.edge:SetPoint("TOPLEFT", INSET, 0)
   item.dot = Skin.unreadDot(item)
   item.title = Skin.label(item, "body", TEXT)
   item.title:SetPoint("TOPLEFT", INSET, -ENTRY_PAD)
@@ -131,9 +135,11 @@ local function drawPlate(friends, y, width)
   return y - height - PLATE_GAP
 end
 
--- Draws a change at y and returns the y under it.
-local function drawEntry(item, change, key, new, y, width)
+-- Draws a change at y and returns the y under it. first is true for a
+-- release's first change, which sits under its label with no Hairline.
+local function drawEntry(item, change, key, new, first, y, width)
   item.key = change.detail and key or nil
+  item.edge:SetShown(not first)
   item:ClearAllPoints()
   item:SetPoint("TOPLEFT", view.content, "TOPLEFT", 0, y)
   item:SetPoint("RIGHT", view.content, "RIGHT", -INSET, 0)
@@ -193,7 +199,7 @@ function WhatsNewTab.draw(scrollView, core, width, onChange)
     y = y - SECTION
     for i, change in ipairs(release.entries) do
       entryCount = entryCount + 1
-      y = drawEntry(entry(entryCount), change, release.version .. ":" .. i, release.new, y, inner - 4)
+      y = drawEntry(entry(entryCount), change, release.version .. ":" .. i, release.new, i == 1, y, inner - 4)
     end
   end
   for i = sectionCount + 1, #sections do sections[i]:Hide() end
