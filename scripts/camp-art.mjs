@@ -2,7 +2,8 @@
 // sprite, a 1-pixel transparent gutter round each cell),
 // Media/CampBackdrop.tga (the static night sky, hills, pines and the fire's
 // glow on the ground), Media/CampPocketBackdrop.tga (the Pocket Camp's
-// soft-edged piece of it) and UI/CampSheet.lua (where each sprite sits). The
+// soft-edged piece of it), Media/CampLight.tga (the fire's light on the
+// window under the band) and UI/CampSheet.lua (where each sprite sits). The
 // grids come from the prototype (prototype/ui-personality). Run it after
 // changing a grid: node scripts/camp-art.mjs. See docs/design/camp.md.
 //
@@ -134,6 +135,8 @@ const flare = (rows) => rows.flatMap((row, j) => (j < 8 ? [row, row] : [row]));
 const FLARE_PAL = { R: "#5b2a9e", O: "#8a45d6", G: "#b77bf2", Y: "#dcc0ff", W: "#f6ecff" };
 const EMBER = ["G"];
 const EMBER_COOL = ["R"];
+// Between the two, for an ember drifting down from the fire into the panel.
+const EMBER_WARM = ["O"];
 
 // The tent: a pitched canvas with a dark doorway and a gold pennant, its
 // peak at the middle column.
@@ -173,7 +176,7 @@ const SPRITES = [
   ["grave", skin(GRAVE)], ["flower", skin(FLOWER)], ["spark", skin(SPARK)],
   ["fire1", skin(FIRE[0])], ["fire2", skin(FIRE[1])], ["fire3", skin(FIRE[2])],
   ["logs", skin(LOGS)], ["seat", skin(SEAT)], ["sleep1", skin(SLEEP[0])], ["sleep2", skin(SLEEP[1])], ["sleep3", skin(SLEEP[2])],
-  ["ember", skin(EMBER)], ["emberCool", skin(EMBER_COOL)],
+  ["ember", skin(EMBER)], ["emberCool", skin(EMBER_COOL)], ["emberWarm", skin(EMBER_WARM)],
   ["tent", tent()],
   ["rod", skin(ROD)], ["star", skin(STAR)], ["fish", skin(FISH)],
   ["smoke1", skin(SMOKE[0])], ["smoke2", skin(SMOKE[1])], ["skeleton", skin(SKELETON)],
@@ -332,11 +335,29 @@ function pocketBackdrop(back) {
   return img;
 }
 
+// The fire's light on the panel under the band (docs/design/camp.md,
+// Firelight): the fire's orange, strongest at the middle of the top edge,
+// where the fire is, and fading out in a half ellipse. Smooth, not
+// dithered: it's light falling on the window, not art. UI draws it added
+// to what's under it, at a low alpha.
+const LIGHT_W = 256, LIGHT_H = 128, LIGHT_FALLOFF = 1.6;
+function light() {
+  const img = image(LIGHT_W, LIGHT_H);
+  const [r, g, b] = hex(PAL.O);
+  for (let y = 0; y < LIGHT_H; y++) for (let x = 0; x < LIGHT_W; x++) {
+    const u = (x + 0.5) / (LIGHT_W / 2) - 1, v = (y + 0.5) / LIGHT_H;
+    const d = Math.min(1, Math.hypot(u, v));
+    img.pixels.set([r, g, b, Math.round(255 * Math.pow(1 - d, LIGHT_FALLOFF))], (y * LIGHT_W + x) * 4);
+  }
+  return img;
+}
+
 const { img, placed } = sheet();
 const back = backdrop();
 writeFileSync(join(root, "Media", "CampSprites.tga"), tga(img));
 writeFileSync(join(root, "Media", "CampBackdrop.tga"), tga(back));
 writeFileSync(join(root, "Media", "CampPocketBackdrop.tga"), tga(pocketBackdrop(back)));
+writeFileSync(join(root, "Media", "CampLight.tga"), tga(light()));
 
 const [skyR, skyG, skyB] = hex(SKY_TOP).map((v) => +(v / 255).toFixed(3));
 const lines = placed.map((s) => `    ${s.name} = { ${s.x}, ${s.y}, ${s.w}, ${s.h} },`);
@@ -368,6 +389,13 @@ ${lines.join("\n")}
     width = ${POCKET_FILE_W},
     height = ${POCKET_FILE_H},
     fire = ${POCKET_FILE_W / 2},
+  },
+  -- The fire's light on the panel under the band, with the fire on the
+  -- middle of its top edge.
+  light = {
+    file = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampLight",
+    width = ${LIGHT_W},
+    height = ${LIGHT_H},
   },
   -- The sky's top colour, above the backdrop's art.
   sky = { ${skyR}, ${skyG}, ${skyB} },

@@ -20,7 +20,8 @@
 -- and redraw when a resize ends. While Core has a Camp (camp()), its band
 -- runs across the window under the header, above the sidebar and every
 -- tab, drawn by CampScene; Roster rows show a small seated figure in place
--- of the class icon, and a Cheer makes a seated friend hop. Under the band
+-- of the class icon, and a Cheer makes a seated friend hop. The fire lights
+-- the window under the band (Firelight). Under the band
 -- sits Core's Tip (tip()), when there is one: a card offering a feature
 -- that's off by default, with a button to turn it on and one to dismiss
 -- it. It never sees a Member record.
@@ -126,6 +127,8 @@ local frame
 -- The Camp band, and its height now (0 while there's no Camp).
 local camp
 local campHeight = 0
+-- The fire's light on the window under the band (Firelight).
+local firelight
 -- The Tip card under the band, and its height now (0 while there's no Tip).
 local tipCard
 local tipHeight = 0
@@ -352,7 +355,7 @@ local function createRow()
   local row = characterButton(ROW_HEIGHT)
   row:SetScript("OnClick", onRowClick)
 
-  row.ownBackground = Skin.fill(row, { GOLD[1], GOLD[2], GOLD[3], 0.05 })
+  row.ownBackground = Skin.litWash(row)
 
   row.icon = row:CreateTexture(nil, "ARTWORK")
   row.icon:SetSize(28, 28)
@@ -487,9 +490,7 @@ end
 -- the sort and Spares, and any later one (ASLEEP IN CAMP) is a plain label
 -- and line.
 local function sectionLabel(parent)
-  local label = Skin.label(parent, "label", DIM)
-  label:SetPoint("LEFT", INSET, -2)
-  return label
+  return Skin.sectionLabel(parent, INSET, -2)
 end
 
 local function createSection()
@@ -516,9 +517,7 @@ local function createSection()
   section.spares.label:SetPoint("RIGHT")
   section.spares:SetScript("OnClick", function() Panel.show("spares") end)
 
-  local line = section:CreateTexture(nil, "ARTWORK")
-  line:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
-  line:SetHeight(1)
+  local line = Skin.rule(section)
   line:SetPoint("LEFT", label, "RIGHT", 8, 0)
   section.line = line
 end
@@ -532,9 +531,7 @@ local function laterSection(index)
   heading = CreateFrame("Frame", nil, rosterView.content)
   heading:SetHeight(SECTION)
   heading.label = sectionLabel(heading)
-  local line = heading:CreateTexture(nil, "ARTWORK")
-  line:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
-  line:SetHeight(1)
+  local line = Skin.rule(heading)
   line:SetPoint("LEFT", heading.label, "RIGHT", 8, 0)
   line:SetPoint("RIGHT", -INSET, 0)
   laterSections[index] = heading
@@ -564,8 +561,8 @@ local function navButton(label, onClick)
   button:SetHeight(NAV_HEIGHT)
   -- The selected tab and the hovered one get a light chip, inset from
   -- the sidebar's edges.
-  button.selected = Skin.chip(button, { 1, 1, 1, 0.08 }, NAV_CHIP_X, NAV_CHIP_Y, NAV_CHIP_RADIUS)
-  Skin.chip(button, { 1, 1, 1, 0.04 }, NAV_CHIP_X, NAV_CHIP_Y, NAV_CHIP_RADIUS, "HIGHLIGHT")
+  button.selected = Skin.chip(button, Skin.CHIP, NAV_CHIP_X, NAV_CHIP_Y, NAV_CHIP_RADIUS)
+  Skin.chip(button, Skin.CHIP_HOVER, NAV_CHIP_X, NAV_CHIP_Y, NAV_CHIP_RADIUS, "HIGHLIGHT")
   button.label = Skin.label(button, "text", MUTED)
   button.label:SetPoint("LEFT", NAV_CHIP_X + 10, 0)
   button.label:SetText(label)
@@ -701,9 +698,7 @@ local function createFeedView()
   feedView:SetPoint("TOPLEFT")
   feedView:SetPoint("BOTTOMRIGHT", -6, 0)
 
-  feedView.line = feedView.content:CreateTexture(nil, "BACKGROUND")
-  feedView.line:SetColorTexture(1, 1, 1, 0.08)
-  feedView.line:SetWidth(2)
+  feedView.segments = {}
   feedView.days = {}
   feedView.entries = {}
 
@@ -734,25 +729,54 @@ local function createFeedView()
   feedView.emptyText = text
 end
 
--- A day's label, like the Roster's CREW: on the window's colour so the
--- timeline's line stops behind it, with a hairline running to the right.
+-- A day's label, like the Roster's CREW, with its rule running to the
+-- right. The timeline's line stops short of it (drawTimeline), so the
+-- label needs no back: the fire's light shows behind it.
+local DAY_HEIGHT = 16
+local DAY_GAP = 4
+
 local function createFeedDay()
   local day = CreateFrame("Frame", nil, feedView.content)
-  day:SetHeight(16)
-  day.back = Skin.fill(day, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1 })
-  day.label = Skin.label(day, "label", DIM)
-  day.label:SetPoint("LEFT", 4, 0)
-  day.back:ClearAllPoints()
-  day.back:SetPoint("TOPLEFT")
-  day.back:SetPoint("BOTTOMLEFT")
-  day.back:SetPoint("RIGHT", day.label, "RIGHT", 4, 0)
-  local line = day:CreateTexture(nil, "ARTWORK")
-  line:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
-  line:SetHeight(1)
+  day:SetHeight(DAY_HEIGHT)
+  day.label = Skin.sectionLabel(day, 4, 0)
+  local line = Skin.rule(day)
   line:SetPoint("LEFT", day.label, "RIGHT", 8, 0)
   line:SetPoint("RIGHT")
   feedView.days[#feedView.days + 1] = day
   return day
+end
+
+-- The timeline's line through the entry pictures: a stretch per day,
+-- from under its label to just above the next one's (or past the last
+-- entry), fading from the newest entry to the oldest. stretches holds
+-- each one's { top, bottom } y.
+local function drawTimeline(stretches)
+  local top = stretches[1] and stretches[1].top
+  local bottom = stretches[1] and stretches[#stretches].bottom
+  local new, old = Skin.TIMELINE_NEW, Skin.TIMELINE_OLD
+  local function colourAt(y)
+    local share = top > bottom and (top - y) / (top - bottom) or 0
+    return Skin.alpha(new, new[4] + (old[4] - new[4]) * share)
+  end
+  local shown = 0
+  for _, stretch in ipairs(stretches) do
+    if stretch.top > stretch.bottom then
+      shown = shown + 1
+      local segment = feedView.segments[shown]
+      if not segment then
+        segment = feedView.content:CreateTexture(nil, "BACKGROUND")
+        segment:SetColorTexture(1, 1, 1, 1)
+        segment:SetWidth(2)
+        feedView.segments[shown] = segment
+      end
+      segment:ClearAllPoints()
+      segment:SetPoint("TOPLEFT", LINE_X, stretch.top)
+      segment:SetHeight(stretch.top - stretch.bottom)
+      Skin.gradient(segment, "VERTICAL", colourAt(stretch.bottom), colourAt(stretch.top))
+      segment:Show()
+    end
+  end
+  for i = shown + 1, #feedView.segments do feedView.segments[i]:Hide() end
 end
 
 -- An entry: the kind's picture on the line, the text, and the time under
@@ -823,8 +847,11 @@ end
 local function drawFeed(feed)
   if not feedView then createFeedView() end
   local y, dayCount, entryCount = -INSET, 0, 0
+  local stretches = {}
   for _, day in ipairs(feed.days) do
     dayCount = dayCount + 1
+    if stretches[dayCount - 1] then stretches[dayCount - 1].bottom = y + DAY_GAP end
+    stretches[dayCount] = { top = y - DAY_HEIGHT - DAY_GAP }
     local chip = feedView.days[dayCount] or createFeedDay()
     chip:ClearAllPoints()
     chip:SetPoint("TOPLEFT", feedView.content, "TOPLEFT", INSET - 4, y)
@@ -847,10 +874,8 @@ local function drawFeed(feed)
   hideAll(feedView.entries, entryCount + 1)
   feedView.emptyText:SetWidth(contentWidth() - 2 * INSET - NODE - 10)
   feedView.empty:SetShown(entryCount == 0)
-  feedView.line:ClearAllPoints()
-  feedView.line:SetPoint("TOPLEFT", LINE_X, -INSET - 8)
-  feedView.line:SetPoint("BOTTOMLEFT", LINE_X, INSET + 8)
-  feedView.line:SetShown(entryCount > 0)
+  if stretches[dayCount] then stretches[dayCount].bottom = y + 8 end
+  drawTimeline(entryCount > 0 and stretches or {})
   feedView.content:SetHeight(math.max(-y + INSET, 1))
   feedView:Show()
   updateThumb(feedView)
@@ -1093,13 +1118,10 @@ local function spareHeading(index)
   if heading then return heading end
   heading = CreateFrame("Frame", nil, sparesView.content)
   heading:SetHeight(SPARE_SECTION)
-  heading.label = Skin.label(heading, "label", DIM)
-  heading.label:SetPoint("LEFT", INSET, -2)
+  heading.label = sectionLabel(heading)
   heading.count = Skin.label(heading, "small", MUTED)
   heading.count:SetPoint("RIGHT", -INSET, -2)
-  heading.line = heading:CreateTexture(nil, "ARTWORK")
-  heading.line:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
-  heading.line:SetHeight(1)
+  heading.line = Skin.rule(heading)
   heading.line:SetPoint("LEFT", heading.label, "RIGHT", 8, 0)
   heading.line:SetPoint("RIGHT", heading.count, "LEFT", -8, 0)
   sparesView.headings[index] = heading
@@ -1496,7 +1518,7 @@ local function professionRow(index)
   if row then return row end
   row = CreateFrame("Frame", nil, professionsView.list.content)
   row:SetHeight(PROFESSION_ROW)
-  row.ownBackground = Skin.fill(row, { GOLD[1], GOLD[2], GOLD[3], 0.05 })
+  row.ownBackground = Skin.litWash(row)
   row.hover = Skin.fill(row, Skin.HOVER, "BORDER")
   row.hover:Hide()
   row.edge = Skin.edge(row, "TOP", Skin.LINE)
@@ -1691,6 +1713,7 @@ local function create()
   camp:SetPoint("TOPLEFT", 1, -HEADER)
   camp:SetPoint("TOPRIGHT", -1, -HEADER)
   Skin.edge(camp, "BOTTOM", Skin.LINE, "OVERLAY")
+  firelight = ns.Firelight.new(frame)
 
   frame.sidebar = CreateFrame("Frame", nil, frame)
   frame.sidebar:SetPoint("BOTTOMLEFT", 1, 1)
@@ -1716,6 +1739,7 @@ local function drawCamp(inCrew)
   end
   camp:SetHeight(math.max(campHeight, 1))
   camp:Draw(view)
+  firelight:Place(camp, campHeight > 0 and frame:GetHeight() - HEADER - campHeight or nil)
 end
 
 -- The Tip card: Core's text on the left, Turn on and No thanks on the

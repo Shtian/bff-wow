@@ -29,6 +29,7 @@ ns.CampSheet = {
     sleep3 = { 84, 16, 5, 5 },
     ember = { 91, 16, 1, 1 },
     emberCool = { 94, 16, 1, 1 },
+    emberWarm = { 97, 16, 1, 1 },
     tent = { 1, 30, 33, 22 },
     rod = { 36, 30, 7, 10 },
     star = { 45, 30, 5, 5 },
@@ -69,6 +70,13 @@ ns.CampSheet = {
     width = 128,
     height = 64,
     fire = 64,
+  },
+  -- The fire's light on the panel under the band, with the fire on the
+  -- middle of its top edge.
+  light = {
+    file = "Interface\\AddOns\\BFF\\Media\\CampLight",
+    width = 256,
+    height = 128,
   },
   -- The sky's top colour, above the backdrop's art.
   sky = { 0.027, 0.039, 0.118 },

@@ -38,6 +38,7 @@ stds.wow = {
     "ChatThrottleLib",
     "ClearCursor",
     "CLOSE",
+    "CreateColor",
     "CreateFont",
     "CreateFrame",
     "Enum",

@@ -12,11 +12,13 @@ colors:
   ash-text: "#e8e6e3"
   smoke-muted: "#adabb8"
   dusk-dim: "#8c8a99"
-  hairline: "rgba(255,255,255,0.07)"
-  border: "rgba(255,255,255,0.10)"
-  hover-wash: "rgba(255,255,255,0.05)"
+  firelight-cream: "#ffecc8"
+  hairline: "rgba(255,236,200,0.075)"
+  border: "rgba(255,236,200,0.10)"
+  hover-wash: "rgba(255,236,200,0.05)"
   bar-fill: "rgba(255,255,255,0.30)"
-  bar-track: "rgba(255,255,255,0.08)"
+  bar-track: "rgba(255,236,200,0.08)"
+  night-settle: "rgba(4,3,8,0.55)"
   online-green: "#70e370"
   offline-grey: "#54525e"
   feed-death: "#f2665c"
@@ -195,12 +197,12 @@ components:
 
 BFF is the record a group of friends keeps by the fire: who went where, who dinged, who died, who left a bag of loot for the others. The window is dark and calm so it sits quietly over the game world. Gold marks the moments worth noticing: a title, a highlight in the Feed, the one action that matters. Everything else is ash and smoke greys on near-black.
 
-The system has two registers. **In the game** it's a ledger: flat, dense and legible at 10–15px, built from solid colour textures and 1px hairlines, so it never depends on Blizzard's frame templates. **On brand surfaces** (the CurseForge gallery, README banner, docs) the same palette sits over the game's own scenery. Teal joins gold as a thin accent, taken from the icon's second ring, and depth comes from the screenshot behind and a soft shadow under each frame.
+The system has two registers. **In the game** it's a ledger kept by the fire: flat, dense and legible at 10–15px, built from solid colour textures and 1px hairlines, so it never depends on Blizzard's frame templates. The Camp's fire lights the panel under its band, so the window is warm near the fire and darker at its foot (the Firelit Window Rule), while rows, bars and text stay flat. **On brand surfaces** (the CurseForge gallery, README banner, docs) the same palette sits over the game's own scenery. Teal joins gold as a thin accent, taken from the icon's second ring, and depth comes from the screenshot behind and a soft shadow under each frame.
 
 BFF has its own flat skin. It deliberately rejects Blizzard's parchment, stone frames and ornate gilded borders.
 
 **Key Characteristics:**
-- Near-black windows (97% opaque) over the game, with 1px white hairlines at 7–10% for structure.
+- Near-black windows (97% opaque) over the game, with 1px hairlines in firelight cream at 7–10% for structure, lit by the Camp's fire under its band.
 - Ember Gold is the only accent in the game, and it means news. The Trophies tab's trophy colours are the one deliberate exception (and Catches shows items in their quality colours), and even there gold is news. Gold and teal appear together only on brand surfaces and inside the icon.
 - Friz Quadrata names things (titles, headings, labels) and Arial Narrow carries everything else in the game. Cinzel and Archivo Narrow stand in for them on the web.
 - Square corners in the game; rounding is faked with stepped pixels only where a chip needs it.
@@ -224,7 +226,8 @@ A night palette: one warm accent glowing against cool, slightly violet near-blac
 - **Ash Text** (ash-text): body text.
 - **Smoke Muted** (smoke-muted): secondary text, the Character line under a Member, headerRight labels, unselected navigation.
 - **Dusk Dim** (dusk-dim): tertiary text: section labels, deaths counts, tiny captions.
-- **Hairline** (hairline) and **Border** (border): dividers and 1px frame edges. White at low alpha, so they work on any plate.
+- **Firelight Cream** (firelight-cream, `Skin.WARM`): every wash and hairline in the game, at low alpha, so the neutrals read as lit by the fire rather than by a white lamp. Bar Fill stays white.
+- **Hairline** (hairline) and **Border** (border): dividers and 1px frame edges. Firelight Cream at low alpha, so they work on any plate.
 - **Bar Fill** (bar-fill) on **Bar Track** (bar-track): every progress bar (Roster XP, While you were away levels). Neutral, so colour on a bar means something. Open Crew goals fill in their track's hue (Trophy Colours Rule).
 
 ### Semantic
@@ -275,13 +278,13 @@ The gallery has its own scale, sized for 1920×1080 images that are also seen as
 
 ## Layout
 
-The in-game windows are movable. The panel opens at 640×520 and resizes from a grip in its bottom right corner, down to 460×380 and up to 900×800, remembered account-wide; it has a 124px sidebar of 30px tabs and the content to its right. Its size never changes between tabs, rows stretch to its width, and long lists scroll inside it. Content is inset 12px (14px in the While you were away popup, which is 400 wide). Rows follow a steady rhythm: 44px Member rows with 20px alt rows under them, 38px Feed entries, 26px day and section headings, the Trophies tab as a gold latest-win plate (at least 60px), medals 52px wide on the shelf and 60px in the cabinet (40px icons, 72px high) that wrap, and 74px Working on tiles in two columns (one below 400px of content), split by 1px hairlines, Play times cells 11px wide by 18px tall, and 25px Professions rows of 18px tiles (a 2px bar under each), and the Catches tab's 28px tiles, 4px apart across and 7px down (room for a fresh tile's 2px gold line), in sections under a Heading, with 22px Recent first catches rows at the bottom. The Dungeons tab's level line scrolls sideways at 24px a level, with 21px label rows above a 20px axis and 23px dungeon lanes (20px bars) below it, between a 32px toolbar on top and a 22px overview strip at the bottom; its type is a step larger than the rest of the panel. In While you were away, each section starts 12px below what's above it, its label takes 16px and each line 20px, so groups sit about 22px apart and lines within them about 6px. Tabs are top-aligned. An empty view is never a lone line in a corner: its content is composed and centred (see Empty state). Toasts are 300×40 and stack 6px apart, up or down from a movable anchor that starts 160px from the top of the screen.
+The in-game windows are movable. The panel opens at 640×520 and resizes from a grip in its bottom right corner, down to 460×380 and up to 900×800, remembered account-wide; it has a 124px sidebar of 30px tabs and the content to its right. Its size never changes between tabs, rows stretch to its width, and long lists scroll inside it. Content is inset 12px (14px in the While you were away popup, which is 400 wide). Rows follow a steady rhythm: 44px Member rows with 20px alt rows under them, 38px Feed entries, 26px day and section headings, the Trophies tab as a gold latest-win plate (at least 60px), medals 52px wide on the shelf and 60px in the cabinet (40px icons, 72px high) that wrap, and 74px Working on tiles in two columns (one below 400px of content), split by 1px hairlines with no fill of their own, so the fire's light shows through, Play times cells 11px wide by 18px tall, and 25px Professions rows of 18px tiles (a 2px bar under each), and the Catches tab's 28px tiles, 4px apart across and 7px down (room for a fresh tile's 2px gold line), in sections under a Heading, with 22px Recent first catches rows at the bottom. The Dungeons tab's level line scrolls sideways at 24px a level, with 21px label rows above a 20px axis and 23px dungeon lanes (20px bars) below it, between a 32px toolbar on top and a 22px overview strip at the bottom; its type is a step larger than the rest of the panel. In While you were away, each section starts 12px below what's above it, its label takes 16px and each line 20px, so groups sit about 22px apart and lines within them about 6px. Tabs are top-aligned. An empty view is never a lone line in a corner: its content is composed and centred (see Empty state). Toasts are 300×40 and stack 6px apart, up or down from a movable anchor that starts 160px from the top of the screen.
 
 Brand images are 1920×1080, plus a 1600×520 banner. Split layouts put a 640px text column on one side, an 80px gap and 110–120px outer margins, and the screenshot column (`minmax(0, 1fr)`, 880px high) on the other side; the side alternates from slide to slide. Frames are measured into their column, so a wide shot can't push the copy, and never enlarged past 1.4x, so game text stays sharp. A second shot (a toast) sits below the first on the side away from the copy, overlapping only its bottom 28px. Only the hero carries the name and icon, small, top left: CurseForge already shows them beside the gallery. The last slide is a numbered how-to for starting a crew.
 
 ## Elevation & Depth
 
-**In the game, depth is tonal, never shadowed.** Layers step from the transparent world to Night Window, then Header Plate or Raised Plate, then white washes (5–8%) for hover and selection. Structure comes from 1px hairlines. The only "lift" is the additive white highlight on hover.
+**In the game, depth is tonal and lit, never shadowed.** Layers step from the transparent world to Night Window, then Header Plate or Raised Plate, then cream washes (5–9%) for hover and selection. Structure comes from 1px hairlines. The only "lift" is the additive highlight on hover. With the Camp on, the fire's light adds the one gradient of depth: warm under the band, settling into night at the window's foot (the Firelit Window Rule).
 
 **On brand surfaces, depth comes from the world.** The slide's own screenshot sits behind as scenery, only lightly softened (8px blur) so it still reads as a place, with Night Window falling over the text side. Slides without a screenshot (banner, how-to) use the navy-to-black gradient with a faint gold and teal light. A fine grain stops gradients banding. Screenshot frames sit on a soft offset shadow, with no mat, ring or glow.
 
@@ -291,9 +294,18 @@ Brand images are 1920×1080, plus a 1600×520 banner. Split layouts put a 640px 
 - **Title lift** (`text-shadow: 0 2px 10px rgba(14,13,20,.6)`): brand titles over scenery.
 
 ### Named Rules
-**The Flat Ledger Rule.** Nothing in the addon casts a shadow. If something needs to stand out, give it a lighter plate or a gold edge.
+**The Flat Ledger Rule.** Nothing in the addon casts a shadow. If something needs to stand out, give it a lighter plate or a gold edge. The only gradients are the fire's light (the Firelit Window Rule).
 
-**The Lit Camp Rule.** The Camp (`docs/design/camp.md`) is the one place the addon is lit rather than a ledger: a night sky dithered towards the horizon, the fire's glow on the ground, pixel-art figures. The exception is scoped to the Camp's band, the popup's Camp and the small figures on Roster rows and toasts, the way the Trophy Colours Rule is scoped to the Trophies tab. Everything around it stays flat. The other rules still hold inside it: no teal in the Camp (Two Rings), and gold in UI text only for news (One Ember): names are in class colour, and only a max level's gained tag is gold. The spark sprite is the Camp's only gold mark on a person. Its colours live in the art (`scripts/camp-art.mjs`) and in `RAID_CLASS_COLORS`, never as one-off UI values. Figures' cloth is authored white and `#9E9E9E` so the class tint multiplies to the prototype's tones. Art pixels are whole screen pixels at about 3 UI units in the band and 2 on rows and toasts, filtered `NEAREST`; names stay in UI units.
+**The Lit Camp Rule.** The Camp (`docs/design/camp.md`) is the one place the addon is lit rather than a ledger: a night sky dithered towards the horizon, the fire's glow on the ground, pixel-art figures. The exception is scoped to the Camp's band, the popup's Camp and the small figures on Roster rows and toasts, the way the Trophy Colours Rule is scoped to the Trophies tab. Everything around it stays flat, but for the fire's light on the panel (the Firelit Window Rule). The other rules still hold inside it: no teal in the Camp (Two Rings), and gold in UI text only for news (One Ember): names are in class colour, and only a max level's gained tag is gold. The spark sprite is the Camp's only gold mark on a person. Its colours live in the art (`scripts/camp-art.mjs`) and in `RAID_CLASS_COLORS`, never as one-off UI values. Figures' cloth is authored white and `#9E9E9E` so the class tint multiplies to the prototype's tones. Art pixels are whole screen pixels at about 3 UI units in the band and 2 on rows and toasts, filtered `NEAREST`; names stay in UI units.
+
+**The Firelit Window Rule.** With the Camp on, its fire lights the panel under the band (`UI/Firelight.lua`), so the window feels like a ledger kept by the fire rather than a sterile sheet. It's light, never decoration, and it's the only gradient in the addon's UI:
+- **The glow:** the fire's orange (`Media/CampLight.tga`, drawn from the art's own colour), hung from the fire at the band's foot and added to the window under it: 16% strength at most, fading out in a half ellipse about 83% of the window wide and up to 300px down, with a brighter, shallow lip (30%) right where the band's ground meets the window. It breathes with the flames, stepping through a few strengths every 0.3s.
+- **Night settles:** a shade rising from the window's foot, `night-settle` at the bottom and clear at the top of its rise (200px, or half the room under the band).
+- **Embers:** now and then (every 1.4–3.6s, sometimes two together, at most six at once) an ember comes out from under the fire at the band's foot and drifts down into the window over 4–7s, swaying and cooling gold, orange, then red, on the Camp's own ember sprites at the band's art pixel. They fade out over the last 24px before the window's edges. WoW tells addons nothing of a reduced-motion preference, so turning the Camp off is how to stop them.
+- **Warm neutrals:** every wash and hairline is Firelight Cream, and the sidebar is a warm near-black.
+- **News catches the light:** your own row's gold wash and the latest-win plate are lit from the left (strong where the news starts, fading to the right), and the plate's top edge is brighter than its others. The Feed's timeline fades from the newest entry to the oldest.
+- **Section labels** open with a small spark, a cross of faint ember with a gold heart, and their rule fades out. It's the fire's, not news: it never grows, moves or marks a row.
+All of it is drawn on the panel's own layers, under every row, picture and line of text, so nothing is shaded and text keeps its contrast. It plays no sound and stops whenever the band is hidden: no Camp, no light. Only the panel is lit: the popup and toasts share the warm neutrals, but no glow, shade or embers. Its numbers live in `UI/Firelight.lua` and `Skin.lua`'s constants, never as one-off values.
 
 ## Shapes
 
@@ -316,15 +328,15 @@ Quiet and flat. Components are faint fills and hairlines, so the content and the
 - **Header button:** the same 22px square holding a small flat glyph drawn from rectangles, Smoke Muted (Ash Text on hover), with a one-line tooltip. Only the panel's header has them: Report a bug and Get in touch, left of the close button.
 
 ### Chips
-- **Navigation chip:** the selected tab gets an 8% white chip and the hovered one a 4% chip, inset 6px×2px with 2px stepped corners.
-- **Badge:** a 14px-high plate at 8% white with Small text, for levels. At least as wide as it is tall, and hidden when there's no value (no "-"). Unseen counts on tabs use a gold plate with near-black Tiny text. The minimap button's online count sits on a Night Window plate with Ash Tiny text, off the icon's rings.
+- **Navigation chip:** the selected tab gets a 9% cream chip and the hovered one a 4% chip, inset 6px×2px with 2px stepped corners.
+- **Badge:** a 14px-high plate at 8% cream with Small text, for levels. At least as wide as it is tall, and hidden when there's no value (no "-"). Unseen counts on tabs use a gold plate with near-black Tiny text. The minimap button's online count sits on a Night Window plate with Ash Tiny text, off the icon's rings.
 
 ### Cards / Containers
 - **Window:** Night Window at 95%, 1px Border all round, a 30px Header Plate with a Hairline under it, a gold Friz title 12px in, and close and status on the right (the panel adds its header buttons between them). Movable, closes on Escape.
-- **Rows:** separated by top Hairlines, no backgrounds; hover gets a 5% wash. Your own Roster row has a 5% gold wash. No coloured side stripes on rows.
+- **Rows:** separated by top Hairlines, no backgrounds; hover gets a 5% wash. Your own Roster and Professions rows have a gold wash lit from the left, 10% fading to 2% (Firelit Window Rule). No coloured side stripes on rows.
 
 ### Section label
-A Label in capitals at the left, with a Hairline running from it to the right edge or to whatever sits at the right (a count, a small button). Used for every section and for the Feed's day labels, which keep an opaque Night Window back so the timeline's line stops behind them. No boxed chips for labels.
+A Label in capitals at the left, opened by a 5px spark (faint ember cross, gold heart) on the panel, with a rule running from it to the right edge or to whatever sits at the right (a count, a small button): 11% cream by the label, fading out to its end. Used for every section and for the Feed's day labels; the timeline's line stops short of a day label, so it needs no back and the fire's light shows behind it. The While you were away popup's labels have no spark. No boxed chips for labels.
 
 ### Progress bar
 Bar Fill on Bar Track, square. 4px on Crew goal tiles and in While you were away, 2px for Roster XP. Colour replaces the fill only when it means something: green for levels gained, a Crew goal's track hue (Trophy Colours Rule), Ember Gold for a completed goal.
@@ -337,10 +349,10 @@ A trophy for a Crew goal rung reached, on the Trophies tab: the track's icon (a 
 - **Checkbox:** a 14px square at 4% white with a 25% white border, an Ember Gold tick inset 3px, and a Small Smoke Muted label clickable to its right.
 
 ### Navigation
-- **Sidebar tabs:** 30px rows in a 124px sidebar at 25% black, shorter in a window too short for them all (the minimum size with the Camp's band), so Settings stays clear. Text labels only, Smoke Muted, or Ash Text on the selected tab's chip. The Feed and Spare Items tabs show a gold unseen-count badge at their right when another tab is open.
+- **Sidebar tabs:** 30px rows in a 124px sidebar at 30% warm near-black, shorter in a window too short for them all (the minimum size with the Camp's band), so Settings stays clear. Text labels only, Smoke Muted, or Ash Text on the selected tab's chip. The Feed and Spare Items tabs show a gold unseen-count badge at their right when another tab is open.
 
 ### Feed picture (signature)
-A square full-colour game icon on an opaque Night Window back, with a 1px edge in its kind's colour at 55% alpha: green for dings, gold for max level and goals, red for deaths, blue for Crew news, violet for Spares, grey for leaving. Used on the Feed's timeline, where the line runs through the pictures' centres, and on toasts.
+A square full-colour game icon on an opaque Night Window back, with a 1px edge in its kind's colour at 55% alpha: green for dings, gold for max level and goals, red for deaths, blue for Crew news, violet for Spares, grey for leaving. Used on the Feed's timeline, where the line runs through the pictures' centres (16% cream at the newest entry, fading to 3% at the oldest), and on toasts.
 
 ### Unread dot
 A 6px Ember Gold dot in the 12px margin left of a Feed picture, level with its centre, on each New entry. It's the only mark on the row: the count lives on the sidebar's badge, and a divider wouldn't work because a Reaction can make an older entry New.
@@ -383,7 +395,7 @@ A 2px line fading in from gold, meeting a teal line at a small white spark: the 
 ### Don't:
 - **Don't** use Blizzard parchment, stone frames, ornate gilded borders or Blizzard frame templates for BFF's look.
 - **Don't** use teal in the addon (The Two Rings Rule).
-- **Don't** add shadows, gradients or glows to in-game frames (The Flat Ledger Rule), outside the Camp (The Lit Camp Rule).
+- **Don't** add shadows, gradients or glows to in-game frames (The Flat Ledger Rule), outside the Camp and its fire's light on the panel (The Lit Camp Rule, the Firelit Window Rule).
 - **Don't** introduce a third typeface.
 - **Don't** fade a gold button to show it's disabled, or mark a row with a coloured side stripe.
 - **Don't** put icons in the sidebar or box a label in a chip.

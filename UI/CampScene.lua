@@ -134,6 +134,10 @@ local function setSprite(t, name, unit, mirrored)
   t:Show()
 end
 
+-- Shows a sprite of the sheet on a texture set up with the sheet (as
+-- Firelight's embers are), at its size in art pixels of `unit` UI units.
+CampScene.sprite = setSprite
+
 local function tint(t, classFilename)
   t:SetVertexColor(Skin.classColor(classFilename))
 end
@@ -575,6 +579,16 @@ function CampScene.new(parent, options)
     local rows = math.floor(height / scene.unit)
     scene.fire = math.floor(columns / 2)
     return columns, rows * scene.unit
+  end
+
+  -- One art pixel in UI units, and the middle of the fire in UI units from
+  -- the band's left edge, as the last Measure or Fit left them.
+  function band:Unit()
+    return scene.unit
+  end
+
+  function band:FireX()
+    return (scene.fire + 0.5) * scene.unit
   end
 
   -- The art pixel's size to aim for in UI units, from the next Measure or

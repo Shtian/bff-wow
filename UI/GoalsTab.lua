@@ -26,7 +26,7 @@ local DIM = Skin.DIM
 
 local INSET = 12
 local HEADING = 28
--- The latest win's plate.
+-- The latest win's plate, which catches the fire's light (Skin.LIT_PLATE_*).
 local PLATE_ICON = 40
 local PLATE_PAD = 10
 local PLATE_MIN = 60
@@ -106,13 +106,10 @@ end
 local function createHeading()
   local heading = CreateFrame("Frame", nil, view.content)
   heading:SetHeight(HEADING)
-  heading.label = Skin.label(heading, "label", DIM)
-  heading.label:SetPoint("LEFT", INSET, -2)
+  heading.label = Skin.sectionLabel(heading, INSET, -2)
   heading.count = Skin.label(heading, "small", MUTED)
   heading.count:SetPoint("RIGHT", -INSET, -2)
-  heading.line = heading:CreateTexture(nil, "ARTWORK")
-  heading.line:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
-  heading.line:SetHeight(1)
+  heading.line = Skin.rule(heading)
   heading.line:SetPoint("LEFT", heading.label, "RIGHT", 8, 0)
   heading.line:SetPoint("RIGHT", heading.count, "LEFT", -8, 0)
   return heading
@@ -286,8 +283,9 @@ end
 -- The newest win, worded like its Feed entry, in a gold plate.
 local function createPlate()
   local frame = CreateFrame("Frame", nil, view.content)
-  Skin.fill(frame, { GOLD[1], GOLD[2], GOLD[3], 0.07 })
-  Skin.border(frame, { GOLD[1], GOLD[2], GOLD[3], 0.35 })
+  Skin.litWash(frame, Skin.LIT_PLATE_FROM, Skin.LIT_PLATE_TO)
+  for _, side in ipairs({ "BOTTOM", "LEFT", "RIGHT" }) do Skin.edge(frame, side, Skin.LIT_PLATE_EDGE) end
+  Skin.edge(frame, "TOP", Skin.LIT_PLATE_TOP)
   frame.picture = Skin.feedPicture(frame, PLATE_ICON)
   frame.picture:SetPoint("LEFT", PLATE_PAD + 2, 0)
   frame.title = Skin.label(frame, "title", GOLD)
@@ -386,7 +384,17 @@ local function createTile()
   tile:EnableMouse(true)
   tile:SetScript("OnEnter", showTileTooltip)
   tile:SetScript("OnLeave", hideTooltip)
-  Skin.fill(tile, { Skin.WINDOW[1], Skin.WINDOW[2], Skin.WINDOW[3], 1 })
+  -- No fill, so the fire's light shows through: the hairlines are the
+  -- 1px gaps to its right and under it, drawn when another tile is there.
+  tile.right = tile:CreateTexture(nil, "BACKGROUND")
+  tile.right:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
+  tile.right:SetPoint("TOPLEFT", tile, "TOPRIGHT")
+  tile.right:SetPoint("BOTTOMLEFT", tile, "BOTTOMRIGHT")
+  tile.right:SetWidth(1)
+  tile.below = tile:CreateTexture(nil, "BACKGROUND")
+  tile.below:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
+  tile.below:SetPoint("TOPRIGHT", tile, "BOTTOMRIGHT")
+  tile.below:SetHeight(1)
   tile.picture = Skin.feedPicture(tile, TILE_ICON)
   tile.picture:SetPoint("TOPLEFT", TILE_PAD, -TILE_PAD)
   tile.title = Skin.label(tile, "heading", TEXT)
@@ -441,19 +449,25 @@ end
 local function drawTiles(rows, y, width)
   if not tiles then
     tiles = CreateFrame("Frame", nil, view.content)
-    Skin.fill(tiles, Skin.LINE)
+    Skin.border(tiles, Skin.LINE)
   end
   local columns = width >= TWO_COLUMNS and 2 or 1
   local tileWidth = (width - (columns + 1)) / columns
+  local lines = math.ceil(#rows / columns)
   local p = pool("tiles", createTile)
   for i, row in ipairs(rows) do
     local tile = take(p)
     local column, line = (i - 1) % columns, math.floor((i - 1) / columns)
     tile:SetPoint("TOPLEFT", tiles, "TOPLEFT", 1 + column * (tileWidth + 1), -(1 + line * (TILE_HEIGHT + 1)))
     tile:SetWidth(tileWidth)
+    -- The border draws the outer edges; tiles draw the lines between.
+    tile.right:SetShown(column < columns - 1 and i < #rows)
+    tile.below:SetShown(line < lines - 1)
+    -- A later column's line also covers the corner where the lines cross.
+    tile.below:SetPoint("TOPLEFT", tile, "BOTTOMLEFT", column > 0 and -1 or 0, 0)
     drawTile(tile, row)
   end
-  local height = math.ceil(#rows / columns) * (TILE_HEIGHT + 1) + 1
+  local height = lines * (TILE_HEIGHT + 1) + 1
   tiles:ClearAllPoints()
   tiles:SetPoint("TOPLEFT", view.content, "TOPLEFT", INSET, y)
   tiles:SetSize(width, height)
