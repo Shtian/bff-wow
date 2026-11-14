@@ -771,7 +771,8 @@ end
 -- { title, lines ("Bob: in The Deadmines", one per actor), hint }. The
 -- rest is how UI shows it: opacity (the backdrop's, 0 to 1), locked (it
 -- can't be dragged), hideInCombat and position ({ x, y }: its bottom left
--- corner from the screen's, or nil where it hasn't been moved). Derived on
+-- corner from the screen's, or nil where it hasn't been moved) and scale
+-- (1 is its usual size). Derived on
 -- read, from what the Roster, Feed and Doing know: it can lag, and reading
 -- it sends nothing. See docs/design/pocket-camp.md.
 function Core:pocketCamp()
@@ -781,6 +782,7 @@ function Core:pocketCamp()
   view.locked = self:setting("pocketCampLocked")
   view.hideInCombat = self:setting("pocketCampCombat")
   view.position = self:setting("pocketCampPosition")
+  view.scale = self:setting("pocketCampScale") / 100
   view.tooltip.hint = view.locked and "Click to open BFF." or "Click to open BFF. Drag to move."
   return view
 end
@@ -1298,17 +1300,19 @@ local function screenPosition(field)
   }
 end
 
--- A whole percentage, 0 to 100, saved as nil while it's the default.
-local function percent(field, default)
+-- A whole percentage, low to high (0 to 100 unless given), saved as nil
+-- while it's the default.
+local function percent(field, default, low, high)
+  low, high = low or 0, high or 100
   return {
     read = function(db)
       local value = db[field]
       if type(value) ~= "number" then return default end
-      return value
+      return math.max(low, math.min(high, value))
     end,
     write = function(db, value)
       if type(value) ~= "number" then value = default end
-      value = math.max(0, math.min(100, math.floor(value + 0.5)))
+      value = math.max(low, math.min(high, math.floor(value + 0.5)))
       if value == default then value = nil end
       db[field] = value
     end,
@@ -1365,6 +1369,9 @@ Core.MAP_PIN_SIZES = {
   { key = "medium", label = "Medium" },
   { key = "large", label = "Large" },
 }
+
+-- The Pocket Camp's scale limits, in percent of its usual size.
+Core.POCKET_CAMP_MIN_SCALE, Core.POCKET_CAMP_MAX_SCALE = 50, 300
 
 local SHARING = "Sharing"
 local NOTIFICATIONS = "Notifications and display"
@@ -1451,7 +1458,7 @@ local SETTINGS = {
   },
   {
     key = "pocketCampLocked", section = POCKET_CAMP, kind = "toggle",
-    label = "Lock its position",
+    label = "Lock its position and size",
     saved = onFlag("pocketCampLocked"),
   },
   {
@@ -1463,6 +1470,13 @@ local SETTINGS = {
   -- { x, y } from the screen's bottom left; nil where it starts. Not on
   -- the page.
   { key = "pocketCampPosition", kind = "position", saved = screenPosition("pocketCampPosition") },
+  -- How big the Pocket Camp is, as a whole percentage of its usual size
+  -- (Core.POCKET_CAMP_MIN_SCALE to POCKET_CAMP_MAX_SCALE). Dragged with its
+  -- corner grip, not on the page.
+  {
+    key = "pocketCampScale", kind = "percent",
+    saved = percent("pocketCampScale", 100, Core.POCKET_CAMP_MIN_SCALE, Core.POCKET_CAMP_MAX_SCALE),
+  },
   -- The Together tab's Show menu (together().show), saved in db.together.
   { key = "togetherOffline", kind = "toggle", saved = offFlag("offlineOff", "together") },
   { key = "togetherAlts", kind = "toggle", saved = onFlag("alts", "together") },
@@ -1638,6 +1652,13 @@ end
 -- where it starts.
 function Core:setPocketCampPosition(x, y)
   self:setSetting("pocketCampPosition", x and { x = x, y = y } or nil)
+end
+
+-- How big the Pocket Camp is: 1 is its usual size. Kept to whole percents
+-- within Core.POCKET_CAMP_MIN_SCALE and POCKET_CAMP_MAX_SCALE. Nil goes
+-- back to 1.
+function Core:setPocketCampScale(scale)
+  self:setSetting("pocketCampScale", scale and scale * 100 or nil)
 end
 
 -- The panel's size and position as the player left it, by its top left

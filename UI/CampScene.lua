@@ -476,7 +476,10 @@ end
 -- target is the art pixel's size to aim for in UI units (default
 -- BAND_TARGET); shadow gives its text a shadow, for a band over the game
 -- world; and backdrop is the backdrop art to draw in the usual one's place
--- with no sky filled in behind it (CampSheet.pocketBackdrop, soft-edged).
+-- with no sky filled in behind it (CampSheet.pocketBackdrop, soft-edged);
+-- crisp false lets Fit size the art pixel at exactly target UI units, not
+-- a whole number of screen pixels, so it scales smoothly but some pixels
+-- come out a screen pixel wider than others.
 function CampScene.new(parent, options)
   options = options or {}
   local band = CreateFrame("Frame", nil, parent)
@@ -494,6 +497,7 @@ function CampScene.new(parent, options)
     names = options.names ~= false,
     backdropArt = options.backdrop or Sheet.backdrop,
     target = options.target or CampScene.BAND_TARGET,
+    crisp = options.crisp ~= false,
     hops = {},
     -- The one-off animations playing: { kind, memberId, start, ends }.
     animations = {},
@@ -573,10 +577,16 @@ function CampScene.new(parent, options)
     return columns, rows * scene.unit
   end
 
+  -- The art pixel's size to aim for in UI units, from the next Measure or
+  -- Fit on (the Pocket Camp's scale).
+  function band:SetTarget(target)
+    scene.target = target
+  end
+
   -- The band's size in UI units for a Camp exactly `columns` by `rows`
   -- art pixels (the Pocket Camp's). Call before Draw, in Measure's place.
   function band:Fit(columns, rows)
-    scene.unit = CampScene.artUnit(band, scene.target)
+    scene.unit = scene.crisp and CampScene.artUnit(band, scene.target) or scene.target
     scene.fire = math.floor(columns / 2)
     return columns * scene.unit, rows * scene.unit
   end

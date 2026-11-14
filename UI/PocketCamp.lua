@@ -4,7 +4,9 @@
 -- soft-edged backdrop of the opacity Core gives. It shows no names: the mouse over a figure
 -- shows that Member's Roster tooltip, and over the fire who is doing what.
 -- A click toggles the panel (not in combat), a drag moves it unless Core
--- says it's locked, and where it's dropped is saved through Core. Core's pocketCampAnimation events play on it, and a
+-- says it's locked, and where it's dropped is saved through Core. Unlocked,
+-- a grip shows in its bottom right corner while the mouse is over it: a drag
+-- there scales it, and a double-click puts it back to its usual size. Core's pocketCampAnimation events play on it, and a
 -- Cheer makes a friend hop. No frame is made until Core first has a Pocket
 -- Camp; hidden, nothing of it runs. It never reads a setting or a Member
 -- record. See docs/design/pocket-camp.md.
@@ -20,6 +22,8 @@ local START_Y = -220
 -- Sparks and Last seen go stale, so it redraws this often while shown.
 local REDRAW_EVERY = 30
 local MUTED = ns.Skin.MUTED
+-- The scale grip's size in UI units.
+local GRIP = 12
 
 local core
 local frame
@@ -32,7 +36,7 @@ local tooltipFor
 
 -- Puts the frame where Core says: where it was dropped, or where it starts.
 local function place()
-  if frame.moving then return end
+  if frame.moving or frame.scaling then return end
   frame:ClearAllPoints()
   if view.position then
     frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", view.position.x, view.position.y)
@@ -49,6 +53,101 @@ local function dropped()
   frame:SetUserPlaced(false)
   core:setPocketCampPosition(frame:GetLeft(), frame:GetBottom())
   if view then place() end
+end
+
+-- Sizes the band for a scale (1 is the usual size). The art pixel is
+-- exactly FIGURE_TARGET × scale UI units, so it scales smoothly.
+local function fit(scale)
+  frame.band:SetTarget(ns.CampScene.FIGURE_TARGET * scale)
+  frame:SetSize(frame.band:Fit(view.columns, view.rows))
+end
+
+local function cursorX()
+  return GetCursorPosition() / frame:GetEffectiveScale()
+end
+
+-- Its top left in UI units from the screen's bottom left.
+local function pinTopLeft(left, top)
+  frame:ClearAllPoints()
+  frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+end
+
+-- The scale the grip is dragged to: the width grows or shrinks by as much
+-- as the mouse has moved since the press, in whole percents, within Core's
+-- limits.
+local function draggedScale(drag)
+  local width = drag.width + cursorX() - drag.x
+  local percent = math.floor(drag.from * width / drag.width * 100 + 0.5)
+  return math.max(ns.Core.POCKET_CAMP_MIN_SCALE, math.min(ns.Core.POCKET_CAMP_MAX_SCALE, percent)) / 100
+end
+
+-- Ends a drag of the grip and saves the scale, and where its corner is.
+-- A press that didn't change the scale saves nothing.
+local function endScaling()
+  local drag = frame.scaling
+  if not drag then return end
+  frame.scaling = nil
+  if drag.scale == drag.from then return end
+  local left, bottom = frame:GetLeft(), frame:GetBottom()
+  core:setPocketCampPosition(left, bottom)
+  core:setPocketCampScale(drag.scale)
+end
+
+-- The grip follows the mouse: shown over the Pocket Camp while it isn't
+-- locked, and while it's being dragged, it redraws at the scale it's
+-- dragged to, its top left where it was at the press (read once, so the
+-- screen's clamp can't feed back into the scale).
+local function updateGrip()
+  local drag = frame.scaling
+  frame.grip:SetShown(drag or (view and not view.locked and not frame.moving and frame:IsMouseOver()) or false)
+  if not (drag and view) then return end
+  local scale = draggedScale(drag)
+  if scale == drag.scale then return end
+  drag.scale = scale
+  fit(scale)
+  pinTopLeft(drag.left, drag.top)
+  frame.band:Draw(view)
+end
+
+-- Back to the usual size, keeping its top left where it is, as a drag does.
+local function usualSize()
+  if not view or view.scale == 1 then return end
+  local left, top = frame:GetLeft(), frame:GetTop()
+  fit(1)
+  core:setPocketCampPosition(left, top - frame:GetHeight())
+  core:setPocketCampScale(nil)
+end
+
+local function createGrip()
+  local grip = CreateFrame("Button", nil, frame)
+  grip:SetSize(GRIP, GRIP)
+  grip:SetPoint("BOTTOMRIGHT")
+  grip:SetFrameLevel(frame:GetFrameLevel() + 10)
+  grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+  grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+  grip:SetScript("OnMouseDown", function(_, button)
+    if button == "LeftButton" and view and not view.locked then
+      GameTooltip:Hide()
+      frame.scaling = {
+        left = frame:GetLeft(), top = frame:GetTop(), width = frame:GetWidth(), x = cursorX(),
+        from = view.scale, scale = view.scale,
+      }
+    end
+  end)
+  grip:SetScript("OnMouseUp", endScaling)
+  grip:SetScript("OnDoubleClick", function()
+    if view and not view.locked then usualSize() end
+  end)
+  grip:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Drag to scale")
+    GameTooltip:AddLine("Double-click: usual size", MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:Show()
+  end)
+  grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  grip:Hide()
+  frame.grip = grip
 end
 
 -- The actor whose figure the mouse is over, or nil.
@@ -101,9 +200,13 @@ local function create()
   frame:SetScript("OnEnter", showTooltip)
   frame:SetScript("OnLeave", hideTooltip)
   -- Hidden mid-drag (combat began): the drag still saves where it got to.
-  frame:SetScript("OnHide", dropped)
+  frame:SetScript("OnHide", function()
+    dropped()
+    endScaling()
+  end)
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
+    updateGrip()
     -- The tooltip follows the mouse from figure to figure.
     if tooltipFor ~= nil and GameTooltip:IsOwned(frame) then
       local actor = hovered()
@@ -125,8 +228,11 @@ local function create()
 
   frame.band = ns.CampScene.new(frame, {
     target = ns.CampScene.FIGURE_TARGET, shadow = true, names = false, backdrop = ns.CampSheet.pocketBackdrop,
+    -- Scales smoothly with the grip; whole screen pixels made it step.
+    crisp = false,
   })
   frame.band:SetAllPoints()
+  createGrip()
 end
 
 -- Redraws from Core: shown while Core has a Pocket Camp, unless it hides
@@ -144,7 +250,7 @@ function PocketCamp.refresh()
     frame:Hide()
     return
   end
-  frame:SetSize(frame.band:Fit(view.columns, view.rows))
+  if not frame.scaling then fit(view.scale) end
   place()
   frame.band:SetBackdropAlpha(view.opacity)
   frame.band:Draw(view)
