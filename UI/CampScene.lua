@@ -508,13 +508,23 @@ local function onUpdate(band)
   drawFrame(scene, f)
 end
 
+-- Backdrop art with a band per width (CampSheet.pocketBackdrop): the top
+-- and bottom texture coordinates of the band for a Camp `columns` wide.
+-- Each band's art is at its bottom, under rows the band clips, so the
+-- band above can't bleed in at the top edge.
+local function bandCoords(art, columns)
+  local first = math.floor((columns - art.columns) / art.step) * art.band
+  return first / art.height, (first + art.band) / art.height
+end
+
 -- A Camp band in parent. options (all optional): gains shows each
 -- actor's gained text (While you were away) instead of names; names false
 -- leaves the names out (the Pocket Camp, whose figures have a tooltip);
 -- target is the art pixel's size to aim for in UI units (default
 -- BAND_TARGET); shadow gives its text a shadow, for a band over the game
 -- world; and backdrop is the backdrop art to draw in the usual one's place
--- with no sky filled in behind it (CampSheet.pocketBackdrop, soft-edged);
+-- with no sky filled in behind it (CampSheet.pocketBackdrop, soft-edged,
+-- with a band per width);
 -- crisp false lets Fit size the art pixel at exactly target UI units, not
 -- a whole number of screen pixels, so it scales smoothly but some pixels
 -- come out a screen pixel wider than others.
@@ -598,8 +608,14 @@ function CampScene.new(parent, options)
       return
     end
     scene.frame = nil
-    scene.backdrop:SetSize(scene.backdropArt.width * scene.unit, scene.backdropArt.height * scene.unit)
-    put(scene, scene.backdrop, -scene.backdropArt.fire, 0)
+    local art = scene.backdropArt
+    if art.band then
+      scene.backdrop:SetTexCoord(0, 1, bandCoords(art, view.columns))
+      scene.backdrop:SetSize(art.width * scene.unit, art.band * scene.unit)
+    else
+      scene.backdrop:SetSize(art.width * scene.unit, art.height * scene.unit)
+    end
+    put(scene, scene.backdrop, -art.fire, 0)
     scene.more:SetText(view.moreText or "")
     band:Show()
     onUpdate(band)
