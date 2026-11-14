@@ -138,26 +138,61 @@ const EMBER_COOL = ["R"];
 // Between the two, for an ember drifting down from the fire into the panel.
 const EMBER_WARM = ["O"];
 
-// The tent: a pitched canvas with a dark doorway and a gold pennant, its
-// peak at the middle column.
+// The tent: a pavilion after the game's own, cone roof laced down the
+// middle over a scalloped valance and walls that flare a little, the front
+// flaps tied back round the centre pole, a gold knob on top. Its canvas is
+// lit on the right, the fire's side; CampScene mirrors it on the fire's
+// right. A 1-pixel outline goes round it last.
+const CANVAS = ["#c2b394", "#958974", "#695f52", "#4a433b"]; // lit to deepest
 function tent() {
-  const rows = 17, flag = 5, half = Math.floor((rows - 1) * 0.95) + 1;
-  const width = half * 2 + 1;
-  const grid = Array.from({ length: rows + flag }, () => Array(width).fill(null));
-  const cx = half;
-  for (let j = 0; j < rows; j++) {
-    const w = Math.floor(j * 0.95) + 1;
-    for (let i = -w; i <= w; i++) {
-      let color = Math.abs(i) === w ? "#0b0a12" : i > 0 ? "#7d6248" : "#5a4636";
-      if (Math.abs(i) < j * 0.32) color = "#120e14";
-      grid[flag + j][cx + i] = color;
+  const [lit, mid, shade, deep] = CANVAS;
+  const darker = { [lit]: mid, [mid]: shade, [shade]: deep, [deep]: deep };
+  // Across the canvas, -1 (the far side) to 1 (the fire's side).
+  const tone = (u) => (u < -0.6 ? deep : u < -0.12 ? shade : u < 0.08 ? mid : u < 0.78 ? lit : mid);
+  const width = 33, cx = 16;
+  const grid = Array.from({ length: 23 }, () => Array(width).fill(null));
+  const set = (i, y, c) => { grid[y][cx + i] = c; };
+  set(0, 0, PAL.G); set(0, 1, PAL.a);
+  // The roof: two darker gores, laced down the middle.
+  for (let j = 0; j < 9; j++) {
+    const hw = Math.round(1 + j * 1.6);
+    for (let i = -hw; i <= hw; i++) {
+      const u = i / hw;
+      let c = tone(u * 0.9 + 0.05);
+      if (Math.abs(Math.abs(u) - 0.55) < 0.09 && hw > 3) c = darker[c];
+      if (i === 0) c = j % 2 ? PAL.A : PAL.a;
+      set(i, 2 + j, c);
     }
   }
-  for (let y = 0; y < flag; y++) grid[y][cx] = "#ffd14a";
-  grid[0][cx + 1] = grid[0][cx + 2] = grid[0][cx + 3] = "#ffd14a";
-  grid[1][cx + 1] = grid[1][cx + 2] = "#ffd14a";
-  grid[flag - 1][cx] = "#3a2518";
-  return grid;
+  // The valance: laced, with a scalloped hem.
+  for (let i = -15; i <= 15; i++) {
+    set(i, 11, i % 2 === 0 ? PAL.A : tone(i / 15));
+    if ((i + 15) % 3 !== 2) set(i, 12, darker[tone(i / 15)]);
+  }
+  // The walls: two seams, the doorway between the folds of the tied-back
+  // flaps, the pole in it, and the ties.
+  const door = [2, 3, 4, 4, 5, 5, 5, 6, 6, 6];
+  for (let j = 0; j < 10; j++) {
+    const y = 13 + j, hw = j < 3 ? 13 : j < 7 ? 14 : 15, d = door[j];
+    for (let i = -hw; i <= hw; i++) {
+      let c = tone(i / hw);
+      if (Math.abs(i) === 10) c = darker[c];
+      if (Math.abs(i) < d) c = j >= 8 ? "#1f1820" : "#120e14";
+      else if (Math.abs(i) === d) c = i > 0 ? lit : mid;
+      else if (Math.abs(i) === d + 1) c = darker[tone(i / hw)];
+      if (i === 0 && j >= 1) c = PAL.B;
+      set(i, y, c);
+    }
+    if (j === 4) { set(-6, y, PAL.A); set(-7, y, PAL.a); set(6, y, PAL.A); set(7, y, PAL.A); }
+  }
+  // The outline, on the four sides only, so the roof's slopes stay thin.
+  const out = Array.from({ length: grid.length + 2 }, (_, y) =>
+    Array.from({ length: width + 2 }, (_, x) => (grid[y - 1] && grid[y - 1][x - 1]) || null));
+  const filled = (x, y) => out[y] && out[y][x] && out[y][x] !== PAL.K;
+  for (let y = 0; y < out.length; y++) for (let x = 0; x < width + 2; x++) {
+    if (!out[y][x] && (filled(x - 1, y) || filled(x + 1, y) || filled(x, y - 1) || filled(x, y + 1))) out[y][x] = PAL.K;
+  }
+  return out;
 }
 
 // A grid of characters as colours; chars the palette lacks are clear.

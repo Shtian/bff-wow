@@ -35,7 +35,7 @@ Positions are art pixels from the fire's centre, negative to the left; `x` is a 
 - **Graves:** one per death in the Member's `death` Feed entries from the last 24 hours, newest first, at most 2 per Member and 4 in the Camp. A collapsed "died 3 times" entry counts as its deaths. Your own deaths count.
 - **Flower:** on a Grave whose Feed entry has any Member's Respects, not only yours. So it's asynchronous: a friend's Respects gossiped while you were offline shows when you log in, and your own Graves get flowers even though you can't react to your own entries. A Removed Member's Respects don't count, as in the Feed.
 - **Spark:** a Member with a `maxLevel` Feed entry from the last 24 hours. Dings get none.
-- **Tent:** after everyone, on the side with more room, only when it fits. Never in the popup.
+- **Tent:** after everyone, on the side with more room, only when it fits. Never in the popup. It's a pavilion, its canvas lit on the side facing the fire, so it's mirrored on the fire's right.
 
 ## While you were away
 
@@ -75,4 +75,4 @@ Alt lines keep plain Last seen. Feed day titles stay TODAY and YESTERDAY, Feed r
 
 ## Still to check in game
 
-None of the rendering has run in a client. Before tuning the art, run the research note's [Check in game](../research/pixel-art-rendering.md#check-in-game) list on retail, then on Forever: `NEAREST` on a TGA first, since everything depends on it, then even pixels across UI scales, the origin under drags and resizes, tint with filtering, ElvUI, clipping, client texture settings, the TGA origin, combat, and the CPU cost with the panel closed. The sprites were judged in a browser at 2x, so expect to tune their contrast against the game's gamma. The short band (as few as 22 art rows) crops the tent's pennant first; sparks sit on the figures so it never crops them. Check names stay readable there.
+None of the rendering has run in a client. Before tuning the art, run the research note's [Check in game](../research/pixel-art-rendering.md#check-in-game) list on retail, then on Forever: `NEAREST` on a TGA first, since everything depends on it, then even pixels across UI scales, the origin under drags and resizes, tint with filtering, ElvUI, clipping, client texture settings, the TGA origin, combat, and the CPU cost with the panel closed. The sprites were judged in a browser at 2x, so expect to tune their contrast against the game's gamma. The short band (as few as 22 art rows) crops the top of the tent's roof first; sparks sit on the figures so it never crops them. Check names stay readable there.
