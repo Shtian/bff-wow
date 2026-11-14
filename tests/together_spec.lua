@@ -144,21 +144,21 @@ describe("Together", function()
       assert.same({ 1, 5, 10, 15, 20, 24, 25, 30, 35, 40, 45, 50, 55, 60 }, numbered)
     end)
 
-    it("shades every other ten levels, from 11", function()
+    it("shades every other ten levels, edge to edge on the tenth levels' ticks", function()
       local _, clients = crew({ { "Gahz", 24 } })
       local view = clients[1].core:together()
       local spans = {}
       for i, decade in ipairs(view.decades) do
         spans[i] = ("%d-%d"):format(decade.from, decade.to)
       end
-      assert.same({ "11-20", "31-40", "51-60" }, spans)
-      local x11, x20
+      assert.same({ "10-20", "30-40", "50-60" }, spans)
+      local x10, x20
       for _, tick in ipairs(view.ticks) do
-        if tick.level == 11 then x11 = tick.x end
+        if tick.level == 10 then x10 = tick.x end
         if tick.level == 20 then x20 = tick.x end
       end
-      assert.equal(x11 - 12, view.decades[1].left)
-      assert.equal(x20 + 12, view.decades[1].right)
+      assert.equal(x10, view.decades[1].left)
+      assert.equal(x20, view.decades[1].right)
     end)
 
     it("marks every tenth level for the overview", function()

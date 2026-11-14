@@ -666,7 +666,8 @@ end
 -- action, setting (what the action turns off) and spans of { left, right } with nothing in a lane; else nil),
 -- width, you (your level's x), band ({ left, right, text } for can play),
 -- ticks (per level: level, x, big, number, you, decade (every tenth)),
--- decades (every other ten levels from 11, shaded: from, to, left,
+-- decades (every other ten levels, 10 to 20, 30 to 40, 50 to 60, tick to
+-- tick, shaded: from, to, left,
 -- right), levels (per level, what hovering it says: "28 · 6 dungeons"),
 -- rows (how many label rows are used, at least 1), groups (a group per level
 -- of the Characters shown: level, x, label, alt, own, online,

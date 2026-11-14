@@ -578,17 +578,13 @@ local function levelTexts(bars)
   return texts
 end
 
--- Every other ten levels, from 11, shaded so the long line has a rhythm.
+-- Every other ten levels shaded, so the long line has a rhythm: 10 to 20,
+-- 30 to 40 and 50 to 60, edge to edge on the tenth levels' ticks.
 local function decades()
   local list = {}
-  for from = 11, LAYOUT.levels, 20 do
-    local to = from + 9
-    list[#list + 1] = {
-      from = from,
-      to = to,
-      left = xOf(from) - LAYOUT.level / 2,
-      right = xOf(to) + LAYOUT.level / 2,
-    }
+  for from = 10, LAYOUT.levels - 10, 20 do
+    local to = from + 10
+    list[#list + 1] = { from = from, to = to, left = xOf(from), right = xOf(to) }
   end
   return list
 end
