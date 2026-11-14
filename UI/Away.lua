@@ -4,7 +4,10 @@
 -- Spares: Claims on yours, what was sent to you and Gives, then
 -- Professions: a line per profession picked up, milestone or maxed, with
 -- the profession's icon and a Cheer, then Catches: the new types others
--- caught, and a line per rare find with its item's icon and a Cheer. Then
+-- caught, and a line per rare find with its item's icon and a Cheer, then
+-- BFF updated: the newest change, a line asking you to make sure your
+-- friends update when a major release came with it, and how many more
+-- changes, with a What's new button (docs/design/whats-new.md). Then
 -- Core's summary as a scoreboard, Members by
 -- most recent activity: a row per Character with its level now, a bar for
 -- the jump (gold when it reached max level), levels gained, deaths, and
@@ -42,6 +45,7 @@ local NOTICED_GAP = 4
 local REACT = 18
 local REACT_GAP = 4
 local REACT_COLUMN = 2 * REACT + REACT_GAP + 8
+local SMALL_BUTTON = 20
 -- A row with the Character's name under the Member's.
 local TALL_ROW = 38
 -- Columns, as x from the left of the scoreboard and from its right.
@@ -63,6 +67,7 @@ local goalLines = {}
 local spareLines = {}
 local professionLines = {}
 local catchLines = {}
+local updateLines = {}
 
 local hex = Skin.hex
 
@@ -101,6 +106,13 @@ local function create()
   frame.professions:SetText("PROFESSIONS")
   frame.catches = Skin.label(frame, "label", Skin.DIM)
   frame.catches:SetText("CATCHES")
+  frame.update = Skin.label(frame, "label", Skin.DIM)
+  frame.whatsNew = Skin.button(frame, "What's new", function()
+    frame:Hide()
+    ns.Panel.show("whatsnew")
+  end)
+  frame.whatsNew.label:SetFontObject(Skin.fonts.small)
+  frame.whatsNew:SetSize(frame.whatsNew.label:GetStringWidth() + 16, SMALL_BUTTON)
   frame.intro = Skin.label(frame, "small", Skin.MUTED)
 
   frame.headings = {}
@@ -359,8 +371,27 @@ local function drawCheerLines(title, news, pool, y)
   return y - NOTICED_GAP
 end
 
+-- BFF updated ({ title, lines, more }), with What's new at the right of
+-- its title. Returns the y below it.
+local function drawUpdate(update, y)
+  frame.whatsNew:SetShown(update ~= nil)
+  if not update then
+    frame.update:Hide()
+    for _, item in ipairs(updateLines) do item:Hide() end
+    return y
+  end
+  local texts = {}
+  for i, text in ipairs(update.lines) do texts[i] = text end
+  if update.more then texts[#texts + 1] = hex(Skin.MUTED) .. update.more .. "|r" end
+  frame.update:SetText(update.title)
+  local below = drawSection(frame.update, texts, updateLines, y)
+  frame.whatsNew:ClearAllPoints()
+  frame.whatsNew:SetPoint("RIGHT", frame, "TOPRIGHT", -INSET, y - SECTION_TOP - NOTICED_TITLE / 2 + 2)
+  return below
+end
+
 -- Shows the summary from Core's awaySummary: { members, goals,
--- spares, professions, catches, count, intro, maxLevel, noticed }. With no Member news, only Your
+-- spares, professions, catches, count, intro, maxLevel, noticed, update }. With no Member news, only Your
 -- Crew noticed, Crew goals, Spares, Professions and Catches show.
 function Away.show(summary)
   if not frame then create() end
@@ -377,6 +408,7 @@ function Away.show(summary)
   y = drawSpares(summary.spares or {}, y)
   y = drawCheerLines(frame.professions, summary.professions or {}, professionLines, y)
   y = drawCheerLines(frame.catches, summary.catches or {}, catchLines, y)
+  y = drawUpdate(summary.update, y)
 
   local scoreboard = #summary.members > 0
   frame.intro:SetShown(scoreboard)

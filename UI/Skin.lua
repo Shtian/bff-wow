@@ -146,6 +146,22 @@ Skin.FEED_EDGES = {
   rareFind = false,
 }
 local EDGE_ALPHA = 0.55
+
+-- What's new: each kind of change's picture and edge, drawn as Feed
+-- pictures. A big change (major) is a battle shout on gold, since it asks
+-- something of you (make sure your friends update); a new feature (minor)
+-- a gift on green, something gained; a small change or fix (patch) a
+-- wrench on grey, quiet. Icons the game has had since launch.
+Skin.CHANGE_PICTURES = {
+  major = "Interface\\Icons\\Ability_Warrior_BattleShout",
+  minor = "Interface\\Icons\\INV_Misc_Gift_01",
+  patch = "Interface\\Icons\\INV_Misc_Wrench_01",
+}
+Skin.CHANGE_EDGES = {
+  major = Skin.GOLD,
+  minor = Skin.ONLINE,
+  patch = { 0.6, 0.6, 0.66 },
+}
 -- A given Reaction's edge: a quiet frame, not gold, so the Feed's gold stays
 -- on the news.
 local GIVEN_EDGE = { 1, 1, 1, 0.3 }
@@ -518,10 +534,10 @@ local function layOutIcon(icon)
 end
 
 -- The spark that opens a section label, like one off the Camp's fire: a
--- 5-unit cross in faint ember with a gold heart, laid out in whole screen
+-- 5-unit cross in ember (75%, enough to read at 5px) with a gold heart, laid out in whole screen
 -- pixels like the icons.
 local SPARK = { width = 5, height = 5, rects = { { 2, 0, 1, 5 }, { 0, 2, 5, 1 }, { 2, 2, 1, 1 } } }
-local SPARK_ARMS = 0.45
+local SPARK_ARMS = 0.75
 local SPARK_GAP = 6
 
 local function spark(parent)
@@ -598,6 +614,19 @@ function Skin.badge(parent, fontName, textColor, plateColor)
     self:SetWidth(math.max(self.label:GetStringWidth() + 8, self:GetHeight()))
   end
   return plate
+end
+
+-- The Unread dot: a 6px Ember Gold dot (DESIGN.md), on a New Feed entry,
+-- the sidebar's version label and What's new's changes. The caller places
+-- it.
+Skin.UNREAD_DOT = 6
+
+function Skin.unreadDot(parent)
+  local dot = Skin.fill(parent, Skin.GOLD, "ARTWORK")
+  dot:ClearAllPoints()
+  dot:SetSize(Skin.UNREAD_DOT, Skin.UNREAD_DOT)
+  Skin.round(parent, dot)
+  return dot
 end
 
 -- The mark for what's new in WoW: Forever: an infinity like the one in the

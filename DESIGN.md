@@ -304,7 +304,7 @@ Brand images are 1920×1080, plus a 1600×520 banner. Split layouts put a 640px 
 - **Embers:** now and then (every 1.4–3.6s, sometimes two together, at most six at once) an ember comes out from under the fire at the band's foot and drifts down into the window over 4–7s, swaying and cooling gold, orange, then red, on the Camp's own ember sprites at the band's art pixel. They fade out over the last 24px before the window's edges. WoW tells addons nothing of a reduced-motion preference, so turning the Camp off is how to stop them.
 - **Warm neutrals:** every wash and hairline is Firelight Cream, and the sidebar is a warm near-black.
 - **News catches the light:** your own row's gold wash and the latest-win plate are lit from the left (strong where the news starts, fading to the right), and the plate's top edge is brighter than its others. The Feed's timeline fades from the newest entry to the oldest.
-- **Section labels** open with a small spark, a cross of faint ember with a gold heart, and their rule fades out. It's the fire's, not news: it never grows, moves or marks a row.
+- **Section labels** open with a small spark, a cross of ember at 75% with a gold heart, and their rule fades out. It's the fire's, not news: it never grows, moves or marks a row.
 All of it is drawn on the panel's own layers, under every row, picture and line of text, so nothing is shaded and text keeps its contrast. It plays no sound and stops whenever the band is hidden: no Camp, no light. Only the panel is lit: the popup and toasts share the warm neutrals, but no glow, shade or embers. Its numbers live in `UI/Firelight.lua` and `Skin.lua`'s constants, never as one-off values.
 
 ## Shapes
@@ -336,7 +336,7 @@ Quiet and flat. Components are faint fills and hairlines, so the content and the
 - **Rows:** separated by top Hairlines, no backgrounds; hover gets a 5% wash. Your own Roster and Professions rows have a gold wash lit from the left, 10% fading to 2% (Firelit Window Rule). No coloured side stripes on rows.
 
 ### Section label
-A Label in capitals at the left, opened by a 5px spark (faint ember cross, gold heart) on the panel, with a rule running from it to the right edge or to whatever sits at the right (a count, a small button): 11% cream by the label, fading out to its end. Used for every section and for the Feed's day labels; the timeline's line stops short of a day label, so it needs no back and the fire's light shows behind it. The While you were away popup's labels have no spark. No boxed chips for labels.
+A Label in capitals at the left, opened by a 5px spark (an ember cross at 75%, gold heart) on the panel, with a rule running from it to the right edge or to whatever sits at the right (a count, a small button): 11% cream by the label, fading out to its end. Used for every section and for the Feed's day labels; the timeline's line stops short of a day label, so it needs no back and the fire's light shows behind it. The While you were away popup's labels have no spark. No boxed chips for labels.
 
 ### Progress bar
 Bar Fill on Bar Track, square. 4px on Crew goal tiles and in While you were away, 2px for Roster XP. Colour replaces the fill only when it means something: green for levels gained, a Crew goal's track hue (Trophy Colours Rule), Ember Gold for a completed goal.
@@ -349,13 +349,16 @@ A trophy for a Crew goal rung reached, on the Trophies tab: the track's icon (a 
 - **Checkbox:** a 14px square at 4% white with a 25% white border, an Ember Gold tick inset 3px, and a Small Smoke Muted label clickable to its right.
 
 ### Navigation
+- **Version label:** the addon's version under Settings, Tiny Dusk Dim on an 18px row with the tabs' chips (Ash Text on the selected chip). It opens What's new.
 - **Sidebar tabs:** 30px rows in a 124px sidebar at 30% warm near-black, shorter in a window too short for them all (the minimum size with the Camp's band), so Settings stays clear. Text labels only, Smoke Muted, or Ash Text on the selected tab's chip. The Feed and Spare Items tabs show a gold unseen-count badge at their right when another tab is open.
 
 ### Feed picture (signature)
-A square full-colour game icon on an opaque Night Window back, with a 1px edge in its kind's colour at 55% alpha: green for dings, gold for max level and goals, red for deaths, blue for Crew news, violet for Spares, grey for leaving. Used on the Feed's timeline, where the line runs through the pictures' centres (16% cream at the newest entry, fading to 3% at the oldest), and on toasts.
+A square full-colour game icon on an opaque Night Window back, with a 1px edge in its kind's colour at 55% alpha: green for dings, gold for max level and goals, red for deaths, blue for Crew news, violet for Spares, grey for leaving. Used on the Feed's timeline, where the line runs through the pictures' centres (16% cream at the newest entry, fading to 3% at the oldest), and on toasts. What's new draws one at 18px per change for its kind: a battle shout on gold for a big change, a gift on green for a new feature, a wrench on grey for a small change or fix.
 
 ### Unread dot
 A 6px Ember Gold dot in the 12px margin left of a Feed picture, level with its centre, on each New entry. It's the only mark on the row: the count lives on the sidebar's badge, and a divider wouldn't work because a Reaction can make an older entry New.
+
+What's new uses the same dot: in the margin left of the sidebar's version label while there are changes you haven't seen (never pulsing, and no NEW tag beside it), and left of each change's title in a release new on this visit. Releases already seen show titles only, in Smoke Muted.
 
 ### Forever mark
 An 18×9 infinity (`Media/Forever.tga`, `Skin.foreverMark`), drawn after the emblem's ribbon: fat around the loops and pinched at the crossing. It marks dungeons and raids new in WoW: Forever on the Dungeons tab's bars, in tooltips and in the Show menu's key, in Ash Text on a bar you fit and Smoke Muted elsewhere. It's never gold, because a new dungeon isn't news.

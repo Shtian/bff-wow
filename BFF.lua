@@ -230,6 +230,8 @@ local function start(isInitialLogin)
     itemLink = ns.Snapshot.itemLink,
     itemLook = ns.Skin.itemLook,
     findItem = ns.Bags.findItem,
+    version = version,
+    changelog = ns.CHANGELOG_TEXT,
   })
   ns.core:setTrace(traceLine)
   ns.ChannelLink.setTrace(traceLine)

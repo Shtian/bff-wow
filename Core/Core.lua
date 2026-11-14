@@ -142,6 +142,8 @@ function Core.new(deps)
     error("Core.new: link.send must be a function", 2)
   end
 
+  -- Before anything writes to it: an empty db is a fresh install.
+  local fresh = next(deps.db) == nil
   local self = setmetatable({
     db = deps.db,
     now = deps.now,
@@ -203,6 +205,10 @@ function Core.new(deps)
   -- The own record's Play times may be out of date until the first tick.
   self.playTimesDue = true
   self.online = ns.Roster.online(self.ledger, deps.now())
+  -- What changed in BFF since you last looked (self.changes, since
+  -- whatsNew() is the method). Its version goes into the own record so
+  -- friends can tell who's behind.
+  self.changes = ns.WhatsNew.new(deps.db, deps.version, deps.changelog, fresh)
   return self
 end
 
@@ -384,7 +390,10 @@ end
 -- name, classFilename, level, xp, maxXp, zone, deaths, money (copper) and
 -- professions (as Professions.read reads them, nil if never read).
 function Core:updateOwn(character)
+  -- bff: the BFF version you run, for friends' What's new.
+  local versionChanged = self.changes.version ~= nil and self.ledger:writeOwn({ bff = self.changes.version })
   local changed, before = self.ledger:updateOwn(character)
+  if versionChanged and not changed then self.gossip:ownChanged("later") end
   -- The first report after login brings the Play times up to date.
   sharePlayTimes(self, changed)
   if changed then
@@ -846,13 +855,24 @@ end
 -- with gained (its Main's, as the scoreboard words it, nil with nothing
 -- gained) and highlight (max level), and intro is in the Camp's voice.
 local function awaySummary(self)
-  if not self:isAwayPopupOn() then return end
+  if not self:isAwayPopupOn() then
+    -- An update is told once, popup or not.
+    self.changes:takeAwayLine()
+    return
+  end
   local view, told = self:catches(), self.db.catchTypesTold
   local newTypesLine = told and ns.Catches.newTypesLine(view, told)
   -- With none saved yet (the first login with this), it's a silent baseline.
   self.db.catchTypesTold = ns.Catches.markTold(told or {}, view)
   local summary = self.log:takeSummary(self.spareLife:takeNews(), newTypesLine)
+  local update = self.changes:takeAwayLine()
+  if not summary and update then
+    -- BFF updated, and nothing else happened: the popup says only that.
+    summary = { members = {}, goals = {}, spares = {}, professions = {}, catches = {}, noticed = {}, count = 0,
+      maxLevel = self.maxLevel }
+  end
   if not summary then return end
+  summary.update = update
   if self:setting("camp") then
     local now = self.now()
     summary.camp, summary.intro = ns.Camp.away(ns.Roster.rows(self.ledger, now),
@@ -1215,6 +1235,36 @@ end
 -- ends, and nothing is New.
 function Core:leaveFeed()
   self.log:leave()
+end
+
+-- What's new: whether changes in BFF since you last looked haven't been
+-- seen (the sidebar's version label marks it).
+function Core:hasNewChanges()
+  return self.changes:hasNew()
+end
+
+-- The What's new view is shown: call it on every draw, before reading
+-- whatsNew(). It starts a visit if none is open: every change is seen,
+-- but the releases new now stay new in whatsNew() until leaveWhatsNew().
+function Core:openWhatsNew()
+  if self.changes:open() then self.listener("changed") end
+end
+
+-- What's new was left (another tab, or the panel hidden).
+function Core:leaveWhatsNew()
+  self.changes:leave()
+end
+
+-- The What's new view, ready to render: { title, line, friends,
+-- releases, older } (WhatsNew:view), or nil when the build carries no
+-- changelog (a dev checkout). friends names the Members known to run a BFF
+-- older than a major release new on this visit, with their Main's class.
+function Core:whatsNew()
+  local ledger = self.ledger
+  return self.changes:view(ns.Roster.rows(ledger, self.now()), function(id)
+    local record = ledger:record(id)
+    return record and record.bff
+  end)
 end
 
 -- Settings: the local preferences, one list of them. Each has its key, the

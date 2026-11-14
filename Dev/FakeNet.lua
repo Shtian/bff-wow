@@ -170,7 +170,11 @@ end
 -- is ahead of server time, default 0) and bags (where each item GUID is,
 -- as Bags.findItem reads it: "bags" for the bags or bank, "equipped", or
 -- nil when it has left; default empty) and gossip (the Gossip module its
--- Core uses, for a client that syncs like an older BFF; default Core's).
+-- Core uses, for a client that syncs like an older BFF; default Core's),
+-- version (the BFF version it runs, as the .toc gives it; default none, as
+-- a dev checkout) and changelog (the CHANGELOG.md text its build carries,
+-- for What's new; default none). Set client.version before a login or
+-- reload to update it.
 function FakeNet:add(name, options)
   options = options or {}
   local client = setmetatable({
@@ -182,6 +186,8 @@ function FakeNet:add(name, options)
     location = copy(options.location),
     bags = copy(options.bags) or {},
     gossip = options.gossip,
+    version = options.version,
+    changelog = options.changelog,
     bagReads = 0,
     character = copy(options.character) or {
       guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
@@ -237,6 +243,8 @@ local function newCore(client, initialLogin)
     itemLink = function(itemString) return net.items[itemString] end,
     itemLook = function(itemId) return net.looks[itemId] end,
     finalBosses = net.finalBosses,
+    version = client.version,
+    changelog = client.changelog,
     findItem = function(itemGuid)
       client.bagReads = client.bagReads + 1
       local where = client.bags[itemGuid]
