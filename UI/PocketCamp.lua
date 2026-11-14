@@ -228,7 +228,7 @@ local function create()
 
   frame.band = ns.CampScene.new(frame, {
     target = ns.CampScene.FIGURE_TARGET, shadow = true, names = false, backdrop = ns.CampSheet.pocketBackdrop,
-    -- Scales smoothly with the grip (try-out: whole screen pixels stepped).
+    -- Scales smoothly with the grip; whole screen pixels made it step.
     crisp = false,
   })
   frame.band:SetAllPoints()
