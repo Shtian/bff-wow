@@ -304,7 +304,7 @@ Brand images are 1920×1080, plus a 1600×520 banner. Split layouts put a 640px 
 - **Embers:** now and then (every 1.4–3.6s, sometimes two together, at most six at once) an ember comes out from under the fire at the band's foot and drifts down into the window over 4–7s, swaying and cooling gold, orange, then red, on the Camp's own ember sprites at the band's art pixel. They fade out over the last 24px before the window's edges. WoW tells addons nothing of a reduced-motion preference, so turning the Camp off is how to stop them.
 - **Warm neutrals:** every wash and hairline is Firelight Cream, and the sidebar is a warm near-black.
 - **News catches the light:** your own row's gold wash and the latest-win plate are lit from the left (strong where the news starts, fading to the right), and the plate's top edge is brighter than its others. The Feed's timeline fades from the newest entry to the oldest.
-- **Section labels** open with a small spark, a cross of faint ember with a gold heart, and their rule fades out. It's the fire's, not news: it never grows, moves or marks a row.
+- **Section labels** open with a small spark, a cross of ember at 75% with a gold heart, and their rule fades out. It's the fire's, not news: it never grows, moves or marks a row.
 All of it is drawn on the panel's own layers, under every row, picture and line of text, so nothing is shaded and text keeps its contrast. It plays no sound and stops whenever the band is hidden: no Camp, no light. Only the panel is lit: the popup and toasts share the warm neutrals, but no glow, shade or embers. Its numbers live in `UI/Firelight.lua` and `Skin.lua`'s constants, never as one-off values.
 
 ## Shapes
@@ -336,7 +336,7 @@ Quiet and flat. Components are faint fills and hairlines, so the content and the
 - **Rows:** separated by top Hairlines, no backgrounds; hover gets a 5% wash. Your own Roster and Professions rows have a gold wash lit from the left, 10% fading to 2% (Firelit Window Rule). No coloured side stripes on rows.
 
 ### Section label
-A Label in capitals at the left, opened by a 5px spark (faint ember cross, gold heart) on the panel, with a rule running from it to the right edge or to whatever sits at the right (a count, a small button): 11% cream by the label, fading out to its end. Used for every section and for the Feed's day labels; the timeline's line stops short of a day label, so it needs no back and the fire's light shows behind it. The While you were away popup's labels have no spark. No boxed chips for labels.
+A Label in capitals at the left, opened by a 5px spark (an ember cross at 75%, gold heart) on the panel, with a rule running from it to the right edge or to whatever sits at the right (a count, a small button): 11% cream by the label, fading out to its end. Used for every section and for the Feed's day labels; the timeline's line stops short of a day label, so it needs no back and the fire's light shows behind it. The While you were away popup's labels have no spark. No boxed chips for labels.
 
 ### Progress bar
 Bar Fill on Bar Track, square. 4px on Crew goal tiles and in While you were away, 2px for Roster XP. Colour replaces the fill only when it means something: green for levels gained, a Crew goal's track hue (Trophy Colours Rule), Ember Gold for a completed goal.

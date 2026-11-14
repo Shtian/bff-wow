@@ -518,10 +518,10 @@ local function layOutIcon(icon)
 end
 
 -- The spark that opens a section label, like one off the Camp's fire: a
--- 5-unit cross in faint ember with a gold heart, laid out in whole screen
+-- 5-unit cross in ember (75%, enough to read at 5px) with a gold heart, laid out in whole screen
 -- pixels like the icons.
 local SPARK = { width = 5, height = 5, rects = { { 2, 0, 1, 5 }, { 0, 2, 5, 1 }, { 2, 2, 1, 1 } } }
-local SPARK_ARMS = 0.45
+local SPARK_ARMS = 0.75
 local SPARK_GAP = 6
 
 local function spark(parent)
