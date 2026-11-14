@@ -2100,7 +2100,7 @@ function Panel.refresh()
   elseif tab == "professions" then
     drawProfessions()
   elseif tab == "together" then
-    ns.TogetherTab.draw(frame.content, core)
+    ns.TogetherTab.draw(frame.content, core, camp:IsShown())
   elseif tab == "catches" then
     ns.CatchesTab.draw(frame.content, core)
   else

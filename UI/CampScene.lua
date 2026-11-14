@@ -171,6 +171,38 @@ function CampScene.figure(parent)
   return frame
 end
 
+-- The art rows of the seated figure that make its hooded head.
+CampScene.HEAD_ROWS = 7
+
+-- Shows the top `rows` art rows of a sprite on a texture.
+local function setSpriteTop(t, name, unit, rows)
+  local s = Sheet.sprites[name]
+  t:SetTexCoord(s[1] / Sheet.width, (s[1] + s[3]) / Sheet.width, s[2] / Sheet.height, (s[2] + rows) / Sheet.height)
+  t.sprite = name .. " top"
+  t:SetSize(s[3] * unit, rows * unit)
+  t:Show()
+end
+
+-- Just the seated figure's head, the same two layers and tint, for the
+-- Dungeons tab's friends on the level line. :SetClass(classFilename) draws
+-- it at FIGURE_TARGET.
+function CampScene.head(parent)
+  local frame = CreateFrame("Frame", nil, parent)
+  frame.cloth = texture(frame, "ARTWORK", 0)
+  frame.cloth:SetPoint("BOTTOMLEFT")
+  frame.skin = texture(frame, "ARTWORK", 1)
+  frame.skin:SetPoint("BOTTOMLEFT")
+  function frame:SetClass(classFilename)
+    local unit = CampScene.artUnit(self, CampScene.FIGURE_TARGET)
+    self:SetSize(Sheet.sprites.seated[3] * unit, CampScene.HEAD_ROWS * unit)
+    setSpriteTop(self.cloth, "seatedCloth", unit, CampScene.HEAD_ROWS)
+    setSpriteTop(self.skin, "seated", unit, CampScene.HEAD_ROWS)
+    tint(self.cloth, classFilename)
+    self:Show()
+  end
+  return frame
+end
+
 -- A name above a figure: centred, cut to its width, never wrapped.
 local function nameLabel(parent)
   local label = Skin.label(parent, "small", nil, "OVERLAY")

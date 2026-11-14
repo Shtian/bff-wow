@@ -443,14 +443,14 @@ local function buildBars(dungeons, others, yourLevel, measure, chosen)
     local dots = {}
     for i = 1, math.min(#fitters, LAYOUT.dots) do dots[i] = fitters[i].classFilename end
     local moreDots = math.max(#fitters - LAYOUT.dots, 0)
-    -- The raids' entry starts a little left of 60, for its diamond.
     local raids = dungeon.kind == "raids"
-    local content = measure(dungeon.name, "small") + 10
+    local content = measure(dungeon.name, "small") + 12
       + (dungeon.forever and LAYOUT.foreverMark + 4 or 0)
       + (#dots > 0 and #dots * LAYOUT.dot + 6 or 0)
       + (moreDots > 0 and measure("+" .. moreDots, "tiny") + 4 or 0)
       + (raids and 12 or 0)
     local shared = sharedBy(dungeon, yourLevel, chosen)
+    local span = (dungeon.to - dungeon.from + 1) * LAYOUT.level
     bars[#bars + 1] = {
       name = dungeon.name,
       kind = dungeon.kind,
@@ -462,8 +462,13 @@ local function buildBars(dungeons, others, yourLevel, measure, chosen)
       count = #fitters,
       dots = dots,
       moreDots = moreDots,
-      x = xOf(dungeon.from) - (raids and 6 or 0),
-      width = math.max((dungeon.to - dungeon.from) * LAYOUT.level, content),
+      past = yourLevel > dungeon.to,
+      x = xOf(dungeon.from) - LAYOUT.level / 2,
+      width = math.max(span, content),
+      -- The plate: the level range's whole cells, as the can-play band
+      -- and the shaded decades. The raids' one level is too narrow for
+      -- its entry, so its whole entry is.
+      range = raids and math.max(span, content) or span,
       tooltip = tooltip,
       shared = shared,
       faded = #chosen > 0 and not shared,
@@ -558,6 +563,63 @@ local function hiddenNote(others, filters)
   return table.concat(parts, ", ") .. " hidden"
 end
 
+-- What hovering a level on the line says: "28 · 6 dungeons", counting
+-- the dungeons shown that it fits.
+local function levelTexts(bars)
+  local texts = {}
+  for level = 1, LAYOUT.levels do
+    local count = 0
+    for _, bar in ipairs(bars) do
+      if fits(level, bar) then count = count + 1 end
+    end
+    local amount = count == 0 and "no dungeons" or ("%d %s"):format(count, plural(count, "dungeon", "dungeons"))
+    texts[level] = ("%d · %s"):format(level, amount)
+  end
+  return texts
+end
+
+-- Every other ten levels shaded, so the long line has a rhythm: 10 to 20,
+-- 30 to 40 and 50 to 60, edge to edge on the tenth levels' ticks.
+local function decades()
+  local list = {}
+  for from = 10, LAYOUT.levels - 10, 20 do
+    local to = from + 10
+    list[#list + 1] = { from = from, to = to, left = xOf(from), right = xOf(to) }
+  end
+  return list
+end
+
+-- The overview's outline: how many dungeons shown fit each level, and
+-- whether it's in your can-play band; most is the largest count.
+local function density(bars, yourLevel)
+  local levels, most = {}, 0
+  for level = 1, LAYOUT.levels do
+    local count = 0
+    for _, bar in ipairs(bars) do
+      if fits(level, bar) then count = count + 1 end
+    end
+    levels[level] = { count = count, near = math.abs(level - yourLevel) <= CAN_PLAY }
+    most = math.max(most, count)
+  end
+  return { levels = levels, most = most }
+end
+
+-- Hovering a bar lights the friends on the line who fit it, and hovering a
+-- friend the bars they fit: each bar's groups and each group's bars, as
+-- indexes.
+local function link(groups, bars)
+  for _, group in ipairs(groups) do group.bars = {} end
+  for b, bar in ipairs(bars) do
+    bar.groups = {}
+    for g, group in ipairs(groups) do
+      if fits(group.level, bar) then
+        bar.groups[#bar.groups + 1] = g
+        group.bars[#group.bars + 1] = b
+      end
+    end
+  end
+end
+
 -- Picking friends on the line: clicking a label or dot picks the Members
 -- in it (memberIds), shift-clicking (add) adds them, and clicking what's
 -- already picked clears it. No Members (your own dot) changes nothing.
@@ -621,7 +683,11 @@ function Together.view(rows, measure, options)
 
   local groups = buildGroups(members, yourLevel, measure, filters, chosen)
   placeLabels(groups, yourLevel)
+  local rowsUsed = 1
+  for _, group in ipairs(groups) do rowsUsed = math.max(rowsUsed, group.row or 0) end
   local bars, lanes = buildBars(shownDungeons(filters, yourLevel), others, yourLevel, measure, chosen)
+
+  link(groups, bars)
 
   local ticks = {}
   for level = 1, LAYOUT.levels do
@@ -632,6 +698,7 @@ function Together.view(rows, measure, options)
       big = big,
       number = big or level == yourLevel,
       you = level == yourLevel,
+      decade = level % 10 == 0,
     }
   end
 
@@ -656,6 +723,10 @@ function Together.view(rows, measure, options)
       text = "can play",
     },
     ticks = ticks,
+    decades = decades(),
+    levels = levelTexts(bars),
+    density = density(bars, yourLevel),
+    rows = rowsUsed,
     groups = groups,
     bars = bars,
     lanes = lanes,

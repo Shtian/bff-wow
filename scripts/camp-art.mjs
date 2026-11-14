@@ -1,5 +1,6 @@
 // Builds the Camp's art from pixel grids: Media/CampSprites.tga (every
 // sprite, a 1-pixel transparent gutter round each cell),
+// Media/Dither50.tga and Media/Dither25.tga (the Dungeons tab's bar fills),
 // Media/CampBackdrop.tga (the static night sky, hills, pines and the fire's
 // glow on the ground), Media/CampPocketBackdrop.tga (the Pocket Camp's
 // soft-edged piece of it), Media/CampLight.tga (the fire's light on the
@@ -387,12 +388,27 @@ function light() {
   return img;
 }
 
+// The Dungeons tab's dithered bar fills, in the Camp's pixel language:
+// white, tiled and tinted. Dither50 is a checker (a bar ahead of you),
+// Dither25 one pixel in four (one you've outlevelled). A texel is one art
+// pixel; the tab tiles them at the Camp's art unit.
+const DITHER = 8;
+function dither(on) {
+  const img = image(DITHER, DITHER);
+  for (let y = 0; y < DITHER; y++)
+    for (let x = 0; x < DITHER; x++)
+      if (on(x, y)) img.pixels.set([255, 255, 255, 255], (y * DITHER + x) * 4);
+  return img;
+}
+
 const { img, placed } = sheet();
 const back = backdrop();
 writeFileSync(join(root, "Media", "CampSprites.tga"), tga(img));
 writeFileSync(join(root, "Media", "CampBackdrop.tga"), tga(back));
 writeFileSync(join(root, "Media", "CampPocketBackdrop.tga"), tga(pocketBackdrop(back)));
 writeFileSync(join(root, "Media", "CampLight.tga"), tga(light()));
+writeFileSync(join(root, "Media", "Dither50.tga"), tga(dither((x, y) => (x + y) % 2 === 0)));
+writeFileSync(join(root, "Media", "Dither25.tga"), tga(dither((x, y) => x % 2 === 0 && y % 2 === 0)));
 
 const [skyR, skyG, skyB] = hex(SKY_TOP).map((v) => +(v / 255).toFixed(3));
 const lines = placed.map((s) => `    ${s.name} = { ${s.x}, ${s.y}, ${s.w}, ${s.h} },`);
@@ -431,6 +447,13 @@ ${lines.join("\n")}
     file = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampLight",
     width = ${LIGHT_W},
     height = ${LIGHT_H},
+  },
+  -- The Dungeons tab's bar fills, white to tint, tiled: a texel is an art
+  -- pixel.
+  dither = {
+    half = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\Dither50",
+    quarter = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\Dither25",
+    size = ${DITHER},
   },
   -- The sky's top colour, above the backdrop's art.
   sky = { ${skyR}, ${skyG}, ${skyB} },

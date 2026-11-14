@@ -144,6 +144,64 @@ describe("Together", function()
       assert.same({ 1, 5, 10, 15, 20, 24, 25, 30, 35, 40, 45, 50, 55, 60 }, numbered)
     end)
 
+    it("shades every other ten levels, edge to edge on the tenth levels' ticks", function()
+      local _, clients = crew({ { "Gahz", 24 } })
+      local view = clients[1].core:together()
+      local spans = {}
+      for i, decade in ipairs(view.decades) do
+        spans[i] = ("%d-%d"):format(decade.from, decade.to)
+      end
+      assert.same({ "10-20", "30-40", "50-60" }, spans)
+      local x10, x20
+      for _, tick in ipairs(view.ticks) do
+        if tick.level == 10 then x10 = tick.x end
+        if tick.level == 20 then x20 = tick.x end
+      end
+      assert.equal(x10, view.decades[1].left)
+      assert.equal(x20, view.decades[1].right)
+    end)
+
+    it("marks every tenth level for the overview", function()
+      local _, clients = crew({ { "Gahz", 24 } })
+      local marked = {}
+      for _, tick in ipairs(clients[1].core:together().ticks) do
+        if tick.decade then marked[#marked + 1] = tick.level end
+      end
+      assert.same({ 10, 20, 30, 40, 50, 60 }, marked)
+    end)
+
+    it("says how many dungeons shown fit each level, for hovering the line", function()
+      local _, clients = crew({ { "Gahz", 24 } })
+      local view = clients[1].core:together()
+      local at24 = 0
+      for _, bar in ipairs(view.bars) do
+        if bar.from <= 24 and bar.to >= 24 then at24 = at24 + 1 end
+      end
+      assert.equal(("24 · %d dungeons"):format(at24), view.levels[24])
+      assert.equal("1 · no dungeons", view.levels[1])
+      assert.equal(60, #view.levels)
+    end)
+
+    it("gives the overview how many dungeons fit each level, and which are near you", function()
+      local _, clients = crew({ { "Gahz", 24 } })
+      local view = clients[1].core:together()
+      local most = 0
+      for level = 1, 60 do
+        local count = 0
+        for _, bar in ipairs(view.bars) do
+          if bar.from <= level and bar.to >= level then count = count + 1 end
+        end
+        assert.equal(count, view.density.levels[level].count, level)
+        most = math.max(most, count)
+      end
+      assert.equal(most, view.density.most)
+      assert.equal(60, #view.density.levels)
+      assert.is_true(view.density.levels[21].near)
+      assert.is_true(view.density.levels[27].near)
+      assert.is_false(view.density.levels[20].near)
+      assert.is_false(view.density.levels[28].near)
+    end)
+
     it("is nil before you play a Character", function()
       local ns = load()
       local core = ns.Core.new({
@@ -248,6 +306,55 @@ describe("Together", function()
       assert.equal("Almost: Simone (2 short)", tooltip.almost)
     end)
 
+    it("plate their level range, and are as wide as their content past it", function()
+      local _, clients = crew({ { "Gahz", 24 } })
+      local view = clients[1].core:together(function(text) return #text * 7 end)
+      local layout = load().Core.TOGETHER_LAYOUT
+      local keep = barFor(view, "Shadowfang Keep")
+      assert.equal((30 - 22 + 1) * layout.level, keep.range)
+      local chasm = barFor(view, "Ragefire Chasm")
+      assert.equal((18 - 13 + 1) * layout.level, chasm.range)
+      -- From its first level's left edge, as the can-play band's.
+      assert.equal(view.ticks[13].x - layout.level / 2, chasm.x)
+      for _, bar in ipairs(view.bars) do
+        assert.truthy(bar.range <= bar.width, bar.name)
+      end
+    end)
+
+    it("mark the ones you've outlevelled", function()
+      local _, clients = crew({ { "Gahz", 24 } })
+      local view = clients[1].core:together()
+      assert.is_true(barFor(view, "Ragefire Chasm").past)
+      assert.is_false(barFor(view, "Shadowfang Keep").past)
+      assert.is_false(barFor(view, "Scholomance").past)
+    end)
+
+    it("link each bar and the friends on the line who fit it, both ways", function()
+      local _, clients = crew({ { "Gahz", 24 }, { "Mira", 20 }, { "Tor", 40 } })
+      local view = clients[1].core:together()
+      local function index(list, item)
+        for i, x in ipairs(list) do if x == item then return i end end
+      end
+      local sfk, you, mira, tor = barFor(view, "Shadowfang Keep"), groupAt(view, 24), groupAt(view, 20), groupAt(view, 40)
+      local wc = barFor(view, "Wailing Caverns")
+      assert.same({ index(view.groups, you) }, sfk.groups)
+      assert.same(sorted({ index(view.groups, you), index(view.groups, mira) }), sorted(wc.groups))
+      assert.truthy(index(you.bars, index(view.bars, sfk)))
+      assert.truthy(index(mira.bars, index(view.bars, wc)))
+      assert.is_nil(index(mira.bars, index(view.bars, sfk)))
+      for _, b in ipairs(tor.bars) do
+        local bar = view.bars[b]
+        assert.truthy(bar.from <= 40 and bar.to >= 40, bar.name)
+      end
+    end)
+
+    it("plate the whole raids entry, a single level", function()
+      local _, clients = crew({ { "Gahz", 60 } })
+      clients[1].core:setSetting("togetherRaids", true)
+      local raids = barFor(clients[1].core:together(), "Raids 5")
+      assert.equal(raids.width, raids.range)
+    end)
+
     it("mark new Forever dungeons and the attunement, and hide raids", function()
       local _, clients = crew({ { "Gahz", 57 } })
       local view = clients[1].core:together()
@@ -328,6 +435,21 @@ describe("Together", function()
       for _, bar in ipairs(view.bars) do assert.truthy(bar.lane >= 1 and bar.lane <= view.lanes) end
       -- Your own label is placed, nearest the axis.
       assert.equal(1, groupAt(view, 24).row)
+    end)
+
+    it("says how many label rows are used, so the rest give their room to the lanes", function()
+      local _, alone = crew({ { "Gahz", 24 } })
+      assert.equal(1, alone[1].core:together().rows)
+      local members = { { "Gahz", 24 } }
+      for i, name in ipairs({ "Bartholomew", "Theodora", "Wilhelmina", "Mirabelle" }) do
+        members[#members + 1] = { name, 24 + i }
+      end
+      local _, clients = crew(members)
+      local view = clients[1].core:together(function(label) return #label * 7 end)
+      local most = 0
+      for _, group in ipairs(view.groups) do most = math.max(most, group.row or 0) end
+      assert.equal(most, view.rows)
+      assert.truthy(view.rows > 1)
     end)
   end)
   describe("selecting friends", function()

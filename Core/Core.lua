@@ -665,16 +665,24 @@ end
 -- { kind, text } } and help), empty (with only near your level on: text,
 -- action, setting (what the action turns off) and spans of { left, right } with nothing in a lane; else nil),
 -- width, you (your level's x), band ({ left, right, text } for can play),
--- ticks (per level: level, x, big, number, you), groups (a group per level
+-- ticks (per level: level, x, big, number, you, decade (every tenth)),
+-- decades (every other ten levels, 10 to 20, 30 to 40, 50 to 60, tick to
+-- tick, shaded: from, to, left,
+-- right), levels (per level, what hovering it says: "28 · 6 dungeons"),
+-- density (for the overview: levels, per level { count, near (in your
+-- can-play band) }, and most, the largest count),
+-- rows (how many label rows are used, at least 1), groups (a group per level
 -- of the Characters shown: level, x, label, alt, own, online,
 -- classFilename, count, more, row (1 nearest the axis, nil when only the
 -- dot shows), labelX, labelWidth, memberIds (the other Members a click
--- picks), faded, and characters: memberId, member ("You" for yours), name,
+-- picks), faded, bars (indexes of the bars it fits, for hover), and characters: memberId, member ("You" for yours), name,
 -- fullName, classFilename, level, alt, online, own, canPlay and apart), bars (a
 -- dungeon each, or the raids' one: name, kind ("dungeon",
 -- "attunement" or "raids"), forever (new in WoW: Forever), from, to,
--- fits, count, dots (class of each Member who fits, up to 4), moreDots, x,
--- width, lane (1 nearest the axis; every bar has one), shared, faded and
+-- fits, past (you've outlevelled it), groups (indexes of the groups that
+-- fit it, for hover), count, dots (class of each Member who
+-- fits, up to 4), moreDots, x, width, range (the plate: its level range's
+-- width, the whole entry for the raids), lane (1 nearest the axis; every bar has one), shared, faded and
 -- tooltip: title,
 -- detail, forever, raids (name, detail, forever), you, fits, fitters
 -- (memberId, member, name, fullName, classFilename, level, online, far), none and
