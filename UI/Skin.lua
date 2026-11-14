@@ -146,6 +146,22 @@ Skin.FEED_EDGES = {
   rareFind = false,
 }
 local EDGE_ALPHA = 0.55
+
+-- What's new: each kind of change's picture and edge, drawn as Feed
+-- pictures. A big change (major) is a battle shout on gold, since it asks
+-- something of you (make sure your friends update); a new feature (minor)
+-- a gift on green, something gained; a small change or fix (patch) a
+-- wrench on grey, quiet. Icons the game has had since launch.
+Skin.CHANGE_PICTURES = {
+  major = "Interface\\Icons\\Ability_Warrior_BattleShout",
+  minor = "Interface\\Icons\\INV_Misc_Gift_01",
+  patch = "Interface\\Icons\\INV_Misc_Wrench_01",
+}
+Skin.CHANGE_EDGES = {
+  major = Skin.GOLD,
+  minor = Skin.ONLINE,
+  patch = { 0.6, 0.6, 0.66 },
+}
 -- A given Reaction's edge: a quiet frame, not gold, so the Feed's gold stays
 -- on the news.
 local GIVEN_EDGE = { 1, 1, 1, 0.3 }

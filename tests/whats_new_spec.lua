@@ -106,14 +106,16 @@ describe("What's new", function()
       assert.are.same({ "2.3.0*", "2.2.0*", "2.1.0", "2.0.0", "1.6.2" }, newFlags(view))
     end)
 
-    it("gives each release its date and entries as titles and details", function()
+    it("gives each release its date and entries as titles and details, with their kind", function()
       ann.core:openWhatsNew()
       local release = ann.core:whatsNew().releases[1]
       assert.are.equal("15 Nov", release.date)
       assert.are.same({
-        { title = "The panel is lit by the Camp's fire", detail = "Its glow spills under the band." },
-        { title = "Fixed the bug report." },
+        { kind = "minor", kindName = "New feature", title = "The panel is lit by the Camp's fire",
+          detail = "Its glow spills under the band." },
+        { kind = "patch", kindName = "Small change or fix", title = "Fixed the bug report." },
       }, release.entries)
+      assert.are.equal("Big change", ann.core:whatsNew().releases[4].entries[1].kindName)
     end)
 
     it("are seen once opened, but stay marked until What's new is left", function()

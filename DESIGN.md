@@ -353,7 +353,7 @@ A trophy for a Crew goal rung reached, on the Trophies tab: the track's icon (a 
 - **Sidebar tabs:** 30px rows in a 124px sidebar at 30% warm near-black, shorter in a window too short for them all (the minimum size with the Camp's band), so Settings stays clear. Text labels only, Smoke Muted, or Ash Text on the selected tab's chip. The Feed and Spare Items tabs show a gold unseen-count badge at their right when another tab is open.
 
 ### Feed picture (signature)
-A square full-colour game icon on an opaque Night Window back, with a 1px edge in its kind's colour at 55% alpha: green for dings, gold for max level and goals, red for deaths, blue for Crew news, violet for Spares, grey for leaving. Used on the Feed's timeline, where the line runs through the pictures' centres (16% cream at the newest entry, fading to 3% at the oldest), and on toasts.
+A square full-colour game icon on an opaque Night Window back, with a 1px edge in its kind's colour at 55% alpha: green for dings, gold for max level and goals, red for deaths, blue for Crew news, violet for Spares, grey for leaving. Used on the Feed's timeline, where the line runs through the pictures' centres (16% cream at the newest entry, fading to 3% at the oldest), and on toasts. What's new draws one at 18px per change for its kind: a battle shout on gold for a big change, a gift on green for a new feature, a wrench on grey for a small change or fix.
 
 ### Unread dot
 A 6px Ember Gold dot in the 12px margin left of a Feed picture, level with its centre, on each New entry. It's the only mark on the row: the count lives on the sidebar's badge, and a divider wouldn't work because a Reaction can make an older entry New.

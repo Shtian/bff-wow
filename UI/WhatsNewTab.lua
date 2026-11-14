@@ -3,11 +3,14 @@
 -- line (what changed since you last looked), then, when a major release is
 -- new, a raised plate with a gold edge asking you to make sure your friends
 -- update, naming those on an older BFF. Then a section per release (its
--- version and date as a section label) with a row per change: its title in
+-- version and date as a section label, with room above it) with a row per
+-- change: a small Feed picture for its kind (Skin.CHANGE_PICTURES: big
+-- change, new feature, small change or fix; hover names it), its title in
 -- Body, and its detail in Small, cut to two lines; a click shows it whole.
--- Changes after a release's first are split by a top Hairline, as rows are.
--- Releases new on this visit carry the Unread dot on each change; the rest
--- show titles only, in Smoke Muted, until clicked. Panel owns the scroll
+-- The pictures mark where each change starts, so rows need no Hairlines,
+-- which would read like the releases' rules. Releases new on this visit
+-- carry the Unread dot left of each picture; the rest show titles only, in
+-- Smoke Muted, until clicked. Panel owns the scroll
 -- view; this fills its content. See docs/design/whats-new.md.
 
 local _, ns = ...
@@ -27,9 +30,14 @@ local TOP_GAP = 10
 local PLATE_PAD_X = 12
 local PLATE_PAD_Y = 10
 local PLATE_GAP = 8
--- A release's section label, as the Feed's day labels.
+-- A release's section label, as the Feed's day labels, with room above
+-- every one but the first so releases read as groups.
 local SECTION = 26
-local ENTRY_PAD = 6
+local RELEASE_GAP = 10
+local ENTRY_PAD = 5
+-- A change's kind picture, and the title's indent past it.
+local PICTURE = 18
+local PICTURE_GAP = 8
 local DETAIL_GAP = 2
 local DETAIL_LINES = 2
 -- The Unread dot, in the margin left of a change's title.
@@ -81,13 +89,14 @@ local function entry(index)
   if entries[index] then return entries[index] end
   local item = CreateFrame("Button", nil, view.content)
   Skin.fill(item, Skin.HOVER, "HIGHLIGHT")
-  -- Across the text column, not the dot's margin.
-  item.edge = Skin.edge(item, "TOP", Skin.LINE)
-  item.edge:SetPoint("TOPLEFT", INSET, 0)
+  item.picture = Skin.feedPicture(item, PICTURE)
+  item.picture:SetPoint("TOPLEFT", INSET, -ENTRY_PAD)
+  -- The Unread dot in the margin, level with the picture's centre, as on
+  -- the Feed.
   item.dot = Skin.unreadDot(item)
+  item.dot:SetPoint("CENTER", item.picture, "LEFT", -(DOT / 2 + 3), 0)
   item.title = Skin.label(item, "body", TEXT)
-  item.title:SetPoint("TOPLEFT", INSET, -ENTRY_PAD)
-  item.dot:SetPoint("TOPLEFT", (INSET - DOT) / 2, -ENTRY_PAD - 6)
+  item.title:SetPoint("TOPLEFT", item.picture, "TOPRIGHT", PICTURE_GAP, 1)
   item.detail = Skin.label(item, "small", MUTED)
   item.detail:SetPoint("TOPLEFT", item.title, "BOTTOMLEFT", 0, -DETAIL_GAP)
   item:SetScript("OnClick", function(self)
@@ -95,6 +104,13 @@ local function entry(index)
     expanded[self.key] = not expanded[self.key] or nil
     redraw()
   end)
+  item:SetScript("OnEnter", function(self)
+    if not self.kindName then return end
+    GameTooltip:SetOwner(self.picture, "ANCHOR_RIGHT")
+    GameTooltip:SetText(self.kindName)
+    GameTooltip:Show()
+  end)
+  item:SetScript("OnLeave", function() GameTooltip:Hide() end)
   entries[index] = item
   return item
 end
@@ -135,11 +151,12 @@ local function drawPlate(friends, y, width)
   return y - height - PLATE_GAP
 end
 
--- Draws a change at y and returns the y under it. first is true for a
--- release's first change, which sits under its label with no Hairline.
-local function drawEntry(item, change, key, new, first, y, width)
+-- Draws a change at y and returns the y under it.
+local function drawEntry(item, change, key, new, y, width)
   item.key = change.detail and key or nil
-  item.edge:SetShown(not first)
+  item.kindName = change.kindName
+  item.picture:SetPicture(Skin.CHANGE_PICTURES[change.kind] or Skin.CHANGE_PICTURES.patch,
+    Skin.CHANGE_EDGES[change.kind] or Skin.CHANGE_EDGES.patch)
   item:ClearAllPoints()
   item:SetPoint("TOPLEFT", view.content, "TOPLEFT", 0, y)
   item:SetPoint("RIGHT", view.content, "RIGHT", -INSET, 0)
@@ -150,12 +167,13 @@ local function drawEntry(item, change, key, new, first, y, width)
   local open = expanded[key] == true
   local showDetail = change.detail ~= nil and (new or open)
   item.detail:SetShown(showDetail)
-  local height = ENTRY_PAD + item.title:GetStringHeight() + ENTRY_PAD
+  local height = ENTRY_PAD + math.max(PICTURE, item.title:GetStringHeight() - 1) + ENTRY_PAD
   if showDetail then
     item.detail:SetWidth(width)
     item.detail:SetMaxLines(open and 0 or DETAIL_LINES)
     item.detail:SetText(change.detail)
-    height = height + DETAIL_GAP + item.detail:GetStringHeight()
+    height = math.max(height, ENTRY_PAD + item.title:GetStringHeight() + DETAIL_GAP
+      + item.detail:GetStringHeight() + ENTRY_PAD)
   end
   item:SetHeight(height)
   item:Show()
@@ -190,6 +208,7 @@ function WhatsNewTab.draw(scrollView, core, width, onChange)
   local sectionCount, entryCount = 0, 0
   for _, release in ipairs(data and data.releases or {}) do
     sectionCount = sectionCount + 1
+    if sectionCount > 1 then y = y - RELEASE_GAP end
     local label = section(sectionCount)
     label:ClearAllPoints()
     label:SetPoint("TOPLEFT", view.content, "TOPLEFT", INSET - 4, y)
@@ -199,7 +218,8 @@ function WhatsNewTab.draw(scrollView, core, width, onChange)
     y = y - SECTION
     for i, change in ipairs(release.entries) do
       entryCount = entryCount + 1
-      y = drawEntry(entry(entryCount), change, release.version .. ":" .. i, release.new, i == 1, y, inner - 4)
+      y = drawEntry(entry(entryCount), change, release.version .. ":" .. i, release.new, y,
+        inner - PICTURE - PICTURE_GAP)
     end
   end
   for i = sectionCount + 1, #sections do sections[i]:Hide() end

@@ -17,6 +17,9 @@ local Changelog = ns.Changelog
 
 -- How many releases the view lists, newest first.
 WhatsNew.SHOWN = 5
+-- What each kind of change is called where the view names it (a change's
+-- tooltip). A patch can be a fix or a small improvement.
+local KIND_NAMES = { major = "Big change", minor = "New feature", patch = "Small change or fix" }
 local OLDER = "Older updates are on BFF's CurseForge page."
 
 local function plural(count, word)
@@ -128,7 +131,7 @@ end
 
 -- The What's new view: { title, line, friends (nil, or { version, behind,
 -- everyone, text, who }), releases (the last SHOWN: { version, date, new, entries
--- ({ title, detail }) }), older (a line about older updates, or nil) }.
+-- ({ kind ("major", "minor" or "patch"), kindName, title, detail }) }), older (a line about older updates, or nil) }.
 -- rows and versionOf as for friends(). Nil without a changelog.
 function WhatsNew:view(rows, versionOf)
   if not self:available() then return nil end
@@ -138,7 +141,10 @@ function WhatsNew:view(rows, versionOf)
   for i, release in ipairs(self.releases) do
     if i <= WhatsNew.SHOWN then
       local entries = {}
-      for j, entry in ipairs(release.entries) do entries[j] = { title = entry.title, detail = entry.detail } end
+      for j, entry in ipairs(release.entries) do
+        entries[j] = { kind = entry.kind, kindName = KIND_NAMES[entry.kind] or KIND_NAMES.patch, title = entry.title,
+          detail = entry.detail }
+      end
       view.releases[i] = { version = release.version, date = release.date, new = visit.new[release.version] == true,
         entries = entries }
     elseif visit.new[release.version] then
