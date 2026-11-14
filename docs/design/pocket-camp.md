@@ -25,6 +25,7 @@ pocketCamp() -> nil, or {
   opacity = 0.6, -- the backdrop's, 0 to 1
   locked = false, hideInCombat = false,
   position = { x, y } | nil, -- its bottom left corner from the screen's; nil where it starts
+  scale = 1, -- how big it is; 1 is its usual size
 }
 ```
 
@@ -95,9 +96,10 @@ In a section of their own on the Settings page, Pocket Camp, after Toasts (`docs
 |---|---|---|
 | `pocketCamp` | Show the Pocket Camp | off |
 | `pocketCampOpacity` | Backdrop opacity (0 to 100, a slider) | 60 |
-| `pocketCampLocked` | Lock its position | off |
+| `pocketCampLocked` | Lock its position and size | off |
 | `pocketCampCombat` | Hide in combat | off |
 | `pocketCampPosition` | not on the page: where it was dragged to | nil |
+| `pocketCampScale` | not on the page: how big it was scaled to, a whole percent from 50 to 300 (`Core.POCKET_CAMP_MIN_SCALE`, `POCKET_CAMP_MAX_SCALE`) | 100 |
 
 All account-wide. With `camp` off the Pocket Camp never shows, whatever its own setting says.
 
@@ -108,6 +110,7 @@ All account-wide. With `camp` off the Pocket Camp never shows, whatever its own 
 - **Backdrop.** Its own art, `Media/CampPocketBackdrop.tga` (`CampSheet.pocketBackdrop`, passed as CampScene's `backdrop` option): the 112 by 34 art pixels of the Camp's backdrop round the fire, cut to a rounded shape that's solid in the middle and dithered away at the rim, so it doesn't sit on the game world as a hard rectangle. `scripts/camp-art.mjs` generates it (`pocketBackdrop`: the roundness, the fade's width and how solid the ground stays are constants there), and its size must match `pocketColumns` and `pocketRows`. No sky is filled in behind it. It's drawn at `opacity` (`band:SetBackdropAlpha`). At 0 only the fire, the figures and "+N" show.
 - **Click** toggles the panel, as the minimap button does. In combat (`InCombatLockdown()`) it does nothing.
 - **Drag** moves it unless `locked`. Where it's dropped is saved with `core:setPocketCampPosition(left, bottom)`; until then it sits under the screen's centre. Locked, a click still works.
+- **Scale.** Unless `locked`, a grip (the chat window's size grabber) shows in its bottom right corner while the mouse is over it. Dragging the grip scales it live: its top left stays put and its right edge follows the mouse, between 50% and 300%. The band's target becomes `FIGURE_TARGET × scale` (`band:SetTarget`), and its art pixel is still a whole number of screen pixels, so the size steps rather than gliding and the art stays crisp. On release `core:setPocketCampPosition` and `core:setPocketCampScale(scale)` save where its corner is and the scale; a double-click on the grip goes back to 1.
 - **Hide in combat.** With `hideInCombat`, the frame hides on `PLAYER_REGEN_DISABLED` and shows on `PLAYER_REGEN_ENABLED`. Hidden, its `OnUpdate` doesn't run.
 - **Tooltip.** Over a figure, that Member's tooltip exactly as the Roster shows it (`Panel.characterTooltip(actor.row, actor.row)`: the Character being shown, level, zone, professions and so on), then the hint. Anywhere else, Core's `tooltip`: the title, a line per figure, "+N" and the hint. `band:ActorAt(x)` says which figure the mouse is over (half the gap each side counts), and the tooltip follows the mouse from one to the next.
 - **Poses.** CampScene's `POSE` table says how each is drawn: whether the figure stands (the hop figure, no seat) or sits, a sprite in its raised hand, one behind it and one over it. Sprites that face the fire are mirrored on its right.
@@ -158,6 +161,7 @@ None of the rendering has run in a client, and the new sprites were authored as 
 - Pixels stay crisp at a few UI scales and across drags (the frame's corner can land between screen pixels; the art's origin frame rounds to the nearest).
 - It's readable over bright and dark scenes at 0%, 60% and 100% opacity, and the backdrop's dithered rim looks right at size.
 - Dragging, the lock, and the position after `/reload` and on another Character.
+- The scale grip: that it shows and hides with the mouse, how the steps feel at a few UI scales, the double-click, and the scale after `/reload`.
 - A click in and out of combat; Hide in combat on and off.
 - Each pose and animation reads at size: the rod towards the fire on both sides, the star, fish, smoke, skeleton, bursts and flare, and that 10 s feels right for each.
 - The Doing poses on both sides of the fire: the AFK text, the torch and doorway (and the raid's), blade, hammer and anvil, pick, bag, coins, inn sign and the griffin with its wing flapping, and the quest mark.

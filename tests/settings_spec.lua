@@ -100,6 +100,7 @@ local SETTINGS = {
   { key = "pocketCampLocked", default = false, other = true },
   { key = "pocketCampCombat", default = false, other = true },
   { key = "pocketCampPosition", default = nil, other = { x = 300, y = 200 } },
+  { key = "pocketCampScale", default = 100, other = 150 },
   { key = "toastSound", default = "UI_BNET_TOAST", other = "none" },
   { key = "toastPosition", default = nil, other = { x = 400, y = 600 } },
   { key = "panelPlace", default = nil, other = { width = 600, height = 500, left = 100, top = 900 } },
@@ -128,7 +129,7 @@ describe("Settings list", function()
     local sections = core:settings()
     assert.same({ "Sharing", "Notifications and display", "Toasts", "Pocket Camp" },
       { sections[1].title, sections[2].title, sections[3].title, sections[4].title })
-    assert.same({ "Show the Pocket Camp", "Backdrop opacity", "Lock its position", "Hide in combat" },
+    assert.same({ "Show the Pocket Camp", "Backdrop opacity", "Lock its position and size", "Hide in combat" },
       { sections[4].settings[1].label, sections[4].settings[2].label, sections[4].settings[3].label,
         sections[4].settings[4].label })
     local chat = sections[2].settings[1]

@@ -573,6 +573,12 @@ function CampScene.new(parent, options)
     return columns, rows * scene.unit
   end
 
+  -- The art pixel's size to aim for in UI units, from the next Measure or
+  -- Fit on (the Pocket Camp's scale).
+  function band:SetTarget(target)
+    scene.target = target
+  end
+
   -- The band's size in UI units for a Camp exactly `columns` by `rows`
   -- art pixels (the Pocket Camp's). Call before Draw, in Measure's place.
   function band:Fit(columns, rows)
