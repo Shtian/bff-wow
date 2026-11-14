@@ -55,8 +55,8 @@ local function dropped()
   if view then place() end
 end
 
--- Sizes the band for a scale (1 is the usual size): its art pixel stays a
--- whole number of screen pixels, so the size steps as the scale changes.
+-- Sizes the band for a scale (1 is the usual size). The art pixel is
+-- exactly FIGURE_TARGET × scale UI units, so it scales smoothly.
 local function fit(scale)
   frame.band:SetTarget(ns.CampScene.FIGURE_TARGET * scale)
   frame:SetSize(frame.band:Fit(view.columns, view.rows))
@@ -104,11 +104,9 @@ local function updateGrip()
   local scale = draggedScale(drag)
   if scale == drag.scale then return end
   drag.scale = scale
-  local width = frame:GetWidth()
   fit(scale)
   pinTopLeft(drag.left, drag.top)
-  -- The art pixel steps, so many scales draw the same.
-  if frame:GetWidth() ~= width then frame.band:Draw(view) end
+  frame.band:Draw(view)
 end
 
 -- Back to the usual size, keeping its top left where it is, as a drag does.
@@ -230,6 +228,8 @@ local function create()
 
   frame.band = ns.CampScene.new(frame, {
     target = ns.CampScene.FIGURE_TARGET, shadow = true, names = false, backdrop = ns.CampSheet.pocketBackdrop,
+    -- Scales smoothly with the grip (try-out: whole screen pixels stepped).
+    crisp = false,
   })
   frame.band:SetAllPoints()
   createGrip()
