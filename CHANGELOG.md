@@ -23,61 +23,87 @@
 ## 2.2.0
 <sub>2026-11-13</sub>
 
-- *(minor)* The Pocket Camp now shows when a friend is away (AFK): they sit by the fire with AFK over their head.
+- *(minor)*
+  Friends who are away (AFK) sit by the fire in the Pocket Camp.
+
+  The Pocket Camp now shows when a friend is away: they sit by the fire with AFK over their head.
 
 ## 2.1.0
 <sub>2026-11-13</sub>
 
 - *(minor)*
-  Added Rares: the first time anyone in the Crew slays one of 30 noteworthy rare mobs, the Crew earns its Trophy (with a Feed entry, a toast and a While you were away line), shown in a new "Rares slain" grid in the trophy cabinet, plus a "Rares slain" Crew goal track.
+  Rares: the Crew earns a Trophy for each of 30 rare mobs.
+
+  The first time anyone in the Crew slays one of 30 noteworthy rare mobs, the Crew earns its Trophy (with a Feed entry, a toast and a While you were away line), shown in a new "Rares slain" grid in the trophy cabinet, plus a "Rares slain" Crew goal track.
 
 ## 2.0.0
 <sub>2026-11-12</sub>
 
 - *(major)*
+  Updates from friends no longer arrive garbled or go missing.
+
   BFF now splits long messages into chunks itself, so one that arrives out of order or with a piece missing no longer shows up as unreadable, and a friend whose update got lost is asked for it again within about half a minute. Friends on an older BFF are still seen, but they see an "out of date" notice and stop seeing you until they update.
 - *(patch)*
-  BFF stops whispering friends it can't reach. A friend who logged out but still shows in the channel list is no longer whispered again every minute, and a friend who hasn't answered for 3 minutes (in a dungeon, say) is left alone until BFF hears from them again.
+  BFF stops whispering friends it can't reach.
+
+  A friend who logged out but still shows in the channel list is no longer whispered again every minute, and a friend who hasn't answered for 3 minutes (in a dungeon, say) is left alone until BFF hears from them again.
 - *(patch)*
-  A friend who is behind is now sent what they missed directly, instead of everyone in the Crew getting it again, so BFF sends fewer messages.
+  Fewer messages: a friend who's behind gets caught up directly.
+
+  A friend who is behind is now sent what they missed directly, instead of everyone in the Crew getting it again.
 
 ## 1.6.2
 <sub>2026-11-12</sub>
 
 - *(patch)*
-  "No player named ... is currently playing" no longer shows in chat when a friend logs out while BFF still has messages queued for them.
+  No more "No player named ... is currently playing" in chat when a friend logs out.
+
+  It showed when a friend logged out while BFF still had messages queued for them.
 - *(patch)*
+  Members you removed stay removed.
+
   Friends no longer send you a Member you removed again after every sync. You still don't see them, and re-adding them brings them back as before.
 
 ## 1.6.1
 <sub>2026-11-12</sub>
 
 - *(patch)*
+  The bug report records when friends join and leave the channel.
+
   The sync log (`/bff report`) now records every channel join and leave notice, to find out whether WoW: Forever tells BFF when a friend logs out.
 
 ## 1.6.0
 <sub>2026-11-12</sub>
 
 - *(minor)*
+  Report a bug and Get in touch, from the panel's header.
+
   The panel's header has a bug button that opens the bug report (`/bff report`) and a message button that opens Get in touch, with links to GitHub issues and CurseForge to copy. The bug report window now says where to paste the report and what to add to it.
 - *(minor)*
-  The Pocket Camp now shows what each friend is doing right now: fighting, at a vendor or the auction house, resting at an inn, flying on a griffin, crafting or gathering, with a gold question mark when they hand in a quest. Dungeons and raids get their own doorway, and the fire flares purple for a Crew goal.
+  The Pocket Camp shows what each friend is doing right now.
+
+  Fighting, at a vendor or the auction house, resting at an inn, flying on a griffin, crafting or gathering, with a gold question mark when they hand in a quest. Dungeons and raids get their own doorway, and the fire flares purple for a Crew goal.
 - *(patch)* Clicking a link in Get in touch no longer causes a Lua error.
 
 ## 1.5.0
 <sub>2026-11-11</sub>
 
 - *(minor)*
-  Added the Pocket Camp, an optional small Camp you can move anywhere and keep on screen while you play: who's by the fire, in a dungeon or fishing, with animations for dings, deaths, rare finds and Crew goals. It's off by default, and BFF offers it once with a Tip: a small window the first time you log in, and a card in the panel until you answer.
+  The Pocket Camp: a small Camp to keep on screen while you play.
+
+  An optional small Camp you can move anywhere: who's by the fire, in a dungeon or fishing, with animations for dings, deaths, rare finds and Crew goals. It's off by default, and BFF offers it once with a Tip: a small window the first time you log in, and a card in the panel until you answer.
 - *(minor)*
-  World map pins now show each friend's avatar (their Camp figure, or class icon with the Camp off) instead of a dot, and follow friends as they move: while you travel, BFF shares your spot every 10 seconds or so (less often the more friends are online) instead of every 5 minutes. New setting "Show your Crew on the world map" turns the pins off.
-  A "Map pin size" setting (Small, Medium or Large) sets how big they are.
+  World map pins show friends' avatars and follow them as they move.
+
+  Pins show each friend's Camp figure (or class icon with the Camp off) instead of a dot. While you travel, BFF shares your spot every 10 seconds or so (less often the more friends are online) instead of every 5 minutes. New settings: "Show your Crew on the world map" turns the pins off, and "Map pin size" (Small, Medium or Large) sets how big they are.
 
 ## 1.4.0
 <sub>2026-11-11</sub>
 
 - *(minor)*
-  New `/bff report`: if syncing with your Crew goes wrong, type it and copy what it shows into your bug report. It holds your BFF and game versions, the state of BFF's link to your Crew, whether you're in a dungeon, and the recent sync log, which BFF now keeps all the time (and across reloads) instead of only while `/bff debug sync` is on. The report includes your Crew's Character names.
+  Type /bff report when syncing with your Crew goes wrong.
+
+  Copy what it shows into your bug report. It holds your BFF and game versions, the state of BFF's link to your Crew, whether you're in a dungeon, and the recent sync log, which BFF now keeps all the time (and across reloads) instead of only while `/bff debug sync` is on. The report includes your Crew's Character names.
 
 ## 1.3.0
 <sub>2026-11-10</sub>

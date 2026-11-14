@@ -40,8 +40,13 @@ zip="BFF-$tag.zip"
 # never pushed. On a retry bumpy's lightweight tag can sit on HEAD too; the
 # packager prefers the highest name, so v<version> still wins.
 work="$(mktemp -d)"
-trap 'git tag -d "$tag" >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
+trap 'git tag -d "$tag" >/dev/null 2>&1 || true; git checkout -- ChangelogText.lua 2>/dev/null || true; rm -rf "$work"' EXIT
 git tag -f "$tag" >/dev/null
+
+# What's new reads the newest releases from ChangelogText.lua, which the
+# checkout carries empty: write them in for the zip. The packager copies the
+# working tree, so the zip gets this copy; the trap puts the empty one back.
+scripts/changelog-text.sh
 
 # The packager fetches the .pkgmeta externals, leaves out the ignored paths and
 # writes .release/BFF-v<version>.zip. Bumpy owns the GitHub release, so the

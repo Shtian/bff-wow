@@ -1,6 +1,8 @@
 -- Panel: the BFF window, in the Skin's flat look. Without a Crew it shows
 -- the setup view (display name, Start or Join); in one, a sidebar with
--- Roster, Feed, Goals, When, Spares, Professions, Together, Catches and Settings. The Roster has your own row pinned on top,
+-- Roster, Feed, Goals, When, Spares, Professions, Together, Catches and Settings, and the version under them, which
+-- opens What's new (drawn by WhatsNewTab) and carries the Unread dot while
+-- there are changes you haven't seen. The Roster has your own row pinned on top,
 -- then a row per Member with expandable Alts, a sort menu, a tooltip and
 -- right-click menu per Character, and a footer with the hidden count,
 -- removed Members and the Crew code. The Feed is a timeline
@@ -49,6 +51,8 @@ local NAV_ROWS = 9
 local NAV_CHIP_X = 6
 local NAV_CHIP_Y = 2
 local NAV_CHIP_RADIUS = 2
+-- The version label under Settings, which opens What's new.
+local VERSION_HEIGHT = 18
 -- The Roster footer's small labels (Crew code, Hidden, Removed) share one
 -- bottom line, so they line up with each other and the code box.
 local CODE_LINE = 15
@@ -64,7 +68,7 @@ local REACT = 20
 local FEED_DAY = 26
 -- The timeline's line runs through the middle of the entry pictures.
 local NODE = 26
-local NEW_DOT = 6
+local NEW_DOT = Skin.UNREAD_DOT
 local LINE_X = INSET + NODE / 2 - 1
 -- Last seen goes stale, so the open panel redraws this often.
 local REDRAW_EVERY = 30
@@ -140,6 +144,7 @@ local section
 local rosterView
 local feedView
 local goalsView
+local whatsNewView
 local whenView
 local sparesView
 local professionsView
@@ -554,7 +559,8 @@ end
 
 -- The sidebar: Roster, Feed, Goals, When, Spares, Professions, Together and Catches on top,
 -- Settings and the addon's version at the bottom, as plain labels. The
--- selected one's chip marks it. In a short window (the Camp's band takes
+-- version opens What's new, with the Unread dot in its margin while there
+-- are changes you haven't seen. The selected one's chip marks it. In a short window (the Camp's band takes
 -- room) the tabs get shorter so Settings stays clear of them.
 local function navButton(label, onClick)
   local button = CreateFrame("Button", nil, frame.sidebar)
@@ -617,9 +623,24 @@ local function createNav()
   end)
   nav.settings:SetPoint("BOTTOMLEFT", 0, NAV_BOTTOM)
   nav.settings:SetPoint("BOTTOMRIGHT", 0, NAV_BOTTOM)
-  nav.version = Skin.label(frame.sidebar, "tiny", DIM)
-  nav.version:SetPoint("BOTTOMLEFT", NAV_CHIP_X + 10, 10)
-  nav.version:SetText(ns.VERSION)
+  nav.version = CreateFrame("Button", nil, frame.sidebar)
+  nav.version:SetHeight(VERSION_HEIGHT)
+  nav.version:SetPoint("BOTTOMLEFT", 0, NAV_BOTTOM - VERSION_HEIGHT)
+  nav.version:SetPoint("BOTTOMRIGHT", 0, NAV_BOTTOM - VERSION_HEIGHT)
+  nav.version.selected = Skin.chip(nav.version, Skin.CHIP, NAV_CHIP_X, 1, NAV_CHIP_RADIUS)
+  Skin.chip(nav.version, Skin.CHIP_HOVER, NAV_CHIP_X, 1, NAV_CHIP_RADIUS, "HIGHLIGHT")
+  nav.version.label = Skin.label(nav.version, "tiny", DIM)
+  nav.version.label:SetPoint("LEFT", NAV_CHIP_X + 10, 0)
+  nav.version.label:SetText(ns.VERSION)
+  nav.version.dot = Skin.unreadDot(nav.version)
+  nav.version.dot:SetPoint("CENTER", nav.version.label, "LEFT", -(NEW_DOT / 2 + 3), 0)
+  nav.version:SetScript("OnClick", open("whatsnew"))
+  nav.version:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText("What's new in BFF")
+    GameTooltip:Show()
+  end)
+  nav.version:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
 -- unseen counts the Feed's unseen entries, and sparesUnseen the
@@ -635,6 +656,11 @@ local function drawNav(unseen, sparesUnseen)
   setSelected(nav.together, tab == "together")
   setSelected(nav.catches, tab == "catches")
   setSelected(nav.settings, false)
+  nav.version.selected:SetShown(tab == "whatsnew")
+  Skin.color(nav.version.label, tab == "whatsnew" and TEXT or DIM)
+  nav.version.dot:SetShown(core:hasNewChanges())
+  -- A checkout carries no changelog: the version is only a label there.
+  nav.version:EnableMouse(core:whatsNew() ~= nil)
   -- Every tab and Settings, the sidebar's top inset and Settings' room
   -- under it.
   local sidebarHeight = frame:GetHeight() - HEADER - campHeight - tipHeight - 1
@@ -794,11 +820,8 @@ local function createFeedEntry()
   entry.text:SetWordWrap(false)
   -- New in this Feed visit: an unread dot in the margin, level with the
   -- picture's centre.
-  entry.new = Skin.fill(entry, GOLD, "ARTWORK")
-  entry.new:ClearAllPoints()
-  entry.new:SetSize(NEW_DOT, NEW_DOT)
+  entry.new = Skin.unreadDot(entry)
   entry.new:SetPoint("CENTER", node, "LEFT", -(NEW_DOT / 2 + 3), 0)
-  Skin.round(entry, entry.new)
   entry.time = Skin.label(entry, "small", MUTED)
   entry.time:SetPoint("TOPLEFT", entry.text, "BOTTOMLEFT", 0, -2)
   entry.reactors = Skin.label(entry, "small", MUTED)
@@ -891,6 +914,18 @@ local function drawGoals()
   ns.GoalsTab.draw(goalsView, core, listWidth(), Panel.refresh)
   goalsView:Show()
   updateThumb(goalsView)
+end
+
+-- What's new: drawn by WhatsNewTab into a scroll view of the panel's.
+local function drawWhatsNew()
+  if not whatsNewView then
+    whatsNewView = createScrollView()
+    whatsNewView:SetPoint("TOPLEFT")
+    whatsNewView:SetPoint("BOTTOMRIGHT", -6, 0)
+  end
+  ns.WhatsNewTab.draw(whatsNewView, core, listWidth(), Panel.refresh)
+  whatsNewView:Show()
+  updateThumb(whatsNewView)
 end
 
 -- When: a menu to pick the Crew or a Member, a line saying what the
@@ -1683,6 +1718,8 @@ local function create()
     if frame.sizing or frame.moving then savePlace() end
     core:leaveFeed()
     core:leaveGoals()
+    core:leaveWhatsNew()
+    ns.WhatsNewTab.leave()
   end)
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
@@ -1955,7 +1992,7 @@ local function drawFooter(crew, summary)
 end
 
 -- Hides every tab's view but the one named ("roster", "feed", "goals",
--- "when", "spares", "professions", "together", "catches"; nil hides them all). Each draw function shows
+-- "when", "spares", "professions", "together", "catches", "whatsnew"; nil hides them all). Each draw function shows
 -- its own.
 local function hideViewsBut(name)
   if name ~= "roster" then
@@ -1966,6 +2003,10 @@ local function hideViewsBut(name)
   if name ~= "goals" then
     if goalsView then goalsView:Hide() end
     ns.GoalsTab.leave()
+  end
+  if name ~= "whatsnew" then
+    if whatsNewView then whatsNewView:Hide() end
+    ns.WhatsNewTab.leave()
   end
   if name ~= "when" and whenView then whenView:Hide() end
   if name ~= "spares" and sparesView then sparesView:Hide() end
@@ -2039,6 +2080,8 @@ function Panel.refresh()
   if tab == "feed" then core:openFeed() else core:leaveFeed() end
   -- Likewise a Goals tab visit, for the latest win's "since you last looked".
   if tab == "goals" then core:openGoals() else core:leaveGoals() end
+  -- And a What's new visit, which marks the changes seen.
+  if tab == "whatsnew" then core:openWhatsNew() else core:leaveWhatsNew() end
 
   local summary = core:summary()
   frame.headerRight:SetText(summary.header)
@@ -2048,6 +2091,8 @@ function Panel.refresh()
     drawFeed(core:feed())
   elseif tab == "goals" then
     drawGoals()
+  elseif tab == "whatsnew" then
+    drawWhatsNew()
   elseif tab == "when" then
     drawWhen()
   elseif tab == "spares" then
@@ -2086,7 +2131,7 @@ function Panel.toggle()
 end
 
 -- Opens the panel on a tab: "roster", "feed", "goals", "when", "spares",
--- "professions", "together" or "catches".
+-- "professions", "together", "catches" or "whatsnew".
 function Panel.show(name)
   if not frame then create() end
   tab = name

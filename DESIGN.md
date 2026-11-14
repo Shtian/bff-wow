@@ -349,6 +349,7 @@ A trophy for a Crew goal rung reached, on the Trophies tab: the track's icon (a 
 - **Checkbox:** a 14px square at 4% white with a 25% white border, an Ember Gold tick inset 3px, and a Small Smoke Muted label clickable to its right.
 
 ### Navigation
+- **Version label:** the addon's version under Settings, Tiny Dusk Dim on an 18px row with the tabs' chips (Ash Text on the selected chip). It opens What's new.
 - **Sidebar tabs:** 30px rows in a 124px sidebar at 30% warm near-black, shorter in a window too short for them all (the minimum size with the Camp's band), so Settings stays clear. Text labels only, Smoke Muted, or Ash Text on the selected tab's chip. The Feed and Spare Items tabs show a gold unseen-count badge at their right when another tab is open.
 
 ### Feed picture (signature)
@@ -356,6 +357,8 @@ A square full-colour game icon on an opaque Night Window back, with a 1px edge i
 
 ### Unread dot
 A 6px Ember Gold dot in the 12px margin left of a Feed picture, level with its centre, on each New entry. It's the only mark on the row: the count lives on the sidebar's badge, and a divider wouldn't work because a Reaction can make an older entry New.
+
+What's new uses the same dot: in the margin left of the sidebar's version label while there are changes you haven't seen (never pulsing, and no NEW tag beside it), and left of each change's title in a release new on this visit. Releases already seen show titles only, in Smoke Muted.
 
 ### Forever mark
 An 18×9 infinity (`Media/Forever.tga`, `Skin.foreverMark`), drawn after the emblem's ribbon: fat around the loops and pinched at the crossing. It marks dungeons and raids new in WoW: Forever on the Dungeons tab's bars, in tooltips and in the Show menu's key, in Ash Text on a bar you fit and Smoke Muted elsewhere. It's never gold, because a new dungeon isn't news.

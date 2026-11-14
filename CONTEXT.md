@@ -87,6 +87,10 @@ _Avoid_: Popup, alert, notification (when meaning a toast)
 A Member's mark on the world map where their shown Character was last seen: their Camp figure (or class icon with the Camp off), with a small green dot while online. While a Member moves in the open world, their client sends a small **WHERE** so the pin follows them between their record's updates; the record still carries the last spot for anyone who missed it.
 _Avoid_: Dot, blip, marker
 
+**What's new**:
+The panel's view of what changed in BFF itself, release by release, opened from the version under the sidebar. Changes since the Member last looked are marked with the Unread dot, and While you were away says once that BFF updated.
+_Avoid_: Changelog (in the UI), release notes, patch notes
+
 **Tip**:
 A one-time offer of a feature that's off by default, with a button to turn it on and one to dismiss it: a small window the first time, and a card at the top of the panel until it's answered. Once answered, it never shows again on any Character of the account.
 _Avoid_: Toast (for a Tip), notice, announcement, what's new

@@ -209,14 +209,15 @@ function Ledger:displayName()
   return record and record.displayName
 end
 
--- Writes the given displayName, left flag, Main (a Character GUID) and
--- joinedAt (when you started or joined the Crew) into the own record. A
+-- Writes the given displayName, left flag, Main (a Character GUID),
+-- joinedAt (when you started or joined the Crew) and bff (the BFF version
+-- running, for What's new) into the own record. A
 -- field not given is kept; false clears left or Main. Returns true if the
 -- record changed.
 function Ledger:writeOwn(fields)
   local record = ownRecord(self)
   local changed = false
-  for _, field in ipairs({ "displayName", "left", "main", "joinedAt" }) do
+  for _, field in ipairs({ "displayName", "left", "main", "joinedAt", "bff" }) do
     local value = fields[field]
     if value ~= nil and (value or nil) ~= record[field] then
       record[field] = value or nil
@@ -389,6 +390,7 @@ local RECORD_SHAPE = {
   main = isOptional(isText),
   left = isOptional(function(value) return value == true end),
   joinedAt = isOptional(isNumber),
+  bff = isOptional(isText),
   playTimes = isOptional(ns.PlayTimes.valid),
 }
 -- A Character's professions aren't checked here: a malformed list costs

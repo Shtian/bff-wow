@@ -600,6 +600,19 @@ function Skin.badge(parent, fontName, textColor, plateColor)
   return plate
 end
 
+-- The Unread dot: a 6px Ember Gold dot (DESIGN.md), on a New Feed entry,
+-- the sidebar's version label and What's new's changes. The caller places
+-- it.
+Skin.UNREAD_DOT = 6
+
+function Skin.unreadDot(parent)
+  local dot = Skin.fill(parent, Skin.GOLD, "ARTWORK")
+  dot:ClearAllPoints()
+  dot:SetSize(Skin.UNREAD_DOT, Skin.UNREAD_DOT)
+  Skin.round(parent, dot)
+  return dot
+end
+
 -- The mark for what's new in WoW: Forever: an infinity like the one in the
 -- game's emblem, white in the file so a caller can tint it.
 local FOREVER_MARK = "Interface\\AddOns\\BFF\\Media\\Forever"
