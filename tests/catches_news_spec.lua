@@ -84,9 +84,9 @@ end
 describe("The types caught track", function()
   it("has steps at 10, 20, 30, 40 and every type", function()
     local Goals = load().Goals
-    assert.same({ 10, 20, 30, 40, 46 }, Goals.rungs("catches", 46, 60))
-    assert.equal(46, Goals.nextRung("catches", 40, 60))
-    assert.is_nil(Goals.nextRung("catches", 46, 60))
+    assert.same({ 10, 20, 30, 40, 48 }, Goals.rungs("catches", 48, 60))
+    assert.equal(48, Goals.nextRung("catches", 40, 60))
+    assert.is_nil(Goals.nextRung("catches", 48, 60))
   end)
 
   it("shows on the Goals tab, counting types towards the next step", function()
