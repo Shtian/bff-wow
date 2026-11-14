@@ -20,6 +20,25 @@
 
 
 
+
+## 2.3.0
+<sub>2026-11-14</sub>
+
+- *(minor)*
+  The Pocket Camp can be scaled.
+
+  Drag the grip in its bottom right corner to make it bigger or smaller, and double-click the grip to go back to the usual size. "Lock its position" now locks its size too.
+- *(minor)*
+  The panel is lit by the Camp's fire.
+
+  Its glow spills under the band and flickers with the flames, the night settles at the window's foot, and now and then an ember drifts down from the fire. Hairlines and washes are warmer, section labels open with a small spark, and your own row and the latest win catch the light.
+- *(minor)*
+  See what's new in BFF from the version under the panel's sidebar.
+
+  A gold dot marks it while there are changes you haven't seen; click it for the newest updates, each change in a line with more under it. While you were away says once that BFF updated, and when an update needs your friends to update too, BFF names who's still on an older version.
+- *(patch)*
+  The Camp's tent is now a pavilion: a laced cone roof over canvas walls, its flaps tied back round the pole and its canvas lit on the side facing the fire.
+
 ## 2.2.0
 <sub>2026-11-13</sub>
 
