@@ -101,6 +101,7 @@ local SETTINGS = {
   { key = "pocketCampCombat", default = false, other = true },
   { key = "pocketCampPosition", default = nil, other = { x = 300, y = 200 } },
   { key = "pocketCampScale", default = 100, other = 150 },
+  { key = "pocketCampColumns", default = 112, other = 176 },
   { key = "toastSound", default = "UI_BNET_TOAST", other = "none" },
   { key = "toastPosition", default = nil, other = { x = 400, y = 600 } },
   { key = "panelPlace", default = nil, other = { width = 600, height = 500, left = 100, top = 900 } },

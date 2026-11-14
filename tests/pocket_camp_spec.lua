@@ -199,6 +199,66 @@ describe("The Pocket Camp", function()
     assert.equal(1, core:pocketCamp().scale)
   end)
 
+  it("grows a step at a time to fit who's online, up to its max width, and counts the rest", function()
+    local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal", "Ivy" }
+    local _, clients, ns = crew(names)
+    local core = clients[1].core
+    local layout = ns.Core.CAMP_LAYOUT
+    -- At its usual max it doesn't grow.
+    local view = core:pocketCamp()
+    assert.same({ layout.pocketColumns, layout.pocketColumns, 6, 3 },
+      { view.columns, view.maxColumns, #view.actors, view.more })
+    -- Room to spare: just wide enough for everyone (five a side).
+    core:setPocketCampColumns(layout.pocketMaxColumns)
+    view = core:pocketCamp()
+    assert.same({ layout.pocketColumns + 2 * layout.pocketStep, layout.pocketMaxColumns, 9 },
+      { view.columns, view.maxColumns, #view.actors })
+    assert.is_nil(view.more)
+    local half = view.columns / 2
+    for _, actor in ipairs(view.actors) do
+      assert.is_true(actor.x >= -half and actor.x + actor.width <= half)
+    end
+    -- A max one step up: eight fit, the ninth is +1.
+    core:setPocketCampColumns(layout.pocketColumns + layout.pocketStep)
+    view = core:pocketCamp()
+    assert.same({ layout.pocketColumns + layout.pocketStep, 8, 1, "+1" },
+      { view.columns, #view.actors, view.more, view.moreText })
+  end)
+
+  it("stays its usual width with few online, whatever its max", function()
+    local _, clients, ns = crew({ "Ann", "Bob" })
+    local core = clients[1].core
+    core:setPocketCampColumns(ns.Core.CAMP_LAYOUT.pocketMaxColumns)
+    assert.equal(ns.Core.CAMP_LAYOUT.pocketColumns, core:pocketCamp().columns)
+  end)
+
+  it("keeps its max width to the layout's steps and limits, and goes back to the usual on nil", function()
+    local _, clients, ns = crew({ "Ann", "Bob" })
+    local core = clients[1].core
+    local layout = ns.Core.CAMP_LAYOUT
+    core:setPocketCampColumns(layout.pocketColumns + layout.pocketStep + 3)
+    assert.equal(layout.pocketColumns + layout.pocketStep, core:pocketCamp().maxColumns)
+    core:setPocketCampColumns(layout.pocketColumns + layout.pocketStep * 1.6)
+    assert.equal(layout.pocketColumns + 2 * layout.pocketStep, core:pocketCamp().maxColumns)
+    core:setPocketCampColumns(9999)
+    assert.equal(layout.pocketMaxColumns, core:pocketCamp().maxColumns)
+    core:setPocketCampColumns(1)
+    assert.equal(layout.pocketColumns, core:pocketCamp().maxColumns)
+    core:setPocketCampColumns(layout.pocketMaxColumns)
+    core:setPocketCampColumns(nil)
+    assert.equal(layout.pocketColumns, core:pocketCamp().maxColumns)
+  end)
+
+  it("counts the seats at each width from the layout: three a side at the usual width, one more a side per step", function()
+    local _, _, ns = crew({ "Ann" })
+    local layout = ns.Core.CAMP_LAYOUT
+    assert.equal(6, ns.Core.pocketCampSeats(layout.pocketColumns))
+    assert.equal(8, ns.Core.pocketCampSeats(layout.pocketColumns + layout.pocketStep))
+    assert.equal(18, ns.Core.pocketCampSeats(layout.pocketMaxColumns))
+    assert.equal(layout.pocketColumns + layout.pocketStep, ns.Core.pocketCampWidth(layout.pocketColumns + 20))
+    assert.equal(layout.pocketMaxColumns, ns.Core.pocketCampWidth(1000))
+  end)
+
   it("gives each actor its Roster row, for the tooltip over its figure", function()
     local _, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]

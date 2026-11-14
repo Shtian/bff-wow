@@ -48,7 +48,7 @@ Everything is **account-wide** in `BFF_DB`, including the minimap button positio
 
 ### One list in Core
 
-Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): its key, kind (`toggle` for on/off, `sound`, `choice` (one of its `choices`), `position`, `panelPlace` or `percent`), default, how it's saved, and the Settings page's section and label as finished text. The list drives:
+Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): its key, kind (`toggle` for on/off, `sound`, `choice` (one of its `choices`), `position`, `panelPlace`, `percent` or `columns` (a Pocket Camp width)), default, how it's saved, and the Settings page's section and label as finished text. The list drives:
 
 - **Storage**, in the shape earlier versions saved, so nothing is migrated:
 
@@ -65,8 +65,9 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `pocketCampOpacity` | `pocketCampOpacity`, a whole percentage from 0 to 100; nil for the default 60 |
   | `pocketCampLocked` | `pocketCampLocked = true`, or nil while off |
   | `pocketCampCombat` | `pocketCampCombatHide = true`, or nil while off |
-  | `pocketCampPosition` | `{ x, y }`, the Pocket Camp's bottom left corner from the screen's; nil where it starts |
+  | `pocketCampPosition` | `{ x, y }` from the screen's bottom left: the bottom left corner the Pocket Camp would have at its usual width, so it's anchored on the fire whatever width it grows to; nil where it starts |
   | `pocketCampScale` | a whole percent, 50 to 300, how big the Pocket Camp is; nil at 100 |
+  | `pocketCampColumns` | how wide the Pocket Camp can grow, in art pixels: one of its widths, 144 to 304 in steps of 32 (others snap to the nearest); nil at 112, its usual width |
   | `toasts` | `toastsOff = true`, or nil while on |
   | `toastSound` | the sound's name, or nil for the default |
   | `toastPosition` | `{ x, y }`, or nil for the default |
@@ -80,7 +81,7 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
 
 - **Core's interface:** `setting(key)`, `setSetting(key, value)` and `settings()` (the page's sections). The named methods (`isPaused()`, `setToasts(on)` and the rest) stay as hand-written one-line wrappers, so they're greppable.
 - **Events:** a real change fires `settingChanged(key, value)`, not `changed`; setting a value it already has fires nothing. Core's own reactions run first (Pause sharing pauses Gossip).
-- **The page:** its content scrolls (the game's scroll frame inside the canvas), since the sections are taller than the Settings panel. A section header per section and a checkbox per on/off setting, built in a loop from `settings()`, so a new on/off setting needs only a list entry. Settings with no section, the Dungeons tab's Show menu choices (`docs/design/together.md`) and the Catches tab's names checkbox (`docs/design/catches.md`), aren't on the page; those menus show them; nor are `pocketCampPosition` and `pocketCampScale`, which dragging the Pocket Camp and its corner grip set. The sound picker (with Play), Move toasts, Reset BFF window and the percentage slider are drawn by hand but read and write through `setting()` and `setSetting()`. Leave Crew sits under Appear offline.
+- **The page:** its content scrolls (the game's scroll frame inside the canvas), since the sections are taller than the Settings panel. A section header per section and a checkbox per on/off setting, built in a loop from `settings()`, so a new on/off setting needs only a list entry. Settings with no section, the Dungeons tab's Show menu choices (`docs/design/together.md`) and the Catches tab's names checkbox (`docs/design/catches.md`), aren't on the page; those menus show them; nor are `pocketCampPosition`, `pocketCampScale` and `pocketCampColumns`, which dragging the Pocket Camp and its corner grip set. The sound picker (with Play), Move toasts, Reset BFF window and the percentage slider are drawn by hand but read and write through `setting()` and `setSetting()`. Leave Crew sits under Appear offline.
 
 Display name isn't in the list: it's part of your Member record and spreads to the Crew.
 

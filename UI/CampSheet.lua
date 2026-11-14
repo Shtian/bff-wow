@@ -64,12 +64,17 @@ ns.CampSheet = {
     height = 64,
     fire = 256,
   },
-  -- The Pocket Camp's backdrop, soft-edged: the same, for its own file.
+  -- The Pocket Camp's backdrop, soft-edged: the same, for its own file,
+  -- which holds a band per width the Pocket Camp can be, top to bottom
+  -- from `columns` in steps of `step`, each `band` texels high.
   pocketBackdrop = {
     file = "Interface\\AddOns\\BFF\\Media\\CampPocketBackdrop",
-    width = 128,
-    height = 64,
-    fire = 64,
+    width = 512,
+    height = 256,
+    fire = 256,
+    band = 36,
+    columns = 112,
+    step = 32,
   },
   -- The fire's light on the panel under the band, with the fire on the
   -- middle of its top edge.

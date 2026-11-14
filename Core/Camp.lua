@@ -21,9 +21,10 @@ local DAY = 24 * 60 * 60
 -- each edge of the band. The tent, `tent` wide, only shows when there's
 -- room. UI reads the same table to draw it. The panel's band is between
 -- `minColumns` and `maxColumns` wide; the popup's is `awayColumns`. The
--- Pocket Camp is always `pocketColumns` wide and `pocketRows` high; a
--- flying figure's griffin takes `griffinFore` more towards the fire and
--- `griffinAft` away from it.
+-- Pocket Camp is `pocketRows` high and from `pocketColumns` (its usual
+-- width, three seats each side) to `pocketMaxColumns` wide, in steps of
+-- `pocketStep` (one more seat each side); a flying figure's griffin takes
+-- `griffinFore` more towards the fire and `griffinAft` away from it.
 local LAYOUT = {
   fire = 9,
   seated = 12,
@@ -37,6 +38,8 @@ local LAYOUT = {
   maxColumns = 375,
   awayColumns = 120,
   pocketColumns = 112,
+  pocketMaxColumns = 304,
+  pocketStep = 32,
   pocketRows = 34,
   griffinFore = 8,
   griffinAft = 6,
@@ -237,8 +240,27 @@ local function poseOf(row, doing)
   return said or "seated"
 end
 
+-- A Pocket Camp width in art pixels, the nearest of its steps: from
+-- LAYOUT.pocketColumns, in steps of pocketStep, up to pocketMaxColumns.
+-- Anything but a number is the usual width.
+function Camp.pocketWidth(columns)
+  local low, high, step = LAYOUT.pocketColumns, LAYOUT.pocketMaxColumns, LAYOUT.pocketStep
+  if type(columns) ~= "number" then return low end
+  columns = math.max(low, math.min(high, columns))
+  return low + math.floor((columns - low) / step + 0.5) * step
+end
+
+-- How many seated figures fit in a Pocket Camp `columns` art pixels wide,
+-- both sides of the fire. A flying figure takes more.
+function Camp.pocketSeats(columns)
+  local room = math.floor(columns / 2) - LAYOUT.margin - LAYOUT.fire + LAYOUT.gap
+  return 2 * math.max(0, math.floor(room / (LAYOUT.seated + LAYOUT.gap)))
+end
+
 -- The Pocket Camp: the fire and the online Members, you first, as many as
--- fit, at LAYOUT.pocketColumns by LAYOUT.pocketRows. doing is what they're
+-- fit, LAYOUT.pocketRows high. It's the narrowest of its widths (from
+-- LAYOUT.pocketColumns in steps of pocketStep, up to maxColumns) that
+-- everyone fits, or maxColumns if they don't. doing is what they're
 -- up to, each by Member id: said (what they last said they're doing, as
 -- Doing gives it), fishing (true while fishing) and working ("crafting"
 -- or "gathering" while at a profession). Each actor is as in view(), with
@@ -247,15 +269,21 @@ end
 -- Member's Roster row, for the tooltip over the figure). A flying figure
 -- takes its griffin's room. Members that didn't fit are counted in more
 -- ("+2"). tooltip lists who is doing what: { title, lines }.
-function Camp.pocket(rows, entries, now, doing)
+function Camp.pocket(rows, entries, now, doing, maxColumns)
   local poses = {}
   for _, row in ipairs(rows) do poses[row.memberId] = poseOf(row, doing) end
-  local view = Camp.view(rows, entries, now, LAYOUT.pocketColumns, {
+  local options = {
     tent = false, onlineOnly = true, moreText = "+%d",
     room = function(row)
       if poses[row.memberId] == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
     end,
-  })
+  }
+  local columns = LAYOUT.pocketColumns
+  local view = Camp.view(rows, entries, now, columns, options)
+  while view.more and columns + LAYOUT.pocketStep <= (maxColumns or LAYOUT.pocketColumns) do
+    columns = columns + LAYOUT.pocketStep
+    view = Camp.view(rows, entries, now, columns, options)
+  end
   view.rows = LAYOUT.pocketRows
   view.graves = nil
   local byMember = {}

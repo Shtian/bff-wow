@@ -344,30 +344,42 @@ function backdrop() {
   return img;
 }
 
-// The Pocket Camp's backdrop: the POCKET_W x POCKET_H art pixels of the
-// backdrop round the fire, with soft edges so it doesn't sit on the game
-// world as a hard rectangle. A rounded shape, solid in the middle and
-// dithered away towards its rim. In a 128 x 64 file, its bottom on the
-// file's and the fire on column 64. POCKET_W and POCKET_H are Core's
-// pocketColumns and pocketRows (Core/Camp.lua).
-const POCKET_W = 112, POCKET_H = 34, POCKET_FILE_W = 128, POCKET_FILE_H = 64;
+// The Pocket Camp's backdrop: the backdrop's bottom POCKET_H rows round
+// the fire, with soft edges so it doesn't sit on the game world as a hard
+// rectangle. A rounded shape, solid in the middle and dithered away towards
+// its rim. The Pocket Camp grows wider with the Crew online, so the file
+// holds one band per width, POCKET_W, POCKET_W + POCKET_STEP and so on up
+// to POCKET_MAX_W, top to bottom, each POCKET_BAND rows high with its art
+// at the band's bottom and the fire on column POCKET_FILE_W / 2. A wider
+// band is the narrowest's ends with a stretch of solid middle between
+// them. POCKET_W, POCKET_MAX_W, POCKET_STEP and POCKET_H are Core's
+// pocketColumns, pocketMaxColumns, pocketStep and pocketRows
+// (Core/Camp.lua).
+const POCKET_W = 112, POCKET_MAX_W = 304, POCKET_STEP = 32, POCKET_H = 34;
+const POCKET_BAND = 36, POCKET_FILE_W = 512, POCKET_FILE_H = 256;
+const POCKET_WIDTHS = [];
+for (let w = POCKET_W; w <= POCKET_MAX_W; w += POCKET_STEP) POCKET_WIDTHS.push(w);
+if (POCKET_WIDTHS.length * POCKET_BAND > POCKET_FILE_H || POCKET_MAX_W > BACK_W) throw new Error("pocket bands don't fit");
 function pocketBackdrop(back) {
   const img = image(POCKET_FILE_W, POCKET_FILE_H);
-  const fromX = FILE_W / 2 - POCKET_W / 2, fromY = FILE_H - POCKET_H;
-  const toX = POCKET_FILE_W / 2 - POCKET_W / 2, toY = POCKET_FILE_H - POCKET_H;
-  // How round the shape is (2 is an ellipse, higher is squarer), how much
-  // of the way out from the middle the fade takes, the row its middle is
-  // on, and how far out the bottom row counts: the ground under the
-  // figures stays mostly solid.
-  const round = 4, fade = 0.22, middle = 20, bottom = 0.86;
-  for (let j = 0; j < POCKET_H; j++) for (let i = 0; i < POCKET_W; i++) {
-    const u = Math.abs((i + 0.5) / (POCKET_W / 2) - 1), y = j + 0.5;
-    const v = y < middle ? (middle - y) / middle : (y - middle) / (POCKET_H - middle) * bottom;
-    const d = Math.pow(Math.pow(u, round) + Math.pow(v, round), 1 / round);
-    if ((1 - d) / fade <= BAYER[j % 4][i % 4]) continue;
-    const from = ((fromY + j) * back.width + fromX + i) * 4, to = ((toY + j) * img.width + toX + i) * 4;
-    img.pixels.set(back.pixels.subarray(from, from + 4), to);
-  }
+  // How round the ends are (2 is an ellipse, higher is squarer), how much
+  // of the way in from an end the fade takes (of the narrowest's half
+  // width), the row its middle is on, and how far out the bottom row
+  // counts: the ground under the figures stays mostly solid.
+  const round = 4, fade = 0.22, middle = 20, bottom = 0.86, half = POCKET_W / 2;
+  POCKET_WIDTHS.forEach((width, band) => {
+    const fromX = FILE_W / 2 - width / 2, fromY = FILE_H - POCKET_H;
+    const toX = POCKET_FILE_W / 2 - width / 2, toY = (band + 1) * POCKET_BAND - POCKET_H;
+    for (let j = 0; j < POCKET_H; j++) for (let i = 0; i < width; i++) {
+      const end = Math.min(i + 0.5, width - i - 0.5);
+      const u = Math.max(0, 1 - end / half), y = j + 0.5;
+      const v = y < middle ? (middle - y) / middle : (y - middle) / (POCKET_H - middle) * bottom;
+      const d = Math.pow(Math.pow(u, round) + Math.pow(v, round), 1 / round);
+      if ((1 - d) / fade <= BAYER[j % 4][i % 4]) continue;
+      const from = ((fromY + j) * back.width + fromX + i) * 4, to = ((toY + j) * img.width + toX + i) * 4;
+      img.pixels.set(back.pixels.subarray(from, from + 4), to);
+    }
+  });
   return img;
 }
 
@@ -434,12 +446,17 @@ ${lines.join("\n")}
     height = ${FILE_H},
     fire = ${FILE_W / 2},
   },
-  -- The Pocket Camp's backdrop, soft-edged: the same, for its own file.
+  -- The Pocket Camp's backdrop, soft-edged: the same, for its own file,
+  -- which holds a band per width the Pocket Camp can be, top to bottom
+  -- from \`columns\` in steps of \`step\`, each \`band\` texels high.
   pocketBackdrop = {
     file = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampPocketBackdrop",
     width = ${POCKET_FILE_W},
     height = ${POCKET_FILE_H},
     fire = ${POCKET_FILE_W / 2},
+    band = ${POCKET_BAND},
+    columns = ${POCKET_W},
+    step = ${POCKET_STEP},
   },
   -- The fire's light on the panel under the band, with the fire on the
   -- middle of its top edge.

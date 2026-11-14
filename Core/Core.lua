@@ -267,7 +267,8 @@ local function pocketView(self)
   for id, work in pairs(self.working) do
     if work.ends > now then doing.working[id] = work.kind end
   end
-  return ns.Camp.pocket(rows, self.log:since(now - ns.Camp.RECENT), now, doing)
+  return ns.Camp.pocket(rows, self.log:since(now - ns.Camp.RECENT), now, doing,
+    self:setting("pocketCampColumns"))
 end
 
 -- How long the Pocket Camp shows a Member fishing after a catch, or at a
@@ -770,9 +771,11 @@ function Core:camp(columns)
 end
 
 -- The Pocket Camp: the small Camp kept on screen, or nil outside a Crew
--- and while the Pocket Camp or the Camp setting is off. Always
--- Core.CAMP_LAYOUT.pocketColumns art pixels wide and pocketRows high:
--- { columns, rows, actors, more, moreText, tooltip, opacity, locked,
+-- and while the Pocket Camp or the Camp setting is off. pocketRows art
+-- pixels high (Core.CAMP_LAYOUT), and as wide as the online Members need:
+-- from pocketColumns, in steps of pocketStep, up to its max width
+-- (maxColumns, the pocketCampColumns setting).
+-- { columns, rows, maxColumns, actors, more, moreText, tooltip, opacity, locked,
 -- hideInCombat, position }. actors are the online Members only, you
 -- first, as many as fit, each as in camp() plus pose ("seated",
 -- "adventuring": the Character being played is in an instance,
@@ -800,6 +803,7 @@ function Core:pocketCamp()
   view.hideInCombat = self:setting("pocketCampCombat")
   view.position = self:setting("pocketCampPosition")
   view.scale = self:setting("pocketCampScale") / 100
+  view.maxColumns = self:setting("pocketCampColumns")
   view.tooltip.hint = view.locked and "Click to open BFF." or "Click to open BFF. Drag to move."
   return view
 end
@@ -1431,6 +1435,25 @@ Core.MAP_PIN_SIZES = {
 -- The Pocket Camp's scale limits, in percent of its usual size.
 Core.POCKET_CAMP_MIN_SCALE, Core.POCKET_CAMP_MAX_SCALE = 50, 300
 
+-- A Pocket Camp width in art pixels, the nearest of CAMP_LAYOUT's steps
+-- (Camp.pocketWidth), and how many seated figures fit at it
+-- (Camp.pocketSeats), for the grip to show while it's dragged.
+Core.pocketCampWidth = ns.Camp.pocketWidth
+Core.pocketCampSeats = ns.Camp.pocketSeats
+
+-- How wide the Pocket Camp can grow, saved as one of its widths
+-- (Camp.pocketWidth); nil at its usual width, the default.
+local function pocketWidth(field)
+  return {
+    read = function(db) return ns.Camp.pocketWidth(db[field]) end,
+    write = function(db, value)
+      value = ns.Camp.pocketWidth(value)
+      if value == ns.Camp.LAYOUT.pocketColumns then value = nil end
+      db[field] = value
+    end,
+  }
+end
+
 local SHARING = "Sharing"
 local NOTIFICATIONS = "Notifications and display"
 local TOASTS = "Toasts"
@@ -1535,6 +1558,11 @@ local SETTINGS = {
     key = "pocketCampScale", kind = "percent",
     saved = percent("pocketCampScale", 100, Core.POCKET_CAMP_MIN_SCALE, Core.POCKET_CAMP_MAX_SCALE),
   },
+  -- How wide the Pocket Camp can grow, in art pixels: it widens to fit the
+  -- online Members up to this, one of CAMP_LAYOUT's steps from
+  -- pocketColumns (the usual width, the default) to pocketMaxColumns.
+  -- Dragged sideways with its corner grip, not on the page.
+  { key = "pocketCampColumns", kind = "columns", saved = pocketWidth("pocketCampColumns") },
   -- The Together tab's Show menu (together().show), saved in db.together.
   { key = "togetherOffline", kind = "toggle", saved = offFlag("offlineOff", "together") },
   { key = "togetherAlts", kind = "toggle", saved = onFlag("alts", "together") },
@@ -1717,6 +1745,13 @@ end
 -- back to 1.
 function Core:setPocketCampScale(scale)
   self:setSetting("pocketCampScale", scale and scale * 100 or nil)
+end
+
+-- How wide the Pocket Camp can grow, in art pixels: snapped to one of
+-- CAMP_LAYOUT's steps between pocketColumns and pocketMaxColumns. Nil
+-- goes back to pocketColumns, its usual width.
+function Core:setPocketCampColumns(columns)
+  self:setSetting("pocketCampColumns", columns)
 end
 
 -- The panel's size and position as the player left it, by its top left
