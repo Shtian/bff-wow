@@ -223,8 +223,8 @@ end
 
 -- The actor whose figure the mouse is over, or nil.
 local function hovered()
-  local x = GetCursorPosition()
-  return frame.band:ActorAt(x / frame:GetEffectiveScale() - frame:GetLeft())
+  local x = cursor()
+  return frame.band:ActorAt(x - frame:GetLeft())
 end
 
 -- Whether the mouse is over the crate.

@@ -1367,7 +1367,8 @@ function Core:withdrawClaim(owner, id)
   return ok, reason
 end
 
--- How many Spare notices haven't been shown yet, for the sidebar.
+-- How many Spare notices haven't been shown yet, for the sidebar and the
+-- Pocket Camp's crate.
 function Core:unseenSpares()
   return self.spareLife:unseen()
 end

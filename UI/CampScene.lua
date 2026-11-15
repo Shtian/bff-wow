@@ -57,8 +57,9 @@ local ROW = {
 }
 -- The Pocket Camp's crate (unseen Spare notices) stands in front of the
 -- fire's right half, its left edge this far from the fire's centre. Its 8
--- columns stay clear of the first seat on the right (LAYOUT.fire - 1) and
--- of a doorway there (LAYOUT.fire - LAYOUT.doorway).
+-- columns stay clear of the first figure's seat on the right (at
+-- LAYOUT.fire + OFFSET.seat) and of a doorway there (LAYOUT.fire -
+-- LAYOUT.doorway).
 local CRATE_X = -1
 -- Each sprite's x from its actor's (or grave's) left edge. A spark sits
 -- by a seated figure's head, or on a sleeper's blanket, so even the short
