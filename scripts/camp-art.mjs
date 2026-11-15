@@ -113,7 +113,7 @@ const INN_SIGN = [
 ];
 // A quest handed in: the gold question mark, over the head.
 const QUEST = outlined([".GGG.", "GYYGG", "G..GG", "...GG", "..GG.", "..GG.", ".....", "..GG.", "..GG."]);
-// A Member on an Alt: a small blue gem by the head, on the side away
+// A Member on an Alt: a small blue gem by the face, on the side away
 // from the fire, outlined.
 const ALT = outlined([".F.", "FFf", ".f."]);
 // "AFK" over an away figure's head, in 3 by 5 letters, outlined.

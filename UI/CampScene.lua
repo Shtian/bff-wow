@@ -112,11 +112,13 @@ local SLEEP_STEP = 4
 -- the figure's 12, so half a pixel left of centre) and the row over the
 -- head; it bobs a row every AWAY.every ticks.
 local AWAY = { x = -1, row = 1, every = 6 }
--- A Member on an Alt: a gem by the head, on the side away from the fire
+-- A Member on an Alt: a gem by the face, on the side away from the fire
 -- (where no pose's sprite faces), x from the figure's left edge left of
--- the fire, and its bottom row from the figure's. It sits beside the head
--- of a seated and a standing figure alike, under a raised hand.
-local ALT = { x = -2, row = 6 }
+-- the fire, and its bottom row from the figure's. It sits beside the face
+-- of a seated and a standing figure alike, under a raised hand and the
+-- spark. A sleeper's is by the head on its pillow, which is always on
+-- the left: x from the bedroll's left edge, row from its bottom.
+local ALT = { x = -2, row = 4, asleepX = -2, asleepRow = 1 }
 local SPARK_ROW = { seated = 13, asleep = 4 }
 -- The name's gap above a figure's head, in art rows.
 local LABEL_GAP = 1
@@ -372,13 +374,18 @@ local function drawAnimations(scene, parts, actor, f, row, top, away)
   return marked
 end
 
--- Shows a Member on an Alt's gem (ALT) by the head of a figure whose
--- bottom row is `row`, on its side away from the fire.
+-- Shows a Member on an Alt's gem (ALT) by the face of an upright figure
+-- whose bottom row is `row`, on its side away from the fire, or by a
+-- sleeper's head.
 local function drawAlt(scene, parts, actor, row)
-  local x = ALT.x
-  if actor.x > 0 then x = LAYOUT.seated - x - Sheet.sprites.alt[3] end
+  local x, up = ALT.x, ALT.row
+  if actor.pose == "asleep" then
+    x, up = ALT.asleepX, ALT.asleepRow
+  elseif actor.x > 0 then
+    x = LAYOUT.seated - x - Sheet.sprites.alt[3]
+  end
   setSprite(parts.alt, "alt", scene.unit)
-  put(scene, parts.alt, actor.x + x, row + ALT.row)
+  put(scene, parts.alt, actor.x + x, row + up)
 end
 
 -- Shows one of a pose's sprites (POSE) on a texture, for a figure whose
@@ -519,6 +526,7 @@ local function drawActor(scene, parts, actor, f)
       end
     end
     top = bed + SLEEP[3].row + Sheet.sprites.sleep3[4]
+    if actor.onAlt then drawAlt(scene, parts, actor, ROW.asleep) end
   end
   tint(parts.cloth, actor.classFilename)
 

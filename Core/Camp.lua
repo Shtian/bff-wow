@@ -446,9 +446,8 @@ end
 -- (true if that's a raid), status (the pose in words) and row (the
 -- Member's Roster row, for the tooltip over the figure), and onAlt (true
 -- while the Character shown isn't their Main; the tooltip line says "on
--- alt" too). A flying figure
--- takes its griffin's room. Members that didn't fit are counted in more
--- ("+2"). group (Member id to true: Camp.grouped) are in your party or
+-- alt" too). A flying figure takes its griffin's room. Members that
+-- didn't fit are counted in more ("+2"). group (Member id to true: Camp.grouped) are in your party or
 -- raid: they sit right after you, marked group. Members adventuring in
 -- the same instance sit side by side, in a doorway they share (doorways,
 -- and each one's doorway: see doorways()). Outside an instance, you and
