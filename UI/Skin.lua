@@ -716,12 +716,14 @@ end
 -- The switch for an on/off setting: a pill-shaped track with a round knob,
 -- the knob at the right on an ember track while on, at the left on a
 -- dimmed grey one while off. Embers are Ember Gold Deep, the spark's arms.
+-- The on knob is the dark Header Plate: Firelight Cream on the ember was
+-- too close in lightness to read.
 Skin.SWITCH_ON = Skin.EMBER_DEEP
 Skin.SWITCH_OFF = Skin.OFFLINE
-Skin.SWITCH_KNOB_ON = Skin.WARM
+Skin.SWITCH_KNOB_ON = Skin.HEADER
 Skin.SWITCH_KNOB_OFF = Skin.MUTED
 local SWITCH_WIDTH, SWITCH_HEIGHT = 28, 16
-local KNOB, KNOB_INSET = 12, 2
+local KNOB, KNOB_INSET = 14, 1
 -- How long the knob takes to slide across, in seconds.
 local SWITCH_SLIDE = 0.12
 
