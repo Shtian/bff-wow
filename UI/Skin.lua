@@ -713,6 +713,84 @@ function Skin.checkbox(parent, text, onClick)
   return check
 end
 
+-- The switch for an on/off setting: a pill-shaped track with a round knob,
+-- the knob at the right on an ember track while on, at the left on a
+-- dimmed grey one while off. Embers are Ember Gold Deep, the spark's arms.
+Skin.SWITCH_ON = Skin.EMBER_DEEP
+Skin.SWITCH_OFF = Skin.OFFLINE
+Skin.SWITCH_KNOB_ON = Skin.WARM
+Skin.SWITCH_KNOB_OFF = Skin.MUTED
+local SWITCH_WIDTH, SWITCH_HEIGHT = 28, 16
+local KNOB, KNOB_INSET = 12, 2
+-- How long the knob takes to slide across, in seconds.
+local SWITCH_SLIDE = 0.12
+
+-- A switch (Skin.SWITCH_*), drawn by :SetOn(on, slide), sliding the knob
+-- across when slide is true; setting the state it already has does
+-- nothing, so a redraw doesn't cut a slide short. :SetEnabled fades it.
+-- It takes no clicks: the caller makes its row clickable.
+function Skin.switch(parent)
+  local switch = CreateFrame("Frame", nil, parent)
+  switch:SetSize(SWITCH_WIDTH, SWITCH_HEIGHT)
+  local track = {}
+  local function part()
+    local texture = switch:CreateTexture(nil, "ARTWORK")
+    texture:SetColorTexture(1, 1, 1, 1)
+    track[#track + 1] = texture
+    return texture
+  end
+  -- Textures have no corner radius: two round ends and a middle.
+  for _, side in ipairs({ "LEFT", "RIGHT" }) do
+    local cap = part()
+    cap:SetSize(SWITCH_HEIGHT, SWITCH_HEIGHT)
+    cap:SetPoint(side)
+    Skin.round(switch, cap)
+  end
+  local middle = part()
+  middle:SetPoint("TOPLEFT", SWITCH_HEIGHT / 2, 0)
+  middle:SetPoint("BOTTOMRIGHT", -SWITCH_HEIGHT / 2, 0)
+  local knob = switch:CreateTexture(nil, "OVERLAY")
+  knob:SetColorTexture(1, 1, 1, 1)
+  knob:SetSize(KNOB, KNOB)
+  Skin.round(switch, knob)
+
+  local travel = SWITCH_WIDTH - KNOB - 2 * KNOB_INSET
+  local function place(share)
+    knob:ClearAllPoints()
+    knob:SetPoint("LEFT", KNOB_INSET + travel * share, 0)
+  end
+  local function slide(self, elapsed)
+    self.share = self.on and math.min(1, self.share + elapsed / SWITCH_SLIDE)
+      or math.max(0, self.share - elapsed / SWITCH_SLIDE)
+    place(self.share)
+    if self.share == (self.on and 1 or 0) then self:SetScript("OnUpdate", nil) end
+  end
+
+  function switch:SetOn(on, animate)
+    on = on and true or false
+    if self.on == on then return end
+    self.on = on
+    local color = on and Skin.SWITCH_ON or Skin.SWITCH_OFF
+    for _, texture in ipairs(track) do Skin.color(texture, color) end
+    Skin.color(knob, on and Skin.SWITCH_KNOB_ON or Skin.SWITCH_KNOB_OFF)
+    if animate and self:IsVisible() then
+      self:SetScript("OnUpdate", slide)
+    else
+      self:SetScript("OnUpdate", nil)
+      self.share = on and 1 or 0
+      place(self.share)
+    end
+  end
+
+  function switch:SetEnabled(enabled)
+    self:SetAlpha(enabled and 1 or 0.4)
+  end
+
+  switch.share = 0
+  switch:SetOn(false)
+  return switch
+end
+
 -- A single-line text box on a dark plate.
 function Skin.editBox(parent, width)
   local box = CreateFrame("EditBox", nil, parent)

@@ -213,7 +213,7 @@ BFF has its own flat skin. It deliberately rejects Blizzard's parchment, stone f
 A night palette: one warm accent glowing against cool, slightly violet near-blacks, plus small semantic colours for kinds of news.
 
 ### Primary
-- **Ember Gold** (ember-gold): window titles; news text (the Feed's max level, joined and goal entries, toasts for them, While you were away's goal lines and "joined" tag); a goal bar once complete; "can play"; the primary button; unseen-count badges; a New Feed entry's unread dot; checkbox ticks; and the Play times heatmap, where it's a scale rather than news. On brand surfaces it's the solid title colour and the numerals of a how-to; **Ember Gold Deep** (ember-gold-deep) is the gold half of the braid divider.
+- **Ember Gold** (ember-gold): window titles; news text (the Feed's max level, joined and goal entries, toasts for them, While you were away's goal lines and "joined" tag); a goal bar once complete; "can play"; the primary button; unseen-count badges; a New Feed entry's unread dot; checkbox ticks; and the Play times heatmap, where it's a scale rather than news. On brand surfaces it's the solid title colour and the numerals of a how-to; **Ember Gold Deep** (ember-gold-deep) is the gold half of the braid divider. In the game it's the spark's arms and an on switch's track, an ember rather than news.
 
 ### Secondary
 - **Brand Teal** (brand-teal): the icon's second ring. On brand surfaces: the teal half of the braid divider and of a frame's top line, and a faint light on slides without scenery. In the addon it appears only inside the icon itself (the minimap button and the game's addon list), never as a UI colour.
@@ -346,7 +346,9 @@ A trophy for a Crew goal rung reached, on the Trophies tab: the track's icon (a 
 
 ### Inputs / Fields
 - **Edit box:** 24px high, black at 35% with a 1px Border, 8px text inset.
-- **Checkbox:** a 14px square at 4% white with a 25% white border, an Ember Gold tick inset 3px, and a Small Smoke Muted label clickable to its right.
+- **Checkbox:** a 14px square at 4% white with a 25% white border, an Ember Gold tick inset 3px, and a Small Smoke Muted label clickable to its right. For choices in a menu (the Dungeons tab's Show).
+- **Switch:** every on/off setting on the Settings view (`Skin.switch`). A 28×16 pill (two round ends and a middle, since textures have no radius) with a 12px round knob inset 2px: on, the knob sits right in Firelight Cream on an Ember Gold Deep track, an ember rather than news; off, left in Smoke Muted on an Offline Grey track. The knob slides across in 0.12s when clicked. Disabled, the whole switch is at 40% and its label Dusk Dim. It sits at the right of a settings row whose whole width is clickable, with the hover wash.
+- **Settings row:** a Text label in Ash Text on the left, wrapping in a narrow window, its control at the right 12px in, at least 34px high, split from the row above by a Hairline. Other controls: a segmented control (cells of Small text in a 1px Border, the chosen one on a 9% cream chip in Ash Text), small buttons, and a flat slider (a 4px Bar Track, Bar Fill up to a 6×14 Ash Text thumb, its percentage in Small Smoke Muted).
 
 ### Navigation
 - **Version label:** the addon's version under Settings, Tiny Dusk Dim on an 18px row with the tabs' chips (Ash Text on the selected chip). It opens What's new.

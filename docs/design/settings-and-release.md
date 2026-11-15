@@ -6,9 +6,9 @@ Answers [What's in the settings panel, and how are releases cut?](https://github
 
 ### Where they live
 
-One page in the game's native Settings panel (Esc → Options → AddOns → **BFF**), built with the Settings API (no AceConfig, per #9). It opens from:
+A **Settings** view inside the BFF panel, drawn by `UI/SettingsTab.lua` in the panel's own flat look (no AceConfig, per #9, and no longer a page in the game's Settings panel). It scrolls inside the panel like the other tabs. It opens from:
 
-- Settings in the panel's sidebar,
+- Settings at the foot of the panel's sidebar, which marks it with the selected chip,
 - **Settings** in the minimap button's right-click menu (#7),
 - `/bff settings`.
 
@@ -26,15 +26,16 @@ One page in the game's native Settings panel (Esc → Options → AddOns → **B
 | | Show the Camp | on | #127, `docs/design/camp.md` |
 | | Show your Crew on the world map | on | `docs/design/code-structure.md` (`mapPins()`, Where) |
 | | Map pin size: Small, Medium or Large (greyed out while the map pins are off) | Medium | `docs/design/code-structure.md` (`mapPins()`) |
+| | BFF window size and position, with a Reset button | | #109 |
 | **Toasts** | Show toasts for live events | on | `docs/design/toasts.md` |
 | | Sound, with a Play button | Friend online | `docs/design/toasts.md` |
-| | Move toasts button | | `docs/design/toasts.md` |
+| | Where toasts appear, with a Move button | | `docs/design/toasts.md` |
 | **Pocket Camp** | Show the Pocket Camp | off | #161, `docs/design/pocket-camp.md` |
 | | Backdrop opacity, a slider from 0% to 100% | 60% | `docs/design/pocket-camp.md` |
 | | Lock its position and size | off | `docs/design/pocket-camp.md` |
 | | Hide in combat | off | `docs/design/pocket-camp.md` |
 
-Not in a Crew: the Crew code and Leave Crew are hidden, and the panel's setup view handles joining.
+Not in a Crew: the Crew code and Leave Crew are hidden, Appear offline is greyed out, and the panel's setup view handles joining. The panel has no sidebar there, so Settings (from the minimap menu or `/bff settings`) takes the window's full width with a **Back** button on top to the setup view, and the panel comes back to setup next time it opens.
 
 The **key binding** to open the panel goes in the game's own Key Bindings screen under a "BFF" header (`Bindings.xml`), not on this page.
 
@@ -80,13 +81,13 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `togetherRaids` | `raids = true` inside `together`, or nil while off |
   | `catchesNames` | `names = true` inside `catches`, or nil while off |
 
-- **Core's interface:** `setting(key)`, `setSetting(key, value)` and `settings()` (the page's sections). The named methods (`isPaused()`, `setToasts(on)` and the rest) stay as hand-written one-line wrappers, so they're greppable.
+- **Core's interface:** `setting(key)`, `setSetting(key, value)` and `settings()` (the page's sections). A setting set by a button (`panelPlace`, `toastPosition`) also carries `button`, the button's text (Reset, Move), beside its label. The named methods (`isPaused()`, `setToasts(on)` and the rest) stay as hand-written one-line wrappers, so they're greppable.
 - **Events:** a real change fires `settingChanged(key, value)`, not `changed`; setting a value it already has fires nothing. Core's own reactions run first (Pause sharing pauses Gossip).
-- **The page:** its content scrolls (the game's scroll frame inside the canvas), since the sections are taller than the Settings panel. A section header per section and a checkbox per on/off setting, built in a loop from `settings()`, so a new on/off setting needs only a list entry. Settings with no section, the Dungeons tab's Show menu choices (`docs/design/together.md`) and the Catches tab's names checkbox (`docs/design/catches.md`), aren't on the page; those menus show them; nor are `pocketCampPosition`, `pocketCampScale` and `pocketCampColumns`, which dragging the Pocket Camp and its corner grip set. The sound picker (with Play), Move toasts, Reset BFF window and the percentage slider are drawn by hand but read and write through `setting()` and `setSetting()`. Leave Crew sits under Appear offline.
+- **The page:** the panel's Settings view, in a scroll view of the panel's. A section label per section (You first, drawn by hand, then one per section of `settings()`), and under it a row per setting split by Hairlines: the label on the left, wrapping in a narrow window, and the control at the right. Every on/off setting is a **switch** (DESIGN.md, Inputs), and its whole row is clickable; the rows are built in a loop from `settings()`, so a new on/off setting needs only a list entry. Settings with no section, the Dungeons tab's Show menu choices (`docs/design/together.md`) and the Catches tab's names checkbox (`docs/design/catches.md`), aren't on the page; those menus show them; nor are `pocketCampPosition`, `pocketCampScale` and `pocketCampColumns`, which dragging the Pocket Camp and its corner grip set. Map pin size is a segmented control (the chosen one on a chip), the sound a picker opening a menu with Play beside it, Move toasts and Reset BFF window small buttons, and the backdrop opacity a flat slider with its value; all read and write through `setting()` and `setSetting()`. A control greys out while what it needs is off. Leave Crew sits under Appear offline. Any `settingChanged` redraws the view while it's open.
 
 Display name isn't in the list: it's part of your Member record and spreads to the Crew.
 
-The panel's size and position (`panelPlace`, #109) is saved through Core, not the game's window-layout cache, which is applied before the panel is created. `setPanelPlace(width, height, left, top)` saves where a move or resize left it, `resetPanelPlace()` goes back to the default, and `panelPlace(screenWidth, screenHeight)` says where it opens on this screen: shrunk to fit and moved onto it, with nil `left` and `top` for centred. The grip in the panel's bottom right corner resizes it (double-click resets), and the Settings page has Reset BFF window under Notifications and display, greyed out while the panel is at its default.
+The panel's size and position (`panelPlace`, #109) is saved through Core, not the game's window-layout cache, which is applied before the panel is created. `setPanelPlace(width, height, left, top)` saves where a move or resize left it, `resetPanelPlace()` goes back to the default, and `panelPlace(screenWidth, screenHeight)` says where it opens on this screen: shrunk to fit and moved onto it, with nil `left` and `top` for centred. The grip in the panel's bottom right corner resizes it (double-click resets), and the Settings page has its Reset under Notifications and display, greyed out while the panel is at its default.
 
 Answered **Tips** (`docs/design/pocket-camp.md`) are saved beside the settings, as `tipsAnswered = { [key] = true }`, account-wide, and those already offered in a window as `tipsOffered`. There is no control to show them again.
 

@@ -47,7 +47,7 @@ end
 local function showMenu(owner)
   MenuUtil.CreateContextMenu(owner, function(_, root)
     root:CreateTitle("BFF")
-    root:CreateButton("Settings", ns.Settings.open)
+    root:CreateButton("Settings", function() ns.Panel.show("settings") end)
     local pause = root:CreateCheckbox("Appear offline", function() return core:isPaused() end,
       function() core:setPaused(not core:isPaused()) end)
     pause:SetEnabled(core:crew() ~= nil)

@@ -30,7 +30,7 @@ Two independent settings, both on by default. Core fires `feedEntry` when **eith
 
 ## Placement
 
-**Move toasts** in Settings closes the Settings panel and shows a sample toast to drag, with **Done** and **Reset** on the side toasts stack towards, so they always have room (Escape closes it too). The position is saved when you drop it: the centre of the first toast, as x and y from the bottom left of the screen. Until it's moved, toasts sit 160 px below the top centre.
+**Move** (Where toasts appear) in Settings hides the BFF panel and shows a sample toast to drag, with **Done** and **Reset** on the side toasts stack towards, so they always have room (Escape closes it too). The position is saved when you drop it: the centre of the first toast, as x and y from the bottom left of the screen. Until it's moved, toasts sit 160 px below the top centre. Once it's closed the panel opens again on Settings.
 
 ## Settings
 

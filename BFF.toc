@@ -61,12 +61,12 @@ UI/TogetherTab.lua
 UI/CatchesTab.lua
 UI/GoalsTab.lua
 UI/WhatsNewTab.lua
+UI/SettingsTab.lua
 UI/Minimap.lua
 UI/MapPins.lua
 UI/Away.lua
 UI/ToastQueue.lua
 UI/Toasts.lua
-UI/Settings.lua
 UI/Report.lua
 UI/Contact.lua
 
