@@ -1,7 +1,8 @@
 -- PocketCamp: the small on-screen Camp you can keep up while playing. It
 -- draws Core's pocketCamp() with a CampScene band of its own: the fire and
 -- the online Members, each doing what Core says they're doing, over a
--- soft-edged backdrop of the opacity Core gives. It shows no names: the mouse over a figure
+-- soft-edged backdrop of the opacity Core gives, and for a while those who
+-- just went offline, asleep in a bedroll. It shows no names: the mouse over a figure
 -- shows that Member's Roster tooltip, and over the fire who is doing what.
 -- A click toggles the panel (not in combat), a drag moves it unless Core
 -- says it's locked, and where it's dropped is saved through Core. It's as
@@ -224,14 +225,16 @@ local function hovered()
   return frame.band:ActorAt(x / frame:GetEffectiveScale() - frame:GetLeft())
 end
 
--- Over a figure, that Member's tooltip as the Roster shows it; anywhere
--- else, who is doing what.
+-- Over a figure, that Member's tooltip as the Roster shows it; over a
+-- bedroll, who is asleep and since when; anywhere else, who is doing what.
 local function showTooltip()
   if not view then return end
   local actor = hovered()
   tooltipFor = actor and actor.memberId or false
   GameTooltip:SetOwner(frame, "ANCHOR_TOP")
-  if actor then
+  if actor and actor.pose == "asleep" then
+    GameTooltip:AddLine(("%s: %s"):format(actor.label, actor.status), 1, 1, 1)
+  elseif actor then
     ns.Panel.characterTooltip(actor.row, actor.row)
   else
     GameTooltip:AddLine(view.tooltip.title)

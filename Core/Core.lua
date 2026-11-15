@@ -116,6 +116,13 @@ local function sendMessage(self, message, to)
   self.link.send(encoded, to)
 end
 
+-- The ids of the Members whose records are held, as a set.
+local function knownMembers(ledger)
+  local known = {}
+  for id in ledger:records() do known[id] = true end
+  return known
+end
+
 -- deps: db, now(), random(), link (with send(string, to): to everyone, or
 -- only the Character named to), listener(event, ...),
 -- initialLogin, maxLevel, utcOffset (seconds local time is ahead of server
@@ -162,6 +169,13 @@ function Core.new(deps)
     -- Who it shows at a profession: Member id to { kind ("crafting" or
     -- "gathering"), ends }. In memory only too.
     working = {},
+    -- Who it shows asleep in a bedroll: Member id to when this client saw
+    -- them go offline. In memory only too.
+    bedrolls = {},
+    -- When Gossip's link came up (updateLink), kept through a short break,
+    -- and when it went down, nil while it's up.
+    upSince = nil,
+    downSince = nil,
     -- What each Member is doing right now (Doing).
     doings = ns.Doing.new(deps.now),
   }, Core)
@@ -205,6 +219,9 @@ function Core.new(deps)
   -- The own record's Play times may be out of date until the first tick.
   self.playTimesDue = true
   self.online = ns.Roster.online(self.ledger, deps.now())
+  -- The Members held at the last check, so one first seen online isn't
+  -- taken for one coming online.
+  self.known = knownMembers(self.ledger)
   -- What changed in BFF since you last looked (self.changes, since
   -- whatsNew() is the method). Its version goes into the own record so
   -- friends can tell who's behind.
@@ -212,10 +229,40 @@ function Core.new(deps)
   return self
 end
 
+-- Everyone online sends a DIGEST about once a minute, so by this long
+-- after your link came up (a login, a /reload, the end of a long lockdown)
+-- all of them have been heard: one first heard sooner may have been online
+-- all along, and doesn't walk into the Pocket Camp.
+local HEAR_ALL_WITHIN = 2 * 60
+-- With your link down this long, Members who never left may time out
+-- (Roster.ONLINE_FOR) for want of being heard. A shorter break (a fight's
+-- lockdown) leaves who's online as it was.
+local DEAF_AFTER = ns.Roster.ONLINE_FOR - HEAR_ALL_WITHIN
+
+-- Whether your link has been down so long that who's online can't be
+-- trusted: going offline then may only be not being heard.
+local function deaf(self, now)
+  return self.upSince == nil or (self.downSince ~= nil and now - self.downSince >= DEAF_AFTER)
+end
+
+-- Whether your link has been up long enough to have heard everyone
+-- online, so one heard coming online now has.
+local function hearsEveryone(self, now)
+  return self.upSince ~= nil and self.downSince == nil and now - self.upSince >= HEAR_ALL_WITHIN
+end
+
 -- Gossip's link is up only while in a Crew. Settling after login starts
--- once it is, and starts over if it goes down first.
+-- once it is, and starts over if it goes down first. When it came up
+-- holds through a break shorter than DEAF_AFTER.
 local function updateLink(self)
   local up = self.linkUp and self.db.crew ~= nil
+  local now = self.now()
+  if up then
+    if not self.upSince or deaf(self, now) then self.upSince = now end
+    self.downSince = nil
+  elseif self.upSince then
+    self.downSince = self.downSince or now
+  end
   if up then self.log:linkUp() else self.log:linkDown() end
   if up then self.crewGoals:linkUp() else self.crewGoals:linkDown() end
   self.gossip:setLink(up)
@@ -252,6 +299,10 @@ local function pocketCampOn(self)
   return self.db.crew ~= nil and self:setting("camp") and self:setting("pocketCamp")
 end
 
+-- How long the Pocket Camp keeps a Member who went offline, asleep in a
+-- bedroll, from when this client saw them go.
+local BEDROLL_FOR = 10 * 60
+
 -- The Pocket Camp as Camp.pocket gives it.
 local function pocketView(self)
   local now = self.now()
@@ -267,7 +318,11 @@ local function pocketView(self)
   for id, work in pairs(self.working) do
     if work.ends > now then doing.working[id] = work.kind end
   end
-  return ns.Camp.pocket(rows, self.log:since(now - ns.Camp.RECENT), now, doing,
+  local bedrolls = {}
+  for id, since in pairs(self.bedrolls) do
+    if now - since < BEDROLL_FOR then bedrolls[id] = since end
+  end
+  return ns.Camp.pocket(rows, self.log:since(now - ns.Camp.RECENT), now, doing, bedrolls,
     self:setting("pocketCampColumns"))
 end
 
@@ -287,8 +342,8 @@ local function startWorking(self, id, kind)
   if kind then self.working[id] = { kind = kind, ends = self.now() + SPELL_FOR } end
 end
 
--- Drops the spells of fishing and of a profession that are over. Returns
--- true if any ended.
+-- Drops the spells of fishing and of a profession that are over, and the
+-- bedrolls that are. Returns true if any ended.
 local function spellsEnded(self)
   local now, ended = self.now(), false
   for id, ends in pairs(self.fishing) do
@@ -303,18 +358,24 @@ local function spellsEnded(self)
       ended = true
     end
   end
+  for id, since in pairs(self.bedrolls) do
+    if now - since >= BEDROLL_FOR then
+      self.bedrolls[id] = nil
+      ended = true
+    end
+  end
   return ended
 end
 
 -- The Feed kinds the Pocket Camp plays a one-off animation for.
 local ANIMATED = { ding = true, maxLevel = true, death = true, rareFind = true, goal = true }
 
--- The Pocket Camp, while it shows the Member by its fire, plays the
--- animation of this kind on their figure.
+-- The Pocket Camp, while it shows the Member by its fire (not asleep),
+-- plays the animation of this kind on their figure.
 local function animateMember(self, kind, memberId)
   if not pocketCampOn(self) then return end
   for _, actor in ipairs(pocketView(self).actors) do
-    if actor.memberId == memberId then
+    if actor.memberId == memberId and actor.pose ~= "asleep" then
       self.listener("pocketCampAnimation", { kind = kind, memberId = memberId })
     end
   end
@@ -776,7 +837,7 @@ end
 -- from pocketColumns, in steps of pocketStep, up to its max width
 -- (maxColumns, the pocketCampColumns setting).
 -- { columns, rows, maxColumns, actors, more, moreText, tooltip, opacity, locked,
--- hideInCombat, position }. actors are the online Members only, you
+-- hideInCombat, position }. actors are the online Members, you
 -- first, as many as fit, each as in camp() plus pose ("seated",
 -- "adventuring": the Character being played is in an instance,
 -- "fishing": for a minute after their catches were seen to grow, or yours
@@ -786,8 +847,11 @@ end
 -- (its name, while in one), raid (true if it's a raid) and status (the
 -- pose in words: "by the fire", "in The Deadmines", "at a vendor"). A
 -- flying figure's griffin reaches CAMP_LAYOUT.griffinFore past it towards
--- the fire and griffinAft away from it. No sleepers, graves or tent; more
--- counts the online Members that didn't fit ("+2"). tooltip is
+-- the fire and griffinAft away from it. Then, in what room the online
+-- Members leave, those seen going offline in the last 10 minutes: pose
+-- "asleep", status "asleep · 4m" (just "asleep" under a minute), never
+-- counted in more and never making it wider. No other sleepers, graves or
+-- tent; more counts the online Members that didn't fit ("+2"). tooltip is
 -- { title, lines ("Bob: in The Deadmines", one per actor), hint }. The
 -- rest is how UI shows it: opacity (the backdrop's, 0 to 1), locked (it
 -- can't be dragged), hideInCombat and position ({ x, y }: its bottom left
@@ -821,24 +885,42 @@ function Core:summary()
   return summary
 end
 
--- Whether someone went online or offline since last checked.
+-- Whether someone went online or offline since last checked. One who
+-- went offline (not by leaving the Crew) sleeps in the Pocket Camp's
+-- bedroll for a while; one held before who came online loses it, and
+-- walks in (pocketCampAnimation "arrive") once sync has settled and your
+-- link has been up long enough to hear everyone (hearsEveryone). After
+-- your link has been down a long while (deaf), one who goes offline may
+-- only not have been heard: no bedroll.
 local function onlineChanged(self)
-  local online = ns.Roster.online(self.ledger, self.now())
+  local now = self.now()
+  local online = ns.Roster.online(self.ledger, now)
   local differs = false
+  local arrived = {}
   for id in pairs(online) do
     if not self.online[id] then
       differs = true
       -- They haven't heard what you're doing.
       if id ~= self.ledger:memberId() then self.doings:newcomer() end
+      self.bedrolls[id] = nil
+      if self.known[id] then arrived[#arrived + 1] = id end
     end
   end
   for id in pairs(self.online) do
     if not online[id] then
       differs = true
       self.doings:forget(id)
+      local record = self.ledger:record(id)
+      if not deaf(self, now) and record and not record.left then
+        self.bedrolls[id] = now
+      end
     end
   end
   self.online = online
+  self.known = knownMembers(self.ledger)
+  if self.log:isSettled() and hearsEveryone(self, now) then
+    for _, id in ipairs(arrived) do animateMember(self, "arrive", id) end
+  end
   return differs
 end
 
@@ -1937,6 +2019,7 @@ function Core:removeMember(id)
   self.online[id] = nil
   self.fishing[id] = nil
   self.working[id] = nil
+  self.bedrolls[id] = nil
   self.doings:forget(id)
   checkGoals(self, true)
   self.listener("changed")
@@ -1982,6 +2065,7 @@ local function finishLeaving(self)
   self.online = {}
   self.fishing = {}
   self.working = {}
+  self.bedrolls = {}
   self.doings:clear()
   self.listener("crewChanged")
   self.listener("notice", "leftCrew")

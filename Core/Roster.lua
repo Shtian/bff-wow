@@ -10,6 +10,7 @@ ns.Roster = Roster
 -- A Member is online if heard within this long and not seen leaving the
 -- channel since.
 local ONLINE_FOR = 12 * 60
+Roster.ONLINE_FOR = ONLINE_FOR
 -- Characters unseen this long are hidden; display only.
 local HIDE_AFTER = 30 * 24 * 60 * 60
 Roster.HIDE_AFTER = HIDE_AFTER
