@@ -225,8 +225,9 @@ local function hovered()
   return frame.band:ActorAt(x / frame:GetEffectiveScale() - frame:GetLeft())
 end
 
--- Over a figure, that Member's tooltip as the Roster shows it; over a
--- bedroll, who is asleep and since when; anywhere else, who is doing what.
+-- Over a figure, that Member's tooltip as the Roster shows it, and "In
+-- your group" when they are; over a bedroll, who is asleep and since when;
+-- anywhere else, who is doing what.
 local function showTooltip()
   if not view then return end
   local actor = hovered()
@@ -236,6 +237,7 @@ local function showTooltip()
     GameTooltip:AddLine(("%s: %s"):format(actor.label, actor.status), 1, 1, 1)
   elseif actor then
     ns.Panel.characterTooltip(actor.row, actor.row)
+    if actor.group then GameTooltip:AddLine("In your group", 1, 1, 1) end
   else
     GameTooltip:AddLine(view.tooltip.title)
     for _, line in ipairs(view.tooltip.lines) do GameTooltip:AddLine(line, 1, 1, 1) end

@@ -25,7 +25,8 @@ local DAY = 24 * 60 * 60
 -- Pocket Camp is `pocketRows` high and from `pocketColumns` (its usual
 -- width, three seats each side) to `pocketMaxColumns` wide, in steps of
 -- `pocketStep` (one more seat each side); a flying figure's griffin takes
--- `griffinFore` more towards the fire and `griffinAft` away from it.
+-- `griffinFore` more towards the fire and `griffinAft` away from it, and a
+-- doorway reaches `doorway` past the first and last figure standing in it.
 local LAYOUT = {
   fire = 9,
   seated = 12,
@@ -44,6 +45,7 @@ local LAYOUT = {
   pocketRows = 34,
   griffinFore = 8,
   griffinAft = 6,
+  doorway = 2,
 }
 Camp.LAYOUT = LAYOUT
 
@@ -153,9 +155,12 @@ end
 -- out sleepers and graves, but those in the set options.sleepers, which
 -- take the room the online Members leave and aren't counted in more if
 -- they don't fit; options.moreText words the count of who
--- didn't fit (default "+%d more"), and options.room(row) gives the room a
--- row's figure needs beyond itself: towards the fire, and away from it.
--- Returns { columns, actors, graves, tent, more }; see Core:camp().
+-- didn't fit (default "+%d more"), options.room(row) gives the room a
+-- row's figure needs beyond itself: towards the fire, and away from it,
+-- and options.together(row) a key that rows next to each other share when
+-- they should sit side by side: they're placed on one side if they fit
+-- there, else one by one, and split is then true.
+-- Returns { columns, actors, graves, tent, more, split }; see Core:camp().
 function Camp.view(rows, entries, now, columns, options)
   options = options or {}
   columns = math.max(1, math.floor(columns))
@@ -167,23 +172,58 @@ function Camp.view(rows, entries, now, columns, options)
 
   local view = { columns = columns, actors = {}, graves = {} }
   local more = 0
-  for _, row in ipairs(candidates(rows, options.onlineOnly, options.sleepers)) do
+  local list = candidates(rows, options.onlineOnly, options.sleepers)
+  local function keyOf(row)
+    return options.together and (row.own or row.online) and options.together(row) or nil
+  end
+  local function roomOf(row)
+    if options.room then return options.room(row) end
+  end
+  -- Rows that sit together, from the first of them: on the roomier side
+  -- if they all fit there, or the other. Where each went: row to { x, side }.
+  local placed = {}
+  local function placeTogether(first)
+    local key = keyOf(list[first])
+    local last = first
+    while key and list[last + 1] and keyOf(list[last + 1]) == key do last = last + 1 end
+    if last == first then return end
+    for _, tried in ipairs({ roomier(left, right) }) do
+      local copy = { sign = tried.sign, used = tried.used, limit = tried.limit }
+      local xs = {}
+      for j = first, last do
+        local fore, aft = roomOf(list[j])
+        xs[#xs + 1] = placeOn(copy, LAYOUT.seated, 0, fore, aft)
+      end
+      if #xs == last - first + 1 then
+        tried.used = copy.used
+        for j = first, last do placed[list[j]] = { x = xs[j - first + 1], side = tried } end
+        return
+      end
+    end
+    view.split = true
+  end
+  for index, row in ipairs(list) do
+    local key = keyOf(row)
+    if key and not placed[row] and (index == 1 or keyOf(list[index - 1]) ~= key) then placeTogether(index) end
     local seated = row.own or row.online
     local figure = seated and LAYOUT.seated or LAYOUT.asleep
     local own = not options.onlineOnly and graves[row.memberId] or {}
-    local fore, aft
-    if options.room then fore, aft = options.room(row) end
-    -- A slot that won't fit with its graves may fit without them.
-    local first, second = roomier(left, right)
+    local fore, aft = roomOf(row)
     local x, graveXs, side
-    for _, count in ipairs({ #own, 0 }) do
-      for _, tried in ipairs({ first, second }) do
-        if not x then
-          x, graveXs = placeOn(tried, figure, count, fore, aft)
-          side = x and tried
+    if placed[row] then
+      x, graveXs, side = placed[row].x, {}, placed[row].side
+    else
+      -- A slot that won't fit with its graves may fit without them.
+      local first, second = roomier(left, right)
+      for _, count in ipairs({ #own, 0 }) do
+        for _, tried in ipairs({ first, second }) do
+          if not x then
+            x, graveXs = placeOn(tried, figure, count, fore, aft)
+            side = x and tried
+          end
         end
+        if x then break end
       end
-      if x then break end
     end
     if x then
       view.actors[#view.actors + 1] = {
@@ -262,6 +302,102 @@ function Camp.pocketSeats(columns)
   return 2 * math.max(0, math.floor(room / (LAYOUT.seated + LAYOUT.gap)))
 end
 
+-- Which of Roster's rows (others') show a Character in your group:
+-- Member id to true. party is the game's group, { guid, name, lastName }
+-- per unit (Core:group()). A unit is matched by GUID, else by name
+-- ignoring case: the first name, and the last name too when both sides
+-- have one.
+function Camp.grouped(rows, party)
+  local found = {}
+  for _, row in ipairs(rows) do
+    if not row.own then
+      local name = row.name and row.name:lower()
+      local lastName = row.fullName and row.fullName ~= row.name and row.fullName:sub(#row.name + 2):lower() or nil
+      for _, unit in ipairs(party or {}) do
+        local match
+        if unit.guid and row.guid then
+          match = unit.guid == row.guid
+        else
+          match = unit.name ~= nil and unit.name:lower() == name
+            and (not unit.lastName or not lastName or unit.lastName:lower() == lastName)
+        end
+        if match then found[row.memberId] = true end
+      end
+    end
+  end
+  return found
+end
+
+-- The online rows (you first) in the Pocket Camp's order: you, your group
+-- (in Roster's order), then the rest; and any who are adventuring in the
+-- same instance are pulled up after the first of them, so they sit
+-- together. The others' rows follow as they were.
+local function together(rows, poses, group)
+  local online, offline = {}, {}
+  for _, row in ipairs(rows) do
+    if row.own or row.online then online[#online + 1] = row else offline[#offline + 1] = row end
+  end
+  local function rank(row)
+    if row.own then return 0 end
+    return group[row.memberId] and 1 or 2
+  end
+  local ranked = {}
+  for r = 0, 2 do
+    for _, row in ipairs(online) do
+      if rank(row) == r then ranked[#ranked + 1] = row end
+    end
+  end
+  local function place(row)
+    return poses[row.memberId] == "adventuring" and row.instance or nil
+  end
+  local ordered, taken = {}, {}
+  for i, row in ipairs(ranked) do
+    if not taken[row] then
+      taken[row] = true
+      ordered[#ordered + 1] = row
+      local instance = place(row)
+      for j = i + 1, instance and #ranked or 0 do
+        local other = ranked[j]
+        if not taken[other] and place(other) == instance then
+          taken[other] = true
+          ordered[#ordered + 1] = other
+        end
+      end
+    end
+  end
+  for _, row in ipairs(offline) do ordered[#ordered + 1] = row end
+  return ordered
+end
+
+-- The doorways the adventuring actors stand in: next to each other on one
+-- side, in the same instance, they share one. Each is { x, width,
+-- instance, raid }, reaching LAYOUT.doorway past its first and last
+-- figure, and each such actor's doorway is its index.
+local function doorways(actors)
+  local list = {}
+  local sorted = {}
+  for _, actor in ipairs(actors) do
+    if actor.pose == "adventuring" then sorted[#sorted + 1] = actor end
+  end
+  table.sort(sorted, function(a, b) return a.x < b.x end)
+  local previous
+  for _, actor in ipairs(sorted) do
+    local door = previous and list[previous.doorway]
+    if door and door.instance == actor.instance and previous.x + previous.width + LAYOUT.gap == actor.x then
+      door.width = actor.x + actor.width + LAYOUT.doorway - door.x
+    else
+      list[#list + 1] = {
+        x = actor.x - LAYOUT.doorway, width = actor.width + 2 * LAYOUT.doorway,
+        instance = actor.instance, raid = actor.raid,
+      }
+    end
+    -- Sorted by x, so a doorway's actors are always the latest ones.
+    actor.doorway = #list
+    previous = actor
+  end
+  return list
+end
+
 -- The Pocket Camp: the fire and the online Members, you first, as many as
 -- fit, LAYOUT.pocketRows high. It's the narrowest of its widths (from
 -- LAYOUT.pocketColumns in steps of pocketStep, up to maxColumns) that
@@ -273,22 +409,31 @@ end
 -- (true if that's a raid), status (the pose in words) and row (the
 -- Member's Roster row, for the tooltip over the figure). A flying figure
 -- takes its griffin's room. Members that didn't fit are counted in more
--- ("+2"). bedrolls (Member id to when they were seen going offline)
+-- ("+2"). group (Member id to true: Camp.grouped) are in your party or
+-- raid: they sit right after you, marked group. Members adventuring in
+-- the same instance sit side by side, in a doorway they share (doorways,
+-- and each one's doorway: see doorways()); it grows to keep them together
+-- if it can. bedrolls (Member id to when they were seen going offline)
 -- are the Members asleep in a bedroll: after every online Member, as many
 -- as fit at the width those need, never counted in more; pose "asleep",
 -- status "asleep · 4m". tooltip lists who is doing what: { title, lines }.
-function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns)
+function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group)
+  group = group or {}
   local poses = {}
   for _, row in ipairs(rows) do poses[row.memberId] = poseOf(row, doing) end
+  rows = together(rows, poses, group)
   local options = {
     tent = false, onlineOnly = true, moreText = "+%d", sleepers = bedrolls,
     room = function(row)
       if poses[row.memberId] == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
     end,
+    together = function(row)
+      if poses[row.memberId] == "adventuring" then return row.instance end
+    end,
   }
   local columns = LAYOUT.pocketColumns
   local view = Camp.view(rows, entries, now, columns, options)
-  while view.more and columns + LAYOUT.pocketStep <= (maxColumns or LAYOUT.pocketColumns) do
+  while (view.more or view.split) and columns + LAYOUT.pocketStep <= (maxColumns or LAYOUT.pocketColumns) do
     columns = columns + LAYOUT.pocketStep
     view = Camp.view(rows, entries, now, columns, options)
   end
@@ -306,6 +451,7 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns)
     else
       actor.pose = poses[actor.memberId]
       actor.instance = actor.row.instance
+      actor.group = group[actor.memberId]
       if actor.pose == "adventuring" then
         actor.raid = RAIDS[actor.instance] or nil
         actor.status = "in " .. actor.instance
@@ -315,6 +461,8 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns)
     end
     lines[i] = ("%s: %s"):format(actor.label, actor.status)
   end
+  view.split = nil
+  view.doorways = doorways(view.actors)
   view.tooltip = { title = "Pocket Camp", lines = lines }
   return view
 end

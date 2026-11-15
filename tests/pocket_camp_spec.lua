@@ -803,3 +803,183 @@ describe("Tips", function()
     assert.equal("pocketCamp", a.core:tip().key)
   end)
 end)
+
+describe("Playing together", function()
+  -- Each actor's label, in the read's order.
+  local function order(view)
+    local labels = {}
+    for i, actor in ipairs(view.actors) do labels[i] = actor.label end
+    return labels
+  end
+
+  -- A unit of your group as Snapshot.party reads it.
+  local function unit(client)
+    return { guid = client.character.guid, name = client.character.name }
+  end
+
+  local function inside(net, clients, instance)
+    for _, client in ipairs(clients) do
+      client:move({ instance = instance })
+      client:play({ zone = instance })
+    end
+    net:run(15)
+  end
+
+  -- The actors standing in a doorway, by label, sorted.
+  local function under(view, doorway)
+    local labels = {}
+    for _, actor in ipairs(view.actors) do
+      if actor.doorway == doorway then labels[#labels + 1] = actor.label end
+    end
+    table.sort(labels)
+    return labels
+  end
+
+  it("seats your group right after you, whatever the Roster's order, and marks them", function()
+    local _, clients = crew({ "Ann", "Bob", "Cid", "Dee" })
+    local a, b, c, d = clients[1], clients[2], clients[3], clients[4]
+    assert.same({ "You", "Bob", "Cid", "Dee" }, order(a.core:pocketCamp()))
+    a.core:group({ unit(a), unit(d), unit(c) })
+    local view = a.core:pocketCamp()
+    assert.same({ "You", "Cid", "Dee", "Bob" }, order(view))
+    assert.same({ true, true }, { actorFor(view, c).group, actorFor(view, d).group })
+    assert.is_nil(actorFor(view, b).group)
+    assert.is_nil(view.actors[1].group)
+  end)
+
+  it("matches a Character by first and last name when the GUID can't be read", function()
+    local net, clients = crew({ "Ann", "Bob", "Cid" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    c:play({ lastName = "Stormgaard" })
+    b:play({ lastName = "Ashby" })
+    -- A last name alone goes out with the next unhurried DATA.
+    net:run(70)
+    a.core:group({ { name = "Cid", lastName = "Stormgaard" }, { name = "Bob", lastName = "Other" } })
+    local view = a.core:pocketCamp()
+    assert.same({ "You", "Cid", "Bob" }, order(view))
+    assert.is_true(actorFor(view, c).group)
+    assert.is_nil(actorFor(view, b).group)
+    -- Names are matched however they're cased; a first name alone matches
+    -- a Character whose last name isn't known.
+    a.core:group({ { name = "BOB" } })
+    assert.is_true(actorFor(a.core:pocketCamp(), b).group)
+  end)
+
+  it("puts Members in the same instance in one shared doorway, and others in one each", function()
+    local net, clients, ns = crew({ "Ann", "Bob", "Cid", "Dee", "Eve" })
+    local a, b, c, d, e = clients[1], clients[2], clients[3], clients[4], clients[5]
+    inside(net, { b, e }, "The Deadmines")
+    inside(net, { d }, "Ragefire Chasm")
+    local view = a.core:pocketCamp()
+    -- Bob and Eve one after the other.
+    local labels = order(view)
+    local at = {}
+    for i, label in ipairs(labels) do at[label] = i end
+    assert.equal(1, math.abs(at.Bob - at.Eve))
+    assert.equal(2, #view.doorways)
+    local bob, eve, dee = actorFor(view, b), actorFor(view, e), actorFor(view, d)
+    assert.equal(bob.doorway, eve.doorway)
+    assert.are_not.equal(bob.doorway, dee.doorway)
+    assert.is_nil(actorFor(view, c).doorway)
+    -- Next to each other on one side, the doorway round both.
+    local layout = ns.Core.CAMP_LAYOUT
+    local shared = view.doorways[bob.doorway]
+    local first, last = bob, eve
+    if eve.x < bob.x then first, last = eve, bob end
+    assert.equal(first.x + first.width + layout.gap, last.x)
+    assert.same({ first.x - layout.doorway, last.x + last.width - first.x + 2 * layout.doorway, "The Deadmines" },
+      { shared.x, shared.width, shared.instance })
+    local own = view.doorways[dee.doorway]
+    assert.same({ dee.x - layout.doorway, dee.width + 2 * layout.doorway, "Ragefire Chasm" },
+      { own.x, own.width, own.instance })
+  end)
+
+  it("takes you and your group into the doorway, and marks a raid's", function()
+    local net, clients = crew({ "Ann", "Bob", "Cid" })
+    local a, c = clients[1], clients[3]
+    inside(net, { a, c }, "Molten Core")
+    a.core:group({ unit(a), unit(c) })
+    local view = a.core:pocketCamp()
+    assert.same({ "You", "Cid", "Bob" }, order(view))
+    assert.equal(1, #view.doorways)
+    assert.same({ "Cid", "You" }, under(view, 1))
+    assert.is_true(view.doorways[1].raid)
+  end)
+
+  it("keeps a Member fishing in the instance out of the doorway", function()
+    local net, clients = crew({ "Ann", "Bob", "Cid" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    inside(net, { b, c }, "The Deadmines")
+    b.core:caught(catch(SMALLFISH))
+    untilFishing(net, a, b, 70)
+    local view = a.core:pocketCamp()
+    assert.equal(1, #view.doorways)
+    assert.same({ "Cid" }, under(view, 1))
+    assert.is_nil(actorFor(view, b).doorway)
+  end)
+
+  it("widens to keep a doorway's Members together, as far as its max width allows", function()
+    local net, clients, ns = crew({ "Ann", "Bob", "Cid", "Dee", "Eve" })
+    local a = clients[1]
+    inside(net, { clients[2], clients[3], clients[4], clients[5] }, "The Deadmines")
+    -- Four don't fit on one side at the usual width.
+    local view = a.core:pocketCamp()
+    assert.equal(ns.Core.CAMP_LAYOUT.pocketColumns, view.columns)
+    assert.is_nil(view.more)
+    a.core:setPocketCampColumns(ns.Core.CAMP_LAYOUT.pocketMaxColumns)
+    view = a.core:pocketCamp()
+    assert.is_true(view.columns > ns.Core.CAMP_LAYOUT.pocketColumns)
+    assert.equal(1, #view.doorways)
+    assert.same({ "Bob", "Cid", "Dee", "Eve" }, under(view, 1))
+  end)
+
+  it("is exactly as before when you're not in a group and nobody shares an instance", function()
+    local function read(group)
+      local net, clients = crew({ "Ann", "Bob", "Cid", "Dee" })
+      inside(net, { clients[3] }, "The Deadmines")
+      if group then clients[1].core:group(group) end
+      local view = clients[1].core:pocketCamp()
+      local seats = {}
+      for _, actor in ipairs(view.actors) do seats[#seats + 1] = { actor.label, actor.x, actor.pose, actor.group } end
+      return seats, view.columns
+    end
+    local before, columns = read(nil)
+    local alone, aloneColumns = read({})
+    assert.same(before, alone)
+    assert.equal(columns, aloneColumns)
+  end)
+
+  it("redraws when the group changes, and only then", function()
+    local _, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local function redraws()
+      local n = 0
+      for _, event in ipairs(a.events) do
+        if event[1] == "changed" then n = n + 1 end
+      end
+      return n
+    end
+    local before = redraws()
+    a.core:group({ unit(a), unit(b) })
+    assert.equal(before + 1, redraws())
+    a.core:group({ unit(b), unit(a) })
+    assert.equal(before + 1, redraws())
+    a.core:group({})
+    assert.equal(before + 2, redraws())
+  end)
+
+  it("sends nothing it wouldn't send without a group", function()
+    local function sentBy(grouped)
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      local mark = #net.wire
+      if grouped then a.core:group({ unit(a), unit(b) }) end
+      a.core:pocketCamp()
+      skip(net, 11 * 60)
+      local types = {}
+      for _, message in ipairs(net:sent(mark, "Ann")) do types[#types + 1] = message.type end
+      return types
+    end
+    assert.same(sentBy(false), sentBy(true))
+  end)
+end)

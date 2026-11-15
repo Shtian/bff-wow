@@ -172,6 +172,9 @@ function Core.new(deps)
     -- Who it shows asleep in a bedroll: Member id to when this client saw
     -- them go offline. In memory only too.
     bedrolls = {},
+    -- Your party or raid as the game last read it (group()), for the
+    -- Pocket Camp. In memory only too.
+    party = {},
     -- When Gossip's link came up (updateLink), kept through a short break,
     -- and when it went down, nil while it's up.
     upSince = nil,
@@ -323,7 +326,7 @@ local function pocketView(self)
     if now - since < BEDROLL_FOR then bedrolls[id] = since end
   end
   return ns.Camp.pocket(rows, self.log:since(now - ns.Camp.RECENT), now, doing, bedrolls,
-    self:setting("pocketCampColumns"))
+    self:setting("pocketCampColumns"), ns.Camp.grouped(rows, self.party))
 end
 
 -- How long the Pocket Camp shows a Member fishing after a catch, or at a
@@ -540,6 +543,32 @@ end
 function Core:doing(facts)
   self.doings:set(type(facts) == "table" and facts or {})
   if self.doings:noteState() and pocketCampOn(self) then self.listener("changed") end
+end
+
+-- Who is in your party or raid, as the game reads it: { guid, name,
+-- lastName } per unit, you included, any of them nil when secret (see
+-- Snapshot.party). App reports it on GROUP_ROSTER_UPDATE. The Pocket Camp
+-- seats the Members whose shown Character is in it next to you
+-- (Camp.grouped matches them). Kept in memory only, and never sent.
+function Core:group(party)
+  local units, keys = {}, {}
+  for _, unit in ipairs(type(party) == "table" and party or {}) do
+    if type(unit) == "table" then
+      local guid = type(unit.guid) == "string" and unit.guid or nil
+      local name = type(unit.name) == "string" and unit.name ~= "" and unit.name or nil
+      local lastName = type(unit.lastName) == "string" and unit.lastName ~= "" and unit.lastName or nil
+      if guid or name then
+        units[#units + 1] = { guid = guid, name = name, lastName = lastName }
+        keys[#keys + 1] = ("%s/%s/%s"):format(guid or "", name or "", lastName or "")
+      end
+    end
+  end
+  table.sort(keys)
+  local key = table.concat(keys, "\n")
+  if key == self.partyKey then return end
+  self.party = units
+  self.partyKey = key
+  if pocketCampOn(self) then self.listener("changed") end
 end
 
 -- A quest was handed in (QUEST_TURNED_IN): the Pocket Camp plays its
@@ -836,9 +865,10 @@ end
 -- pixels high (Core.CAMP_LAYOUT), and as wide as the online Members need:
 -- from pocketColumns, in steps of pocketStep, up to its max width
 -- (maxColumns, the pocketCampColumns setting).
--- { columns, rows, maxColumns, actors, more, moreText, tooltip, opacity, locked,
+-- { columns, rows, maxColumns, actors, doorways, more, moreText, tooltip, opacity, locked,
 -- hideInCombat, position }. actors are the online Members, you
--- first, as many as fit, each as in camp() plus pose ("seated",
+-- first, then those in your party or raid (group()), marked group, as
+-- many as fit, each as in camp() plus pose ("seated",
 -- "adventuring": the Character being played is in an instance,
 -- "fishing": for a minute after their catches were seen to grow, or yours
 -- did, "crafting" or "gathering": for a minute after a profession's skill
@@ -847,7 +877,10 @@ end
 -- (its name, while in one), raid (true if it's a raid) and status (the
 -- pose in words: "by the fire", "in The Deadmines", "at a vendor"). A
 -- flying figure's griffin reaches CAMP_LAYOUT.griffinFore past it towards
--- the fire and griffinAft away from it. Then, in what room the online
+-- the fire and griffinAft away from it. Adventuring figures in the same
+-- instance sit side by side and share a doorway: doorways lists them ({ x,
+-- width, instance, raid }), and each adventuring actor's doorway is its
+-- index. Then, in what room the online
 -- Members leave, those seen going offline in the last 10 minutes: pose
 -- "asleep", status "asleep · 4m" (just "asleep" under a minute), never
 -- counted in more and never making it wider. No other sleepers, graves or

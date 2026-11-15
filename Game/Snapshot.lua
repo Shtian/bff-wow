@@ -125,13 +125,17 @@ local function groupUnits()
   return units
 end
 
--- Who is in the group: { guid, name } per member, either nil when secret.
--- The name is UnitName's, without the realm.
+-- Who is in the group: { guid, name, lastName } per member, any of them
+-- nil when secret. The names are UnitName's: on Forever its second value
+-- is the last name (retail's realm), nil or "" when there's none.
 function Snapshot.party()
   local party = {}
   for _, unit in ipairs(groupUnits()) do
     if UnitExists(unit) then
-      party[#party + 1] = { guid = readable(UnitGUID(unit)), name = readable((UnitName(unit))) }
+      local name, lastName = UnitName(unit)
+      name, lastName = readable(name), readable(lastName)
+      if lastName == "" then lastName = nil end
+      party[#party + 1] = { guid = readable(UnitGUID(unit)), name = name, lastName = lastName }
     end
   end
   return party
@@ -299,6 +303,20 @@ local WINDOW_EVENTS = {
   AUCTION_HOUSE_SHOW = { "auction", true }, AUCTION_HOUSE_CLOSED = { "auction", false },
 }
 
+-- Tells Core who is in your party or raid (Snapshot.party), now and on
+-- each change, for the Pocket Camp. A read that errors (a restriction we
+-- don't know of) tells nothing.
+local function watchGroup(core)
+  local function tell()
+    local ok, party = pcall(Snapshot.party)
+    if ok then core:group(party) end
+  end
+  local frame = CreateFrame("Frame")
+  frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+  frame:SetScript("OnEvent", tell)
+  tell()
+end
+
 -- Keeps the windows doing() reports, and tells Core of each quest handed
 -- in. Core hears what the Character is doing from App, every second.
 local function watchDoing(core)
@@ -339,4 +357,5 @@ function Snapshot.start(core)
   update()
   watchDoing(core)
   watchRares(core)
+  watchGroup(core)
 end

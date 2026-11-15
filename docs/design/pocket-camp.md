@@ -2,11 +2,11 @@
 
 Answers [Pocket Camp: an optional on-screen Camp](https://github.com/Shtian/bff-wow/issues/161). Builds on the Camp (`docs/design/camp.md`), whose art, art unit and rendering rules it shares. Domain words (**Pocket Camp**, **Tip**, **Camp**) are in `CONTEXT.md`.
 
-The Pocket Camp is a small, movable Camp you can keep on screen while playing: the fire and the Members who are online, you included, each shown doing what they're doing. A Member who comes online walks in and says hi, and one who goes offline sleeps in a bedroll by the fire for 10 minutes ([#205](https://github.com/Shtian/bff-wow/issues/205)). Most of that is what the Roster and Feed already know; what a Member is doing right now (fighting, at a vendor or the auction house, away, resting, flying) comes in a small live message, a DOING, that is no part of a record. It's off by default, and the panel offers it once with a **Tip**. No record field is new.
+The Pocket Camp is a small, movable Camp you can keep on screen while playing: the fire and the Members who are online, you included, each shown doing what they're doing. A Member who comes online walks in and says hi, and one who goes offline sleeps in a bedroll by the fire for 10 minutes ([#205](https://github.com/Shtian/bff-wow/issues/205)). Members in your party or raid sit next to you, and Members in the same instance stand together in one doorway ([#206](https://github.com/Shtian/bff-wow/issues/206)). Most of that is what the Roster and Feed already know; what a Member is doing right now (fighting, at a vendor or the auction house, away, resting, flying) comes in a small live message, a DOING, that is no part of a record. It's off by default, and the panel offers it once with a **Tip**. No record field is new.
 
 ## Core decides, UI renders
 
-`Core:pocketCamp()` is the ready-to-render read, built by `Camp.pocket` (`Core/Camp.lua`) from Roster's rows, Feed's entries of the last 24 hours, who Core holds as fishing or at a profession, and what Doing says each Member is doing. It's nil outside a Crew and while the `pocketCamp` or the `camp` setting is off.
+`Core:pocketCamp()` is the ready-to-render read, built by `Camp.pocket` (`Core/Camp.lua`) from Roster's rows, Feed's entries of the last 24 hours, who Core holds as fishing or at a profession, what Doing says each Member is doing, and your party or raid as the game last read it (`core:group()`). It's nil outside a Crew and while the `pocketCamp` or the `camp` setting is off.
 
 ```lua
 pocketCamp() -> nil, or {
@@ -18,9 +18,14 @@ pocketCamp() -> nil, or {
         | "vendor" | "auction" | "afk" | "resting" | "flying"
         | "asleep", -- a bedroll: went offline in the last 10 minutes
       instance = "The Deadmines" | nil, raid = true | nil, -- the instance is a raid
+      group = true | nil, -- their shown Character is in your party or raid
+      doorway = 1 | nil, -- adventuring: the doorway (below) they stand in
       status = "by the fire" | "in The Deadmines" | "fishing" | "at a vendor" | "asleep · 4m" | ..., -- the pose in words
       spark = true | nil, you = true | nil,
       row = { ... } }, -- the Member's Roster row, for the tooltip over the figure
+  },
+  doorways = { -- one per adventuring figure, or per run of them side by side in the same instance
+    { x, width, instance = "The Deadmines", raid = true | nil },
   },
   more = 2, moreText = "+2", -- online Members that didn't fit; nil when all did
   tooltip = { title = "Pocket Camp", lines = { "You: by the fire", "Bob: in The Deadmines", "Cy: asleep · 4m" }, hint },
@@ -33,13 +38,13 @@ pocketCamp() -> nil, or {
 
 It takes no width: Core decides it, so Core can also tell whether a Member is by its fire when it decides on an animation. Positions are art pixels from the fire's centre, in the Camp's geometry.
 
-**Width.** It's one of a few widths, from `pocketColumns` (112, its usual width: six figures, three each side) in steps of `pocketStep` (32: one more figure each side) up to `pocketMaxColumns` (304: eighteen), all in `Core.CAMP_LAYOUT`. `Camp.pocket` takes the narrowest that fits every online Member, but never wider than `maxColumns`, the player's `pocketCampColumns` setting (default 112, so it doesn't grow until the player gives it room). Past that, "+N" counts the rest. A flying figure takes two seats, so it can need the next step.
+**Width.** It's one of a few widths, from `pocketColumns` (112, its usual width: six figures, three each side) in steps of `pocketStep` (32: one more figure each side) up to `pocketMaxColumns` (304: eighteen), all in `Core.CAMP_LAYOUT`. `Camp.pocket` takes the narrowest that fits every online Member, and keeps those sharing a doorway on one side, but never wider than `maxColumns`, the player's `pocketCampColumns` setting (default 112, so it doesn't grow until the player gives it room). Past that, "+N" counts the rest. A flying figure takes two seats, so it can need the next step.
 
 UI never reads a setting or a Member record. `UI/PocketCamp.lua` creates its frame the first time the read isn't nil, so with the setting off (the default) there is no frame at all.
 
 ## Rules
 
-- **Who:** the Members whose Roster row is online, you first, in the Roster's order, then the bedrolls (below). No other sleepers, no Graves or tent. Online Members that don't fit are counted in `more` ("+2").
+- **Who:** the Members whose Roster row is online, you first, then your group, then the rest in the Roster's order (see Together, below), then the bedrolls (below). No other sleepers, no Graves or tent. Online Members that don't fit are counted in `more` ("+2").
 - **Bedrolls:** a Member whose row goes from online to offline (a logout, or timing out) sleeps in a bedroll, the Camp's sleeper art, for 10 minutes from when this client saw it (`BEDROLL_FOR` in `Core/Core.lua`), then is gone. Pose `asleep`, status "asleep · 4m" ("asleep" under a minute), and the same line in the whole-Camp tooltip, after the online figures.
   - Bedrolls take the seats after every online Member, most recent Last seen first, in the room the online Members leave at the width they need. They're the first left out, never counted in "+N", and never make it wider.
   - Coming back online within the 10 minutes swaps the bedroll for the usual figure, which walks in.
@@ -48,6 +53,11 @@ UI never reads a setting or a Member record. `UI/PocketCamp.lua` creates its fra
   - Kept in memory only (`Core.bedrolls`), so a `/reload` forgets them.
 - **Seated:** online, in the open world.
 - **Adventuring:** the Character being played is inside an instance (the row's `instance`). The figure stands in a stone doorway with a torch raised, and `instance` and `status` name the instance for the tooltip. `raid` marks an instance the dungeon table lists as a raid: its doorway is red, with a skull for a keystone.
+- **Together** ([#206](https://github.com/Shtian/bff-wow/issues/206)):
+  - **Your group.** Members whose shown Character is in your party or raid sit right after you, in the Roster's order, marked `group`; the tooltip over the figure adds "In your group". App reads the group (`Snapshot.party`: each unit's GUID and `UnitName`'s first and last name, any of them nil when secret) at start and on `GROUP_ROSTER_UPDATE`, and hands it to `core:group(party)`, which fires `changed` when it differs (the Pocket Camp on). `Camp.grouped` matches a unit to a row's shown Character by GUID, else by first name ignoring case, and by last name too when both have one. Kept in memory only (`Core.party`); nothing is sent or saved.
+  - **One doorway.** Adventuring Members in the same instance (equal `instance` names), you included, are pulled up behind the first of them in that order, so they sit next to each other, and Camp.view places them all on one side: the roomier, or the other. If they don't fit on either it tries the next width (as for "+N", up to `maxColumns`); past that they're placed one by one. Side by side in the same instance, they share a doorway: `doorways` has one per run of such figures, reaching `doorway` (2, in `Core.CAMP_LAYOUT`) past the first and last, so one figure's doorway is 16 wide as the arch has always been. It's red with the skull for a raid. Others in an instance on their own get one each.
+  - **Fishing wins.** A figure fishing or at a profession inside the instance isn't adventuring, so it stands in no doorway and isn't pulled up.
+  - We can't see others' groups, so Members in the same instance are taken to be together. Not in a group, with nobody sharing an instance, it's exactly as before.
 - **Fishing:** for 60 s after Core sees a Member's catches grow. When a Member's record is merged and its total catch count (`Catches.total`: every type's `n`) is higher than in the copy held before, they fish from then; another increase starts the 60 s over, and several catches in one update make one spell. Your own figure fishes for 60 s after `caught()` changes your record. Fishing replaces seated or adventuring while it lasts. Core fires `changed` when a spell ends, so the Pocket Camp redraws.
   - Silent on the first sight of a Member (no copy held before) and until sync has settled after a login (as for Live events), so what's caught up at login isn't "fishing now".
   - Kept in memory only (`Core.fishing`), never saved or sent, so a `/reload` forgets it.
@@ -131,7 +141,7 @@ All account-wide. With `camp` off the Pocket Camp never shows, whatever its own 
 
   | Pose | Figure | Sprites |
   |---|---|---|
-  | adventuring | standing | `torch` in hand, `arch` behind (`archRaid` for a raid) |
+  | adventuring | standing | `torch` in hand, and its doorway (below) behind |
   | fighting | standing | `blade` in hand |
   | crafting | standing | `hammer` in hand, `anvil` at its feet |
   | gathering | standing | `pick` in hand |
@@ -141,6 +151,8 @@ All account-wide. With `camp` off the Pocket Camp never shows, whatever its own 
   | resting | seated | `innSign` behind, its board over the head |
   | afk | seated | `afk`, the word AFK in pixel letters, over its head, bobbing a row once a second; it's the head mark's last case, so a one-off mark takes its place while it plays |
   | flying | seated, raised 9 rows | `griffin` under it, `griffinWing` over its legs, lifting to `griffinWingUp` for 3 ticks in 9 |
+
+  A doorway (`view.doorways`) is drawn behind its figures from slices of `arch` (`archRaid` for a raid), so it can be as wide as Core says: the sprite's 4 columns at each edge, its middle 8 (the keystone, or the skull) at the doorway's centre, and the column next to each rim stretched over the rest (`drawDoorway`, `DOORWAY` in `UI/CampScene.lua`). One figure's doorway is the sprite as drawn.
 
   The griffin reaches 8 art pixels past the figure towards the fire and 6 away from it (`griffinFore` and `griffinAft` in `Core.CAMP_LAYOUT`), and Core keeps that clear when it places the figure. New tools have a dark outline (`outlined()` in the art script) so they read with the game world behind them.
 - **Animations.** `band:Animate(kind, memberId)` keeps each for its length and draws it on the band's 6-per-second tick: an arrival's `walk1`/`walk2` steps in from the edge (mirrored coming from the right, the seat waiting for them), then `wave1`/`wave2` with the `hi` bubble over the head; `star`, `fish`, `quest`, `smoke1`/`smoke2` over the head, `skeleton` in the figure's place (one untinted layer, no tool, whatever the pose), alternate-tick alpha for the flicker, seven sparks flying out for each burst, and `flare1`–`flare3` in the fire's place.
@@ -165,7 +177,7 @@ Panel draws it as a card across the window under the Camp band, above the sideba
 
 ## Tests
 
-`tests/pocket_camp_spec.lua` drives real Cores through FakeNet: who is in `pocketCamp()` and when it's nil, "+N", adventuring, the spark, each actor's Roster row, how it's shown, fishing (the 60 s, the restart, your own, first sight, login and reload), each animation and when none plays, arrivals and bedrolls (once, first sight, login, reload, lockdown, the 10 minutes, coming back, removed and left, seats and width, and that nothing more is sent), and Tips. `tests/doing_spec.lua` covers Doing the same way: your own figure, the one DOING and what it leaves alone, which state wins, the fighting hold, the rate, the refresh and running out, newcomers and going offline, pause, lockdown and being alone, an unknown state, the redraw, a quest handed in, the profession spells, raids and the griffin's room. `tests/settings_spec.lua` covers the new settings. Frames and art aren't tested offline; in game, `/bff sim` and `/bff sim fish` make simulated Members fish, and the dev console's Doing and Quest buttons step one through what it can be doing and hand in a quest.
+`tests/pocket_camp_spec.lua` drives real Cores through FakeNet: who is in `pocketCamp()` and when it's nil, "+N", adventuring, the spark, each actor's Roster row, how it's shown, fishing (the 60 s, the restart, your own, first sight, login and reload), each animation and when none plays, arrivals and bedrolls (once, first sight, login, reload, lockdown, the 10 minutes, coming back, removed and left, seats and width, and that nothing more is sent), Tips, and playing together (your group's seats and mark, the name match, shared and single doorways, fishing in the instance, widening, the read unchanged out of a group, the redraw and that nothing more is sent). `tests/doing_spec.lua` covers Doing the same way: your own figure, the one DOING and what it leaves alone, which state wins, the fighting hold, the rate, the refresh and running out, newcomers and going offline, pause, lockdown and being alone, an unknown state, the redraw, a quest handed in, the profession spells, raids and the griffin's room. `tests/settings_spec.lua` covers the new settings. Frames and art aren't tested offline; in game, `/bff sim` and `/bff sim fish` make simulated Members fish, and the dev console's Doing and Quest buttons step one through what it can be doing and hand in a quest.
 
 ## Still to check in game
 
@@ -187,3 +199,6 @@ None of the rendering has run in a client, and the new sprites were authored as 
 - A bedroll in the Pocket Camp beside seated figures, its z's inside the band, and its tooltip.
 - The Tip window at first login: its place next to While you were away, which opens a little later, and that it waits for combat to end.
 - The Settings slider's thumb and track on Forever's Settings page.
+- A shared doorway for two, three and four figures, normal and raid: that the stretched lintel and the centred keystone or skull read well, and the torches inside it.
+- That `GROUP_ROSTER_UPDATE` fires on joining, leaving and a raid conversion on Forever, and whether `UnitGUID` or `UnitName` of party and raid units read secret in an instance (the name match is the fallback). That `UnitName` on a party unit gives the last name as its second value, as it does for `"player"`.
+- The "In your group" line in a figure's tooltip.
