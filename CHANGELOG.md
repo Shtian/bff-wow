@@ -23,6 +23,23 @@
 
 
 
+
+## 2.6.0
+<sub>2026-11-15</sub>
+
+- *(minor)*
+  Friends walk into the Pocket Camp and say hi.
+
+  When someone in your Crew comes online, they walk in from the edge and wave. When someone logs off, they sleep in a bedroll by the fire for 10 minutes. Hover over the bedroll to see who it is and how long ago they left.
+- *(minor)*
+  The Pocket Camp shows who's playing together.
+
+  Friends in your party or raid sit right next to you, and their tooltip says "In your group". Friends in the same dungeon or raid stand side by side in one shared doorway.
+- *(minor)*
+  The Pocket Camp shows who's playing an alt.
+
+  A friend playing a character other than their main has "ALT" over their head. Hover over the Pocket Camp and their line says "on alt" too. Don't want it? Turn it off under Settings → Shown in the Pocket Camp.
+
 ## 2.5.0
 <sub>2026-11-14</sub>
 
