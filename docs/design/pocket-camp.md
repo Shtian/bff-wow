@@ -44,7 +44,7 @@ UI never reads a setting or a Member record. `UI/PocketCamp.lua` creates its fra
   - Bedrolls take the seats after every online Member, most recent Last seen first, in the room the online Members leave at the width they need. They're the first left out, never counted in "+N", and never make it wider.
   - Coming back online within the 10 minutes swaps the bedroll for the usual figure, which walks in.
   - A Member who leaves the Crew or is removed gets none, and loses one they had.
-  - None while your own link is down (a lockdown): nobody can be heard then, so one who seems to go offline may not have.
+  - None once your own link has been down 10 minutes (a long lockdown; `DEAF_AFTER`): Members who never left start timing out then for want of being heard. A fight's short lockdown changes nothing.
   - Kept in memory only (`Core.bedrolls`), so a `/reload` forgets them.
 - **Seated:** online, in the open world.
 - **Adventuring:** the Character being played is inside an instance (the row's `instance`). The figure stands in a stone doorway with a torch raised, and `instance` and `status` name the instance for the tooltip. `raid` marks an instance the dungeon table lists as a raid: its doorway is red, with a skull for a keystone.
@@ -95,7 +95,7 @@ No other kind animates. Core decides, in `animate()`:
 - Only while `pocketCamp()` isn't nil.
 - A Member's animation only when they're an actor of the Pocket Camp at that moment. Sleepers and Members counted in "+N" get none.
 - Others' entries only once sync has settled, so first sight and login catch-up (While you were away) animate nothing. Your own entries always count.
-- **Arrive** fires when a Member held before (not first sight) goes from offline to online in Roster's eyes (`onlineChanged`), once sync has settled and only once your link has been up for 2 minutes (`HEAR_ALL_WITHIN`): everyone online sends a DIGEST about once a minute, so by then anyone online when your link came up (a login, a `/reload`, the end of a lockdown) has been heard, and one first heard sooner may have been online all along. Never for your own figure, and a bedroll's Member gets no other animation.
+- **Arrive** fires when a Member held before (not first sight) goes from offline to online in Roster's eyes (`onlineChanged`), once sync has settled and only once your link has been up for 2 minutes (`HEAR_ALL_WITHIN`): everyone online sends a DIGEST about once a minute, so by then anyone online when your link came up (a login, a `/reload`, the end of a long lockdown) has been heard, and one first heard sooner may have been online all along. The 2 minutes count from before a break shorter than `DEAF_AFTER` (10 minutes, a fight's lockdown), which can't have let anyone time out, so a friend logging in right after a fight still walks in. Never for your own figure, and a bedroll's Member gets no other animation.
 - **Independent of the chat-line and toast settings.** `feedEntry` is only fired while one of those is on, so the animation has its own event. It marks nothing seen: with both off the entry still waits for While you were away.
 
 For these nothing new is sent: the entries are the ones Feed already makes, and arrivals and bedrolls come from who Roster already shows online.

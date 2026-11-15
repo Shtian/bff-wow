@@ -273,16 +273,15 @@ end
 -- (true if that's a raid), status (the pose in words) and row (the
 -- Member's Roster row, for the tooltip over the figure). A flying figure
 -- takes its griffin's room. Members that didn't fit are counted in more
--- ("+2"). doing.asleep (Member id to when they were seen going offline)
+-- ("+2"). bedrolls (Member id to when they were seen going offline)
 -- are the Members asleep in a bedroll: after every online Member, as many
 -- as fit at the width those need, never counted in more; pose "asleep",
 -- status "asleep · 4m". tooltip lists who is doing what: { title, lines }.
-function Camp.pocket(rows, entries, now, doing, maxColumns)
+function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns)
   local poses = {}
   for _, row in ipairs(rows) do poses[row.memberId] = poseOf(row, doing) end
-  local asleep = doing.asleep or {}
   local options = {
-    tent = false, onlineOnly = true, moreText = "+%d", sleepers = asleep,
+    tent = false, onlineOnly = true, moreText = "+%d", sleepers = bedrolls,
     room = function(row)
       if poses[row.memberId] == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
     end,
@@ -302,7 +301,7 @@ function Camp.pocket(rows, entries, now, doing, maxColumns)
     actor.row = byMember[actor.memberId]
     if actor.pose == "asleep" then
       -- Under a minute it's too soon to say how long.
-      local since = now - asleep[actor.memberId]
+      local since = now - bedrolls[actor.memberId]
       actor.status = since < 60 and "asleep" or "asleep · " .. ns.Text.ago(since)
     else
       actor.pose = poses[actor.memberId]

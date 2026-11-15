@@ -412,9 +412,10 @@ end
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
   local top
-  local arriving = actor.pose ~= "asleep" and playing(scene, "arrive", actor.memberId)
-  if arriving then
-    x, top = drawArrival(scene, parts, actor, f, arriving)
+  -- Seconds into walking in, or nil.
+  local walkedIn = actor.pose ~= "asleep" and playing(scene, "arrive", actor.memberId)
+  if walkedIn then
+    x, top = drawArrival(scene, parts, actor, f, walkedIn)
   elseif actor.pose ~= "asleep" then
     local dead = playing(scene, "death", actor.memberId) ~= nil
     local pose = not dead and POSE[actor.pose] or {}
@@ -494,7 +495,7 @@ local function drawActor(scene, parts, actor, f)
   if actor.spark then
     setSprite(parts.spark, "spark", scene.unit)
     local upright = actor.pose ~= "asleep"
-    local lift = upright and not arriving and celebrating(scene, actor, f) and ROW.hop - ROW.seated or 0
+    local lift = upright and not walkedIn and celebrating(scene, actor, f) and ROW.hop - ROW.seated or 0
     put(scene, parts.spark, x + (upright and OFFSET.seatedSpark or OFFSET.asleepSpark),
       (upright and SPARK_ROW.seated or SPARK_ROW.asleep) + lift)
   else

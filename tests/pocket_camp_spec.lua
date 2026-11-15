@@ -550,6 +550,20 @@ describe("Arrivals and bedrolls", function()
     assert.same({}, arrivals(a, clients))
   end)
 
+  it("still walks in a Member who comes online right after a fight's short lockdown", function()
+    local net, clients = settledCrew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b:logout()
+    net:run(5)
+    a:lockdown(true)
+    net:run(30)
+    a:lockdown(false)
+    a.events = {}
+    b:login()
+    net:run(40)
+    assert.same({ "arrive:Bob" }, arrivals(a, clients))
+  end)
+
   it("walks in nobody while the Pocket Camp is off", function()
     local net, clients = settledCrew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]

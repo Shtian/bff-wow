@@ -172,8 +172,10 @@ function Core.new(deps)
     -- Who it shows asleep in a bedroll: Member id to when this client saw
     -- them go offline. In memory only too.
     bedrolls = {},
-    -- When Gossip's link last came up (updateLink), nil while it's down.
+    -- When Gossip's link came up (updateLink), kept through a short break,
+    -- and when it went down, nil while it's up.
     upSince = nil,
+    downSince = nil,
     -- What each Member is doing right now (Doing).
     doings = ns.Doing.new(deps.now),
   }, Core)
@@ -227,11 +229,40 @@ function Core.new(deps)
   return self
 end
 
+-- Everyone online sends a DIGEST about once a minute, so by this long
+-- after your link came up (a login, a /reload, the end of a long lockdown)
+-- all of them have been heard: one first heard sooner may have been online
+-- all along, and doesn't walk into the Pocket Camp.
+local HEAR_ALL_WITHIN = 2 * 60
+-- With your link down this long, Members who never left may time out
+-- (Roster.ONLINE_FOR) for want of being heard. A shorter break (a fight's
+-- lockdown) leaves who's online as it was.
+local DEAF_AFTER = ns.Roster.ONLINE_FOR - HEAR_ALL_WITHIN
+
+-- Whether your link has been down so long that who's online can't be
+-- trusted: going offline then may only be not being heard.
+local function deaf(self, now)
+  return self.upSince == nil or (self.downSince ~= nil and now - self.downSince >= DEAF_AFTER)
+end
+
+-- Whether your link has been up long enough to have heard everyone
+-- online, so one heard coming online now has.
+local function hearsEveryone(self, now)
+  return self.upSince ~= nil and self.downSince == nil and now - self.upSince >= HEAR_ALL_WITHIN
+end
+
 -- Gossip's link is up only while in a Crew. Settling after login starts
--- once it is, and starts over if it goes down first.
+-- once it is, and starts over if it goes down first. When it came up
+-- holds through a break shorter than DEAF_AFTER.
 local function updateLink(self)
   local up = self.linkUp and self.db.crew ~= nil
-  self.upSince = up and (self.upSince or self.now()) or nil
+  local now = self.now()
+  if up then
+    if not self.upSince or deaf(self, now) then self.upSince = now end
+    self.downSince = nil
+  elseif self.upSince then
+    self.downSince = self.downSince or now
+  end
   if up then self.log:linkUp() else self.log:linkDown() end
   if up then self.crewGoals:linkUp() else self.crewGoals:linkDown() end
   self.gossip:setLink(up)
@@ -287,11 +318,11 @@ local function pocketView(self)
   for id, work in pairs(self.working) do
     if work.ends > now then doing.working[id] = work.kind end
   end
-  doing.asleep = {}
+  local bedrolls = {}
   for id, since in pairs(self.bedrolls) do
-    if now - since < BEDROLL_FOR then doing.asleep[id] = since end
+    if now - since < BEDROLL_FOR then bedrolls[id] = since end
   end
-  return ns.Camp.pocket(rows, self.log:since(now - ns.Camp.RECENT), now, doing,
+  return ns.Camp.pocket(rows, self.log:since(now - ns.Camp.RECENT), now, doing, bedrolls,
     self:setting("pocketCampColumns"))
 end
 
@@ -854,18 +885,13 @@ function Core:summary()
   return summary
 end
 
--- Everyone online sends a DIGEST about once a minute, so by this long
--- after your link came up (a login, a /reload, the end of a lockdown) all
--- of them have been heard: one first heard sooner may have been online
--- all along, and doesn't walk in.
-local HEAR_ALL_WITHIN = 2 * 60
-
 -- Whether someone went online or offline since last checked. One who
 -- went offline (not by leaving the Crew) sleeps in the Pocket Camp's
 -- bedroll for a while; one held before who came online loses it, and
 -- walks in (pocketCampAnimation "arrive") once sync has settled and your
--- link has been up HEAR_ALL_WITHIN. While your link is down nobody can be
--- heard, so one who goes offline then may not have: no bedroll.
+-- link has been up long enough to hear everyone (hearsEveryone). After
+-- your link has been down a long while (deaf), one who goes offline may
+-- only not have been heard: no bedroll.
 local function onlineChanged(self)
   local now = self.now()
   local online = ns.Roster.online(self.ledger, now)
@@ -885,14 +911,14 @@ local function onlineChanged(self)
       differs = true
       self.doings:forget(id)
       local record = self.ledger:record(id)
-      if self.upSince and record and not record.left then
+      if not deaf(self, now) and record and not record.left then
         self.bedrolls[id] = now
       end
     end
   end
   self.online = online
   self.known = knownMembers(self.ledger)
-  if self.log:isSettled() and self.upSince and now - self.upSince >= HEAR_ALL_WITHIN then
+  if self.log:isSettled() and hearsEveryone(self, now) then
     for _, id in ipairs(arrived) do animateMember(self, "arrive", id) end
   end
   return differs
