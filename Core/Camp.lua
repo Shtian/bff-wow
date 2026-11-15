@@ -2,8 +2,9 @@
 -- and Feed's entries, placed so the UI only draws it. Who is there, seated
 -- by the fire or asleep, the graves recent deaths leave, the flowers
 -- Respects put on them and the spark over a fresh max level. Also the
--- Pocket Camp, the cut-down one kept on screen: the fire and the online
--- Members, with what each is doing. Pure and stateless: tested through
+-- Pocket Camp, the cut-down one kept on screen: the fire, the online
+-- Members, with what each is doing, and bedrolls for those who just went
+-- offline. Pure and stateless: tested through
 -- Core:camp() and Core:pocketCamp(). See docs/design/camp.md and
 -- docs/design/pocket-camp.md.
 
@@ -53,8 +54,9 @@ local MEMBER_GRAVES = 2
 local GRAVES = 4
 
 -- Online Members, you first, in Roster's order; then sleepers, most
--- recent Last seen first, unless onlineOnly.
-local function candidates(rows, onlineOnly)
+-- recent Last seen first. With onlineOnly, only those of the sleepers in
+-- the set `sleepers` (if given).
+local function candidates(rows, onlineOnly, sleepers)
   local seated, asleep = {}, {}
   for _, row in ipairs(rows) do
     if row.own or row.online then
@@ -67,8 +69,9 @@ local function candidates(rows, onlineOnly)
     if a.lastSeen ~= b.lastSeen then return a.lastSeen > b.lastSeen end
     return a.memberId < b.memberId
   end)
-  if onlineOnly then return seated end
-  for _, row in ipairs(asleep) do seated[#seated + 1] = row end
+  for _, row in ipairs(asleep) do
+    if not onlineOnly or (sleepers and sleepers[row.memberId]) then seated[#seated + 1] = row end
+  end
   return seated
 end
 
@@ -147,7 +150,9 @@ end
 -- The Camp at `columns` art pixels wide, from Roster's rows (yours first)
 -- and Feed's entries (newest first, as Feed:describe gives them), at time
 -- now. options.tent false leaves the tent out; options.onlineOnly leaves
--- out sleepers and graves, and options.moreText words the count of who
+-- out sleepers and graves, but those in the set options.sleepers, which
+-- take the room the online Members leave and aren't counted in more if
+-- they don't fit; options.moreText words the count of who
 -- didn't fit (default "+%d more"), and options.room(row) gives the room a
 -- row's figure needs beyond itself: towards the fire, and away from it.
 -- Returns { columns, actors, graves, tent, more }; see Core:camp().
@@ -162,7 +167,7 @@ function Camp.view(rows, entries, now, columns, options)
 
   local view = { columns = columns, actors = {}, graves = {} }
   local more = 0
-  for _, row in ipairs(candidates(rows, options.onlineOnly)) do
+  for _, row in ipairs(candidates(rows, options.onlineOnly, options.sleepers)) do
     local seated = row.own or row.online
     local figure = seated and LAYOUT.seated or LAYOUT.asleep
     local own = not options.onlineOnly and graves[row.memberId] or {}
@@ -195,7 +200,7 @@ function Camp.view(rows, entries, now, columns, options)
       for i, graveX in ipairs(graveXs) do
         view.graves[#view.graves + 1] = { memberId = row.memberId, x = graveX, flower = own[i].flower }
       end
-    else
+    elseif seated or not options.onlineOnly then
       more = more + 1
     end
   end
@@ -268,12 +273,16 @@ end
 -- (true if that's a raid), status (the pose in words) and row (the
 -- Member's Roster row, for the tooltip over the figure). A flying figure
 -- takes its griffin's room. Members that didn't fit are counted in more
--- ("+2"). tooltip lists who is doing what: { title, lines }.
+-- ("+2"). doing.asleep (Member id to when they were seen going offline)
+-- are the Members asleep in a bedroll: after every online Member, as many
+-- as fit at the width those need, never counted in more; pose "asleep",
+-- status "asleep · 4m". tooltip lists who is doing what: { title, lines }.
 function Camp.pocket(rows, entries, now, doing, maxColumns)
   local poses = {}
   for _, row in ipairs(rows) do poses[row.memberId] = poseOf(row, doing) end
+  local asleep = doing.asleep or {}
   local options = {
-    tent = false, onlineOnly = true, moreText = "+%d",
+    tent = false, onlineOnly = true, moreText = "+%d", sleepers = asleep,
     room = function(row)
       if poses[row.memberId] == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
     end,
@@ -291,13 +300,19 @@ function Camp.pocket(rows, entries, now, doing, maxColumns)
   local lines = {}
   for i, actor in ipairs(view.actors) do
     actor.row = byMember[actor.memberId]
-    actor.instance = actor.row.instance
-    actor.pose = poses[actor.memberId]
-    if actor.pose == "adventuring" then
-      actor.raid = RAIDS[actor.instance] or nil
-      actor.status = "in " .. actor.instance
+    if actor.pose == "asleep" then
+      -- Under a minute it's too soon to say how long.
+      local since = now - asleep[actor.memberId]
+      actor.status = since < 60 and "asleep" or "asleep · " .. ns.Text.ago(since)
     else
-      actor.status = STATUS[actor.pose]
+      actor.pose = poses[actor.memberId]
+      actor.instance = actor.row.instance
+      if actor.pose == "adventuring" then
+        actor.raid = RAIDS[actor.instance] or nil
+        actor.status = "in " .. actor.instance
+      else
+        actor.status = STATUS[actor.pose]
+      end
     end
     lines[i] = ("%s: %s"):format(actor.label, actor.status)
   end

@@ -115,6 +115,33 @@ const INN_SIGN = [
 const QUEST = outlined([".GGG.", "GYYGG", "G..GG", "...GG", "..GG.", "..GG.", ".....", "..GG.", "..GG."]);
 // "AFK" over an away figure's head, in 3 by 5 letters, outlined.
 const AFK = outlined([".W..WWW.W.W", "W.W.W...W.W", "WWW.WW..WW.", "W.W.W...W.W", "W.W.W...W.W"]);
+// A Member coming online walks in (two frames, facing right, mirrored
+// when walking left) and waves (two frames, one arm raised) with a "hi!"
+// speech bubble over their head.
+const WALK = [
+  ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...",
+    "..KCCDDCCK..", ".KSCCDDCCK..", "..KCCDDCCSK.", "..KCCCCCCK..", ".KDDK..KDDK.", ".KKK....KKK."],
+  ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...",
+    "..KCCDDCCK..", "..KCCDDCCK..", "..KSCDDCSK..", "..KCCCCCCK..", "...KDDDDK...", "...KKKKKK..."],
+];
+const WAVE = [
+  ["....KKKK..K.", "...KCCCCKSK.", "..KCCCCCCCK.", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...",
+    "..KCCDDCCK..", ".KSCCDDCCK..", "..KCCDDCCK..", "..KCCCCCCK..", "..KDDKKDDK..", "..KKK..KKK.."],
+  ["....KKKK...K", "...KCCCCK.KS", "..KCCCCCCKCK", "..KCSSSSCCK.", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...",
+    "..KCCDDCCK..", ".KSCCDDCCK..", "..KCCDDCCK..", "..KCCCCCCK..", "..KDDKKDDK..", "..KKK..KKK.."],
+];
+// "hi!" in 3 by 5 letters on a white bubble with a dark rim, its tail
+// pointing down to the head.
+const HI = ["K...K.K", "K.....K", "KKK.K.K", "K.K.K..", "K.K.K.K"];
+function bubble(text) {
+  const inner = text[0].length + 2;
+  const edge = "." + "K".repeat(inner) + ".";
+  const blank = "K" + "W".repeat(inner) + "K";
+  const lines = text.map((row) => "KW" + row.replaceAll(".", "W") + "WK");
+  const tail = ["...KWK", "....K."].map((row) => row.padEnd(inner + 2, "."));
+  return [edge, blank, ...lines, blank, edge, ...tail];
+}
+const HI_BUBBLE = bubble(HI);
 // A griffin under a flying figure, facing the fire (mirrored on its right).
 // The rider sits on its columns 3 to 14, their bottom row on its sixth. The
 // wing is drawn over the rider's legs, its right end on the griffin's
@@ -223,6 +250,11 @@ const SPRITES = [
   ["bag", skin(BAG)], ["coins", skin(COINS)], ["innSign", skin(INN_SIGN)], ["quest", skin(QUEST)],
   ["griffin", skin(GRIFFIN)], ["griffinWing", skin(GRIFFIN_WING)], ["griffinWingUp", skin(GRIFFIN_WING_UP)],
   ["afk", skin(AFK)],
+  ["walkCloth1", cloth(WALK[0], CLOTH)], ["walk1", skin(WALK[0])],
+  ["walkCloth2", cloth(WALK[1], CLOTH)], ["walk2", skin(WALK[1])],
+  ["waveCloth1", cloth(WAVE[0], CLOTH)], ["wave1", skin(WAVE[0])],
+  ["waveCloth2", cloth(WAVE[1], CLOTH)], ["wave2", skin(WAVE[1])],
+  ["hi", skin(HI_BUBBLE)],
 ];
 
 function hex(color) {

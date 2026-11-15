@@ -34,12 +34,17 @@ local FPS = 6
 local HOP_FOR = 0.7
 -- How long each one-off animation plays (band:Animate), in seconds: a
 -- quick opening, then a tail long enough to notice at a glance.
-local ANIMATION_FOR = { ding = 10, maxLevel = 10, death = 10, rareFind = 10, goal = 10, quest = 6 }
+local ANIMATION_FOR = { ding = 10, maxLevel = 10, death = 10, rareFind = 10, goal = 10, quest = 6, arrive = 6 }
 -- The openings: a ding's star rises for this long, and a death's smoke
 -- rises while the figure flickers. A max level's burst repeats this often.
 local STAR_RISES_FOR = 1.2
 local SMOKE_FOR = 1.6
 local BURST_EVERY = 1.8
+-- A Member coming online walks in from the band's nearer edge for this
+-- long, a step every WALK_STEP ticks, then waves with "hi!" over their
+-- head (a wave every WALK_STEP ticks too) until the arrival ends.
+local WALK_FOR = 2.5
+local WALK_STEP = 2
 -- A celebrating figure (a ding or a max level) and a held-up fish bounce:
 -- up for this many ticks, then down for as many.
 local BOUNCE_TICKS = 3
@@ -82,6 +87,7 @@ local FLAP_TICKS = 3
 -- star and a death's smoke rise this many rows, a rare find's fish is held.
 local STAR = { x = 3, rise = 3 }
 local QUEST = { x = 3 }
+local HI = { x = 1, row = 1 }
 local FISH = { x = 2 }
 local SMOKE = { x = 2, row = -4, rise = 6 }
 -- A max level's burst: sparks fly this far out from the figure's middle,
@@ -348,14 +354,68 @@ local function posePart(scene, t, actor, part, row, name)
   put(scene, t, actor.x + x, row + part[3])
 end
 
+-- Hides what only a pose or a one-off animation draws on an actor.
+local function hideExtras(parts)
+  parts.tool:Hide()
+  parts.back:Hide()
+  parts.front:Hide()
+  parts.mark:Hide()
+  for _, z in ipairs(parts.sleep) do z:Hide() end
+  if parts.burst then
+    for _, spark in ipairs(parts.burst) do spark:Hide() end
+  end
+  parts.cloth:SetAlpha(1)
+  parts.skin:SetAlpha(1)
+end
+
+-- Draws a Member coming online, `played` seconds into it: walking in from
+-- the band's nearer edge to their place for WALK_FOR, facing the way they
+-- go, then standing there waving with "hi!" over their head. Their seat
+-- (if their pose has one) waits for them. Returns the figure's x and the
+-- row above its head.
+local function drawArrival(scene, parts, actor, f, played)
+  local unit, x = scene.unit, actor.x
+  local pose = POSE[actor.pose] or {}
+  if pose.standing or pose.lift then
+    parts.seat:Hide()
+  else
+    setSprite(parts.seat, "seat", unit)
+    put(scene, parts.seat, x + OFFSET.seat, ROW.seat)
+  end
+  hideExtras(parts)
+  -- Left of the fire they come from the left edge, facing right as drawn;
+  -- right of it from the right edge, mirrored.
+  local fromRight = actor.x > 0
+  local frame = math.floor(f / WALK_STEP) % 2 + 1
+  local walking = played < WALK_FOR
+  if walking then
+    local edge = fromRight and scene.view.columns - scene.fire or -scene.fire - actor.width
+    x = math.floor(edge + (actor.x - edge) * played / WALK_FOR + 0.5)
+  end
+  local sprite = walking and "walk" or "wave"
+  setSprite(parts.cloth, sprite .. "Cloth" .. frame, unit, fromRight)
+  setSprite(parts.skin, sprite .. frame, unit, fromRight)
+  put(scene, parts.cloth, x, ROW.standing)
+  put(scene, parts.skin, x, ROW.standing)
+  local top = ROW.standing + Sheet.sprites.seated[4]
+  if not walking then
+    setSprite(parts.mark, "hi", unit)
+    put(scene, parts.mark, x + HI.x, markRow(scene, "hi", top + HI.row))
+  end
+  return x, top
+end
+
 -- Draws one actor's figure, seat or sleep marks, what its pose adds, spark
 -- and name, for the animation frame f. Upright poses: "seated" and the
 -- Pocket Camp's (POSE). After a death the figure is a skeleton for a
--- while, whatever its pose.
+-- while, whatever its pose. A Member coming online walks in first.
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
   local top
-  if actor.pose ~= "asleep" then
+  local arriving = actor.pose ~= "asleep" and playing(scene, "arrive", actor.memberId)
+  if arriving then
+    x, top = drawArrival(scene, parts, actor, f, arriving)
+  elseif actor.pose ~= "asleep" then
     local dead = playing(scene, "death", actor.memberId) ~= nil
     local pose = not dead and POSE[actor.pose] or {}
     local standing = pose.standing == true
@@ -395,15 +455,7 @@ local function drawActor(scene, parts, actor, f)
     drawAnimations(scene, parts, actor, f, row, top, pose.away)
   else
     parts.seat:Hide()
-    parts.tool:Hide()
-    parts.back:Hide()
-    parts.front:Hide()
-    parts.mark:Hide()
-    parts.cloth:SetAlpha(1)
-    parts.skin:SetAlpha(1)
-    if parts.burst then
-      for _, spark in ipairs(parts.burst) do spark:Hide() end
-    end
+    hideExtras(parts)
     setSprite(parts.cloth, "asleepCloth", scene.unit)
     setSprite(parts.skin, "asleep", scene.unit)
     put(scene, parts.cloth, x, ROW.asleep)
@@ -442,7 +494,7 @@ local function drawActor(scene, parts, actor, f)
   if actor.spark then
     setSprite(parts.spark, "spark", scene.unit)
     local upright = actor.pose ~= "asleep"
-    local lift = upright and celebrating(scene, actor, f) and ROW.hop - ROW.seated or 0
+    local lift = upright and not arriving and celebrating(scene, actor, f) and ROW.hop - ROW.seated or 0
     put(scene, parts.spark, x + (upright and OFFSET.seatedSpark or OFFSET.asleepSpark),
       (upright and SPARK_ROW.seated or SPARK_ROW.asleep) + lift)
   else
@@ -675,9 +727,9 @@ function CampScene.new(parent, options)
     return nil
   end
 
-  -- Plays a one-off animation: "ding", "maxLevel", "death" or "rareFind"
-  -- on that Member's figure, if it's up by the fire here, or "goal" on the
-  -- fire.
+  -- Plays a one-off animation: "ding", "maxLevel", "death", "rareFind",
+  -- "quest" or "arrive" on that Member's figure, if it's up by the fire
+  -- here, or "goal" on the fire.
   function band:Animate(kind, memberId)
     local lasts = ANIMATION_FOR[kind]
     if not lasts then return end

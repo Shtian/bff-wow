@@ -90,13 +90,15 @@ describe("The Pocket Camp", function()
     assert.is_nil(a.core:pocketCamp())
   end)
 
-  it("shows the fire and exactly the online Members, you first: no sleepers, graves or tent", function()
+  it("shows the fire and exactly the online Members, you first: no older sleepers, graves or tent", function()
     local net, clients, ns = crew({ "Ann", "Bob", "Cid" })
     local a, b, c = clients[1], clients[2], clients[3]
     b:play({ deaths = 1 })
     net:run(15)
     c:logout()
     net:run(2)
+    -- Past Cid's bedroll.
+    skip(net, 10 * 60)
     local view = a.core:pocketCamp()
     assert.equal(ns.Core.CAMP_LAYOUT.pocketColumns, view.columns)
     assert.equal(ns.Core.CAMP_LAYOUT.pocketRows, view.rows)
@@ -355,7 +357,7 @@ describe("The Pocket Camp", function()
       assert.equal("seated", poseOf(a, b))
     end)
 
-    it("never shows an offline Member, and makes nothing of other record changes", function()
+    it("never shows an offline Member fishing, and makes nothing of other record changes", function()
       local net, clients = crew({ "Ann", "Bob" })
       local a, b = clients[1], clients[2]
       b:play({ level = 11 })
@@ -365,7 +367,7 @@ describe("The Pocket Camp", function()
       untilFishing(net, a, b, 70)
       b:logout()
       net:run(2)
-      assert.is_nil(actorFor(a.core:pocketCamp(), b))
+      assert.equal("asleep", poseOf(a, b))
     end)
   end)
 
@@ -464,6 +466,213 @@ describe("The Pocket Camp", function()
       assert.equal(1, a:count("awaySummary"))
       assert.same({}, animations(a, clients))
     end)
+  end)
+end)
+
+describe("Arrivals and bedrolls", function()
+  local function arrivals(client, clients)
+    local list = {}
+    for _, name in ipairs(animations(client, clients)) do
+      if name:find("^arrive") then list[#list + 1] = name end
+    end
+    return list
+  end
+
+  -- A Crew as crew() makes it, with Ann's link up long enough that whoever
+  -- she hears next came online.
+  local function settledCrew(names)
+    local net, clients, ns = crew(names)
+    skip(net, 2 * 60)
+    return net, clients, ns
+  end
+
+  it("walks in a Member who comes online, once", function()
+    local net, clients = settledCrew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b:logout()
+    net:run(5)
+    a.events = {}
+    b:login()
+    net:run(40)
+    assert.same({ "arrive:Bob" }, arrivals(a, clients))
+    assert.equal("seated", poseOf(a, b))
+    -- Nobody else walks in: not Bob again, and not you.
+    assert.same({}, arrivals(b, clients))
+  end)
+
+  it("walks in nobody on first sight, at login catch-up or after a reload", function()
+    local net, clients = settledCrew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    -- First sight: Cid joins.
+    a.events = {}
+    local c = net:add("Cid", { character = character("Cid") }):login()
+    c:join(a.core:crew().code)
+    clients[3] = c
+    net:run(40)
+    assert.is_table(actorFor(a.core:pocketCamp(), c))
+    assert.same({}, arrivals(a, clients))
+
+    -- Login: Ann logs in with Bob and Cid already online.
+    a:logout()
+    net:run(5)
+    a:login()
+    a.core:setSetting("pocketCamp", true)
+    net:run(3 * 60)
+    assert.same({}, arrivals(a, clients))
+
+    -- Reload: everyone is still online.
+    a:reload()
+    net:run(3 * 60)
+    assert.same({}, arrivals(a, clients))
+
+    -- Bob comes online while Ann's sync hasn't settled.
+    b:logout()
+    net:run(5)
+    a:logout()
+    net:run(5)
+    a:login()
+    b:login()
+    net:run(5)
+    assert.same({}, arrivals(a, clients))
+  end)
+
+  it("walks in nobody, and makes no bedroll, when it's your link that was down", function()
+    local net, clients = settledCrew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    a.events = {}
+    a:lockdown(true)
+    net:run(13 * 60)
+    -- Bob was online all along; Ann just couldn't hear him.
+    assert.is_nil(actorFor(a.core:pocketCamp(), b))
+    a:lockdown(false)
+    net:run(3 * 60)
+    assert.equal("seated", poseOf(a, b))
+    assert.same({}, arrivals(a, clients))
+  end)
+
+  it("walks in nobody while the Pocket Camp is off", function()
+    local net, clients = settledCrew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    a.core:setSetting("pocketCamp", false)
+    b:logout()
+    net:run(5)
+    a.events = {}
+    b:login()
+    net:run(40)
+    assert.same({}, arrivals(a, clients))
+  end)
+
+  it("keeps a Member who went offline asleep in a bedroll for 10 minutes, then lets them go", function()
+    local net, clients = settledCrew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b:logout()
+    net:run(2)
+    local actor = actorFor(a.core:pocketCamp(), b)
+    assert.same({ "asleep", "asleep" }, { actor.pose, actor.status })
+    assert.equal(b.memberId, actor.row.memberId)
+    skip(net, 4 * 60)
+    actor = actorFor(a.core:pocketCamp(), b)
+    assert.equal("asleep · 4m", actor.status)
+    assert.same({ "You: by the fire", "Bob: asleep · 4m" }, a.core:pocketCamp().tooltip.lines)
+    a.events = {}
+    skip(net, 6 * 60)
+    assert.is_nil(actorFor(a.core:pocketCamp(), b))
+    assert.is_true(a:count("changed") > 0)
+  end)
+
+  it("swaps the bedroll for the figure when the Member comes back within the 10 minutes, and walks them in", function()
+    local net, clients = settledCrew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b:logout()
+    net:run(5)
+    assert.equal("asleep", poseOf(a, b))
+    a.events = {}
+    b:login()
+    net:run(40)
+    assert.equal("seated", poseOf(a, b))
+    assert.same({ "arrive:Bob" }, arrivals(a, clients))
+    -- The old bedroll doesn't come back when they go again later.
+    skip(net, 11 * 60)
+    assert.equal("seated", poseOf(a, b))
+  end)
+
+  it("forgets bedrolls on a reload", function()
+    local net, clients = settledCrew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b:logout()
+    net:run(2)
+    assert.equal("asleep", poseOf(a, b))
+    a:reload()
+    net:run(5)
+    assert.is_nil(actorFor(a.core:pocketCamp(), b))
+  end)
+
+  it("gives no bedroll to a Member who's removed or who left the Crew", function()
+    local net, clients = settledCrew({ "Ann", "Bob", "Cid" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    b:logout()
+    net:run(2)
+    assert.equal("asleep", poseOf(a, b))
+    a.core:removeMember(b.memberId)
+    assert.is_nil(actorFor(a.core:pocketCamp(), b))
+    c.core:leaveCrew()
+    net:run(20)
+    assert.is_nil(actorFor(a.core:pocketCamp(), c))
+  end)
+
+  it("seats online Members before bedrolls, and never counts or widens for a bedroll", function()
+    local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal", "Ivy" }
+    local net, clients, ns = crew(names)
+    local a = clients[1]
+    a.core:setPocketCampColumns(ns.Core.CAMP_LAYOUT.pocketMaxColumns)
+    -- Five online: the usual width fits them.
+    for i = 6, #names do clients[i]:logout() end
+    net:run(2)
+    local view = a.core:pocketCamp()
+    assert.equal(ns.Core.CAMP_LAYOUT.pocketColumns, view.columns)
+    assert.is_nil(view.more)
+    local online, asleep = 0, 0
+    for i, actor in ipairs(view.actors) do
+      if actor.pose == "asleep" then
+        asleep = asleep + 1
+      else
+        online = online + 1
+        -- Online figures come before any bedroll.
+        assert.equal(i, online)
+      end
+    end
+    assert.equal(5, online)
+    assert.is_true(asleep < 4)
+
+    -- Nine online at the usual max width: no bedrolls get a seat.
+    a.core:setPocketCampColumns(nil)
+    for i = 6, #names do clients[i]:login() end
+    net:run(40)
+    clients[2]:logout()
+    net:run(2)
+    view = a.core:pocketCamp()
+    assert.equal(ns.Core.CAMP_LAYOUT.pocketColumns, view.columns)
+    assert.is_nil(actorFor(view, clients[2]))
+    assert.equal(8 - #view.actors, view.more)
+  end)
+
+  it("sends nothing it wouldn't send without the Pocket Camp", function()
+    local function sentBy(on)
+      local net, clients = settledCrew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      a.core:setSetting("pocketCamp", on)
+      local mark = #net.wire
+      b:logout()
+      net:run(5)
+      a.core:pocketCamp()
+      b:login()
+      net:run(40)
+      skip(net, 11 * 60)
+      local types = {}
+      for _, message in ipairs(net:sent(mark, "Ann")) do types[#types + 1] = message.type end
+      return types
+    end
+    assert.same(sentBy(false), sentBy(true))
   end)
 end)
 

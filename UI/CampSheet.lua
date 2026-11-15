@@ -55,6 +55,15 @@ ns.CampSheet = {
     griffinWing = { 50, 79, 19, 7 },
     griffinWingUp = { 71, 79, 19, 8 },
     afk = { 92, 79, 13, 7 },
+    walkCloth1 = { 107, 79, 12, 13 },
+    walk1 = { 1, 107, 12, 13 },
+    walkCloth2 = { 15, 107, 12, 13 },
+    walk2 = { 29, 107, 12, 13 },
+    waveCloth1 = { 43, 107, 12, 13 },
+    wave1 = { 57, 107, 12, 13 },
+    waveCloth2 = { 71, 107, 12, 13 },
+    wave2 = { 85, 107, 12, 13 },
+    hi = { 99, 107, 11, 11 },
   },
   -- The backdrop's file, its size in texels, and the column the fire's
   -- centre sits on.

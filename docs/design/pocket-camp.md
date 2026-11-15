@@ -2,7 +2,7 @@
 
 Answers [Pocket Camp: an optional on-screen Camp](https://github.com/Shtian/bff-wow/issues/161). Builds on the Camp (`docs/design/camp.md`), whose art, art unit and rendering rules it shares. Domain words (**Pocket Camp**, **Tip**, **Camp**) are in `CONTEXT.md`.
 
-The Pocket Camp is a small, movable Camp you can keep on screen while playing: the fire and the Members who are online, you included, each shown doing what they're doing. Most of that is what the Roster and Feed already know; what a Member is doing right now (fighting, at a vendor or the auction house, away, resting, flying) comes in a small live message, a DOING, that is no part of a record. It's off by default, and the panel offers it once with a **Tip**. No record field is new.
+The Pocket Camp is a small, movable Camp you can keep on screen while playing: the fire and the Members who are online, you included, each shown doing what they're doing. A Member who comes online walks in and says hi, and one who goes offline sleeps in a bedroll by the fire for 10 minutes ([#205](https://github.com/Shtian/bff-wow/issues/205)). Most of that is what the Roster and Feed already know; what a Member is doing right now (fighting, at a vendor or the auction house, away, resting, flying) comes in a small live message, a DOING, that is no part of a record. It's off by default, and the panel offers it once with a **Tip**. No record field is new.
 
 ## Core decides, UI renders
 
@@ -12,17 +12,18 @@ The Pocket Camp is a small, movable Camp you can keep on screen while playing: t
 pocketCamp() -> nil, or {
   columns, rows, -- as wide as who's online needs (below), by pocketRows (34)
   maxColumns = 112, -- how wide it can grow: the pocketCampColumns setting
-  actors = { -- the online Members, you first, as many as fit
+  actors = { -- the online Members, you first, as many as fit; then bedrolls in the room left
     { memberId, label = "You" | displayName, classFilename, x, width, labelWidth,
       pose = "seated" | "adventuring" | "fishing" | "crafting" | "gathering" | "fighting"
-        | "vendor" | "auction" | "afk" | "resting" | "flying",
+        | "vendor" | "auction" | "afk" | "resting" | "flying"
+        | "asleep", -- a bedroll: went offline in the last 10 minutes
       instance = "The Deadmines" | nil, raid = true | nil, -- the instance is a raid
-      status = "by the fire" | "in The Deadmines" | "fishing" | "at a vendor" | ..., -- the pose in words
+      status = "by the fire" | "in The Deadmines" | "fishing" | "at a vendor" | "asleep · 4m" | ..., -- the pose in words
       spark = true | nil, you = true | nil,
       row = { ... } }, -- the Member's Roster row, for the tooltip over the figure
   },
   more = 2, moreText = "+2", -- online Members that didn't fit; nil when all did
-  tooltip = { title = "Pocket Camp", lines = { "You: by the fire", "Bob: in The Deadmines" }, hint },
+  tooltip = { title = "Pocket Camp", lines = { "You: by the fire", "Bob: in The Deadmines", "Cy: asleep · 4m" }, hint },
   opacity = 0.6, -- the backdrop's, 0 to 1
   locked = false, hideInCombat = false,
   position = { x, y } | nil, -- its bottom left corner from the screen's; nil where it starts
@@ -38,7 +39,13 @@ UI never reads a setting or a Member record. `UI/PocketCamp.lua` creates its fra
 
 ## Rules
 
-- **Who:** only the Members whose Roster row is online, you first, in the Roster's order. No sleepers, Graves or tent. Those that don't fit are counted in `more` ("+2"). A Member who logs out or times out is gone at the next read.
+- **Who:** the Members whose Roster row is online, you first, in the Roster's order, then the bedrolls (below). No other sleepers, no Graves or tent. Online Members that don't fit are counted in `more` ("+2").
+- **Bedrolls:** a Member whose row goes from online to offline (a logout, or timing out) sleeps in a bedroll, the Camp's sleeper art, for 10 minutes from when this client saw it (`BEDROLL_FOR` in `Core/Core.lua`), then is gone. Pose `asleep`, status "asleep · 4m" ("asleep" under a minute), and the same line in the whole-Camp tooltip, after the online figures.
+  - Bedrolls take the seats after every online Member, most recent Last seen first, in the room the online Members leave at the width they need. They're the first left out, never counted in "+N", and never make it wider.
+  - Coming back online within the 10 minutes swaps the bedroll for the usual figure, which walks in.
+  - A Member who leaves the Crew or is removed gets none, and loses one they had.
+  - None while your own link is down (a lockdown): nobody can be heard then, so one who seems to go offline may not have.
+  - Kept in memory only (`Core.bedrolls`), so a `/reload` forgets them.
 - **Seated:** online, in the open world.
 - **Adventuring:** the Character being played is inside an instance (the row's `instance`). The figure stands in a stone doorway with a torch raised, and `instance` and `status` name the instance for the tooltip. `raid` marks an instance the dungeon table lists as a raid: its doorway is red, with a skull for a keystone.
 - **Fishing:** for 60 s after Core sees a Member's catches grow. When a Member's record is merged and its total catch count (`Catches.total`: every type's `n`) is higher than in the copy held before, they fish from then; another increase starts the 60 s over, and several catches in one update make one spell. Your own figure fishes for 60 s after `caught()` changes your record. Fishing replaces seated or adventuring while it lasts. Core fires `changed` when a spell ends, so the Pocket Camp redraws.
@@ -77,6 +84,7 @@ A new Feed entry made while running fires the listener event `pocketCampAnimatio
 | rare find | that Member holds up a fish, bobbing (over the rod, if they're fishing) |
 | goal (Crew-wide) | the fire flares, taller and purple; no `memberId` |
 | quest (not a Feed kind) | a gold question mark over that Member's head, bobbing |
+| arrive (not a Feed kind) | that Member walks in from the band's nearer edge to their place (2.5 s), then stands there waving with a "hi!" speech bubble over their head; 6 s in all |
 
 A mark over a raised figure (flying) is kept inside the band, so it sits over the head and not above it.
 
@@ -87,9 +95,10 @@ No other kind animates. Core decides, in `animate()`:
 - Only while `pocketCamp()` isn't nil.
 - A Member's animation only when they're an actor of the Pocket Camp at that moment. Sleepers and Members counted in "+N" get none.
 - Others' entries only once sync has settled, so first sight and login catch-up (While you were away) animate nothing. Your own entries always count.
+- **Arrive** fires when a Member held before (not first sight) goes from offline to online in Roster's eyes (`onlineChanged`), once sync has settled and only once your link has been up for 2 minutes (`HEAR_ALL_WITHIN`): everyone online sends a DIGEST about once a minute, so by then anyone online when your link came up (a login, a `/reload`, the end of a lockdown) has been heard, and one first heard sooner may have been online all along. Never for your own figure, and a bedroll's Member gets no other animation.
 - **Independent of the chat-line and toast settings.** `feedEntry` is only fired while one of those is on, so the animation has its own event. It marks nothing seen: with both off the entry still waits for While you were away.
 
-For these nothing new is sent: the entries are the ones Feed already makes.
+For these nothing new is sent: the entries are the ones Feed already makes, and arrivals and bedrolls come from who Roster already shows online.
 
 ## Settings
 
@@ -117,7 +126,7 @@ All account-wide. With `camp` off the Pocket Camp never shows, whatever its own 
 - **Scale and width.** Unless `locked`, a grip (the chat window's size grabber) shows in its bottom right corner while the mouse is over it, its tooltip saying what dragging does. A press on the grip draws it at once at its max width (`maxColumns`), so the room it has shows, and dragging resizes it live with its top and the fire kept where they were at the press: it grows and shrinks both ways from the fire. Up and down scales it, in whole percents between 50% and 300%: its height grows or shrinks by as much as the mouse moves. Sideways raises or lowers the max width from what it was at the press, a step at a time (`Core.pocketCampWidth`); since it grows both ways, the width changes by twice what the mouse moves, keeping its right edge under the mouse. The tooltip says "Room for 10" (`Core.pocketCampSeats`, seated figures, from the layout) and the size. A redraw during the drag (the 30 s one, combat, a setting) keeps the dragged size. The band's target becomes `FIGURE_TARGET × scale` (`band:SetTarget`), and the band is made with `crisp = false`, so its art pixel is exactly that many UI units rather than a whole number of screen pixels: it scales smoothly, but some art pixels come out a screen pixel wider than others. Chosen over crisp steps after trying both in game: the steps were too coarse to scale with. On release `core:setPocketCampPosition`, `core:setPocketCampScale(scale)` and `core:setPocketCampColumns(columns)` save where it is and what changed, and it fits who's online again round the same fire, so it can come back narrower than it was dragged to. A press that changes neither saves nothing. A double-click on the grip goes back to scale 1 and the usual width, keeping its top and the fire where they are.
 - **Why both.** The width follows the Crew so a small group doesn't get an empty stretch of screen, and a cap the player sets so a big group can't push it into the action bars it was placed next to (player feedback: "make it longer, not just larger").
 - **Hide in combat.** With `hideInCombat`, the frame hides on `PLAYER_REGEN_DISABLED` and shows on `PLAYER_REGEN_ENABLED`. Hidden, its `OnUpdate` doesn't run.
-- **Tooltip.** Over a figure, that Member's tooltip exactly as the Roster shows it (`Panel.characterTooltip(actor.row, actor.row)`: the Character being shown, level, zone, professions and so on), then the hint. Anywhere else, Core's `tooltip`: the title, a line per figure, "+N" and the hint. `band:ActorAt(x)` says which figure the mouse is over (half the gap each side counts), and the tooltip follows the mouse from one to the next.
+- **Tooltip.** Over a figure, that Member's tooltip exactly as the Roster shows it (`Panel.characterTooltip(actor.row, actor.row)`: the Character being shown, level, zone, professions and so on), then the hint. Over a bedroll, "Bob: asleep · 4m", then the hint. Anywhere else, Core's `tooltip`: the title, a line per figure, "+N" and the hint. `band:ActorAt(x)` says which figure the mouse is over (half the gap each side counts), and the tooltip follows the mouse from one to the next.
 - **Poses.** CampScene's `POSE` table says how each is drawn: whether the figure stands (the hop figure, no seat) or sits, a sprite in its raised hand, one behind it and one over it. Sprites that face the fire are mirrored on its right.
 
   | Pose | Figure | Sprites |
@@ -134,8 +143,8 @@ All account-wide. With `camp` off the Pocket Camp never shows, whatever its own 
   | flying | seated, raised 9 rows | `griffin` under it, `griffinWing` over its legs, lifting to `griffinWingUp` for 3 ticks in 9 |
 
   The griffin reaches 8 art pixels past the figure towards the fire and 6 away from it (`griffinFore` and `griffinAft` in `Core.CAMP_LAYOUT`), and Core keeps that clear when it places the figure. New tools have a dark outline (`outlined()` in the art script) so they read with the game world behind them.
-- **Animations.** `band:Animate(kind, memberId)` keeps each for its length and draws it on the band's 6-per-second tick: `star`, `fish`, `quest`, `smoke1`/`smoke2` over the head, `skeleton` in the figure's place (one untinted layer, no tool, whatever the pose), alternate-tick alpha for the flicker, seven sparks flying out for each burst, and `flare1`–`flare3` in the fire's place.
-- **Sprites.** The poses' sprites above, `afk`, `star`, `quest`, `fish`, `smoke1`, `smoke2`, `skeleton` and `flare1`–`flare3` are grids in `scripts/camp-art.mjs` (the flare is each fire frame with its upper rows doubled, painted in purples). Run it after changing one.
+- **Animations.** `band:Animate(kind, memberId)` keeps each for its length and draws it on the band's 6-per-second tick: an arrival's `walk1`/`walk2` steps in from the edge (mirrored coming from the right, the seat waiting for them), then `wave1`/`wave2` with the `hi` bubble over the head; `star`, `fish`, `quest`, `smoke1`/`smoke2` over the head, `skeleton` in the figure's place (one untinted layer, no tool, whatever the pose), alternate-tick alpha for the flicker, seven sparks flying out for each burst, and `flare1`–`flare3` in the fire's place.
+- **Sprites.** The poses' sprites above, `afk`, `star`, `quest`, `fish`, `smoke1`, `smoke2`, `skeleton`, `flare1`–`flare3`, and the arrival's `walk1`, `walk2`, `wave1`, `wave2` (each with a cloth layer) and `hi` are grids in `scripts/camp-art.mjs` (the flare is each fire frame with its upper rows doubled, painted in purples). Run it after changing one.
 - **Redraws** on Core's `changed`, `crewChanged` and its settings, on a UI scale or display change, and every 30 s while shown.
 - **Silence.** It plays no sound.
 
@@ -156,7 +165,7 @@ Panel draws it as a card across the window under the Camp band, above the sideba
 
 ## Tests
 
-`tests/pocket_camp_spec.lua` drives real Cores through FakeNet: who is in `pocketCamp()` and when it's nil, "+N", adventuring, the spark, each actor's Roster row, how it's shown, fishing (the 60 s, the restart, your own, first sight, login and reload), each animation and when none plays, and Tips. `tests/doing_spec.lua` covers Doing the same way: your own figure, the one DOING and what it leaves alone, which state wins, the fighting hold, the rate, the refresh and running out, newcomers and going offline, pause, lockdown and being alone, an unknown state, the redraw, a quest handed in, the profession spells, raids and the griffin's room. `tests/settings_spec.lua` covers the new settings. Frames and art aren't tested offline; in game, `/bff sim` and `/bff sim fish` make simulated Members fish, and the dev console's Doing and Quest buttons step one through what it can be doing and hand in a quest.
+`tests/pocket_camp_spec.lua` drives real Cores through FakeNet: who is in `pocketCamp()` and when it's nil, "+N", adventuring, the spark, each actor's Roster row, how it's shown, fishing (the 60 s, the restart, your own, first sight, login and reload), each animation and when none plays, arrivals and bedrolls (once, first sight, login, reload, lockdown, the 10 minutes, coming back, removed and left, seats and width, and that nothing more is sent), and Tips. `tests/doing_spec.lua` covers Doing the same way: your own figure, the one DOING and what it leaves alone, which state wins, the fighting hold, the rate, the refresh and running out, newcomers and going offline, pause, lockdown and being alone, an unknown state, the redraw, a quest handed in, the profession spells, raids and the griffin's room. `tests/settings_spec.lua` covers the new settings. Frames and art aren't tested offline; in game, `/bff sim` and `/bff sim fish` make simulated Members fish, and the dev console's Doing and Quest buttons step one through what it can be doing and hand in a quest.
 
 ## Still to check in game
 
@@ -174,5 +183,7 @@ None of the rendering has run in a client, and the new sprites were authored as 
 - The tooltip over each figure and over the fire, and that it changes as the mouse moves between them.
 - No measurable CPU cost while it's hidden.
 - The Tip card at the panel's narrowest (460) and with the short Camp band.
+- An arrival: the walk frames and speed from each edge at a few widths, the wave and the "hi!" bubble at size, and that 6 s feels right. That a friend logging in shortly after you (within 2 minutes) not walking in doesn't look like a bug.
+- A bedroll in the Pocket Camp beside seated figures, its z's inside the band, and its tooltip.
 - The Tip window at first login: its place next to While you were away, which opens a little later, and that it waits for combat to end.
 - The Settings slider's thumb and track on Forever's Settings page.
