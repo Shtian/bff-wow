@@ -551,12 +551,13 @@ end
 -- seats the Members whose shown Character is in it next to you
 -- (Camp.grouped matches them). Kept in memory only, and never sent.
 function Core:group(party)
+  local function text(value)
+    return type(value) == "string" and value ~= "" and value or nil
+  end
   local units, keys = {}, {}
   for _, unit in ipairs(type(party) == "table" and party or {}) do
     if type(unit) == "table" then
-      local guid = type(unit.guid) == "string" and unit.guid or nil
-      local name = type(unit.name) == "string" and unit.name ~= "" and unit.name or nil
-      local lastName = type(unit.lastName) == "string" and unit.lastName ~= "" and unit.lastName or nil
+      local guid, name, lastName = text(unit.guid), text(unit.name), text(unit.lastName)
       if guid or name then
         units[#units + 1] = { guid = guid, name = name, lastName = lastName }
         keys[#keys + 1] = ("%s/%s/%s"):format(guid or "", name or "", lastName or "")

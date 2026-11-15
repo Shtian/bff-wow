@@ -304,66 +304,72 @@ end
 
 -- Which of Roster's rows (others') show a Character in your group:
 -- Member id to true. party is the game's group, { guid, name, lastName }
--- per unit (Core:group()). A unit is matched by GUID, else by name
--- ignoring case: the first name, and the last name too when both sides
--- have one.
+-- per unit (Core:group()). A unit is matched by GUID, else by its full
+-- name ("First Last", or the first name where it has no last name)
+-- against the row's, ignoring case, as the channel link compares names.
 function Camp.grouped(rows, party)
   local found = {}
   for _, row in ipairs(rows) do
-    if not row.own then
-      local name = row.name and row.name:lower()
-      local lastName = row.fullName and row.fullName ~= row.name and row.fullName:sub(#row.name + 2):lower() or nil
-      for _, unit in ipairs(party or {}) do
-        local match
-        if unit.guid and row.guid then
-          match = unit.guid == row.guid
-        else
-          match = unit.name ~= nil and unit.name:lower() == name
-            and (not unit.lastName or not lastName or unit.lastName:lower() == lastName)
-        end
-        if match then found[row.memberId] = true end
+    local fullName = not row.own and row.fullName and row.fullName:lower()
+    for _, unit in ipairs(fullName and party or {}) do
+      local match
+      if unit.guid and row.guid then
+        match = unit.guid == row.guid
+      else
+        match = unit.name ~= nil
+          and (unit.lastName and unit.name .. " " .. unit.lastName or unit.name):lower() == fullName
       end
+      if match then found[row.memberId] = true end
     end
   end
   return found
 end
 
--- The online rows (you first) in the Pocket Camp's order: you, your group
--- (in Roster's order), then the rest; and any who are adventuring in the
--- same instance are pulled up after the first of them, so they sit
--- together. The others' rows follow as they were.
-local function together(rows, poses, group)
-  local online, offline = {}, {}
+-- The online rows in the Pocket Camp's order: you, then your group, then
+-- the rest. Within your group and within the rest: those sharing your
+-- doorway (doorwayOf gives its key: the instance of an adventuring row),
+-- then each set of two or more sharing a doorway, together, in the order
+-- of its first, then the others; each in Roster's order. The others' rows
+-- follow as they were.
+local function seatingOrder(rows, group, doorwayOf)
+  local you, ranks, offline = nil, { {}, {} }, {}
   for _, row in ipairs(rows) do
-    if row.own or row.online then online[#online + 1] = row else offline[#offline + 1] = row end
-  end
-  local function rank(row)
-    if row.own then return 0 end
-    return group[row.memberId] and 1 or 2
-  end
-  local ranked = {}
-  for r = 0, 2 do
-    for _, row in ipairs(online) do
-      if rank(row) == r then ranked[#ranked + 1] = row end
+    if row.own then
+      you = row
+    elseif row.online then
+      local rank = group[row.memberId] and ranks[1] or ranks[2]
+      rank[#rank + 1] = row
+    else
+      offline[#offline + 1] = row
     end
   end
-  local function place(row)
-    return poses[row.memberId] == "adventuring" and row.instance or nil
-  end
-  local ordered, taken = {}, {}
-  for i, row in ipairs(ranked) do
-    if not taken[row] then
-      taken[row] = true
-      ordered[#ordered + 1] = row
-      local instance = place(row)
-      for j = i + 1, instance and #ranked or 0 do
-        local other = ranked[j]
-        if not taken[other] and place(other) == instance then
-          taken[other] = true
-          ordered[#ordered + 1] = other
+  local ordered = { you }
+  local yours = you and doorwayOf(you)
+  for _, rank in ipairs(ranks) do
+    local count = {}
+    for _, row in ipairs(rank) do
+      local key = doorwayOf(row)
+      if key then count[key] = (count[key] or 0) + 1 end
+    end
+    local taken = {}
+    local function take(wanted)
+      for _, row in ipairs(rank) do
+        if not taken[row] and wanted(row) then
+          taken[row] = true
+          ordered[#ordered + 1] = row
+          local key = doorwayOf(row)
+          for _, other in ipairs(rank) do
+            if key and not taken[other] and doorwayOf(other) == key then
+              taken[other] = true
+              ordered[#ordered + 1] = other
+            end
+          end
         end
       end
     end
+    take(function(row) return yours ~= nil and doorwayOf(row) == yours end)
+    take(function(row) return doorwayOf(row) ~= nil and count[doorwayOf(row)] > 1 end)
+    take(function() return true end)
   end
   for _, row in ipairs(offline) do ordered[#ordered + 1] = row end
   return ordered
@@ -421,15 +427,16 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group)
   group = group or {}
   local poses = {}
   for _, row in ipairs(rows) do poses[row.memberId] = poseOf(row, doing) end
-  rows = together(rows, poses, group)
+  local function doorwayOf(row)
+    if poses[row.memberId] == "adventuring" then return row.instance end
+  end
+  rows = seatingOrder(rows, group, doorwayOf)
   local options = {
     tent = false, onlineOnly = true, moreText = "+%d", sleepers = bedrolls,
     room = function(row)
       if poses[row.memberId] == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
     end,
-    together = function(row)
-      if poses[row.memberId] == "adventuring" then return row.instance end
-    end,
+    together = doorwayOf,
   }
   local columns = LAYOUT.pocketColumns
   local view = Camp.view(rows, entries, now, columns, options)

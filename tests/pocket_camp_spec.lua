@@ -859,10 +859,43 @@ describe("Playing together", function()
     assert.same({ "You", "Cid", "Bob" }, order(view))
     assert.is_true(actorFor(view, c).group)
     assert.is_nil(actorFor(view, b).group)
-    -- Names are matched however they're cased; a first name alone matches
-    -- a Character whose last name isn't known.
-    a.core:group({ { name = "BOB" } })
-    assert.is_true(actorFor(a.core:pocketCamp(), b).group)
+    -- Matched however they're cased, but on the whole name: a first name
+    -- alone doesn't match a Character with a last name, nor the reverse.
+    a.core:group({ { name = "cid", lastName = "STORMGAARD" }, { name = "Bob" } })
+    view = a.core:pocketCamp()
+    assert.is_true(actorFor(view, c).group)
+    assert.is_nil(actorFor(view, b).group)
+    a.core:group({ { name = "Ann", lastName = "Lee" } })
+    assert.is_nil(actorFor(a.core:pocketCamp(), b).group)
+  end)
+
+  it("seats your group before a Member who only shares your instance", function()
+    local net, clients = crew({ "Ann", "Bob", "Cid" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    inside(net, { a, b }, "The Deadmines")
+    a.core:group({ unit(a), unit(c) })
+    assert.same({ "You", "Cid", "Bob" }, order(a.core:pocketCamp()))
+  end)
+
+  it("orders you, your group, each set sharing an instance, then the rest, whatever the Roster's order", function()
+    local ns = load()
+    local function row(id, extra)
+      local r = { memberId = id, name = id, fullName = id, online = true, classFilename = "MAGE", lastSeen = 0 }
+      for k, v in pairs(extra or {}) do r[k] = v end
+      return r
+    end
+    local rows = {
+      row("you", { own = true, instance = "The Deadmines" }),
+      row("d"), row("e", { instance = "Ragefire Chasm" }), row("f"), row("g", { instance = "Ragefire Chasm" }),
+      row("h", { instance = "The Deadmines" }), row("b"), row("c", { instance = "The Deadmines" }),
+    }
+    local doing = { said = {}, fishing = {}, working = {} }
+    local view = ns.Camp.pocket(rows, {}, 0, doing, {}, 304, { b = true, c = true })
+    local ids = {}
+    for i, actor in ipairs(view.actors) do ids[i] = actor.memberId end
+    -- Your group (Cid sharing your doorway first), then Hal sharing it,
+    -- then the pair in Ragefire Chasm, then the rest.
+    assert.same({ "you", "c", "b", "h", "e", "g", "d", "f" }, ids)
   end)
 
   it("puts Members in the same instance in one shared doorway, and others in one each", function()
