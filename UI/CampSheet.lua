@@ -64,6 +64,7 @@ ns.CampSheet = {
     waveCloth2 = { 71, 107, 12, 13 },
     wave2 = { 85, 107, 12, 13 },
     hi = { 99, 107, 11, 11 },
+    alt = { 112, 107, 13, 7 },
   },
   -- The backdrop's file, its size in texels, and the column the fire's
   -- centre sits on.

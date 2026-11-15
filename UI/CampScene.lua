@@ -112,6 +112,11 @@ local SLEEP_STEP = 4
 -- the figure's 12, so half a pixel left of centre) and the row over the
 -- head; it bobs a row every AWAY.every ticks.
 local AWAY = { x = -1, row = 1, every = 6 }
+-- "ALT" over the head of a Member on an Alt: x from the figure's left
+-- edge (as AFK's), and the row over the head, or over what the pose holds
+-- up there (a tool, the inn sign), as far as the band allows. A sleeper's
+-- is over the z's, where the Camp puts its name.
+local ALT = { x = -1, row = 1 }
 local SPARK_ROW = { seated = 13, asleep = 4 }
 -- The name's gap above a figure's head, in art rows.
 local LABEL_GAP = 1
@@ -317,7 +322,7 @@ end
 -- Draws what plays over one upright actor: a ding's star, a rare find's
 -- fish held up, a handed-in quest's mark, a death's smoke and flicker, and
 -- a max level's bursts. With none of those over its head, an away
--- figure's "AFK" is.
+-- figure's "AFK" is. Returns true while one of those marks shows.
 -- row is the figure's bottom row and top the row above its head.
 local function drawAnimations(scene, parts, actor, f, row, top, away)
   local unit, x, id = scene.unit, actor.x, actor.memberId
@@ -344,6 +349,7 @@ local function drawAnimations(scene, parts, actor, f, row, top, away)
   else
     parts.mark:Hide()
   end
+  local marked = (fish or ding or quest or smoke or away) and true or false
   -- The skeleton flickers on alternate ticks while the smoke rises.
   local alpha = smoke and f % 2 == 0 and 0.3 or 1
   parts.cloth:SetAlpha(alpha)
@@ -363,6 +369,19 @@ local function drawAnimations(scene, parts, actor, f, row, top, away)
   elseif parts.burst then
     for _, spark in ipairs(parts.burst) do spark:Hide() end
   end
+  return marked
+end
+
+-- Shows "ALT" (ALT) for a Member on an Alt, its bottom row over `top`.
+local function drawAlt(scene, parts, actor, top)
+  setSprite(parts.alt, "alt", scene.unit)
+  put(scene, parts.alt, actor.x + ALT.x, markRow(scene, "alt", top + ALT.row))
+end
+
+-- The row above the top of a pose's part (POSE) on a figure whose bottom
+-- row is `row`, or 0 for none.
+local function partTop(part, row)
+  return part and row + part[3] + Sheet.sprites[part[1]][4] or 0
 end
 
 -- Shows one of a pose's sprites (POSE) on a texture, for a figure whose
@@ -382,6 +401,7 @@ local function hideExtras(parts)
   parts.back:Hide()
   parts.front:Hide()
   parts.mark:Hide()
+  parts.alt:Hide()
   for _, z in ipairs(parts.sleep) do z:Hide() end
   if parts.burst then
     for _, spark in ipairs(parts.burst) do spark:Hide() end
@@ -475,7 +495,14 @@ local function drawActor(scene, parts, actor, f)
     else
       parts.front:Hide()
     end
-    drawAnimations(scene, parts, actor, f, row, top, pose.away)
+    -- A head mark (or a death) takes ALT's place while it shows. ALT goes
+    -- over a tool held up or the inn sign.
+    local marked = drawAnimations(scene, parts, actor, f, row, top, pose.away)
+    if actor.onAlt and not dead and not marked then
+      drawAlt(scene, parts, actor, math.max(top, partTop(pose.tool, row) - ALT.row, partTop(pose.back, row) - ALT.row))
+    else
+      parts.alt:Hide()
+    end
   else
     parts.seat:Hide()
     hideExtras(parts)
@@ -496,6 +523,7 @@ local function drawActor(scene, parts, actor, f)
       end
     end
     top = bed + SLEEP[3].row + Sheet.sprites.sleep3[4]
+    if actor.onAlt then drawAlt(scene, parts, actor, top) end
   end
   tint(parts.cloth, actor.classFilename)
 
@@ -665,6 +693,7 @@ function CampScene.new(parent, options)
         front = texture(band.art, "ARTWORK", 4),
         spark = texture(band.art, "OVERLAY", 0),
         mark = texture(band.art, "OVERLAY", 1),
+        alt = texture(band.art, "OVERLAY", 1),
         label = shadowed(nameLabel(band.art)),
       }
     end),

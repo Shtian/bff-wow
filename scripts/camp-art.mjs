@@ -113,6 +113,9 @@ const INN_SIGN = [
 ];
 // A quest handed in: the gold question mark, over the head.
 const QUEST = outlined([".GGG.", "GYYGG", "G..GG", "...GG", "..GG.", "..GG.", ".....", "..GG.", "..GG."]);
+// "ALT" over the head of a Member on an Alt, in the same letters as AFK
+// but pale blue, so it reads as a label and not an alert. Outlined.
+const ALT = outlined([".F..F...FFF", "F.F.F....F.", "FFF.F....F.", "F.F.F....F.", "F.F.FFF..F."]);
 // "AFK" over an away figure's head, in 3 by 5 letters, outlined.
 const AFK = outlined([".W..WWW.W.W", "W.W.W...W.W", "WWW.WW..WW.", "W.W.W...W.W", "W.W.W...W.W"]);
 // A Member coming online walks in (two frames, facing right, mirrored
@@ -254,7 +257,7 @@ const SPRITES = [
   ["walkCloth2", cloth(WALK[1], CLOTH)], ["walk2", skin(WALK[1])],
   ["waveCloth1", cloth(WAVE[0], CLOTH)], ["wave1", skin(WAVE[0])],
   ["waveCloth2", cloth(WAVE[1], CLOTH)], ["wave2", skin(WAVE[1])],
-  ["hi", skin(HI_BUBBLE)],
+  ["hi", skin(HI_BUBBLE)], ["alt", skin(ALT)],
 ];
 
 function hex(color) {

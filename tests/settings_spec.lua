@@ -99,6 +99,7 @@ local SETTINGS = {
   { key = "pocketCampOpacity", default = 60, other = 25 },
   { key = "pocketCampLocked", default = false, other = true },
   { key = "pocketCampCombat", default = false, other = true },
+  { key = "pocketCampAlts", default = true, other = false },
   { key = "pocketCampPosition", default = nil, other = { x = 300, y = 200 } },
   { key = "pocketCampScale", default = 100, other = 150 },
   { key = "pocketCampColumns", default = 112, other = 176 },
@@ -121,18 +122,21 @@ describe("Settings list", function()
       for _, setting in ipairs(section.settings) do keys[#keys + 1] = setting.key end
     end
     assert.same({ "paused", "chatLines", "awayPopup", "minimap", "camp", "mapPins", "mapPinSize", "panelPlace", "toasts",
-      "toastSound", "toastPosition", "pocketCamp", "pocketCampOpacity", "pocketCampLocked", "pocketCampCombat" }, keys)
+      "toastSound", "toastPosition", "pocketCamp", "pocketCampOpacity", "pocketCampLocked", "pocketCampCombat",
+      "pocketCampAlts" }, keys)
   end)
 
   it("gives the Settings page sections with finished labels and current values", function()
     local core = newCore()
     core:setSetting("chatLines", false)
     local sections = core:settings()
-    assert.same({ "Sharing", "Notifications and display", "Toasts", "Pocket Camp" },
-      { sections[1].title, sections[2].title, sections[3].title, sections[4].title })
+    assert.same({ "Sharing", "Notifications and display", "Toasts", "Pocket Camp", "Shown in the Pocket Camp" },
+      { sections[1].title, sections[2].title, sections[3].title, sections[4].title, sections[5].title })
     assert.same({ "Show the Pocket Camp", "Backdrop opacity", "Lock its position and size", "Hide in combat" },
       { sections[4].settings[1].label, sections[4].settings[2].label, sections[4].settings[3].label,
         sections[4].settings[4].label })
+    assert.same({ key = "pocketCampAlts", kind = "toggle", label = "ALT over a friend playing an alt", value = true,
+      needs = "pocketCamp" }, sections[5].settings[1])
     local chat = sections[2].settings[1]
     assert.same({ key = "chatLines", kind = "toggle", label = "Chat message for live events", value = false }, chat)
     assert.equal("Appear offline: send nothing, so your Crew sees you as offline", sections[1].settings[1].label)

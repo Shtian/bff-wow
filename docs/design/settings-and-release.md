@@ -65,6 +65,7 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `pocketCampOpacity` | `pocketCampOpacity`, a whole percentage from 0 to 100; nil for the default 60 |
   | `pocketCampLocked` | `pocketCampLocked = true`, or nil while off |
   | `pocketCampCombat` | `pocketCampCombatHide = true`, or nil while off |
+  | `pocketCampAlts` | `pocketCampAltsOff = true`, or nil while on |
   | `pocketCampPosition` | `{ x, y }` from the screen's bottom left: the bottom left corner the Pocket Camp would have at its usual width, so it's anchored on the fire whatever width it grows to; nil where it starts |
   | `pocketCampScale` | a whole percent, 50 to 300, how big the Pocket Camp is; nil at 100 |
   | `pocketCampColumns` | how wide the Pocket Camp can grow, in art pixels: one of its widths, 144 to 304 in steps of 32 (others snap to the nearest); nil at 112, its usual width |

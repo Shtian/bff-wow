@@ -444,9 +444,10 @@ end
 -- or "gathering" while at a profession). Each actor is as in view(), with
 -- pose (see Core:pocketCamp()), instance (its name, while in one), raid
 -- (true if that's a raid), status (the pose in words) and row (the
--- Member's Roster row, for the tooltip over the figure). A flying figure
--- takes its griffin's room. Members that didn't fit are counted in more
--- ("+2"). group (Member id to true: Camp.grouped) are in your party or
+-- Member's Roster row, for the tooltip over the figure), and onAlt (true
+-- while the Character shown isn't their Main; the tooltip line says "on
+-- alt" too). A flying figure takes its griffin's room. Members that
+-- didn't fit are counted in more ("+2"). group (Member id to true: Camp.grouped) are in your party or
 -- raid: they sit right after you, marked group. Members adventuring in
 -- the same instance sit side by side, in a doorway they share (doorways,
 -- and each one's doorway: see doorways()). Outside an instance, you and
@@ -454,8 +455,11 @@ end
 -- are the Members asleep in a bedroll: after every online Member, as many
 -- as fit at the width those need, never counted in more; pose "asleep",
 -- status "asleep · 4m". tooltip lists who is doing what: { title, lines }.
-function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group)
+-- shown is what the player chose to have marked (each on unless false):
+-- alts, onAlt and "on alt" in the tooltip.
+function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, shown)
   group = group or {}
+  shown = shown or {}
   local poses = {}
   for _, row in ipairs(rows) do poses[row.memberId] = poseOf(row, doing) end
   -- Who sits together: a doorway's set (its instance), or, with you
@@ -520,7 +524,9 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group)
         actor.status = STATUS[actor.pose]
       end
     end
-    lines[i] = ("%s: %s"):format(actor.label, actor.status)
+    -- On an Alt: the Character shown isn't their Main.
+    actor.onAlt = shown.alts ~= false and actor.row.onAlt or nil
+    lines[i] = ("%s%s: %s"):format(actor.label, actor.onAlt and " (on alt)" or "", actor.status)
   end
   view.splits = nil
   view.doorways = doorways(view.actors)
