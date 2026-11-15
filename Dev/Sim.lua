@@ -7,7 +7,8 @@
 -- console (/bffdev, opened by /bff sim too): an action bar whose buttons
 -- make the simulated Member selected in its list (click a row) ding, die, move, fish (a Catch, or now and then an
 -- unlisted one), step through what they're doing (a vendor, the auction
--- house, fighting, away, resting, flying), go into an instance (a dungeon,
+-- house, fighting, away, resting, flying), shapeshift (each form in
+-- turn), go into an instance (a dungeon,
 -- then a raid, then back out), join or leave your group (for the Pocket
 -- Camp's seating and shared doorways), hand in a quest, react to your newest
 -- entry, offer a
@@ -470,10 +471,23 @@ end
 local DOING = { { vendor = true }, { auction = true }, { combat = true }, { afk = true }, { resting = true },
   { flying = true } }
 
+-- What the console's Form button steps a simulated Member through: each
+-- shapeshift form, then back to none.
+local FORMS = { "wolf", "bear", "cat", "travel", "seal", "moonkin" }
+
 -- What the console's Inst button steps a simulated Member through: a
 -- dungeon, then a raid, then back out to where they were. Two Members in
 -- the same one share a doorway in the Pocket Camp.
 local INSTANCES = { "The Deadmines", "Molten Core" }
+
+-- Tells the Member's Core what they're doing and the form they're in,
+-- where the Doing and Form buttons have stepped them to.
+local function simulateDoing(client)
+  local facts = {}
+  for key, value in pairs(DOING[client.doingStep] or {}) do facts[key] = value end
+  facts.form = FORMS[client.formStep]
+  client.core:doing(facts)
+end
 
 -- What each console button does to a simulated Member's client.
 local ACTIONS = {
@@ -502,7 +516,11 @@ local ACTIONS = {
   -- Steps through what a Member can be doing, then back to nothing.
   doing = function(client)
     client.doingStep = (client.doingStep or 0) % (#DOING + 1) + 1
-    client.core:doing(DOING[client.doingStep] or {})
+    simulateDoing(client)
+  end,
+  form = function(client)
+    client.formStep = (client.formStep or 0) % (#FORMS + 1) + 1
+    simulateDoing(client)
   end,
   quest = function(client) client.core:questHandedIn() end,
   inside = function(client)
@@ -774,7 +792,8 @@ local TRACE = "e0a070"
 -- Member's own row.
 local BUTTONS = {
   { "ding", "Ding" }, { "xp", "XP" }, { "die", "Die" }, { "zone", "Zone" },
-  { "alt", "Alt" }, { "max", "Max" }, { "skill", "Skill" }, { "fish", "Fish" }, { "doing", "Doing" }, { "quest", "Quest" },
+  { "alt", "Alt" }, { "max", "Max" }, { "skill", "Skill" }, { "fish", "Fish" }, { "doing", "Doing" }, { "form", "Form" },
+  { "quest", "Quest" },
   { "inside", "Inst" }, { "group", "Group" },
   { "react", "React" }, { "offer", "Offer" },
   { "claim", "Claim" },

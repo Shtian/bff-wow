@@ -226,6 +226,107 @@ function tent() {
   return out;
 }
 
+// Shapeshift forms (docs/design/pocket-camp.md), from the prototype
+// (prototypes/shapeshift-sprites.html on PR #217's branch): fill-only grids facing right, the
+// way a figure left of the fire faces it, outlined like the tools. Each
+// form has its own palette, K being the outline's. Ghost Wolf trots (two
+// frames); the bear stands breathing (two frames), rears up and swipes,
+// with claw marks in front of its paw; the night elf's cat (Alliance) and
+// the tauren's lion (Horde) prowl and swish their tails; the travel form,
+// a sabre-toothed cheetah, trots; the seal waves a flipper and the moonkin
+// blinks.
+const FORM_PAL = {
+  wolf: { d: "#2f4a6e", F: "#5f86b8", V: "#a9d4f5", W: "#e2f6ff", E: "#e2f6ff" },
+  catElf: { d: "#241c36", m: "#5566a8", M: "#4f3f6b", n: "#8a76b0", E: "#ffd14a", W: "#ece8d8" },
+  catLion: { M: "#d9a03c", A: "#d9a03c", a: "#9e6a24", N: "#f3d590", B: "#7a4a26", b: "#4a2c16", H: "#ece8d8", E: "#3a2518", W: "#ece8d8" },
+  bear: { B: "#8a4f26", b: "#5a3018", A: "#b8743c", a: "#d8a86a", E: "#0b0a12", W: "#ece8d8" },
+  claws: { W: "#fff3c4" },
+  travel: { A: "#cf9238", a: "#94591f", N: "#ecd3a0", s: "#3f2412", W: "#fffaf0", E: "#0b0a12" },
+  seal: { T: "#7d8794", t: "#4f5866", N: "#c9d0d6", E: "#0b0a12" },
+  moonkin: { B: "#6b4f38", b: "#3f2c1e", N: "#ece8d8", G: "#ffd14a", a: "#c89a5a", E: "#ffe9a0" },
+  leaves: { L: "#70e370", g: "#ffd14a" },
+  spirit: { V: "#bfe8ff", F: "#5fb4ef" },
+};
+for (const palette of Object.values(FORM_PAL)) palette.K = PAL.K;
+const WOLF_RUN = [
+  ["..........d.d.", ".........dFdF.", ".....d.ddFFFF.", "dd..dFdFFFEFFF", ".d..FFFFFFFFFK", "..dFFFFFFFVVV.",
+    "..dFVVVVVFF...", ".dFF....dFF...", "dFF......dFF..", "VV........VVV."],
+  ["..........d.d.", ".........dFdF.", ".....d.ddFFFF.", "dd..dFdFFFEFFF", ".d..FFFFFFFFFK", "..dFFFFFFFVVV.",
+    "..dFVVVVVFF...", "...dFF.dFF....", "...dFF.dFF....", "...VVV.VVV...."],
+];
+const BEAR_STAND = [
+  ["........AAA.b.b.", "....AAAABBBBbBb.", "..AABBBBBBBBBBB.", ".ABBBBBBBBBbBEaa", ".BBBBBBBBBBbBBaK", ".BBBBBBBBBBbBba.",
+    ".bBBBBBBBBBBBb..", ".bBBb.bbbbbBBb..", "..BBb.....bBBb..", "..BBb.....bBBb..", "..bbb.....bbbb.."],
+  ["............b.b.", "....AAAAAAAAbBb.", "..AABBBBBBBBBBB.", ".ABBBBBBBBBbBEaa", ".BBBBBBBBBBbBBaK", ".BBBBBBBBBBbBba.",
+    ".bBBBBBBBBBBBb..", ".bBBb.bbbbbBBb..", "..BBb.....bBBb..", "..BBb.....bBBb..", "..bbb.....bbbb.."],
+];
+const BEAR_REAR = [
+  "......b.b.......", "......bBBBB.....", "......BBBEaa....", "......BBBBaK..WW", ".....ABBBBB..BBW", "....AABBBBBBBBB.",
+  "....ABBBBBBBB...", "....BBBBBBBb....", "....BBBBaaBb....", "....BBBBaaBb....", "...bBBBBBBBb....", "...bBBBBBBBb....",
+  "...bBBb.bBBb....", "...bBBb.bBBb....", "..bbbb..bbbbb...",
+];
+const BEAR_SWIPE = [
+  "......b.b.......", "......bBBBB.....", "......BBBEaa....", "......BBBBaK....", ".....ABBBBB.....", "....AABBBBBB....",
+  "....ABBBBBBBBB..", "....BBBBBBBbBBBW", "....BBBBaaBb..WW", "....BBBBaaBb....", "...bBBBBBBBb....", "...bBBBBBBBb....",
+  "...bBBb.bBBb....", "...bBBb.bBBb....", "..bbbb..bbbbb...",
+];
+// The swipe's claw marks, not outlined: drawn in front of the paw, at
+// column 16 and row 4 of the outlined swipe frame (CampScene's CLAWS).
+const BEAR_CLAWS = ["....W..W", "...W..W.", "..W..W..", ".W..W...", "W..W...."];
+const CAT_ELF = [
+  ["d.............", "d.............", ".d....m.m..d.d", ".d...mmmmmMMMM", "..MMMMMmMdMMEM", "..MMMMMMMdMMMK",
+    "..MnnnnnnMMWW.", "..dM...dM.....", "..dM...dM.....", "..nn...nnn...."],
+  ["..............", "d.............", "dd....m.m..d.d", ".d...mmmmmMMMM", "..MMMMMmMdMMMM", "..MMMMMMMdMMMK",
+    "..MnnnnnnMMWW.", "..dM...dM.....", "..dM...dM.....", "..nn...nnn...."],
+];
+const CAT_LION = [
+  ["b..............", "b.............H", ".a....bBbB.HHHH", ".a...bBBBBAAAA.", "..AAABBBBBAAEA.", "..AAAABBBBAANNK",
+    "..AaNNNNBBANWW.", "..aA...aA......", "..aA...aA......", "..aa...aaa....."],
+  ["...............", "b.............H", "ba....bBbB.HHHH", ".a...bBBBBAAAA.", "..AAABBBBBAAAA.", "..AAAABBBBAANNK",
+    "..AaNNNNBBANWW.", "..aA...aA......", "..aA...aA......", "..aa...aaa....."],
+];
+const TRAVEL_RUN = [
+  ["...........a.a.", "..........AAAA.", "..........AAAEA", "a..AsAAsAAAAAAK", ".a.AAAsAAsAAAa.", "..aAsAAAAAsN.W.",
+    "..aNNNNNNNN..W.", ".aA.......aA...", "aA.........aA..", "A...........AA."],
+  ["...........a.a.", "..........AAAA.", "..........AAAEA", "a..AsAAsAAAAAAK", ".a.AAAsAAsAAAa.", "..aAsAAAAAsN.W.",
+    "..aNNNNNNNN..W.", "....aA.aA......", "....aAaA.......", "...AA.AA......."],
+];
+const SEAL = [
+  ["..........TTT..", ".........TTTET.", ".........TTTTTK", ".........tTNN..", "........TTNNN..", "......TTTTNNN..",
+    "...TTTTTTTNNt..", ".tTTTTTTTTTNt..", "ttNNNNNNNNTtt..", "t.t........tttt"],
+  ["..........TTT..", ".........TTTET.", ".........TTTTTK", ".........tTNN..", "........TTNNN..", "......TTTTNNNtt",
+    "...TTTTTTTNNttt", ".tTTTTTTTTTNt..", "ttNNNNNNNNTt...", ".t............."],
+];
+const MOONKIN = [
+  ["..a......a..", "..aa....aa..", "...aBBBBa...", "..BBBBBBBB..", "..BEBGGBEB..", "..BBBGGBBB..", ".BBBNNNNBBB.",
+    "BBBNNNNNNBBB", "BBBNNNNNNBBB", ".BBNNNNNNBB.", "..BBBBBBBB..", "..BBB..BBB..", "..bbb..bbb.."],
+  ["..a......a..", "..aa....aa..", "...aBBBBa...", "..BBBBBBBB..", "..BBBGGBBB..", "..BBBGGBBB..", ".BBBNNNNBBB.",
+    "BBBNNNNNNBBB", "BBBNNNNNNBBB", ".BBNNNNNNBB.", "..BBBBBBBB..", "..BBB..BBB..", "..bbb..bbb.."],
+];
+// Shifting puffs leaves (a druid) or spirit wisps (Ghost Wolf), two
+// frames each, not outlined.
+const LEAVES = [
+  ["..L.......L..", ".LL..g....LL.", "......L......", "L...........g", "..g.......L..", "......L......", ".L.........L."],
+  ["L....L....g.L", "..g.......L..", ".............", "g...........L", ".............", "..L.......g..", "L.....L.....L"],
+];
+const SPIRIT = [
+  ["....V..V.....", "..V.......V..", ".V...F.F...V.", "V..F.....F..V", ".V...F.F...V.", "..V.......V..", "....V..V....."],
+  [".V....V....V.", "V...........V", "....F...F....", "V...........V", "....F...F....", "V...........V", ".V....V....V."],
+];
+// Ghost Wolf's glow: a pale ring one pixel out from the outlined sprite,
+// all round it (corners too), so it's 2 wider and 2 taller. CampScene
+// draws it faintly behind the see-through wolf.
+const GLOW = "#8cd2ff";
+function glow(rows) {
+  const sprite = outlined(rows);
+  return outlined(sprite).map((row, y) => [...row].map((ch, x) => {
+    const own = sprite[y - 1] && sprite[y - 1][x - 1];
+    return ch === "K" && (!own || own === ".") ? "g" : ".";
+  }).join(""));
+}
+// An outlined form sprite in its palette.
+const form = (rows, palette) => paint(outlined(rows), FORM_PAL[palette]);
+
 // A grid of characters as colours; chars the palette lacks are clear.
 function paint(rows, palette) {
   return rows.map((row) => [...row].map((ch) => palette[ch] || null));
@@ -258,6 +359,18 @@ const SPRITES = [
   ["waveCloth1", cloth(WAVE[0], CLOTH)], ["wave1", skin(WAVE[0])],
   ["waveCloth2", cloth(WAVE[1], CLOTH)], ["wave2", skin(WAVE[1])],
   ["hi", skin(HI_BUBBLE)], ["alt", skin(ALT)],
+  ["wolfRun1", form(WOLF_RUN[0], "wolf")], ["wolfRun2", form(WOLF_RUN[1], "wolf")],
+  ["wolfGlow1", paint(glow(WOLF_RUN[0]), { g: GLOW })], ["wolfGlow2", paint(glow(WOLF_RUN[1]), { g: GLOW })],
+  ["bearStand1", form(BEAR_STAND[0], "bear")], ["bearStand2", form(BEAR_STAND[1], "bear")],
+  ["bearRear", form(BEAR_REAR, "bear")], ["bearSwipe", form(BEAR_SWIPE, "bear")],
+  ["bearClaws", paint(BEAR_CLAWS, FORM_PAL.claws)],
+  ["catElf1", form(CAT_ELF[0], "catElf")], ["catElf2", form(CAT_ELF[1], "catElf")],
+  ["catLion1", form(CAT_LION[0], "catLion")], ["catLion2", form(CAT_LION[1], "catLion")],
+  ["travelRun1", form(TRAVEL_RUN[0], "travel")], ["travelRun2", form(TRAVEL_RUN[1], "travel")],
+  ["seal1", form(SEAL[0], "seal")], ["seal2", form(SEAL[1], "seal")],
+  ["moonkin1", form(MOONKIN[0], "moonkin")], ["moonkin2", form(MOONKIN[1], "moonkin")],
+  ["leaves1", paint(LEAVES[0], FORM_PAL.leaves)], ["leaves2", paint(LEAVES[1], FORM_PAL.leaves)],
+  ["spirit1", paint(SPIRIT[0], FORM_PAL.spirit)], ["spirit2", paint(SPIRIT[1], FORM_PAL.spirit)],
 ];
 
 function hex(color) {

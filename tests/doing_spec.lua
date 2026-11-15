@@ -412,6 +412,166 @@ describe("What a Member is doing", function()
     end)
   end)
 
+  describe("a shapeshift form", function()
+    local function formOf(viewer, client)
+      local actor = actorFor(viewer.core:pocketCamp(), client)
+      return actor and actor.form
+    end
+
+    it("shows on your own figure at once, in words too, and goes at once", function()
+      local _, clients = crew({ "Ann", "Bob" })
+      local a = clients[1]
+      a.core:doing({ form = "bear" })
+      assert.same({ "seated", "in bear form" }, shown(a, a))
+      assert.equal("bear", formOf(a, a))
+      a.core:doing({ form = "wolf" })
+      assert.same({ "seated", "a ghost wolf" }, shown(a, a))
+      -- A travel form is shown at once on your own figure.
+      a.core:doing({ form = "seal" })
+      assert.same({ "seated", "in aquatic form" }, shown(a, a))
+      a.core:doing({})
+      assert.same({ "seated", "by the fire" }, shown(a, a))
+      assert.is_nil(formOf(a, a))
+    end)
+
+    it("sends a combat form or Ghost Wolf at once, in the same small DOING", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      local mark = #net.wire
+      b.core:doing({ form = "cat" })
+      net:run(3)
+      assert.equal("cat", formOf(a, b))
+      local sent = doings(net, mark, "Bob")
+      assert.equal(1, #sent)
+      assert.same({ "cat", nil }, { sent[1].form, sent[1].doing })
+      assert.is_true(sent[1].size <= 247)
+      -- A change of form waits out the usual 15 s.
+      b.core:doing({ form = "wolf" })
+      net:run(5)
+      assert.equal("cat", formOf(a, b))
+      net:run(12)
+      assert.equal("wolf", formOf(a, b))
+      assert.equal(2, #doings(net, mark, "Bob"))
+    end)
+
+    it("sends a travel form only once it's been held for 30 s", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      local mark = #net.wire
+      -- Mounting up and getting off again sends nothing.
+      b.core:doing({ form = "travel" })
+      net:run(20)
+      b.core:doing({})
+      net:run(60)
+      assert.equal(0, #doings(net, mark, "Bob"))
+      assert.is_nil(formOf(a, b))
+
+      b.core:doing({ form = "seal" })
+      net:run(28)
+      assert.equal(0, #doings(net, mark, "Bob"))
+      net:run(5)
+      assert.equal("seal", formOf(a, b))
+      assert.equal(1, #doings(net, mark, "Bob"))
+    end)
+
+    it("never sends the end of a form: what's heard runs out 2.5 min after it was last heard", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      local mark = #net.wire
+      b.core:doing({ form = "bear" })
+      net:run(3)
+      b.core:doing({})
+      net:run(2 * 60)
+      assert.equal(1, #doings(net, mark, "Bob"))
+      assert.equal("bear", formOf(a, b))
+      local before = a:count("changed")
+      net:run(40)
+      assert.is_nil(formOf(a, b))
+      assert.same({ "seated", "by the fire" }, shown(a, b))
+      assert.is_true(a:count("changed") > before)
+      assert.equal(1, #doings(net, mark, "Bob"))
+
+      -- Shifting into it again is told again.
+      b.core:doing({ form = "bear" })
+      net:run(3)
+      assert.equal("bear", formOf(a, b))
+    end)
+
+    it("says it again every 2 minutes while it's held", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      local mark = #net.wire
+      b.core:doing({ form = "moonkin" })
+      net:run(5 * 60 + 5)
+      assert.equal(3, #doings(net, mark, "Bob"))
+      assert.equal("moonkin", formOf(a, b))
+    end)
+
+    it("goes when a DOING says nothing of it, as an older BFF's does", function()
+      local net, clients, ns = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      b.core:doing({ form = "bear" })
+      net:run(3)
+      assert.equal("bear", formOf(a, b))
+      net:broadcast(b, ns.Codec.encode({ type = "DOING", from = b.memberId, doing = "vendor", at = net:now() + 1 }))
+      net:run(2)
+      assert.same({ "vendor", "at a vendor" }, shown(a, b))
+      assert.is_nil(formOf(a, b))
+      -- A form this BFF doesn't know is none.
+      net:broadcast(b, ns.Codec.encode({ type = "DOING", from = b.memberId, form = "tree", at = net:now() + 2 }))
+      net:run(2)
+      assert.same({ "seated", "by the fire" }, shown(a, b))
+      assert.is_nil(formOf(a, b))
+    end)
+
+    it("is told with what you're doing, which a form shows over only by the fire or fighting", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      b.core:doing({ form = "bear", combat = true })
+      net:run(3)
+      assert.same({ "fighting", "fighting" }, shown(a, b))
+      assert.equal("bear", formOf(a, b))
+      b.core:doing({ form = "travel", vendor = true })
+      assert.same({ "vendor", "at a vendor" }, shown(b, b))
+      assert.is_nil(formOf(b, b))
+      -- The vendor goes out with no form: the bear has ended, the travel form isn't due yet.
+      net:run(20)
+      assert.same({ "vendor", "at a vendor" }, shown(a, b))
+      assert.is_nil(formOf(a, b))
+    end)
+
+    it("gives a form its room: clear of the fire and of its neighbours, trotting away from the fire", function()
+      local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay" }
+      local net, clients, ns = crew(names)
+      local a = clients[1]
+      local layout = ns.Core.CAMP_LAYOUT
+      a.core:doing({ form = "bear" })
+      clients[2].core:doing({ form = "wolf" })
+      clients[3].core:doing({ form = "cat" })
+      net:run(3)
+      local view = a.core:pocketCamp()
+      -- From the sprite's one end to its other, the trot included.
+      local function span(actor)
+        if not actor.form then return actor.x, actor.x + actor.width end
+        local fore, aft = layout.formFore, layout.formAft + (actor.trots and layout.formTrot or 0)
+        if actor.x > 0 then return actor.x - fore, actor.x + actor.width + aft end
+        return actor.x - aft, actor.x + actor.width + fore
+      end
+      assert.is_true(actorFor(view, clients[2]).trots)
+      assert.is_nil(actorFor(view, clients[3]).trots)
+      local half = view.columns / 2
+      for i, actor in ipairs(view.actors) do
+        local from, to = span(actor)
+        assert.is_true(from >= -half and to <= half)
+        assert.is_true(to <= -layout.fire or from >= layout.fire)
+        for j = i + 1, #view.actors do
+          local otherFrom, otherTo = span(view.actors[j])
+          assert.is_true(to <= otherFrom or otherTo <= from)
+        end
+      end
+    end)
+  end)
+
   describe("with the rest of the Pocket Camp", function()
     it("gives way to an instance, whatever was said before going in", function()
       local net, clients = crew({ "Ann", "Bob" })
