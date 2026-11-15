@@ -290,6 +290,25 @@ describe("The Pocket Camp", function()
     assert.equal("Bob: by the fire", a.core:pocketCamp().tooltip.lines[2])
   end)
 
+  it("shows nobody on an Alt with its setting off, and again with it on", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b.character = character("Bobalt", { level = 4 })
+    b:play()
+    net:run(5)
+    assert.is_true(b.core:setMain("Player-0-Bob"))
+    net:run(15)
+
+    a.core:setSetting("pocketCampAlts", false)
+    local view = a.core:pocketCamp()
+    assert.is_nil(actorFor(view, b).onAlt)
+    assert.same({ "You: by the fire", "Bob: by the fire" }, view.tooltip.lines)
+    assert.is_true(actorFor(view, b).row.onAlt)
+
+    a.core:setSetting("pocketCampAlts", true)
+    assert.is_true(actorFor(a.core:pocketCamp(), b).onAlt)
+  end)
+
   it("gives each actor its Roster row, for the tooltip over its figure", function()
     local _, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]

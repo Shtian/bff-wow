@@ -325,8 +325,9 @@ local function pocketView(self)
   for id, since in pairs(self.bedrolls) do
     if now - since < BEDROLL_FOR then bedrolls[id] = since end
   end
+  local shown = { alts = self:setting("pocketCampAlts") }
   return ns.Camp.pocket(rows, self.log:since(now - ns.Camp.RECENT), now, doing, bedrolls,
-    self:setting("pocketCampColumns"), ns.Camp.grouped(rows, self.party))
+    self:setting("pocketCampColumns"), ns.Camp.grouped(rows, self.party), shown)
 end
 
 -- How long the Pocket Camp shows a Member fishing after a catch, or at a
@@ -1575,6 +1576,7 @@ local SHARING = "Sharing"
 local NOTIFICATIONS = "Notifications and display"
 local TOASTS = "Toasts"
 local POCKET_CAMP = "Pocket Camp"
+local POCKET_CAMP_SHOWN = "Shown in the Pocket Camp"
 
 local SETTINGS = {
   {
@@ -1663,6 +1665,14 @@ local SETTINGS = {
     key = "pocketCampCombat", section = POCKET_CAMP, kind = "toggle",
     label = "Hide in combat",
     saved = onFlag("pocketCampCombatHide"),
+  },
+  -- What the Pocket Camp marks on its figures, each on by default, so a
+  -- player can opt out (pocketView passes them to Camp.pocket as shown):
+  -- "ALT" over a Member on an Alt.
+  {
+    key = "pocketCampAlts", section = POCKET_CAMP_SHOWN, kind = "toggle", needs = "pocketCamp",
+    label = "ALT over a friend playing an alt",
+    saved = offFlag("pocketCampAltsOff"),
   },
   -- Where the Pocket Camp was dragged to: its bottom left corner, as
   -- { x, y } from the screen's bottom left; nil where it starts. Not on

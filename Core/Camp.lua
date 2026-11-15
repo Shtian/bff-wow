@@ -455,8 +455,11 @@ end
 -- are the Members asleep in a bedroll: after every online Member, as many
 -- as fit at the width those need, never counted in more; pose "asleep",
 -- status "asleep · 4m". tooltip lists who is doing what: { title, lines }.
-function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group)
+-- shown is what the player chose to have marked (each on unless false):
+-- alts, onAlt and "on alt" in the tooltip.
+function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, shown)
   group = group or {}
+  shown = shown or {}
   local poses = {}
   for _, row in ipairs(rows) do poses[row.memberId] = poseOf(row, doing) end
   -- Who sits together: a doorway's set (its instance), or, with you
@@ -522,7 +525,7 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group)
       end
     end
     -- On an Alt: the Character shown isn't their Main.
-    actor.onAlt = actor.row.onAlt or nil
+    actor.onAlt = shown.alts ~= false and actor.row.onAlt or nil
     lines[i] = ("%s%s: %s"):format(actor.label, actor.onAlt and " (on alt)" or "", actor.status)
   end
   view.splits = nil
