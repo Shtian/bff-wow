@@ -53,8 +53,13 @@ local BOUNCE_TICKS = 3
 -- sprite's bottom sits on it (from the prototype).
 local ROW = {
   seat = 3, seated = 4, hop = 6, standing = 3, asleep = 3, grave = 3, flower = 2,
-  logs = 3, fire = 5, tent = 5, ember = 16,
+  logs = 3, fire = 5, tent = 5, ember = 16, crate = 1,
 }
+-- The Pocket Camp's crate (unseen Spare notices) stands in front of the
+-- fire's right half, its left edge this far from the fire's centre. Its 8
+-- columns stay clear of the first seat on the right (LAYOUT.fire - 1) and
+-- of a doorway there (LAYOUT.fire - LAYOUT.doorway).
+local CRATE_X = -1
 -- Each sprite's x from its actor's (or grave's) left edge. A spark sits
 -- by a seated figure's head, or on a sleeper's blanket, so even the short
 -- band never crops it.
@@ -712,6 +717,12 @@ local function drawFrame(scene, f)
   -- A Crew goal flares the fire for a moment.
   setSprite(scene.flame, (playing(scene, "goal", nil) and "flare" or "fire") .. (f % 3 + 1), unit)
   put(scene, scene.flame, -5, ROW.fire)
+  if view.spares then
+    setSprite(scene.crate, "crate", unit)
+    put(scene, scene.crate, CRATE_X, ROW.crate)
+  else
+    scene.crate:Hide()
+  end
   for i, ember in ipairs(scene.embers) do
     local life = math.floor((f * 0.7 + (i - 1) * 5) % 14)
     local ex = math.floor(math.sin((i - 1) * 2 + f * 0.35) * 3 + (i - 2) * 2 + 0.5)
@@ -884,6 +895,9 @@ function CampScene.new(parent, options)
   scene.tent = texture(scene.art, "BORDER", 0)
   scene.logs = texture(scene.art, "ARTWORK", 0)
   scene.flame = texture(scene.art, "ARTWORK", 1)
+  -- In front of the logs and the fire's base.
+  scene.crate = texture(scene.art, "ARTWORK", 2)
+  scene.crate:Hide()
   scene.embers = { texture(scene.art, "ARTWORK", 2), texture(scene.art, "ARTWORK", 2), texture(scene.art, "ARTWORK", 2) }
   -- Hidden until there's a view, so the more label has a home too.
   scene.more = shadowed(Skin.label(band, "small", Skin.MUTED, "OVERLAY"))
@@ -965,6 +979,15 @@ function CampScene.new(parent, options)
       if at >= actor.x - reach and at < actor.x + actor.width + reach then return actor end
     end
     return nil
+  end
+
+  -- Whether x, y (UI units from the band's bottom left) is over the crate
+  -- (the view's spares), outline and all.
+  function band:CrateAt(x, y)
+    if not (scene.view and scene.view.spares and scene.unit) then return false end
+    local s = Sheet.sprites.crate
+    local at, row = x / scene.unit - scene.fire, y / scene.unit
+    return at >= CRATE_X and at < CRATE_X + s[3] and row >= ROW.crate and row < ROW.crate + s[4]
   end
 
   -- Plays a one-off animation: "ding", "maxLevel", "death", "rareFind",

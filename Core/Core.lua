@@ -878,7 +878,7 @@ end
 -- (maxColumns, the pocketCampColumns setting), or past it for a doorway's
 -- set to fit on one side.
 -- { columns, rows, maxColumns, actors, doorways, more, moreText, tooltip, opacity, locked,
--- hideInCombat, position }. actors are the online Members, you
+-- hideInCombat, position, scale, spares, sparesTooltip }. actors are the online Members, you
 -- first, then those in your party or raid (group()), marked group, as
 -- many as fit, each as in camp() plus pose ("seated",
 -- "adventuring": the Character being played is in an instance,
@@ -906,7 +906,10 @@ end
 -- rest is how UI shows it: opacity (the backdrop's, 0 to 1), locked (it
 -- can't be dragged), hideInCombat and position ({ x, y }: its bottom left
 -- corner from the screen's, or nil where it hasn't been moved) and scale
--- (1 is its usual size). Derived on
+-- (1 is its usual size). spares is how many Spare notices are unseen
+-- (unseenSpares()), nil at none: a crate by the fire, whose tooltip is
+-- sparesTooltip { title ("2 Spare notices"), hint }, and a click on it
+-- opens the Spares tab. Derived on
 -- read, from what the Roster, Feed and Doing know: it can lag, and reading
 -- it sends nothing. See docs/design/pocket-camp.md.
 function Core:pocketCamp()
@@ -919,6 +922,12 @@ function Core:pocketCamp()
   view.scale = self:setting("pocketCampScale") / 100
   view.maxColumns = self:setting("pocketCampColumns")
   view.tooltip.hint = view.locked and "Click to open BFF." or "Click to open BFF. Drag to move."
+  local spares = self:unseenSpares()
+  if spares > 0 then
+    view.spares = spares
+    view.sparesTooltip = spares == 1 and { title = "1 Spare notice", hint = "Click to see it in Spares." }
+      or { title = spares .. " Spare notices", hint = "Click to see them in Spares." }
+  end
   return view
 end
 
