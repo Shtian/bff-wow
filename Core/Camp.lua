@@ -444,7 +444,9 @@ end
 -- or "gathering" while at a profession). Each actor is as in view(), with
 -- pose (see Core:pocketCamp()), instance (its name, while in one), raid
 -- (true if that's a raid), status (the pose in words) and row (the
--- Member's Roster row, for the tooltip over the figure). A flying figure
+-- Member's Roster row, for the tooltip over the figure), and onAlt (true
+-- while the Character shown isn't their Main; the tooltip line says "on
+-- alt" too). A flying figure
 -- takes its griffin's room. Members that didn't fit are counted in more
 -- ("+2"). group (Member id to true: Camp.grouped) are in your party or
 -- raid: they sit right after you, marked group. Members adventuring in
@@ -520,7 +522,9 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group)
         actor.status = STATUS[actor.pose]
       end
     end
-    lines[i] = ("%s: %s"):format(actor.label, actor.status)
+    -- On an Alt: the Character shown isn't their Main.
+    actor.onAlt = actor.row.onAlt or nil
+    lines[i] = ("%s%s: %s"):format(actor.label, actor.onAlt and " (on alt)" or "", actor.status)
   end
   view.splits = nil
   view.doorways = doorways(view.actors)

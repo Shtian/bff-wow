@@ -261,6 +261,35 @@ describe("The Pocket Camp", function()
     assert.equal(layout.pocketMaxColumns, ns.Core.pocketCampWidth(1000))
   end)
 
+  it("marks a Member on an Alt, in the actor and the tooltip, and not one on their Main", function()
+    local net, clients = crew({ "Ann", "Bob", "Cy" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    b.character = character("Bobalt", { level = 4 })
+    b:play()
+    net:run(5)
+    assert.is_true(b.core:setMain("Player-0-Bob"))
+    net:run(15)
+
+    local view = a.core:pocketCamp()
+    assert.is_true(actorFor(view, b).onAlt)
+    assert.is_nil(actorFor(view, a).onAlt)
+    assert.is_nil(actorFor(view, c).onAlt)
+    assert.same({ "You: by the fire", "Bob (on alt): by the fire", "Cy: by the fire" }, view.tooltip.lines)
+
+    -- Your own Alt too.
+    b.core:setSetting("pocketCamp", true)
+    view = b.core:pocketCamp()
+    assert.is_true(actorFor(view, b).onAlt)
+    assert.equal("You (on alt): by the fire", view.tooltip.lines[1])
+
+    -- Back on the Main, the mark goes.
+    b.character = character("Bob")
+    b:play()
+    net:run(70)
+    assert.is_nil(actorFor(a.core:pocketCamp(), b).onAlt)
+    assert.equal("Bob: by the fire", a.core:pocketCamp().tooltip.lines[2])
+  end)
+
   it("gives each actor its Roster row, for the tooltip over its figure", function()
     local _, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
