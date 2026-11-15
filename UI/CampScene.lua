@@ -112,13 +112,11 @@ local SLEEP_STEP = 4
 -- the figure's 12, so half a pixel left of centre) and the row over the
 -- head; it bobs a row every AWAY.every ticks.
 local AWAY = { x = -1, row = 1, every = 6 }
--- A Member on an Alt: a gem by the face, on the side away from the fire
--- (where no pose's sprite faces), x from the figure's left edge left of
--- the fire, and its bottom row from the figure's. It sits beside the face
--- of a seated and a standing figure alike, under a raised hand and the
--- spark. A sleeper's is by the head on its pillow, which is always on
--- the left: x from the bedroll's left edge, row from its bottom.
-local ALT = { x = -2, row = 4, asleepX = -2, asleepRow = 1 }
+-- "ALT" over the head of a Member on an Alt: x from the figure's left
+-- edge (as AFK's), and the row over the head, or over what the pose holds
+-- up there (a tool, the inn sign), as far as the band allows. A sleeper's
+-- is over the z's, where the Camp puts its name.
+local ALT = { x = -1, row = 1 }
 local SPARK_ROW = { seated = 13, asleep = 4 }
 -- The name's gap above a figure's head, in art rows.
 local LABEL_GAP = 1
@@ -374,18 +372,16 @@ local function drawAnimations(scene, parts, actor, f, row, top, away)
   return marked
 end
 
--- Shows a Member on an Alt's gem (ALT) by the face of an upright figure
--- whose bottom row is `row`, on its side away from the fire, or by a
--- sleeper's head.
-local function drawAlt(scene, parts, actor, row)
-  local x, up = ALT.x, ALT.row
-  if actor.pose == "asleep" then
-    x, up = ALT.asleepX, ALT.asleepRow
-  elseif actor.x > 0 then
-    x = LAYOUT.seated - x - Sheet.sprites.alt[3]
-  end
+-- Shows "ALT" (ALT) for a Member on an Alt, its bottom row over `top`.
+local function drawAlt(scene, parts, actor, top)
   setSprite(parts.alt, "alt", scene.unit)
-  put(scene, parts.alt, actor.x + x, row + up)
+  put(scene, parts.alt, actor.x + ALT.x, markRow(scene, "alt", top + ALT.row))
+end
+
+-- The row above the top of a pose's part (POSE) on a figure whose bottom
+-- row is `row`, or 0 for none.
+local function partTop(part, row)
+  return part and row + part[3] + Sheet.sprites[part[1]][4] or 0
 end
 
 -- Shows one of a pose's sprites (POSE) on a texture, for a figure whose
@@ -499,10 +495,11 @@ local function drawActor(scene, parts, actor, f)
     else
       parts.front:Hide()
     end
-    -- A head mark (or a death) takes the Alt's gem's place while it shows.
+    -- A head mark (or a death) takes ALT's place while it shows. ALT goes
+    -- over a tool held up or the inn sign.
     local marked = drawAnimations(scene, parts, actor, f, row, top, pose.away)
     if actor.onAlt and not dead and not marked then
-      drawAlt(scene, parts, actor, row)
+      drawAlt(scene, parts, actor, math.max(top, partTop(pose.tool, row) - ALT.row, partTop(pose.back, row) - ALT.row))
     else
       parts.alt:Hide()
     end
@@ -526,7 +523,7 @@ local function drawActor(scene, parts, actor, f)
       end
     end
     top = bed + SLEEP[3].row + Sheet.sprites.sleep3[4]
-    if actor.onAlt then drawAlt(scene, parts, actor, ROW.asleep) end
+    if actor.onAlt then drawAlt(scene, parts, actor, top) end
   end
   tint(parts.cloth, actor.classFilename)
 
