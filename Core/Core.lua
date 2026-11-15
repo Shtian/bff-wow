@@ -865,7 +865,8 @@ end
 -- and while the Pocket Camp or the Camp setting is off. pocketRows art
 -- pixels high (Core.CAMP_LAYOUT), and as wide as the online Members need:
 -- from pocketColumns, in steps of pocketStep, up to its max width
--- (maxColumns, the pocketCampColumns setting).
+-- (maxColumns, the pocketCampColumns setting), or past it for a doorway's
+-- set to fit on one side.
 -- { columns, rows, maxColumns, actors, doorways, more, moreText, tooltip, opacity, locked,
 -- hideInCombat, position }. actors are the online Members, you
 -- first, then those in your party or raid (group()), marked group, as

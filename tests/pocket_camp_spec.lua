@@ -919,7 +919,7 @@ describe("Playing together", function()
     local shared = view.doorways[bob.doorway]
     local first, last = bob, eve
     if eve.x < bob.x then first, last = eve, bob end
-    assert.equal(first.x + first.width + layout.gap, last.x)
+    assert.equal(first.x + first.width + layout.doorwayGap, last.x)
     assert.same({ first.x - layout.doorway, last.x + last.width - first.x + 2 * layout.doorway, "The Deadmines" },
       { shared.x, shared.width, shared.instance })
     local own = view.doorways[dee.doorway]
@@ -951,19 +951,48 @@ describe("Playing together", function()
     assert.is_nil(actorFor(view, b).doorway)
   end)
 
-  it("widens to keep a doorway's Members together, as far as its max width allows", function()
+  it("widens as far as a doorway's set needs, past its max width, with them standing closer", function()
     local net, clients, ns = crew({ "Ann", "Bob", "Cid", "Dee", "Eve" })
     local a = clients[1]
-    inside(net, { clients[2], clients[3], clients[4], clients[5] }, "The Deadmines")
-    -- Four don't fit on one side at the usual width.
+    local layout = ns.Core.CAMP_LAYOUT
+    inside(net, clients, "The Deadmines")
+    -- Five don't fit on one side at the usual width, the max by default.
     local view = a.core:pocketCamp()
-    assert.equal(ns.Core.CAMP_LAYOUT.pocketColumns, view.columns)
+    assert.equal(layout.pocketColumns, view.maxColumns)
+    assert.equal(layout.pocketColumns + 2 * layout.pocketStep, view.columns)
     assert.is_nil(view.more)
-    a.core:setPocketCampColumns(ns.Core.CAMP_LAYOUT.pocketMaxColumns)
-    view = a.core:pocketCamp()
-    assert.is_true(view.columns > ns.Core.CAMP_LAYOUT.pocketColumns)
     assert.equal(1, #view.doorways)
-    assert.same({ "Bob", "Cid", "Dee", "Eve" }, under(view, 1))
+    assert.same({ "Bob", "Cid", "Dee", "Eve", "You" }, under(view, 1))
+    local xs = {}
+    for i, actor in ipairs(view.actors) do xs[i] = actor.x end
+    table.sort(xs)
+    for i = 2, #xs do assert.equal(layout.seated + layout.doorwayGap, xs[i] - xs[i - 1]) end
+  end)
+
+  it("seats your group on your side of the fire outside an instance, filling it first", function()
+    local _, clients, ns = crew({ "Ann", "Bob", "Cid", "Dee", "Eve" })
+    local a, b, c, d, e = clients[1], clients[2], clients[3], clients[4], clients[5]
+    a.core:group({ unit(a), unit(c), unit(e) })
+    local view = a.core:pocketCamp()
+    local you = view.actors[1]
+    for _, client in ipairs({ c, e }) do
+      local actor = actorFor(view, client)
+      assert.equal(you.x < 0, actor.x < 0)
+    end
+    for _, client in ipairs({ b, d }) do
+      assert.are_not.equal(you.x < 0, actorFor(view, client).x < 0)
+    end
+    -- Four in your group don't fit on one side: three there, one across.
+    a.core:setPocketCampColumns(ns.Core.CAMP_LAYOUT.pocketMaxColumns)
+    a.core:group({ unit(a), unit(b), unit(c), unit(d), unit(e) })
+    view = a.core:pocketCamp()
+    -- And it doesn't grow for that.
+    assert.equal(ns.Core.CAMP_LAYOUT.pocketColumns, view.columns)
+    local yours = 0
+    for _, actor in ipairs(view.actors) do
+      if (actor.x < 0) == (view.actors[1].x < 0) then yours = yours + 1 end
+    end
+    assert.equal(3, yours)
   end)
 
   it("is exactly as before when you're not in a group and nobody shares an instance", function()
