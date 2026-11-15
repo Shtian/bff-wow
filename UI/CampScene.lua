@@ -9,9 +9,9 @@
 -- runs only while the band is shown. Silent. See docs/design/camp.md.
 -- The Pocket Camp (UI/PocketCamp.lua) is a band of its own: its actors
 -- are also drawn doing what Core says they're doing (POSE: a torch in a
--- doorway, a rod out to the fire, a griffin under them and so on), and
--- :Animate plays its one-off animations. See
--- docs/design/pocket-camp.md.
+-- doorway, a rod out to the fire, a griffin under them and so on), or
+-- as the shapeshift form they're in (FORM), and :Animate plays its one-off
+-- animations. See docs/design/pocket-camp.md.
 
 local _, ns = ...
 
@@ -34,7 +34,8 @@ local FPS = 6
 local HOP_FOR = 0.7
 -- How long each one-off animation plays (band:Animate), in seconds: a
 -- quick opening, then a tail long enough to notice at a glance.
-local ANIMATION_FOR = { ding = 10, maxLevel = 10, death = 10, rareFind = 10, goal = 10, quest = 6, arrive = 6 }
+local ANIMATION_FOR = { ding = 10, maxLevel = 10, death = 10, rareFind = 10, goal = 10, quest = 6, arrive = 6,
+  shift = 1 }
 -- The openings: a ding's star rises for this long, and a death's smoke
 -- rises while the figure flickers. A max level's burst repeats this often.
 local STAR_RISES_FOR = 1.2
@@ -118,6 +119,43 @@ local AWAY = { x = -1, row = 1, every = 6 }
 -- is over the z's, where the Camp puts its name.
 local ALT = { x = -1, row = 1 }
 local SPARK_ROW = { seated = 13, asleep = 4 }
+-- A shapeshift form (actor.form) is drawn in the figure's place, with no
+-- seat: its sprite stands on the ground centred on the figure's columns,
+-- facing right as drawn and mirrored on the fire's right to face it. idle
+-- is its frames at rest: the second shows now and then (a blink, a swish,
+-- a wave: BLINK), or every other BREATHE_TICKS for one that breathes. One
+-- that trots has trot frames instead and goes to and fro over TROT.span
+-- columns from its place, away from the fire, turning at each end. A cat
+-- is the night elf's (idle) for an Alliance viewer and the tauren's
+-- (horde) for a Horde one: faction isn't synced, and the Crew is yours.
+-- Ghost Wolf is see-through (GHOST), with a glow behind it. Shifting
+-- puffs leaves, or spirit wisps to or from Ghost Wolf (puff).
+local FORM = {
+  wolf = { trot = { "wolfRun1", "wolfRun2" }, glow = { "wolfGlow1", "wolfGlow2" }, puff = "spirit" },
+  bear = { idle = { "bearStand1", "bearStand2" }, breathe = true, swipe = true },
+  cat = { idle = { "catElf1", "catElf2" }, horde = { "catLion1", "catLion2" } },
+  travel = { trot = { "travelRun1", "travelRun2" } },
+  seal = { idle = { "seal1", "seal2" } },
+  moonkin = { idle = { "moonkin1", "moonkin2" } },
+}
+local BREATHE_TICKS = 9
+local BLINK = { every = 24, ticks = 3 }
+-- A trot's step every `step` ticks, and how far it goes.
+local TROT = { step = 2, span = 4 }
+-- Every SWIPE.every ticks the bear rears up for `rear` ticks, swipes for
+-- `swipe` (claw marks in front of its paw: CLAWS) and rears again for
+-- `after`.
+local SWIPE = { every = 60, rear = 3, swipe = 2, after = 2 }
+-- The claw marks' left column and top row in the outlined swipe frame.
+local CLAWS = { x = 16, row = 4 }
+-- Ghost Wolf's alpha and its glow's, and for PULSE.ticks of every
+-- PULSE.every they brighten a little.
+local GHOST = { alpha = 0.6, glow = 0.15, pulseAlpha = 0.7, pulseGlow = 0.25 }
+local PULSE = { every = 9, ticks = 2 }
+-- A shift's puff: two frames, alternating each tick, over the figure,
+-- this many rows above the ground; it fades to PUFF.fade after PUFF.solid
+-- ticks.
+local PUFF = { row = 2, solid = 4, fade = 0.5 }
 -- The name's gap above a figure's head, in art rows.
 local LABEL_GAP = 1
 
@@ -290,7 +328,7 @@ local function playing(scene, kind, memberId)
   for i = #scene.animations, 1, -1 do
     local animation = scene.animations[i]
     if animation.kind == kind and animation.memberId == memberId and now < animation.ends then
-      return now - animation.start
+      return now - animation.start, animation
     end
   end
   return nil
@@ -408,6 +446,7 @@ local function hideExtras(parts)
   end
   parts.cloth:SetAlpha(1)
   parts.skin:SetAlpha(1)
+  parts.back:SetAlpha(1)
 end
 
 -- Draws a Member coming online, `played` seconds into it: walking in from
@@ -447,10 +486,84 @@ local function drawArrival(scene, parts, actor, f, played)
   return x, top
 end
 
+-- Draws an actor as its shapeshift form (FORM), for the animation frame
+-- f. Returns the row above its head.
+local function drawForm(scene, parts, actor, f)
+  local form, unit = FORM[actor.form], scene.unit
+  -- Offsets each actor's animation, so they don't all move at once.
+  local seed = math.abs(actor.x)
+  local right = actor.x > 0
+  local x, mirrored = actor.x, right
+  local name
+  local clawing = false
+  if form.trot then
+    local step = math.floor(f / TROT.step)
+    local p = (step + seed) % (TROT.span * 2)
+    local outward = p < TROT.span
+    local off = outward and p or TROT.span * 2 - p
+    x = right and x + off or x - off
+    -- Sprites face right: going right, it's drawn as it is.
+    mirrored = right ~= outward
+    name = form.trot[step % 2 + 1]
+  else
+    local phase = (f + seed * 9) % SWIPE.every
+    if form.swipe and phase < SWIPE.rear + SWIPE.swipe + SWIPE.after then
+      clawing = phase >= SWIPE.rear and phase < SWIPE.rear + SWIPE.swipe
+      name = clawing and "bearSwipe" or "bearRear"
+    else
+      local frames = form.horde and scene.horde and form.horde or form.idle
+      local beat
+      if form.breathe then
+        beat = math.floor((f + seed) / BREATHE_TICKS) % 2
+      else
+        beat = (f + seed) % BLINK.every < BLINK.ticks and 1 or 0
+      end
+      name = frames[beat + 1]
+    end
+  end
+  local s = Sheet.sprites[name]
+  -- Centred on the figure's columns, and kept inside the band.
+  local left = x + math.floor(LAYOUT.seated / 2) - math.floor(s[3] / 2)
+  left = math.max(-scene.fire, math.min(scene.view.columns - scene.fire - s[3], left))
+  setSprite(parts.skin, name, unit, mirrored)
+  put(scene, parts.skin, left, ROW.standing)
+  if form.glow then
+    local pulse = f % PULSE.every < PULSE.ticks
+    local frame = form.trot and math.floor(f / TROT.step) % 2 + 1 or 1
+    setSprite(parts.back, form.glow[frame], unit, mirrored)
+    put(scene, parts.back, left - 1, ROW.standing - 1)
+    parts.back:SetAlpha(pulse and GHOST.pulseGlow or GHOST.glow)
+    parts.skin:SetAlpha(pulse and GHOST.pulseAlpha or GHOST.alpha)
+  end
+  if clawing then
+    local claws = Sheet.sprites.bearClaws
+    setSprite(parts.front, "bearClaws", unit, mirrored)
+    put(scene, parts.front, mirrored and left + s[3] - CLAWS.x - claws[3] or left + CLAWS.x,
+      ROW.standing + s[4] - CLAWS.row - claws[4])
+  end
+  return ROW.standing + s[4]
+end
+
+-- Draws a shift's puff over an actor, while one plays.
+local function drawPuff(scene, parts, actor)
+  local played, animation = playing(scene, "shift", actor.memberId)
+  if not played then
+    parts.puff:Hide()
+    return
+  end
+  local age = math.floor(played * FPS)
+  local name = animation.puff .. (age % 2 + 1)
+  setSprite(parts.puff, name, scene.unit)
+  put(scene, parts.puff, actor.x + math.floor(LAYOUT.seated / 2) - math.floor(Sheet.sprites[name][3] / 2),
+    ROW.standing + PUFF.row)
+  parts.puff:SetAlpha(age >= PUFF.solid and PUFF.fade or 1)
+end
+
 -- Draws one actor's figure, seat or sleep marks, what its pose adds, spark
 -- and name, for the animation frame f. Upright poses: "seated" and the
--- Pocket Camp's (POSE). After a death the figure is a skeleton for a
--- while, whatever its pose. A Member coming online walks in first.
+-- Pocket Camp's (POSE), or its shapeshift form (FORM). After a death the
+-- figure is a skeleton for a while, whatever its pose or form. A Member
+-- coming online walks in first.
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
   local top
@@ -458,6 +571,20 @@ local function drawActor(scene, parts, actor, f)
   local walkedIn = actor.pose ~= "asleep" and playing(scene, "arrive", actor.memberId)
   if walkedIn then
     x, top = drawArrival(scene, parts, actor, f, walkedIn)
+  elseif actor.form and not playing(scene, "death", actor.memberId) then
+    parts.seat:Hide()
+    parts.cloth:Hide()
+    hideExtras(parts)
+    top = drawForm(scene, parts, actor, f)
+    -- Marks over its head, as over a figure's; they leave Ghost Wolf
+    -- see-through.
+    local alpha = parts.skin:GetAlpha()
+    if drawAnimations(scene, parts, actor, f, ROW.standing, top) or not actor.onAlt then
+      parts.alt:Hide()
+    else
+      drawAlt(scene, parts, actor, top)
+    end
+    parts.skin:SetAlpha(alpha)
   elseif actor.pose ~= "asleep" then
     local dead = playing(scene, "death", actor.memberId) ~= nil
     local pose = not dead and POSE[actor.pose] or {}
@@ -470,6 +597,7 @@ local function drawActor(scene, parts, actor, f)
       setSprite(parts.seat, "seat", scene.unit)
       put(scene, parts.seat, x + OFFSET.seat, ROW.seat)
     end
+    parts.back:SetAlpha(1)
     local armsUp = hop or standing
     if dead then
       parts.cloth:Hide()
@@ -526,6 +654,7 @@ local function drawActor(scene, parts, actor, f)
     if actor.onAlt then drawAlt(scene, parts, actor, top) end
   end
   tint(parts.cloth, actor.classFilename)
+  drawPuff(scene, parts, actor)
 
   local centre = x + actor.width / 2
   local label = parts.label
@@ -636,6 +765,25 @@ local function onUpdate(band)
   drawFrame(scene, f)
 end
 
+-- A shift's puff for each actor whose form isn't what it was at the last
+-- Draw: spirit wisps to or from Ghost Wolf, else leaves. Not for one that
+-- just came into view.
+local function puffShifts(scene, view)
+  local now, forms = GetTime(), {}
+  for _, actor in ipairs(view.actors) do
+    local id = actor.memberId
+    local form = actor.pose ~= "asleep" and actor.form or false
+    local was = scene.forms[id]
+    if was ~= nil and was ~= form then
+      local puff = FORM[form] and FORM[form].puff or FORM[was] and FORM[was].puff or "leaves"
+      scene.animations[#scene.animations + 1] = { kind = "shift", memberId = id, start = now,
+        ends = now + ANIMATION_FOR.shift, puff = puff }
+    end
+    forms[id] = form
+  end
+  scene.forms = forms
+end
+
 -- Backdrop art with a band per width (CampSheet.pocketBackdrop): the top
 -- and bottom texture coordinates of the band for a Camp `columns` wide.
 -- Each band's art is at its bottom, under rows the band clips, so the
@@ -675,6 +823,9 @@ function CampScene.new(parent, options)
     target = options.target or CampScene.BAND_TARGET,
     crisp = options.crisp ~= false,
     hops = {},
+    -- Each actor's form at the last Draw (false for none), to puff on a
+    -- change.
+    forms = {},
     -- The one-off animations playing: { kind, memberId, start, ends }.
     animations = {},
     texture = function(layer, sublevel) return texture(band.art, layer, sublevel) end,
@@ -694,6 +845,7 @@ function CampScene.new(parent, options)
         spark = texture(band.art, "OVERLAY", 0),
         mark = texture(band.art, "OVERLAY", 1),
         alt = texture(band.art, "OVERLAY", 1),
+        puff = texture(band.art, "OVERLAY", 2),
         label = shadowed(nameLabel(band.art)),
       }
     end),
@@ -746,6 +898,8 @@ function CampScene.new(parent, options)
       return
     end
     scene.frame = nil
+    scene.horde = UnitFactionGroup ~= nil and UnitFactionGroup("player") == "Horde"
+    puffShifts(scene, view)
     local art = scene.backdropArt
     if art.band then
       scene.backdrop:SetTexCoord(0, 1, bandCoords(art, view.columns))

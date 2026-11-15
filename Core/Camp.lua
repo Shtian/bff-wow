@@ -27,7 +27,10 @@ local DAY = 24 * 60 * 60
 -- `pocketStep` (one more seat each side); a flying figure's griffin takes
 -- `griffinFore` more towards the fire and `griffinAft` away from it, and a
 -- doorway reaches `doorway` past the first and last figure standing in it,
--- whose figures stand `doorwayGap` apart, a little closer than `gap`.
+-- whose figures stand `doorwayGap` apart, a little closer than `gap`. A
+-- shapeshift form's sprite, wider than a figure, reaches `formFore` past
+-- it towards the fire and `formAft` away from it, and `formTrot` further
+-- for a form that trots to and fro.
 local LAYOUT = {
   fire = 9,
   seated = 12,
@@ -46,6 +49,9 @@ local LAYOUT = {
   pocketRows = 34,
   griffinFore = 8,
   griffinAft = 6,
+  formFore = 3,
+  formAft = 3,
+  formTrot = 4,
   doorway = 2,
   doorwayGap = 3,
 }
@@ -280,6 +286,16 @@ local STATUS = {
   afk = "away", flying = "flying",
 }
 
+-- A shapeshift form in words, and the forms that trot.
+local FORM_STATUS = {
+  wolf = "a ghost wolf", bear = "in bear form", cat = "in cat form", travel = "in travel form",
+  seal = "in aquatic form", moonkin = "in moonkin form",
+}
+local TROTS = { wolf = true, travel = true }
+-- The poses a form is drawn over: by the fire and fighting. Anything else
+-- shows what's being done.
+local FORM_POSES = { seated = true, fighting = true }
+
 -- The seat key of you and your group outside an instance (Camp.pocket):
 -- no instance's name, so it never matches one.
 local GROUP = {}
@@ -441,9 +457,13 @@ end
 -- of the widest can hold them. doing is what they're
 -- up to, each by Member id: said (what they last said they're doing, as
 -- Doing gives it), fishing (true while fishing) and working ("crafting"
--- or "gathering" while at a profession). Each actor is as in view(), with
+-- or "gathering" while at a profession), and form (the shapeshift form
+-- each was last said to be in). Each actor is as in view(), with
 -- pose (see Core:pocketCamp()), instance (its name, while in one), raid
--- (true if that's a raid), status (the pose in words) and row (the
+-- (true if that's a raid), form (the shapeshift form drawn in its place,
+-- seated or fighting, with trots true for one that trots, and the room
+-- its sprite needs: LAYOUT.formFore and formAft), status (the pose in
+-- words, or by the fire the form's: "in bear form") and row (the
 -- Member's Roster row, for the tooltip over the figure), and onAlt (true
 -- while the Character shown isn't their Main; the tooltip line says "on
 -- alt" too). A flying figure takes its griffin's room. Members that
@@ -460,8 +480,13 @@ end
 function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, shown)
   group = group or {}
   shown = shown or {}
-  local poses = {}
-  for _, row in ipairs(rows) do poses[row.memberId] = poseOf(row, doing) end
+  local poses, forms = {}, {}
+  for _, row in ipairs(rows) do
+    local id = row.memberId
+    poses[id] = poseOf(row, doing)
+    local form = doing.form and doing.form[id]
+    if FORM_POSES[poses[id]] and FORM_STATUS[form] then forms[id] = form end
+  end
   -- Who sits together: a doorway's set (its instance), or, with you
   -- outside an instance, you and your group outside one (GROUP), so
   -- they're on your side of the fire. With you in a doorway, your group
@@ -479,6 +504,8 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
     tent = false, onlineOnly = true, moreText = "+%d", sleepers = bedrolls,
     room = function(row)
       if poses[row.memberId] == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
+      local form = forms[row.memberId]
+      if form then return LAYOUT.formFore, LAYOUT.formAft + (TROTS[form] and LAYOUT.formTrot or 0) end
     end,
     together = function(row)
       local key = seatKey(row)
@@ -517,9 +544,13 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
       actor.pose = poses[actor.memberId]
       actor.instance = actor.row.instance
       actor.group = group[actor.memberId]
+      actor.form = forms[actor.memberId]
+      actor.trots = actor.form and TROTS[actor.form] or nil
       if actor.pose == "adventuring" then
         actor.raid = RAIDS[actor.instance] or nil
         actor.status = "in " .. actor.instance
+      elseif actor.form and actor.pose == "seated" then
+        actor.status = FORM_STATUS[actor.form]
       else
         actor.status = STATUS[actor.pose]
       end

@@ -86,7 +86,8 @@ local function sentLine(self, message, size, to)
   end
   if message.type == "WHERE" then return ("send WHERE · %d B"):format(size) end
   if message.type == "DOING" then
-    return ("send DOING · %s · %d B"):format(message.doing or "nothing", size)
+    return ("send DOING · %s%s · %d B"):format(message.doing or "nothing",
+      message.form and (" · " .. message.form) or "", size)
   end
   local records = {}
   for i, record in ipairs(type(message.records) == "table" and message.records or {}) do
@@ -310,10 +311,14 @@ local BEDROLL_FOR = 10 * 60
 local function pocketView(self)
   local now = self.now()
   local rows = ns.Roster.rows(self.ledger, now)
-  local doing = { said = {}, fishing = {}, working = {} }
+  local doing = { said = {}, form = {}, fishing = {}, working = {} }
   for _, row in ipairs(rows) do
     local id = row.memberId
-    if row.own then doing.said[id] = self.doings:state() else doing.said[id] = self.doings:of(id) end
+    if row.own then
+      doing.said[id], doing.form[id] = self.doings:state(), self.doings:form()
+    else
+      doing.said[id], doing.form[id] = self.doings:of(id), self.doings:formOf(id)
+    end
   end
   for id, ends in pairs(self.fishing) do
     if ends > now then doing.fishing[id] = true end
@@ -535,7 +540,11 @@ end
 
 -- What the Character being played is doing right now, as the game says
 -- it: { combat, vendor (a vendor's window is open), auction (the auction
--- house's is), afk (flagged away), resting, flying }, each true or not.
+-- house's is), afk (flagged away), resting, flying }, each true or not,
+-- and form: the shapeshift form you're in ("wolf", "bear", "cat",
+-- "travel", "seal" or "moonkin"), or nil. Your figure shows the form at
+-- once; the Crew hears of Ghost Wolf and the combat forms at once, of a
+-- travel form once it's been held for 30 s, and never of a form's end.
 -- App reports it every second; Core picks the one to show (flying, the
 -- auction house, a vendor, fighting, which lasts 20 s past the end of
 -- combat, then away, then resting), shows it on your figure in the Pocket
@@ -876,7 +885,12 @@ end
 -- "fishing": for a minute after their catches were seen to grow, or yours
 -- did, "crafting" or "gathering": for a minute after a profession's skill
 -- was, or what they're doing right now, as doing() reports it and a DOING
--- tells: "fighting", "vendor", "auction", "afk", "resting" or "flying"), instance
+-- tells: "fighting", "vendor", "auction", "afk", "resting" or "flying"),
+-- form (the shapeshift form drawn in the figure's place, seated or
+-- fighting: "wolf", "bear", "cat", "travel", "seal" or "moonkin"; trots
+-- is true for the forms that trot, wolf and travel, and the sprite reaches
+-- CAMP_LAYOUT.formFore past the figure towards the fire and formAft, plus
+-- formTrot if it trots, away from it), instance
 -- (its name, while in one), raid (true if it's a raid) and status (the
 -- pose in words: "by the fire", "in The Deadmines", "at a vendor"). A
 -- flying figure's griffin reaches CAMP_LAYOUT.griffinFore past it towards

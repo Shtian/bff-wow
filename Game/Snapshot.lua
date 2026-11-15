@@ -276,8 +276,8 @@ end
 
 -- What the Character is doing right now, for Core's doing(): in combat,
 -- at a vendor or the auction house (their windows, kept from their show
--- and close events), away (AFK), resting, and flying (a flight path, or a flying
--- mount where the client has them). A value that reads secret is false,
+-- and close events), away (AFK), resting, flying (a flight path, or a flying
+-- mount where the client has them), and the shapeshift form it's in. A value that reads secret is false,
 -- and so is one whose function the client doesn't have.
 local windows = { vendor = false, auction = false }
 local function flag(ask, ...)
@@ -285,6 +285,43 @@ local function flag(ask, ...)
   local value = ask(...)
   if issecretvalue and issecretvalue(value) then return false end
   return value and true or false
+end
+
+-- The shapeshift form, by GetShapeshiftFormID(): the druid's cat (1),
+-- travel (3), aquatic (4), bear (5, and dire bear's 8) and moonkin (31,
+-- 35), and the shaman's Ghost Wolf (16). Other forms (tree of life,
+-- flight) are none.
+local FORM_IDS = { [1] = "cat", [3] = "travel", [4] = "seal", [5] = "bear", [8] = "bear", [16] = "wolf",
+  [31] = "moonkin", [35] = "moonkin" }
+-- Ghost Wolf's spell, for its aura where the form reads as none.
+local GHOST_WOLF = 2645
+-- The last form read that wasn't secret: what's shown while a read is
+-- (in combat, under Midnight's restrictions).
+local lastForm = nil
+
+-- A read, or nil with secret true when it reads secret or errors (a
+-- restriction we don't know of).
+local function askSafely(ask, ...)
+  if not ask then return nil end
+  local ok, value = pcall(ask, ...)
+  if not ok or (issecretvalue and issecretvalue(value)) then return nil, true end
+  return value
+end
+
+-- The shapeshift form the Character is in, for Core's doing(): "wolf",
+-- "bear", "cat", "travel", "seal", "moonkin" or nil. While a read is
+-- secret, the last one read outside combat.
+local function form()
+  local id, secret = askSafely(GetShapeshiftFormID)
+  if secret then return lastForm end
+  local found = FORM_IDS[id]
+  if not found and C_UnitAuras then
+    local aura, auraSecret = askSafely(C_UnitAuras.GetPlayerAuraBySpellID, GHOST_WOLF)
+    if auraSecret then return lastForm end
+    if aura then found = "wolf" end
+  end
+  lastForm = found
+  return found
 end
 
 function Snapshot.doing()
@@ -295,6 +332,7 @@ function Snapshot.doing()
     afk = flag(UnitIsAFK, "player"),
     resting = flag(IsResting),
     flying = flag(UnitOnTaxi, "player") or flag(IsFlying),
+    form = form(),
   }
 end
 
