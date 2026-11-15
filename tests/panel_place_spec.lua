@@ -98,8 +98,8 @@ describe("Panel place", function()
     local core = newCore()
     local display = core:settings()[2]
     local reset = display.settings[#display.settings]
-    assert.same({ key = "panelPlace", kind = "panelPlace", label = "Reset BFF window" },
-      { key = reset.key, kind = reset.kind, label = reset.label })
+    assert.same({ key = "panelPlace", kind = "panelPlace", label = "BFF window size and position", button = "Reset" },
+      { key = reset.key, kind = reset.kind, label = reset.label, button = reset.button })
     assert.is_nil(reset.value)
   end)
 end)

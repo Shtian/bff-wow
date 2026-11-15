@@ -142,6 +142,7 @@ describe("Settings list", function()
     assert.equal("Appear offline: send nothing, so your Crew sees you as offline", sections[1].settings[1].label)
     assert.equal("sound", sections[3].settings[2].kind)
     assert.equal("position", sections[3].settings[3].kind)
+    assert.same({ "Where toasts appear", "Move" }, { sections[3].settings[3].label, sections[3].settings[3].button })
   end)
 
   it("offers map pin sizes as choices, needing the map setting, and keeps only a known size", function()

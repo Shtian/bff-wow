@@ -1622,7 +1622,7 @@ local SETTINGS = {
   -- The panel's size and position (panelPlace()); the page shows a reset.
   {
     key = "panelPlace", section = NOTIFICATIONS, kind = "panelPlace",
-    label = "Reset BFF window",
+    label = "BFF window size and position", button = "Reset",
     saved = windowPlace("panelPlace"),
   },
   {
@@ -1640,7 +1640,7 @@ local SETTINGS = {
   -- left; nil for the default.
   {
     key = "toastPosition", section = TOASTS, kind = "position",
-    label = "Move toasts",
+    label = "Where toasts appear", button = "Move",
     saved = screenPosition("toastPosition"),
   },
   -- The Pocket Camp (pocketCamp()), in a section of its own: whether it shows, its backdrop's
@@ -1803,7 +1803,8 @@ function Core:dismissTip(key)
 end
 
 -- The Settings page, ready to render: sections in order, { title,
--- settings }, each setting { key, kind, label, value }. Settings with no
+-- settings }, each setting { key, kind, label, value }, and button, the
+-- text of the button for a setting set by one (Reset, Move). Settings with no
 -- section (the Together tab's Show menu) aren't on it.
 function Core:settings()
   local sections, byTitle = {}, {}
@@ -1822,6 +1823,7 @@ function Core:settings()
         value = self:setting(setting.key),
         choices = setting.choices,
         needs = setting.needs,
+        button = setting.button,
       }
     end
   end

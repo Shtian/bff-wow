@@ -207,10 +207,10 @@ None of the rendering has run in a client, and the new sprites were authored as 
 - An arrival: the walk frames and speed from each edge at a few widths, the wave and the "hi!" bubble at size, and that 6 s feels right. That a friend logging in shortly after you (within 2 minutes) not walking in doesn't look like a bug.
 - A bedroll in the Pocket Camp beside seated figures, its z's inside the band, and its tooltip.
 - The Tip window at first login: its place next to While you were away, which opens a little later, and that it waits for combat to end.
-- The Settings slider's thumb and track on Forever's Settings page.
+- The Settings slider's thumb, track and fill in the panel's Settings view.
 - How the Pocket Camp growing past its max width for a dungeon group of four or five looks next to the action bars it was placed by. A press on the grip draws it at the max width, which can then be narrower than the doorway's set, clipping them until the release.
 - A shared doorway for two, three, four and five figures, normal and raid: that the stretched lintel and the centred keystone or skull read well, and the torches inside it.
 - That `GROUP_ROSTER_UPDATE` fires on joining, leaving and a raid conversion on Forever, and whether `UnitGUID` or `UnitName` of party and raid units read secret in an instance (the name match is the fallback). That `UnitName` on a party unit gives the last name as its second value, as it does for `"player"`.
 - The "In your group" line in a figure's tooltip.
 - ALT at size in every pose: seated, in a doorway over the raised torch, fighting, crafting, gathering, flying, resting (on the inn sign's beam), and over a bedroll's z's. That the pale blue reads over bright and dark scenes, that ALT over a raised tool still looks like the figure's, and that it goes while a head mark or AFK shows. `/bffdev`'s **Alt** button switches the selected simulated Member to their next Character, which shows ALT for one with a Main set.
-- The Shown in the Pocket Camp section on the Settings page, its checkbox greyed out while the Pocket Camp is off, and ALT going and coming back at once when it's turned off and on.
+- The Shown in the Pocket Camp section on the Settings page, its switch greyed out while the Pocket Camp is off, and ALT going and coming back at once when it's turned off and on.

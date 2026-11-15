@@ -24,7 +24,6 @@ local MESSAGES = {
   wrongPassword = "BFF couldn't join its channel: start a new Crew.",
   leftCrew = "You left the Crew.",
   minimapHidden = "Minimap button hidden. Type /bff minimap to show it again.",
-  settingsInCombat = "BFF's settings open once you're out of combat.",
   outOfDate = "BFF is out of date: someone in your Crew has a newer version. Update to keep seeing them.",
   invalidItem = "That isn't an item. Drop one on the Spares tab (/bff spares), or type /bff spares add and shift-click it into the chat box.",
   bound = "That item is bound to you, so it can't be passed on.",
@@ -129,7 +128,6 @@ local function onCoreEvent(event, arg, more)
     ns.TipDialog.refresh()
     ns.Minimap.refresh()
     ns.MapPins.refresh()
-    ns.Settings.refresh()
   elseif event == "settingChanged" then
     -- arg is the key, more the new value; each module ignores keys it
     -- doesn't use.
@@ -138,7 +136,6 @@ local function onCoreEvent(event, arg, more)
     ns.TipDialog.refresh()
     ns.Minimap.settingChanged(arg, more)
     ns.Toasts.settingChanged(arg, more)
-    ns.Settings.settingChanged(arg, more)
     ns.MapPins.settingChanged(arg, more)
   elseif event == "moved" then
     -- A Member's live spot (a WHERE): only the map shows it.
@@ -149,7 +146,6 @@ local function onCoreEvent(event, arg, more)
     ns.PocketCamp.refresh()
     ns.Minimap.refresh()
     ns.MapPins.refresh()
-    ns.Settings.refresh()
   elseif event == "notice" then
     say(MESSAGES[arg])
   elseif event == "feedEntry" or event == "reaction" or event == "spare" then
@@ -243,7 +239,6 @@ local function start(isInitialLogin)
   ns.Minimap.start(ns.core)
   ns.MapPins.start(ns.core)
   ns.Toasts.start(ns.core)
-  ns.Settings.start(ns.core)
   ns.Snapshot.start(ns.core)
   C_Timer.NewTicker(1, function()
     ns.core:doing(ns.Snapshot.doing())
@@ -403,7 +398,7 @@ function commands.together()
 end
 
 function commands.settings()
-  ns.Settings.open()
+  ns.Panel.show("settings")
 end
 
 function commands.minimap()

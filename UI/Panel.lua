@@ -17,7 +17,8 @@
 -- Member and a tile each with their best Character's skill, sortable by a
 -- profession. Together is a level line of friends and dungeons, drawn by
 -- TogetherTab. Catches is a field guide of the Crew's fishing catches,
--- drawn by CatchesTab. A grip in the bottom right corner resizes the window, and
+-- drawn by CatchesTab. Settings is every setting, drawn by SettingsTab;
+-- out of a Crew it opens in place of the setup view, with a way back. A grip in the bottom right corner resizes the window, and
 -- Core keeps its size and position; views lay out to the current width
 -- and redraw when a resize ends. While Core has a Camp (camp()), its band
 -- runs across the window under the header, above the sidebar and every
@@ -145,6 +146,7 @@ local rosterView
 local feedView
 local goalsView
 local whatsNewView
+local settingsView
 local whenView
 local sparesView
 local professionsView
@@ -617,10 +619,7 @@ local function createNav()
   nav.catches = navButton("Catches", open("catches"))
   nav.catches:SetPoint("TOPLEFT", nav.together, "BOTTOMLEFT")
   nav.catches:SetPoint("TOPRIGHT", nav.together, "BOTTOMRIGHT")
-  -- The panel steps aside so it doesn't cover the settings.
-  nav.settings = navButton("Settings", function()
-    if ns.Settings.open() then frame:Hide() end
-  end)
+  nav.settings = navButton("Settings", open("settings"))
   nav.settings:SetPoint("BOTTOMLEFT", 0, NAV_BOTTOM)
   nav.settings:SetPoint("BOTTOMRIGHT", 0, NAV_BOTTOM)
   nav.version = CreateFrame("Button", nil, frame.sidebar)
@@ -655,7 +654,7 @@ local function drawNav(unseen, sparesUnseen)
   setSelected(nav.professions, tab == "professions")
   setSelected(nav.together, tab == "together")
   setSelected(nav.catches, tab == "catches")
-  setSelected(nav.settings, false)
+  setSelected(nav.settings, tab == "settings")
   nav.version.selected:SetShown(tab == "whatsnew")
   Skin.color(nav.version.label, tab == "whatsnew" and TEXT or DIM)
   nav.version.dot:SetShown(core:hasNewChanges())
@@ -914,6 +913,24 @@ local function drawGoals()
   ns.GoalsTab.draw(goalsView, core, listWidth(), Panel.refresh)
   goalsView:Show()
   updateThumb(goalsView)
+end
+
+-- Settings: drawn by SettingsTab into a scroll view of the panel's. Out of
+-- a Crew there's no sidebar, so it's the window's full width, and Back
+-- goes to the setup view.
+local function drawSettings(inCrew)
+  if not settingsView then
+    settingsView = createScrollView()
+    settingsView:SetPoint("TOPLEFT")
+    settingsView:SetPoint("BOTTOMRIGHT", -6, 0)
+  end
+  local width = inCrew and listWidth() or frame:GetWidth() - 2 - 6
+  ns.SettingsTab.draw(settingsView, core, width, not inCrew and function()
+    tab = "roster"
+    Panel.refresh()
+  end or nil)
+  settingsView:Show()
+  updateThumb(settingsView)
 end
 
 -- What's new: drawn by WhatsNewTab into a scroll view of the panel's.
@@ -1720,6 +1737,10 @@ local function create()
     core:leaveGoals()
     core:leaveWhatsNew()
     ns.WhatsNewTab.leave()
+    ns.SettingsTab.leave()
+    -- Out of a Crew, Settings opens over the setup view only when asked
+    -- for; the panel comes back to setup.
+    if tab == "settings" and not core:crew() then tab = "roster" end
   end)
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
@@ -1992,7 +2013,7 @@ local function drawFooter(crew, summary)
 end
 
 -- Hides every tab's view but the one named ("roster", "feed", "goals",
--- "when", "spares", "professions", "together", "catches", "whatsnew"; nil hides them all). Each draw function shows
+-- "when", "spares", "professions", "together", "catches", "whatsnew", "settings"; nil hides them all). Each draw function shows
 -- its own.
 local function hideViewsBut(name)
   if name ~= "roster" then
@@ -2007,6 +2028,10 @@ local function hideViewsBut(name)
   if name ~= "whatsnew" then
     if whatsNewView then whatsNewView:Hide() end
     ns.WhatsNewTab.leave()
+  end
+  if name ~= "settings" then
+    if settingsView then settingsView:Hide() end
+    ns.SettingsTab.leave()
   end
   if name ~= "when" and whenView then whenView:Hide() end
   if name ~= "spares" and sparesView then sparesView:Hide() end
@@ -2070,8 +2095,13 @@ function Panel.refresh()
   local crew = core:crew()
   layout(crew ~= nil)
   if not crew then
-    hideViewsBut(nil)
-    showSetup()
+    hideViewsBut(tab == "settings" and "settings" or nil)
+    if tab == "settings" then
+      if setup then setup:Hide() end
+      drawSettings(false)
+    else
+      showSetup()
+    end
     return
   end
   if setup then setup:Hide() end
@@ -2103,6 +2133,8 @@ function Panel.refresh()
     ns.TogetherTab.draw(frame.content, core, camp:IsShown())
   elseif tab == "catches" then
     ns.CatchesTab.draw(frame.content, core)
+  elseif tab == "settings" then
+    drawSettings(true)
   else
     drawRoster(crew, summary)
   end
@@ -2112,9 +2144,12 @@ end
 -- above, so the open tab redraws. A new panel place (a resize, a move or a
 -- reset) puts the window there and redraws the views at its size. The
 -- Pocket Camp turned on in Settings answers its Tip, so the card goes.
+-- The Settings tab redraws on any setting, so its controls show it.
 function Panel.settingChanged(key)
   if key == "panelPlace" and frame then applyPlace() end
-  if key == "paused" or key == "panelPlace" or key == "camp" or key == "pocketCamp" then Panel.refresh() end
+  if key == "paused" or key == "panelPlace" or key == "camp" or key == "pocketCamp" or tab == "settings" then
+    Panel.refresh()
+  end
 end
 
 -- You Cheered a Member (from the Feed, a toast or While you were away):
@@ -2131,11 +2166,16 @@ function Panel.toggle()
 end
 
 -- Opens the panel on a tab: "roster", "feed", "goals", "when", "spares",
--- "professions", "together", "catches" or "whatsnew".
+-- "professions", "together", "catches", "whatsnew" or "settings".
 function Panel.show(name)
   if not frame then create() end
   tab = name
   if frame:IsShown() then Panel.refresh() else frame:Show() end
+end
+
+-- Steps aside, as Move toasts does while the sample toast is dragged.
+function Panel.hide()
+  if frame then frame:Hide() end
 end
 
 -- Opens the When tab on a Member, or the Crew for nil.

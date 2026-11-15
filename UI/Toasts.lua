@@ -285,6 +285,11 @@ local function createMover()
   mover:SetScript("OnDragStart", mover.StartMoving)
   mover:SetScript("OnDragStop", moverDropped)
   mover:Hide()
+  mover:SetScript("OnHide", function(self)
+    local onDone = self.onDone
+    self.onDone = nil
+    if onDone then onDone() end
+  end)
   table.insert(UISpecialFrames, "BFFToastMover")
   Skin.fill(mover, Skin.WINDOW)
   Skin.border(mover, Skin.GOLD)
@@ -300,12 +305,11 @@ local function createMover()
   end)
 end
 
--- Move mode, from Settings: closes the Settings panel and shows the mover.
--- Not in combat, where the Settings panel can't be closed.
-function Toasts.move()
-  if InCombatLockdown() then return end
+-- Move mode, from Settings: shows the mover. onDone, if given, runs once
+-- it's closed (Done or Escape), to bring Settings back.
+function Toasts.move(onDone)
   if not mover then createMover() end
-  if SettingsPanel and SettingsPanel:IsShown() then HideUIPanel(SettingsPanel) end
+  mover.onDone = onDone
   placeMover()
   mover:Show()
 end

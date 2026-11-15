@@ -94,8 +94,6 @@ stds.wow = {
     "PlaySound",
     "RAID_CLASS_COLORS",
     "RemoveChatWindowChannel",
-    "Settings",
-    "SettingsPanel",
     "StaticPopup_Show",
     "SOUNDKIT",
     "time",
