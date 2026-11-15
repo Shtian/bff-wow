@@ -68,8 +68,9 @@ local OFFSET = { seat = -1, flower = 2, seatedSpark = 9, asleepSpark = 11 }
 -- reaches as far past the figure as Core keeps clear for it
 -- (LAYOUT.griffinFore and griffinAft). away shows "AFK" over the head
 -- (AWAY).
+-- An adventuring figure's doorway is drawn from view.doorways (DOORWAY).
 local POSE = {
-  adventuring = { standing = true, tool = { "torch", 6, 11 }, back = { "arch", -2, 0 }, raid = "archRaid" },
+  adventuring = { standing = true, tool = { "torch", 6, 11 } },
   fighting = { standing = true, tool = { "blade", 6, 12 } },
   crafting = { standing = true, tool = { "hammer", 5, 11 }, front = { "anvil", 5, -1, true } },
   gathering = { standing = true, tool = { "pick", 3, 11 } },
@@ -81,6 +82,13 @@ local POSE = {
   flying = { lift = 9, back = { "griffin", -4, -7, true }, front = { "griffinWing", -6, -3, true },
     flap = "griffinWingUp" },
 }
+-- A doorway (view.doorways) stands on the ground behind its figures, cut
+-- from the `arch` sprite (`archRaid` for a raid): its left and right `rim`
+-- columns at its edges, the columns between them (the keystone, or the
+-- raid's skull) at its centre, and the column next to each rim stretched
+-- to fill the rest. At its narrowest (one figure) it's the sprite as
+-- drawn.
+local DOORWAY = { rim = 4 }
 -- A griffin's wing is up for this many ticks, then down for twice as many.
 local FLAP_TICKS = 3
 -- What plays over a figure's head, from the figure's left edge: a ding's
@@ -143,6 +151,20 @@ end
 -- Shows a sprite of the sheet on a texture set up with the sheet (as
 -- Firelight's embers are), at its size in art pixels of `unit` UI units.
 CampScene.sprite = setSprite
+
+-- Shows columns `from` to `from + count - 1` of a sprite on a texture,
+-- stretched to `width` art pixels; hidden when that's none.
+local function setSlice(t, name, unit, from, count, width)
+  local s = Sheet.sprites[name]
+  local key = ("%s %d %d"):format(name, from, count)
+  if t.sprite ~= key then
+    t:SetTexCoord((s[1] + from) / Sheet.width, (s[1] + from + count) / Sheet.width,
+      s[2] / Sheet.height, (s[2] + s[4]) / Sheet.height)
+    t.sprite = key
+  end
+  t:SetSize(math.max(width, 1) * unit, s[4] * unit)
+  t:SetShown(width > 0)
+end
 
 local function tint(t, classFilename)
   t:SetVertexColor(Skin.classColor(classFilename))
@@ -443,7 +465,7 @@ local function drawActor(scene, parts, actor, f)
     top = row + Sheet.sprites.seated[4]
     if pose.tool then posePart(scene, parts.tool, actor, pose.tool, row) else parts.tool:Hide() end
     if pose.back then
-      posePart(scene, parts.back, actor, pose.back, row, actor.raid and pose.raid or nil)
+      posePart(scene, parts.back, actor, pose.back, row)
     else
       parts.back:Hide()
     end
@@ -503,6 +525,27 @@ local function drawActor(scene, parts, actor, f)
   end
 end
 
+-- Draws a doorway (view.doorways) from its slices of the arch (DOORWAY).
+local function drawDoorway(scene, parts, doorway)
+  local name = doorway.raid and "archRaid" or "arch"
+  local unit, rim = scene.unit, DOORWAY.rim
+  local full = Sheet.sprites[name][3]
+  local middle = full - 2 * rim
+  local fill = doorway.width - full
+  local left = math.floor(fill / 2)
+  local x = doorway.x
+  setSlice(parts.left, name, unit, 0, rim, rim)
+  put(scene, parts.left, x, ROW.standing)
+  setSlice(parts.fillLeft, name, unit, rim, 1, left)
+  put(scene, parts.fillLeft, x + rim, ROW.standing)
+  setSlice(parts.middle, name, unit, rim, middle, middle)
+  put(scene, parts.middle, x + rim + left, ROW.standing)
+  setSlice(parts.fillRight, name, unit, full - rim - 1, 1, fill - left)
+  put(scene, parts.fillRight, x + rim + left + middle, ROW.standing)
+  setSlice(parts.right, name, unit, full - rim, rim, rim)
+  put(scene, parts.right, x + doorway.width - rim, ROW.standing)
+end
+
 -- Draws the fire, embers and everything Core placed, for frame f.
 local function drawFrame(scene, f)
   local view = scene.view
@@ -518,6 +561,10 @@ local function drawFrame(scene, f)
     setSprite(ember, life < 7 and "ember" or "emberCool", unit)
     put(scene, ember, ex, ROW.ember + life)
   end
+
+  scene.doorParts.used = 0
+  for _, doorway in ipairs(view.doorways or {}) do drawDoorway(scene, take(scene.doorParts), doorway) end
+  hideRest(scene.doorParts)
 
   scene.actorParts.used = 0
   for _, actor in ipairs(view.actors) do drawActor(scene, take(scene.actorParts), actor, f) end
@@ -619,6 +666,15 @@ function CampScene.new(parent, options)
         spark = texture(band.art, "OVERLAY", 0),
         mark = texture(band.art, "OVERLAY", 1),
         label = shadowed(nameLabel(band.art)),
+      }
+    end),
+    doorParts = pool(function()
+      return {
+        left = texture(band.art, "BORDER", 1),
+        fillLeft = texture(band.art, "BORDER", 1),
+        middle = texture(band.art, "BORDER", 1),
+        fillRight = texture(band.art, "BORDER", 1),
+        right = texture(band.art, "BORDER", 1),
       }
     end),
     graveParts = pool(function()
