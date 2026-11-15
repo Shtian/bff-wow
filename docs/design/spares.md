@@ -123,7 +123,7 @@ The Crew heading shows "2 Spares for you": other Members' open Spares one of you
 
 ## Dev
 
-The `/bffdev` console has **Offer** (the simulated Member posts a test Spare: a plain one, an enchanted one or one with a scaling random suffix) and **Claim** (it claims your newest Spare) on each simulated Member's row. `/bffdev toast` includes sample Claim, Give and gave toasts.
+The `/bffdev` console has **Offer** (the simulated Member posts a test Spare: a plain one, an enchanted one or one with a scaling random suffix) and **Claim** (it claims your newest Spare) in its action bar, for the simulated Member selected in its list. `/bffdev toast` includes sample Claim, Give and gave toasts.
 
 ## Not decided here
 

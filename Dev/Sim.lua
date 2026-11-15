@@ -4,14 +4,14 @@
 -- where no one else is known yet: start a test Crew for it. It fills the
 -- Camp: two sit by the fire, two fall asleep, one with a fresh max level,
 -- and one by the fire leaves two graves. Also the dev
--- console (/bffdev, opened by /bff sim too): buttons that make each
--- simulated Member ding, die, move, fish (a Catch, or now and then an
+-- console (/bffdev, opened by /bff sim too): an action bar whose buttons
+-- make the simulated Member selected in its list (click a row) ding, die, move, fish (a Catch, or now and then an
 -- unlisted one), step through what they're doing (a vendor, the auction
 -- house, fighting, away, resting, flying), go into an instance (a dungeon,
 -- then a raid, then back out), join or leave your group (for the Pocket
 -- Camp's seating and shared doorways), hand in a quest, react to your newest
 -- entry, offer a
--- test Spare, Claim your newest one or log out,
+-- test Spare or Claim your newest one, a Log in/out button on each row,
 -- one that plays out a stretch of you being away so While you were away
 -- shows (with Reactions to your entries), one that reaches the next Crew
 -- deaths goal, one where simulated Members clear the next dungeon, one
@@ -754,8 +754,8 @@ ns.Console = Console
 
 local Skin = ns.Skin
 
-local WIDTH = 1040
-local HEIGHT = 480
+local WIDTH = 930
+local HEIGHT = 510
 local INSET = 12
 local ROW_HEIGHT = 28
 local BUTTON_WIDTH = 50
@@ -769,17 +769,21 @@ local LINK = "c0a0ff"
 local DIM = "8c8a99"
 local TRACE = "e0a070"
 
--- The console buttons on each simulated Member's row, left to right.
+-- The console's action bar, left to right: each acts on the simulated
+-- Member selected in the list below it. Logging in and out is on each
+-- Member's own row.
 local BUTTONS = {
   { "ding", "Ding" }, { "xp", "XP" }, { "die", "Die" }, { "zone", "Zone" },
   { "alt", "Alt" }, { "max", "Max" }, { "skill", "Skill" }, { "fish", "Fish" }, { "doing", "Doing" }, { "quest", "Quest" },
   { "inside", "Inst" }, { "group", "Group" },
   { "react", "React" }, { "offer", "Offer" },
-  { "claim", "Claim" }, { "online", "Log out" },
+  { "claim", "Claim" },
 }
 
 local frame
 local watched
+-- The simulated Member the action bar acts on (their index).
+local selected = 1
 local showChanged = false
 
 local function color(hex, text)
@@ -920,45 +924,77 @@ local function refreshMembers()
       if member.grouped then state = state .. color("8fb6ff", "  in your group") end
       row.label:SetText(("%s  %s\n%s L%d %s, %d xp, %d deaths"):format(
         member.name, state, c.name, c.level, c.zone, c.xp, c.deaths or 0))
-      for _, button in ipairs(row.buttons) do
-        if button.action == "online" then
-          button:SetText(member.online and "Log out" or "Log in")
-        else
-          button:SetEnabled(member.online)
-          button:SetAlpha(member.online and 1 or 0.4)
-        end
-      end
+      row.online:SetText(member.online and "Log out" or "Log in")
+      row.selected:SetShown(i == selected)
+    end
+  end
+  local member = list[selected]
+  frame.actions:SetShown(member ~= nil)
+  if member then
+    frame.actionsLabel:SetText(member.name .. ":")
+    for _, button in ipairs(frame.actionButtons) do
+      button:SetEnabled(member.online)
+      button:SetAlpha(member.online and 1 or 0.4)
     end
   end
 end
 
-local function memberRow(i)
-  local row = CreateFrame("Frame", nil, frame)
-  row:SetHeight(ROW_HEIGHT)
-  row:SetPoint("TOPLEFT", INSET, -(Skin.HEADER_HEIGHT + 44 + (i - 1) * (ROW_HEIGHT + 4)))
-  row:SetPoint("RIGHT", -INSET, 0)
-  row.buttons = {}
-  local anchor
-  for b = #BUTTONS, 1, -1 do
-    local action, text = BUTTONS[b][1], BUTTONS[b][2]
-    local button = Skin.button(row, text, function()
-      if Sim.act(i, action) then
-        local member = Sim.members()[i]
-        log(color(DIM, ("sim  %s: %s"):format(member.name, action)))
-      end
-      refreshMembers()
-    end)
-    button:SetSize(action == "online" and 64 or BUTTON_WIDTH, 22)
-    if anchor then button:SetPoint("RIGHT", anchor, "LEFT", -4, 0) else button:SetPoint("RIGHT", 0, 0) end
-    button.action = action
-    anchor = button
-    row.buttons[#row.buttons + 1] = button
+-- Makes the selected simulated Member do action, and logs it.
+local function act(i, action)
+  if Sim.act(i, action) then
+    local member = Sim.members()[i]
+    log(color(DIM, ("sim  %s: %s"):format(member.name, action)))
   end
-  -- Cut short with "..." rather than run under the buttons.
+  refreshMembers()
+end
+
+-- The action bar: who it acts on, then a button per action (BUTTONS).
+local function actionBar()
+  local bar = CreateFrame("Frame", nil, frame)
+  bar:SetHeight(22)
+  bar:SetPoint("TOPLEFT", INSET, -(Skin.HEADER_HEIGHT + 44))
+  bar:SetPoint("RIGHT", -INSET, 0)
+  frame.actionsLabel = Skin.label(bar, "small", Skin.GOLD)
+  frame.actionsLabel:SetPoint("LEFT", 0, 0)
+  frame.actionsLabel:SetWidth(70)
+  frame.actionButtons = {}
+  local anchor = frame.actionsLabel
+  for _, spec in ipairs(BUTTONS) do
+    local action = spec[1]
+    local button = Skin.button(bar, spec[2], function() act(selected, action) end)
+    button:SetSize(BUTTON_WIDTH, 22)
+    button:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
+    anchor = button
+    frame.actionButtons[#frame.actionButtons + 1] = button
+  end
+  return bar
+end
+
+-- Where the Member list starts, under the action bar.
+local LIST_TOP = Skin.HEADER_HEIGHT + 44 + 30
+
+-- A simulated Member's row: a click selects them for the action bar, and
+-- its one button logs them in or out.
+local function memberRow(i)
+  local row = CreateFrame("Button", nil, frame)
+  row:SetHeight(ROW_HEIGHT)
+  row:SetPoint("TOPLEFT", INSET, -(LIST_TOP + (i - 1) * (ROW_HEIGHT + 4)))
+  row:SetPoint("RIGHT", -INSET, 0)
+  row.selected = Skin.fill(row, Skin.LIT_FROM)
+  local hover = Skin.fill(row, Skin.HOVER, "HIGHLIGHT")
+  hover:SetBlendMode("ADD")
+  row:SetScript("OnClick", function()
+    selected = i
+    refreshMembers()
+  end)
+  row.online = Skin.button(row, "Log out", function() act(i, "online") end)
+  row.online:SetSize(64, 22)
+  row.online:SetPoint("RIGHT", -4, 0)
+  -- Cut short with "..." rather than run under the button.
   row.label = Skin.label(row, "small", Skin.TEXT)
-  row.label:SetPoint("TOPLEFT", 0, 0)
-  row.label:SetPoint("BOTTOMLEFT", 0, 0)
-  row.label:SetPoint("RIGHT", anchor, "LEFT", -8, 0)
+  row.label:SetPoint("TOPLEFT", 6, 0)
+  row.label:SetPoint("BOTTOMLEFT", 6, 0)
+  row.label:SetPoint("RIGHT", row.online, "LEFT", -8, 0)
   return row
 end
 
@@ -1037,10 +1073,11 @@ local function create()
   frame.empty:SetPoint("TOPLEFT", INSET, top - 38)
   frame.empty:SetText("The sim is off. The log still shows real traffic on your Crew's channel.")
 
+  frame.actions = actionBar()
   frame.rows = {}
   for i = 1, #MEMBERS do frame.rows[i] = memberRow(i) end
 
-  local logTop = Skin.HEADER_HEIGHT + 44 + #MEMBERS * (ROW_HEIGHT + 4) + 8
+  local logTop = LIST_TOP + #MEMBERS * (ROW_HEIGHT + 4) + 8
   local plate = CreateFrame("Frame", nil, frame)
   plate:SetPoint("TOPLEFT", INSET, -logTop)
   plate:SetPoint("BOTTOMRIGHT", -INSET, INSET)
