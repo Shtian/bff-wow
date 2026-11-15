@@ -7,7 +7,9 @@
 -- console (/bffdev, opened by /bff sim too): buttons that make each
 -- simulated Member ding, die, move, fish (a Catch, or now and then an
 -- unlisted one), step through what they're doing (a vendor, the auction
--- house, fighting, away, resting, flying), hand in a quest, react to your newest
+-- house, fighting, away, resting, flying), go into an instance (a dungeon,
+-- then a raid, then back out), join or leave your group (for the Pocket
+-- Camp's seating and shared doorways), hand in a quest, react to your newest
 -- entry, offer a
 -- test Spare, Claim your newest one or log out,
 -- one that plays out a stretch of you being away so While you were away
@@ -182,6 +184,8 @@ local ticker
 local members
 -- Your Member id, whose entries the React button reacts to.
 local yourId
+-- Your Core, told who is in your group (tellGroup).
+local yourCore
 
 -- The GUID of member i's Character j.
 local function guidFor(i, j)
@@ -276,6 +280,23 @@ end
 
 -- Starts the simulated Members. Returns true, or nil and "running" or
 -- "notAlone".
+-- Tells your Core who is in your group: the real one (Snapshot.party)
+-- and the simulated Members online that the console's Group button put in
+-- it, by their Character being played. Core ignores a group it already
+-- has, so this can run every second.
+local function tellGroup()
+  if not yourCore then return end
+  local ok, party = pcall(ns.Snapshot.party)
+  party = ok and party or {}
+  for _, client in ipairs(members or {}) do
+    if client.grouped and client.core then
+      local c = client.character
+      party[#party + 1] = { guid = c.guid, name = c.name, lastName = c.lastName }
+    end
+  end
+  yourCore:group(party)
+end
+
 function Sim.start(core)
   if net then return nil, "running" end
   local crew = core:crew()
@@ -290,6 +311,7 @@ function Sim.start(core)
   })
   local you = net:attach(core)
   yourId = core.ledger:memberId()
+  yourCore = core
   -- The simulated Members only belong to the Crew the sim started in. Once
   -- you leave it (or join another), nothing more passes between them and
   -- you, or your Core would take their records into the new Crew and relay
@@ -326,6 +348,9 @@ function Sim.start(core)
   ticker = C_Timer.NewTicker(1, function()
     if not inSimCrew() then return Sim.stop(true) end
     net:step(GetServerTime())
+    -- A real GROUP_ROSTER_UPDATE tells Core the real group alone; put the
+    -- simulated Members back in it.
+    tellGroup()
   end)
   ns.Console.open(core)
   return true
@@ -366,7 +391,7 @@ end
 function Sim.members()
   local list = {}
   for i, client in ipairs(members or {}) do
-    list[i] = { name = client.name, online = client.core ~= nil, character = client.character }
+    list[i] = { name = client.name, online = client.core ~= nil, character = client.character, grouped = client.grouped }
   end
   return list
 end
@@ -445,6 +470,11 @@ end
 local DOING = { { vendor = true }, { auction = true }, { combat = true }, { afk = true }, { resting = true },
   { flying = true } }
 
+-- What the console's Inst button steps a simulated Member through: a
+-- dungeon, then a raid, then back out to where they were. Two Members in
+-- the same one share a doorway in the Pocket Camp.
+local INSTANCES = { "The Deadmines", "Molten Core" }
+
 -- What each console button does to a simulated Member's client.
 local ACTIONS = {
   skill = skillUp,
@@ -475,6 +505,22 @@ local ACTIONS = {
     client.core:doing(DOING[client.doingStep] or {})
   end,
   quest = function(client) client.core:questHandedIn() end,
+  inside = function(client)
+    client.insideStep = (client.insideStep or 0) % (#INSTANCES + 1) + 1
+    local instance = INSTANCES[client.insideStep]
+    if instance then
+      client.outside = client.outside or client.character.zone
+      client:move({ instance = instance })
+      client:play({ zone = instance })
+    else
+      local zone = client.outside or otherZone(client.character.zone)
+      client.outside = nil
+      client:move(spotIn(zone))
+      client:play({ zone = zone })
+    end
+  end,
+  -- In or out of your group, as if they'd joined your party.
+  group = function(client) client.grouped = not client.grouped or nil end,
   offer = function(client, i) offer(client, i) end,
   claim = function(client) claimYours(client, yourId) end,
   online = function(client)
@@ -490,6 +536,7 @@ function Sim.act(i, action)
   if not client or not ACTIONS[action] then return false end
   if action ~= "online" and not client.core then return false end
   ACTIONS[action](client, i)
+  tellGroup()
   return true
 end
 
@@ -659,6 +706,9 @@ function Sim.stop(abandoned)
   ticker:Cancel()
   ns.ChannelLink.onSend = nil
   net, ticker, members = nil, nil, nil
+  -- Back to the real group alone.
+  tellGroup()
+  yourCore = nil
 end
 
 -- Whether a record is one of the simulated Members': their Characters'
@@ -704,7 +754,7 @@ ns.Console = Console
 
 local Skin = ns.Skin
 
-local WIDTH = 930
+local WIDTH = 1040
 local HEIGHT = 480
 local INSET = 12
 local ROW_HEIGHT = 28
@@ -723,6 +773,7 @@ local TRACE = "e0a070"
 local BUTTONS = {
   { "ding", "Ding" }, { "xp", "XP" }, { "die", "Die" }, { "zone", "Zone" },
   { "alt", "Alt" }, { "max", "Max" }, { "skill", "Skill" }, { "fish", "Fish" }, { "doing", "Doing" }, { "quest", "Quest" },
+  { "inside", "Inst" }, { "group", "Group" },
   { "react", "React" }, { "offer", "Offer" },
   { "claim", "Claim" }, { "online", "Log out" },
 }
@@ -866,6 +917,7 @@ local function refreshMembers()
     if member then
       local c = member.character
       local state = member.online and color("70e370", "online") or color(DIM, "offline")
+      if member.grouped then state = state .. color("8fb6ff", "  in your group") end
       row.label:SetText(("%s  %s\n%s L%d %s, %d xp, %d deaths"):format(
         member.name, state, c.name, c.level, c.zone, c.xp, c.deaths or 0))
       for _, button in ipairs(row.buttons) do
