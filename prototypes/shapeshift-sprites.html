@@ -1,0 +1,758 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Question: what should a shapeshifted Member look like in the Pocket Camp?
+  (Ghost Wolf for shamans; Bear, Cat, Travel, Aquatic and Moonkin for druids.)
+  Three takes, same scene (the real Pocket Camp backdrop, fire, logs and seated figures):
+    A  Animal in the seat: the form replaces the figure, still. Lying or sitting by the fire.
+    B  Figure in a pelt: the class-tinted figure keeps its seat and wears the form's ears or antlers.
+    C  Alive: A's animals breathe, blink and swish; the travel forms trot to and fro by their seat;
+       shifting puffs leaves (druid) or spirit wisps (shaman); the Ghost Wolf's glow pulses.
+  Click a figure to shift it to its next form. Keys: ←/→ variant, 1–3 zoom.
+  Grids are between GRIDS-BEGIN/END, fill only; outlined() adds the rim like scripts/camp-art.mjs.
+  Run: open the file, or serve the folder.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shapeshift sprites</title>
+<style>
+  :root { --gold:#ffd14a; --text:#e8e6e3; --muted:#adabb8; --bg:#0e0d14; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; color:var(--text); background:#14121b; font:14px/1.35 "Arial Narrow", system-ui, sans-serif; padding-bottom:90px; }
+  h1 { font:600 18px system-ui; margin:20px 16px 4px; text-align:center; }
+  .note { text-align:center; color:var(--muted); max-width:760px; margin:0 auto 16px; padding:0 16px; min-height:40px; }
+  .stage { display:flex; justify-content:center; padding:0 16px; overflow-x:auto; }
+  canvas { image-rendering:pixelated; image-rendering:crisp-edges; display:block; }
+  #scene { cursor:pointer; border-radius:6px; }
+  .row { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:12px 16px; }
+  .row button { font:13px system-ui; color:var(--text); background:#1b1a23; border:1px solid rgba(255,255,255,.14); padding:5px 11px; border-radius:4px; cursor:pointer; }
+  .row button.on { background:var(--gold); color:#1a1400; border-color:var(--gold); }
+  .gallery { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px; max-width:980px; margin:24px auto; padding:0 16px; }
+  .cell { background:#1b1a23; border:1px solid rgba(255,255,255,.08); border-radius:6px; padding:10px; display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .cell b { font:600 13px system-ui; } .cell span { color:var(--muted); font-size:12px; text-align:center; }
+  h2 { font:600 14px system-ui; text-align:center; color:var(--muted); margin-top:28px; }
+  .switcher { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); display:flex; align-items:center; gap:4px; background:#fff; color:#111; border-radius:999px; padding:6px; box-shadow:0 6px 24px rgba(0,0,0,.5); font:600 13px system-ui; z-index:9; }
+  .switcher button { border:0; background:#eee; border-radius:999px; width:32px; height:32px; font-size:16px; cursor:pointer; }
+  .switcher .label { padding:0 12px; min-width:220px; text-align:center; }
+</style>
+</head>
+<body>
+<h1>Shapeshifting in the Pocket Camp</h1>
+<div class="note" id="note"></div>
+<div class="stage"><canvas id="scene"></canvas></div>
+<div class="row" id="zooms"></div>
+<div class="row" id="forms"></div>
+<h2>The sprites (8×, outlined as in game)</h2>
+<div class="gallery" id="gallery"></div>
+<div class="switcher"><button id="prev">←</button><div class="label" id="label"></div><button id="next">→</button></div>
+<script>
+// GRIDS-BEGIN
+// Fill-only grids, facing right (towards the fire on its left side). outlined() adds the dark rim.
+// Keys: per-sprite palette below. C = class colour mark (tinted).
+var G = {};
+// Ghost Wolf, sitting.
+G.wolfSit = [
+  "........F.F.",
+  "........FFF.",
+  ".......FFEFF",
+  ".......FFFFK",
+  "......fFFff.",
+  ".....FVFFf..",
+  "...FFFVFFf..",
+  "..FFFFVFVf..",
+  ".FFFFfFFVf..",
+  "fFFFFfFFVf..",
+  "ffff.fff.ff.",
+];
+G.wolfSit2 = G.wolfSit.map(function (r, i) { return i === 9 ? ".FFFFfFFVf.." : i === 10 ? "fff..fff.ff." : i === 8 ? "fFFFFfFFVf.." : r; });
+// Ghost Wolf, trotting (two frames).
+G.oldWolfRun1 = [
+  "...........F.F",
+  "..........FFF.",
+  ".........FFEFF",
+  "ff.......FFFFK",
+  "..fFFFFFFFFf..",
+  "..FVVVVVVVFf..",
+  "..FFFFFFFFFf..",
+  "..Ff......fF..",
+  ".f.........f..",
+  "f...........f.",
+];
+G.oldWolfRun2 = [
+  "...........F.F",
+  "..........FFF.",
+  ".........FFEFF",
+  ".........FFFFK",
+  "ffFFFFFFFFFf..",
+  "..FVVVVVVVFf..",
+  "..FFFFFFFFFf..",
+  "...Ff....fF...",
+  "...f.f..f.f...",
+  "..f...ff...f..",
+];
+// Ghost Wolf, 14 by 10 before the outline: standing, a tail wag, two trot frames.
+G.wolfStand = [
+  "..........d.d.",
+  ".........dFdF.",
+  ".....d.ddFFFF.",
+  "dd..dFdFFFEFFF",
+  ".d..FFFFFFFFFK",
+  "..dFFFFFFFVVV.",
+  "..dFVVVVVFF...",
+  "..dFF...dFF...",
+  "..dFF...dFF...",
+  "..VVV...VVV...",
+];
+G.wolfWag = [
+  "..........d.d.",
+  ".........dFdF.",
+  "d....d.ddFFFF.",
+  ".d..dFdFFFEFFF",
+  "..d.FFFFFFFFFK",
+  "..dFFFFFFFVVV.",
+  "..dFVVVVVFF...",
+  "..dFF...dFF...",
+  "..dFF...dFF...",
+  "..VVV...VVV...",
+];
+G.wolfRun1 = [
+  "..........d.d.",
+  ".........dFdF.",
+  ".....d.ddFFFF.",
+  "dd..dFdFFFEFFF",
+  ".d..FFFFFFFFFK",
+  "..dFFFFFFFVVV.",
+  "..dFVVVVVFF...",
+  ".dFF....dFF...",
+  "dFF......dFF..",
+  "VV........VVV.",
+];
+G.wolfRun2 = [
+  "..........d.d.",
+  ".........dFdF.",
+  ".....d.ddFFFF.",
+  "dd..dFdFFFEFFF",
+  ".d..FFFFFFFFFK",
+  "..dFFFFFFFVVV.",
+  "..dFVVVVVFF...",
+  "...dFF.dFF....",
+  "...dFF.dFF....",
+  "...VVV.VVV....",
+];
+// Cat form, prowling, 14 by 10 before the outline: the night elf's panther and the tauren's lion; the second frame swishes the tail and blinks.
+G.catElf = [
+  "d.............",
+  "d.............",
+  ".d....m.m..d.d",
+  ".d...mmmmmMMMM",
+  "..MMMMMmMdMMEM",
+  "..MMMMMMMdMMMK",
+  "..MnnnnnnMMWW.",
+  "..dM...dM.....",
+  "..dM...dM.....",
+  "..nn...nnn....",
+];
+G.catElfSwish = [
+  "..............",
+  "d.............",
+  "dd....m.m..d.d",
+  ".d...mmmmmMMMM",
+  "..MMMMMmMdMMMM",
+  "..MMMMMMMdMMMK",
+  "..MnnnnnnMMWW.",
+  "..dM...dM.....",
+  "..dM...dM.....",
+  "..nn...nnn....",
+];
+G.catLion = [
+  "b..............",
+  "b.............H",
+  ".a....bBbB.HHHH",
+  ".a...bBBBBAAAA.",
+  "..AAABBBBBAAEA.",
+  "..AAAABBBBAANNK",
+  "..AaNNNNBBANWW.",
+  "..aA...aA......",
+  "..aA...aA......",
+  "..aa...aaa.....",
+];
+G.catLionSwish = [
+  "...............",
+  "b.............H",
+  "ba....bBbB.HHHH",
+  ".a...bBBBBAAAA.",
+  "..AAABBBBBAAAA.",
+  "..AAAABBBBAANNK",
+  "..AaNNNNBBANWW.",
+  "..aA...aA......",
+  "..aA...aA......",
+  "..aa...aaa.....",
+];
+// Before: a dark panther sitting tall, tail curled round its feet.
+G.oldCatSit = [
+  "........M..M",
+  "........MMMM",
+  "........MEME",
+  "........MMMn",
+  ".........Mm.",
+  "........MMm.",
+  ".......MMnm.",
+  "......MMMnm.",
+  ".....MMMMnm.",
+  "....MMmMMnm.",
+  "mmmmmmmmmmm.",
+];
+G.oldCatSit2 = G.oldCatSit.map(function (r, i) { return i === 10 ? ".mmmmmmmmmm." : i === 9 ? "m...MMmMMnm." : i === 8 ? "m....MMMMnm." : r; });
+// Bear form: a big brown bear lying in a loaf, head up.
+G.bearLie = [
+  "..........B..B.",
+  "..........BBBB.",
+  "...BBBBBB.BBEB.",
+  ".BBBBBBBBBBBBAA",
+  "BBBBBBBBBBBBAAK",
+  "BBBbBBBBBbBBbaa",
+  "BBBBbBBBBBbBBb.",
+  "bbbbbbbbbbbaab.",
+];
+G.bearLie2 = [
+  "..........B..B.",
+  "...BBBBB..BBBB.",
+  "..BBBBBBB.BBEB.",
+  ".BBBBBBBBBBBBAA",
+  "BBBBBBBBBBBBAAK",
+  "BBBbBBBBBbBBbaa",
+  "BBBBbBBBBBbBBb.",
+  "bbbbbbbbbbbaab.",
+];
+// Bear form, 16 wide: standing on all fours (breathing), rearing up and swiping (15 rows), and the swipe's claw marks (drawn without an outline).
+G.bearStand = [
+  "........AAA.b.b.",
+  "....AAAABBBBbBb.",
+  "..AABBBBBBBBBBB.",
+  ".ABBBBBBBBBbBEaa",
+  ".BBBBBBBBBBbBBaK",
+  ".BBBBBBBBBBbBba.",
+  ".bBBBBBBBBBBBb..",
+  ".bBBb.bbbbbBBb..",
+  "..BBb.....bBBb..",
+  "..BBb.....bBBb..",
+  "..bbb.....bbbb..",
+];
+G.bearStand2 = [
+  "............b.b.",
+  "....AAAAAAAAbBb.",
+  "..AABBBBBBBBBBB.",
+  ".ABBBBBBBBBbBEaa",
+  ".BBBBBBBBBBbBBaK",
+  ".BBBBBBBBBBbBba.",
+  ".bBBBBBBBBBBBb..",
+  ".bBBb.bbbbbBBb..",
+  "..BBb.....bBBb..",
+  "..BBb.....bBBb..",
+  "..bbb.....bbbb..",
+];
+G.bearRear = [
+  "......b.b.......",
+  "......bBBBB.....",
+  "......BBBEaa....",
+  "......BBBBaK..WW",
+  ".....ABBBBB..BBW",
+  "....AABBBBBBBBB.",
+  "....ABBBBBBBB...",
+  "....BBBBBBBb....",
+  "....BBBBaaBb....",
+  "....BBBBaaBb....",
+  "...bBBBBBBBb....",
+  "...bBBBBBBBb....",
+  "...bBBb.bBBb....",
+  "...bBBb.bBBb....",
+  "..bbbb..bbbbb...",
+];
+G.bearSwipe = [
+  "......b.b.......",
+  "......bBBBB.....",
+  "......BBBEaa....",
+  "......BBBBaK....",
+  ".....ABBBBB.....",
+  "....AABBBBBB....",
+  "....ABBBBBBBBB..",
+  "....BBBBBBBbBBBW",
+  "....BBBBaaBb..WW",
+  "....BBBBaaBb....",
+  "...bBBBBBBBb....",
+  "...bBBBBBBBb....",
+  "...bBBb.bBBb....",
+  "...bBBb.bBBb....",
+  "..bbbb..bbbbb...",
+];
+G.bearClaws = [
+  "....W..W",
+  "...W..W.",
+  "..W..W..",
+  ".W..W...",
+  "W..W....",
+];
+// Travel form: a sabre-toothed cheetah, speckled, long-legged: standing, and two gallop frames.
+G.travelStand = [
+  "...........a.a.",
+  "..........AAAA.",
+  "..........AAAEA",
+  "a..AsAAsAAAAAAK",
+  ".a.AAAsAAsAAAa.",
+  "..aAsAAAAAsN.W.",
+  "..aNNNNNNNN..W.",
+  "..aA.....aA....",
+  "..aA.....aA....",
+  "..AA.....AA....",
+];
+G.travelRun1 = [
+  "...........a.a.",
+  "..........AAAA.",
+  "..........AAAEA",
+  "a..AsAAsAAAAAAK",
+  ".a.AAAsAAsAAAa.",
+  "..aAsAAAAAsN.W.",
+  "..aNNNNNNNN..W.",
+  ".aA.......aA...",
+  "aA.........aA..",
+  "A...........AA.",
+];
+G.travelRun2 = [
+  "...........a.a.",
+  "..........AAAA.",
+  "..........AAAEA",
+  "a..AsAAsAAAAAAK",
+  ".a.AAAsAAsAAAa.",
+  "..aAsAAAAAsN.W.",
+  "..aNNNNNNNN..W.",
+  "....aA.aA......",
+  "....aAaA.......",
+  "...AA.AA.......",
+];
+// Before: a cheetah, lying (A) and running (C).
+G.oldTravelLie = [
+  "...........A.A",
+  "..........AAAA",
+  "..........AEAA",
+  "...AAaAAaAAANK",
+  "a.AAAAAAAAAAN.",
+  ".aANNNNNNNNNN.",
+  "..aaaaaaaaaNNN",
+];
+G.oldTravelRun1 = [
+  "...........A.A",
+  "..........AAAA",
+  ".........AAEAA",
+  "aa.AaAAaAAAANK",
+  "..aAAAAaAAAA..",
+  "...ANNNNNNNA..",
+  "..aA.......Aa.",
+  ".a...........a",
+];
+G.oldTravelRun2 = [
+  "...........A.A",
+  "..........AAAA",
+  ".........AAEAA",
+  "...AaAAaAAAANK",
+  "aaaAAAAaAAAA..",
+  "...ANNNNNNNA..",
+  "....Aa...aA...",
+  "...a..a.a..a..",
+];
+// Before: a seal on its belly, flipper down / up.
+G.oldSeal = [
+  "..........TTT.",
+  ".........TTETT",
+  ".........TTTTK",
+  "..TTTTTTTTTTt.",
+  ".TTTTTTTTTTt..",
+  "TTNNNNNNNNNt..",
+  "t.ttttttttt...",
+];
+G.oldSeal2 = [
+  "..........TTT.",
+  ".........TTETT",
+  "t........TTTTK",
+  "tTTTTTTTTTTTt.",
+  ".TTTTTTTTTTt..",
+  ".TNNNNNNNNNt..",
+  "..tttttttt.t..",
+];
+// Aquatic form: a sea lion propped on its front flippers, head up, tail flippers fanned; the second frame waves a front flipper.
+G.seal = [
+  "..........TTT..",
+  ".........TTTET.",
+  ".........TTTTTK",
+  ".........tTNN..",
+  "........TTNNN..",
+  "......TTTTNNN..",
+  "...TTTTTTTNNt..",
+  ".tTTTTTTTTTNt..",
+  "ttNNNNNNNNTtt..",
+  "t.t........tttt",
+];
+G.seal2 = [
+  "..........TTT..",
+  ".........TTTET.",
+  ".........TTTTTK",
+  ".........tTNN..",
+  "........TTNNN..",
+  "......TTTTNNNtt",
+  "...TTTTTTTNNttt",
+  ".tTTTTTTTTTNt..",
+  "ttNNNNNNNNTt...",
+  ".t.............",
+];
+// Moonkin: an owlbear standing, antlers, beak, white belly.
+G.moonkin = [
+  "..a......a..",
+  "..aa....aa..",
+  "...aBBBBa...",
+  "..BBBBBBBB..",
+  "..BEBGGBEB..",
+  "..BBBGGBBB..",
+  ".BBBNNNNBBB.",
+  "BBBNNNNNNBBB",
+  "BBBNNNNNNBBB",
+  ".BBNNNNNNBB.",
+  "..BBBBBBBB..",
+  "..BBB..BBB..",
+  "..bbb..bbb..",
+];
+G.moonkin2 = G.moonkin.map(function (r, i) { return i === 4 ? "..BBBGGBBB.." : r; }); // blink
+// Variant B: costumes worn over the seated figure's head (12 wide, drawn over rows 0..).
+G.hoodBear = [
+  "..B......B..",
+  ".BBB....BBB.",
+  ".BBBBBBBBBB.",
+  "..BBBBBBBB..",
+];
+G.hoodCat = [
+  "..M......M..",
+  "..MM....MM..",
+  "...MMMMMM...",
+];
+G.hoodWolf = [
+  "..F......F..",
+  "..FF....FF..",
+  "...FFFFFF...",
+];
+G.hoodMoonkin = [
+  ".a........a.",
+  ".aa......aa.",
+  "..aa.BB.aa..",
+  "...BBBBBB...",
+];
+G.hoodTravel = [
+  "..A......A..",
+  "..AA....AA..",
+  "...AAAAAA...",
+];
+G.hoodSeal = [
+  "............",
+  "....TTTT....",
+  "...TTTTTT...",
+];
+// Shift poofs, over the figure: leaves (druid), spirit wisps (shaman).
+G.leaves1 = [
+  "..L.......L..",
+  ".LL..g....LL.",
+  "......L......",
+  "L...........g",
+  "..g.......L..",
+  "......L......",
+  ".L.........L.",
+];
+G.leaves2 = [
+  "L....L....g.L",
+  "..g.......L..",
+  ".............",
+  "g...........L",
+  ".............",
+  "..L.......g..",
+  "L.....L.....L",
+];
+G.spirit1 = [
+  "....V..V.....",
+  "..V.......V..",
+  ".V...F.F...V.",
+  "V..F.....F..V",
+  ".V...F.F...V.",
+  "..V.......V..",
+  "....V..V.....",
+];
+G.spirit2 = [
+  ".V....V....V.",
+  "V...........V",
+  "....F...F....",
+  "V...........V",
+  "....F...F....",
+  "V...........V",
+  ".V....V....V.",
+];
+var FORM_PAL = {
+  wolf:    { d: "#2f4a6e", F: "#5f86b8", V: "#a9d4f5", W: "#e2f6ff", E: "#e2f6ff" },
+  oldWolf: { F: "#8fd3f5", f: "#4a8fc7", V: "#e2f6ff", E: "#1d3f6e" },
+  cat:     { M: "#4b3c63", m: "#2c2340", n: "#6d5a8c", E: "#ffd14a" },
+  catElf:  { d: "#241c36", m: "#5566a8", M: "#4f3f6b", n: "#8a76b0", E: "#ffd14a", W: "#ece8d8" },
+  catLion: { A: "#d9a03c", a: "#9e6a24", N: "#f3d590", B: "#7a4a26", b: "#4a2c16", H: "#ece8d8", E: "#3a2518", W: "#ece8d8" },
+  bear:    { B: "#6b4429", b: "#3f2817", A: "#c89a5a", a: "#8f6a3a", E: "#0b0a12" },
+  bear2:   { B: "#8a4f26", b: "#5a3018", A: "#b8743c", a: "#d8a86a", E: "#0b0a12", W: "#ece8d8" },
+  claws:   { W: "#fff3c4" },
+  travel:  { A: "#cf9238", a: "#94591f", N: "#ecd3a0", s: "#3f2412", W: "#fffaf0", E: "#0b0a12" },
+  oldTravel: { A: "#d9a95c", a: "#8f6a3a", N: "#f3dfb4", E: "#0b0a12" },
+  seal:    { T: "#7d8794", t: "#4f5866", N: "#c9d0d6", E: "#0b0a12" },
+  oldSeal: { T: "#8c8796", t: "#5d5966", N: "#d8d4c8", E: "#0b0a12" },
+  moonkin: { B: "#6b4f38", b: "#3f2c1e", N: "#ece8d8", G: "#ffd14a", a: "#c89a5a", E: "#ffe9a0" },
+  leaves:  { L: "#70e370", g: "#ffd14a" },
+  spirit:  { V: "#bfe8ff", F: "#5fb4ef" },
+};
+
+// GRIDS-END
+
+// From scripts/camp-art.mjs: the seated figure, seat log, logs, fire.
+const PAL = { K:"#0b0a12", S:"#e8b890", s:"#b98465", W:"#fff3c4", Y:"#ffe9a0", G:"#ffd14a", O:"#f0a21c", R:"#c9481c", B:"#5a3a24", b:"#3a2518" };
+const SIT = ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...", "..KCCDDCCK..", ".KCCCDDCCCK.", ".KSCCDDCCSK.", ".KKCCCCCCKK.", "..KDDKKDDK..", "..KKK..KKK.."];
+const FIRE = [
+  [".....R.....", "....RR.....", "....ROR..R.", "...ROOR.RR.", ".R.ROOORRR.", ".RRROGGORR.", ".RROOGGOOR.", "RROOGYYGOOR", "ROOGGYYGGOR", "ROGGYYYYGOR", ".ROGYYWYGO.", "..ROGGGGO.."],
+  [".........R.", "..R..R.....", "..RR.RR....", ".RORROR..R.", ".ROORROR.R.", ".ROOOOORRR.", ".ROGGOOGOR.", "RROGYGOGOOR", "ROOGYYGGGOR", "ROGGYYYYGOR", ".ROGYWYYGO.", "..ROGGGGO.."],
+  ["...R.......", "...RR...R..", "..RORR..R..", "..ROOR.RR..", ".RROOORRO..", ".ROOGOOROR.", ".ROGGGOOOR.", "RROGGYGGOOR", "ROOGYYYGGOR", "ROGGYYYYGOR", ".ROGYYWYGO.", "..ROGGGGO.."],
+];
+const LOGS = ["..BB.......BB..", ".BBBBb...bBBBB.", "bbBBBBBBBBBBBbb", "..bbbbbbbbbbb.."];
+const SEAT = ["BBBBBBBBBBBBBB", "bbbbbbbbbbbbbb", "bbbbbbbbbbbbbb"];
+function outlined(rows) {
+  const w = Math.max(...rows.map(r => r.length)) + 2, h = rows.length + 2;
+  const at = (x, y) => { const r = rows[y - 1]; const c = r && r[x - 1]; return c && c !== "." ? c : null; };
+  const out = [];
+  for (let y = 0; y < h; y++) { let l = ""; for (let x = 0; x < w; x++) { const o = at(x, y); if (o) { l += o; continue; }
+    let n = false; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (at(x + i, y + j)) n = true; l += n ? "K" : "."; } out.push(l); }
+  return out;
+}
+const CLASS = { SHAMAN:"#0070dd", DRUID:"#ff7c0a", WARRIOR:"#c69b6d", MAGE:"#3fc7eb", PRIEST:"#ffffff", ROGUE:"#fff468" };
+const hex = (c) => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+const rgb = (a) => `rgb(${a.map(Math.round).join(",")})`;
+function tint(color, k) { return rgb(hex(color).map(v => v * k)); }
+
+// Forms: sprites per variant. still = A's sprite, idle = C's frames at rest, move = C's trot (travel forms).
+const FORMS = {
+  none:    { label: "No form" },
+  wolf:    { label: "Ghost Wolf", cls: "SHAMAN", pal: "wolf", still: "wolfStand", idle: ["wolfStand", "wolfWag"], move: ["wolfRun1", "wolfRun2"], hood: "hoodWolf", poof: "spirit", ghost: true },
+  bear:    { label: "Bear", cls: "DRUID", pal: "bear2", still: "bearStand", idle: ["bearStand", "bearStand2"], breathe: true, swipe: true, hood: "hoodBear", poof: "leaves" },
+  cat:     { label: "Cat", cls: "DRUID", hood: "hoodCat", poof: "leaves", pal: "cat",
+    byFaction: { Alliance: { pal: "catElf", still: "catElf", idle: ["catElf", "catElfSwish"] }, Horde: { pal: "catLion", still: "catLion", idle: ["catLion", "catLionSwish"] } } },
+  travel:  { label: "Travel", cls: "DRUID", pal: "travel", still: "travelStand", idle: ["travelStand"], move: ["travelRun1", "travelRun2"], hood: "hoodTravel", poof: "leaves" },
+  seal:    { label: "Aquatic", cls: "DRUID", pal: "seal", still: "seal", idle: ["seal", "seal2"], hood: "hoodSeal", poof: "leaves" },
+  moonkin: { label: "Moonkin", cls: "DRUID", pal: "moonkin", still: "moonkin", idle: ["moonkin", "moonkin2"], hood: "hoodMoonkin", poof: "leaves" },
+};
+const CYCLE = { SHAMAN: ["none", "wolf"], DRUID: ["none", "bear", "cat", "travel", "seal", "moonkin"] };
+
+const VARIANTS = [
+  { key: "A", name: "Animal in the seat", note: "The form replaces the figure, still, lying or sitting where the seat was. The animal says who it is: only a druid is a bear, only a shaman a ghost wolf. Ghost Wolf is see-through, with a pale glow round its outline." },
+  { key: "B", name: "Figure in a pelt", note: "The class-tinted figure keeps its seat and wears the form: ears, antlers or a bear's scalp over the hood. Cheapest art, keeps the class colour, but reads small at real size." },
+  { key: "C", name: "Alive", note: "A's animals, moving: the bear breathes and now and then rears up and swipes, the cat's tail swishes, the moonkin blinks, the seal waves a flipper. Travel forms (Ghost Wolf, Travel) trot to and fro by their seat. Shifting puffs leaves (druid) or spirit wisps (shaman). Click a druid or shaman to shift." },
+];
+
+// The Pocket Camp: 112 columns by 34 rows, fire in the middle, seats as Camp.LAYOUT places them.
+const COLS = 112, ROWS = 34, FIRE_X = 56;
+const ROW = { seat: 3, seated: 4, ground: 3, logs: 3, fire: 5 };
+const cast = [
+  { name: "You", cls: "SHAMAN", x: -21, form: "wolf" },
+  { name: "Lunara", cls: "DRUID", x: 9, form: "bear" },
+  { name: "Thistle", cls: "DRUID", x: -37, form: "cat" },
+  { name: "Fenn", cls: "DRUID", x: 25, form: "travel" },
+  { name: "Ilsa", cls: "MAGE", x: -53, form: "none" },
+  { name: "Kesh", cls: "SHAMAN", x: 41, form: "wolf" },
+];
+cast.forEach((a, i) => { a.seed = i * 7; a.poof = null; a.walk = 0; a.dir = 1; });
+
+const backdrop = new Image();
+backdrop.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHAAAAAkCAYAAABR/76qAAACsElEQVR4nO2WzUoDMRCA96qHtmAptXgQhJ691IeQ3n0LH0AQ38Sn8Y18gJUcRuKQSeYv2dTdgWEY3axJvnxZh2GJJZaYUaw2j+Oc+lnE1Js8S0hX1/sx1UOFRW5vTkuf6SG6OBQUxKX+rRBNoMGJoWqABQk/DxNbarly9heqKWI4Q3RysHEAMvw+nmyr/vn8WuX98SHVvi8+3NCH+cb7SV2vqogNGwrmpTJ14t4/Prs4+dJaWpeniVgKk4nUyyjzOBAlFYzqBZ51Xdhk6rrE+20yr2Qax8QAIlRImLylH7+/2M9Tm18aX1qXdP6l8fhvpOCyoKYMk8K0nPwAx9Mkzby4h9PL5BgadfOxzMtdk6v1UWRfeD4+aVNkyZ7a4zkml/ZRfZ26mLg+/mYP8CQQrOMlJsOzagM9YHEgtgIq2bga46UmU+ZhiNA3h0lB9ASaemduLhZ4niaX4Kmh1bSvRWrmpVljgHC3e0pWjz2MuYQ5qqBeGkTrvCT2ASzcW2GxTOQMujQTrfOSjK9pXgxVbV7Lb2BreKm5acZTEEO1QMua1+ob2LOFHvBjiDg9DTRDvRRw2ivU+4DWgJWExhnkvbhe4HltvKfJXKjZ2G5uR6r2lPe7uv2Umdp/MbSam5yrkLifOrnz9z4UOanYUD0gSuBZ8vRwEPW1YUoglm5A0XUpgWeFAZsqqZC4lyb1Pk61wm52naZgWs3SwGqdVohaM92gWa89K4yX075YIXGPk3qeU62wLaaKYVJQ4WXSa1JqlmRzvdIK0cvUeJ9FsDC0FKya5knhvJ3rVClcKVSJiZiDq4EcEz3N42QMg0outBw8T2g5WO4m4lrLPG8Tc/A4ELUmaq9TN4g4SieFgrt8Aw9ZOLi6BsfE3v8bpXortBqmVTGvFBIz4xoW+R+qdv0e8QO74/oIB3fo2wAAAABJRU5ErkJggg==";
+
+let variant = Math.max(0, VARIANTS.findIndex(v => v.key === new URLSearchParams(location.search).get("variant")));
+let zoom = 5, tick = 0;
+const canvas = document.getElementById("scene"), g = canvas.getContext("2d");
+
+// Draws a grid with its bottom-left at art column x (from the band's left) and row (up from the bottom).
+function draw(rows, x, row, palette, opts = {}) {
+  const h = rows.length;
+  rows.forEach((r, y) => [...r].forEach((ch, i) => {
+    let c = ch === "K" ? PAL.K : palette[ch];
+    if (!c) return;
+    const col = opts.mirror ? x + r.length - 1 - i : x + i;
+    g.globalAlpha = opts.alpha ?? 1;
+    g.fillStyle = c;
+    g.fillRect(col * zoom, (ROWS - row - h + y) * zoom, zoom, zoom);
+  }));
+  g.globalAlpha = 1;
+}
+// A spirit's glow: a pale ring one pixel out from the outline.
+function glow(rows, x, row, alpha, mirror) {
+  const h = rows.length, w = rows[0].length, on = (i, j) => rows[j] && rows[j][i] && rows[j][i] !== ".";
+  g.globalAlpha = alpha; g.fillStyle = "#8cd2ff";
+  for (let j = -1; j <= h; j++) for (let i = -1; i <= w; i++) {
+    if (on(i, j)) continue;
+    let near = false; for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) if (on(i + c, j + b)) near = true;
+    if (near) g.fillRect((mirror ? x + w - 1 - i : x + i) * zoom, (ROWS - row - h + j) * zoom, zoom, zoom);
+  }
+  g.globalAlpha = 1;
+}
+function figure(a, x) {
+  const cloth = { C: CLASS[a.cls], D: tint(CLASS[a.cls], 0.62), S: PAL.S, s: PAL.s };
+  draw(SEAT, x - 1, ROW.seat, PAL);
+  draw(SIT, x, ROW.seated, cloth);
+}
+// The Crew's faction is your own (whispers don't cross factions), so the cat is the night elf's or the tauren's.
+let faction = "Alliance";
+function resolved(f) { const form = FORMS[f]; return form.byFaction ? Object.assign({}, form, form.byFaction[faction]) : form; }
+function formPal(f) { return FORM_PAL[resolved(f).pal]; }
+
+function actor(a) {
+  const left = FIRE_X + a.x;          // the actor's left edge in band columns
+  const facingLeft = a.x > 0;         // right of the fire: turn to face it
+  const v = VARIANTS[variant].key;
+  const form = resolved(a.form);
+  if (a.form === "none") { figure(a, left); return; }
+  if (v === "B") {
+    figure(a, left);
+    const hood = outlined(G[form.hood]);
+    draw(hood, left - 1, ROW.seated + SIT.length - 3, formPal(a.form));
+    return;
+  }
+  let name = form.still, x = left, mirror = facingLeft, clawsAt = false;
+  if (v === "C") {
+    if (form.move) {
+      // Trot to and fro over 6 columns by the seat, on the side away from the fire, turning at each end.
+      const span = 6, step = Math.floor(tick / 2) + a.seed;
+      const p = step % (span * 2);
+      const off = p < span ? p : span * 2 - p;
+      const goingRight = p < span;
+      name = form.move[Math.floor(tick / 2) % 2];
+      x = (facingLeft ? left - 1 : left - 5) + off;
+      mirror = !goingRight;
+    } else {
+      // Idle: the second frame now and then (a blink, a swish), the bear breathes slowly.
+      // Now and then (every 10 s) the bear rears up and swipes: up 3 ticks, swipe 2, up 2.
+      const phase = (tick + a.seed * 9) % 60;
+      if (form.swipe && phase < 7) { name = phase === 3 || phase === 4 ? "bearSwipe" : "bearRear"; clawsAt = phase === 3 || phase === 4; }
+      const beat = form.breathe ? Math.floor((tick + a.seed) / 9) % 2 : ((tick + a.seed) % 24 < 3 ? 1 : 0);
+      if (!(form.swipe && (tick + a.seed * 9) % 60 < 7)) name = form.idle[Math.min(beat, form.idle.length - 1)];
+    }
+  }
+  const rows = outlined(G[name]);
+  const w = rows[0].length;
+  const cx = x + 6 - Math.floor(w / 2); // centre it on the seat's 12 columns
+  const pulse = v === "C" && tick % 9 < 2;
+  if (form.ghost) glow(rows, cx, ROW.ground, pulse ? 0.25 : 0.15, mirror);
+  draw(rows, cx, ROW.ground, formPal(a.form), { mirror, alpha: form.ghost ? (pulse ? 0.7 : 0.6) : 1 });
+  if (clawsAt) {
+    // The claw marks in front of the paw: grid columns 15.. and rows 4.. of the outlined swipe frame.
+    const c = G.bearClaws, cw = c[0].length, col = 16, top = 4;
+    const cxw = mirror ? cx + w - col - cw : cx + col;
+    draw(c, cxw, ROW.ground + rows.length - top - c.length, FORM_PAL.claws, { mirror });
+  }
+}
+function poofs(a) {
+  if (VARIANTS[variant].key !== "C" || !a.poof) return;
+  const age = tick - a.poof.at;
+  if (age > 5) { a.poof = null; return; }
+  const name = a.poof.kind + (age % 2 + 1);
+  const rows = G[name];
+  draw(rows, FIRE_X + a.x + 6 - Math.floor(rows[0].length / 2), ROW.ground + 2, FORM_PAL[a.poof.kind], { alpha: age > 3 ? 0.5 : 1 });
+}
+
+function render() {
+  canvas.width = COLS * zoom; canvas.height = ROWS * zoom;
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = "#0e0d14"; g.fillRect(0, 0, canvas.width, canvas.height);
+  if (backdrop.complete) g.drawImage(backdrop, 0, canvas.height - backdrop.height * zoom, backdrop.width * zoom, backdrop.height * zoom);
+  draw(LOGS, FIRE_X - 7, ROW.logs, PAL);
+  draw(FIRE[tick % 3], FIRE_X - 5, ROW.fire, PAL);
+  cast.forEach(actor);
+  cast.forEach(poofs);
+}
+
+function shift(a) {
+  const list = CYCLE[a.cls]; if (!list) return;
+  const next = list[(list.indexOf(a.form) + 1) % list.length];
+  const kind = (FORMS[next].poof || FORMS[a.form].poof);
+  a.poof = kind ? { kind, at: tick } : null;
+  a.form = next;
+  render(); buildForms();
+}
+canvas.addEventListener("click", (e) => {
+  const r = canvas.getBoundingClientRect();
+  const col = (e.clientX - r.left) / r.width * COLS - FIRE_X;
+  const hit = cast.find(a => col >= a.x - 4 && col < a.x + 16);
+  if (hit) shift(hit);
+});
+
+function setVariant(i) {
+  variant = (i + VARIANTS.length) % VARIANTS.length;
+  const v = VARIANTS[variant];
+  const u = new URL(location); u.searchParams.set("variant", v.key); history.replaceState(null, "", u);
+  document.getElementById("label").textContent = `${v.key} (${v.name})`;
+  document.getElementById("note").textContent = v.note;
+  render();
+}
+document.getElementById("prev").onclick = () => setVariant(variant - 1);
+document.getElementById("next").onclick = () => setVariant(variant + 1);
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest("input,textarea,[contenteditable]")) return;
+  if (e.key === "ArrowLeft") setVariant(variant - 1);
+  if (e.key === "ArrowRight") setVariant(variant + 1);
+  if (e.key in ZOOMS) setZoom(ZOOMS[e.key]);
+});
+
+const ZOOMS = { 1: 3, 2: 5, 3: 8 };
+function setZoom(z) { zoom = z; buildZooms(); render(); }
+function buildZooms() {
+  const el = document.getElementById("zooms"); el.innerHTML = "";
+  [[3, "3× (about in-game)"], [5, "5×"], [8, "8×"]].forEach(([z, t]) => {
+    const b = document.createElement("button"); b.textContent = t; b.className = z === zoom ? "on" : ""; b.onclick = () => setZoom(z); el.append(b);
+  });
+}
+function buildForms() {
+  const el = document.getElementById("forms"); el.innerHTML = "";
+  ["Alliance", "Horde"].forEach(f => {
+    const b = document.createElement("button"); b.textContent = f; b.className = f === faction ? "on" : "";
+    b.onclick = () => { faction = f; buildForms(); render(); }; el.append(b);
+  });
+  cast.filter(a => CYCLE[a.cls]).forEach(a => {
+    const b = document.createElement("button");
+    b.textContent = `${a.name}: ${FORMS[a.form].label}`;
+    b.style.borderColor = CLASS[a.cls]; b.onclick = () => shift(a); el.append(b);
+  });
+}
+function buildGallery() {
+  const el = document.getElementById("gallery");
+  const entries = [
+    ["wolfStand", "wolf", "Ghost Wolf, standing", "A, C at rest"], ["wolfWag", "wolf", "Ghost Wolf, tail wag", "C idle"], ["wolfRun1", "wolf", "Ghost Wolf, trot 1", "C"], ["wolfRun2", "wolf", "Ghost Wolf, trot 2", "C"],
+    ["wolfSit", "oldWolf", "Before: Ghost Wolf, sitting", "first draft"], ["oldWolfRun1", "oldWolf", "Before: trot", "first draft"],
+    ["bearStand", "bear2", "Bear, standing", "A; C breathes"], ["bearRear", "bear2", "Bear, rearing", "C, every 10 s"], ["bearSwipe", "bear2", "Bear, swipe", "C"], ["bearLie", "bear", "Before: Bear, lying", "first draft"], ["catElf", "catElf", "Cat, night elf (Alliance)", "A; C idle"], ["catElfSwish", "catElf", "Cat, night elf, swish", "C"], ["catLion", "catLion", "Cat, tauren (Horde)", "A; C idle"], ["catLionSwish", "catLion", "Cat, tauren, swish", "C"], ["oldCatSit", "cat", "Before: Cat, sitting", "first draft"], ["travelStand", "travel", "Travel, standing", "A"],
+    ["travelRun1", "travel", "Travel, run 1", "C"], ["travelRun2", "travel", "Travel, run 2", "C"], ["oldTravelLie", "oldTravel", "Before: Travel, lying", "first draft"], ["seal", "seal", "Aquatic", "A; C waves"], ["seal2", "seal", "Aquatic, wave", "C"], ["oldSeal", "oldSeal", "Before: Aquatic", "first draft"],
+    ["moonkin", "moonkin", "Moonkin", "A; C blinks"],
+    ["hoodWolf", "wolf", "Wolf ears", "B"], ["hoodBear", "bear", "Bear scalp", "B"], ["hoodCat", "cat", "Cat ears", "B"],
+    ["hoodTravel", "travel", "Cheetah ears", "B"], ["hoodSeal", "seal", "Seal cap", "B"], ["hoodMoonkin", "moonkin", "Antlers", "B"],
+    ["leaves1", "leaves", "Leaf puff", "C, druid shift"], ["spirit1", "spirit", "Spirit wisps", "C, shaman shift"],
+  ];
+  const save = zoom; zoom = 8;
+  for (const [name, pal, title, use] of entries) {
+    const rows = (name.startsWith("leaves") || name.startsWith("spirit")) ? G[name] : outlined(G[name]);
+    const c = document.createElement("canvas");
+    c.width = rows[0].length * 8; c.height = rows.length * 8;
+    const cg = c.getContext("2d");
+    rows.forEach((r, y) => [...r].forEach((ch, i) => { const col = ch === "K" ? PAL.K : FORM_PAL[pal][ch]; if (!col) return; cg.fillStyle = col; cg.fillRect(i * 8, y * 8, 8, 8); }));
+    const cell = document.createElement("div"); cell.className = "cell";
+    cell.innerHTML = `<b>${title}</b><span>${rows[0].length}×${rows.length} · ${use}</span>`;
+    cell.prepend(c); el.append(cell);
+  }
+  zoom = save;
+}
+
+backdrop.onload = render;
+buildZooms(); buildForms(); buildGallery(); setVariant(variant);
+setInterval(() => { tick++; render(); }, 1000 / 6); // the band's 6-per-second tick
+</script>
+</body>
+</html>
