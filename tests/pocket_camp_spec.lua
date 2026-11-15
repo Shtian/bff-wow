@@ -969,6 +969,33 @@ describe("Playing together", function()
     for i = 2, #xs do assert.equal(layout.seated + layout.doorwayGap, xs[i] - xs[i - 1]) end
   end)
 
+  it("doesn't grow past its max width for a raid too big for one side of the widest", function()
+    local ns = load()
+    local layout = ns.Core.CAMP_LAYOUT
+    local rows = {}
+    for i = 1, 12 do
+      rows[i] = { memberId = "m" .. i, name = "m" .. i, fullName = "m" .. i, online = true, own = i == 1 or nil,
+        classFilename = "MAGE", lastSeen = 0, instance = i > 1 and "Molten Core" or nil }
+    end
+    local doing = { said = {}, fishing = {}, working = {} }
+    assert.equal(layout.pocketColumns, ns.Camp.pocket(rows, {}, 0, doing, {}, nil, {}).columns)
+    -- Nine fit on one side of the widest: that's worth growing for.
+    for i = 11, 12 do rows[i].instance = nil end
+    assert.equal(layout.pocketMaxColumns, ns.Camp.pocket(rows, {}, 0, doing, {}, nil, {}).columns)
+  end)
+
+  it("seats your group outside your instance round the fire, not across from you together", function()
+    local net, clients = crew({ "Ann", "Bob", "Cid", "Dee" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    inside(net, { a }, "The Deadmines")
+    a.core:group({ unit(a), unit(b), unit(c) })
+    local view = a.core:pocketCamp()
+    assert.same({ "You", "Bob", "Cid", "Dee" }, order(view))
+    -- Bob across the fire from you, Cid beside you: as without a group.
+    assert.are_not.equal(view.actors[1].x < 0, actorFor(view, b).x < 0)
+    assert.equal(view.actors[1].x < 0, actorFor(view, c).x < 0)
+  end)
+
   it("seats your group on your side of the fire outside an instance, filling it first", function()
     local _, clients, ns = crew({ "Ann", "Bob", "Cid", "Dee", "Eve" })
     local a, b, c, d, e = clients[1], clients[2], clients[3], clients[4], clients[5]

@@ -164,7 +164,7 @@ end
 -- they should sit side by side, and the gap between them (default
 -- LAYOUT.gap): they're placed on one side if they fit there, else as
 -- many as fit on the roomier side and the rest one by one, and splits
--- then has their key (key to true).
+-- then has their key (key to how many they are).
 -- Returns { columns, actors, graves, tent, more, splits }; see Core:camp().
 function Camp.view(rows, entries, now, columns, options)
   options = options or {}
@@ -216,7 +216,7 @@ function Camp.view(rows, entries, now, columns, options)
       placed[list[j]] = { x = x, side = side }
     end
     view.splits = view.splits or {}
-    view.splits[key] = true
+    view.splits[key] = last - first + 1
   end
   for index, row in ipairs(list) do
     local key = (keyOf(row))
@@ -425,10 +425,20 @@ local function doorways(actors)
   return list
 end
 
+-- How many figures standing in one doorway (LAYOUT.doorwayGap apart) fit
+-- on one side of a Pocket Camp `columns` wide.
+local function doorwaySeats(columns)
+  local room = math.floor(columns / 2) - LAYOUT.margin - LAYOUT.fire
+  if room < LAYOUT.seated then return 0 end
+  return 1 + math.floor((room - LAYOUT.seated) / (LAYOUT.seated + LAYOUT.doorwayGap))
+end
+
 -- The Pocket Camp: the fire and the online Members, you first, as many as
 -- fit, LAYOUT.pocketRows high. It's the narrowest of its widths (from
 -- LAYOUT.pocketColumns in steps of pocketStep, up to maxColumns) that
--- everyone fits, or maxColumns if they don't. doing is what they're
+-- everyone fits, or maxColumns if they don't; but past maxColumns (up to
+-- pocketMaxColumns) for a doorway's set to fit on one side, when one side
+-- of the widest can hold them. doing is what they're
 -- up to, each by Member id: said (what they last said they're doing, as
 -- Doing gives it), fishing (true while fishing) and working ("crafting"
 -- or "gathering" while at a profession). Each actor is as in view(), with
@@ -439,8 +449,8 @@ end
 -- ("+2"). group (Member id to true: Camp.grouped) are in your party or
 -- raid: they sit right after you, marked group. Members adventuring in
 -- the same instance sit side by side, in a doorway they share (doorways,
--- and each one's doorway: see doorways()); it grows to keep them together
--- if it can. bedrolls (Member id to when they were seen going offline)
+-- and each one's doorway: see doorways()). Outside an instance, you and
+-- your group sit on your side of the fire, filling it first. bedrolls (Member id to when they were seen going offline)
 -- are the Members asleep in a bedroll: after every online Member, as many
 -- as fit at the width those need, never counted in more; pose "asleep",
 -- status "asleep · 4m". tooltip lists who is doing what: { title, lines }.
@@ -448,11 +458,17 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group)
   group = group or {}
   local poses = {}
   for _, row in ipairs(rows) do poses[row.memberId] = poseOf(row, doing) end
-  -- Who sits together: a doorway's set (its instance), or you and your
-  -- group anywhere else (GROUP), so they're on your side of the fire.
+  -- Who sits together: a doorway's set (its instance), or, with you
+  -- outside an instance, you and your group outside one (GROUP), so
+  -- they're on your side of the fire. With you in a doorway, your group
+  -- outside it sits round the fire as anyone else does.
+  local outside = true
+  for _, row in ipairs(rows) do
+    if row.own and poses[row.memberId] == "adventuring" then outside = false end
+  end
   local function seatKey(row)
     if poses[row.memberId] == "adventuring" then return row.instance end
-    if row.own or group[row.memberId] then return GROUP end
+    if outside and (row.own or group[row.memberId]) then return GROUP end
   end
   rows = seatingOrder(rows, group, seatKey)
   local options = {
@@ -467,11 +483,12 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group)
   }
   -- Wider, a step at a time: within maxColumns for anyone left out, and
   -- as far as it takes (up to pocketMaxColumns) for a doorway's set split
-  -- up. Your group split up outside an instance isn't worth any width:
+  -- up that one side of the widest can hold; a bigger raid is shown as it
+  -- comes. Your group split up outside an instance isn't worth any width:
   -- they sit round the fire as usual.
   local function wanted(view, columns)
-    for key in pairs(view.splits or {}) do
-      if key ~= GROUP then return true end
+    for key, count in pairs(view.splits or {}) do
+      if key ~= GROUP and count <= doorwaySeats(LAYOUT.pocketMaxColumns) then return true end
     end
     return view.more and columns + LAYOUT.pocketStep <= (maxColumns or LAYOUT.pocketColumns)
   end
