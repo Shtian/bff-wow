@@ -24,6 +24,20 @@
 
 
 
+
+## 2.7.0
+<sub>2026-11-15</sub>
+
+- *(minor)*
+  Settings now open inside the BFF window, with switches.
+
+  Settings is a page in the BFF window now, not in the game's Options, and opens from the sidebar, the minimap button's menu or /bff settings. Every on/off setting is a switch that glows like an ember while on, in the same sections as before.
+- *(minor)*
+  Shapeshifted friends show as their form in the Pocket Camp.
+
+  A druid in bear, cat, travel, aquatic or moonkin form, or a shaman in Ghost Wolf, is drawn as that animal by the fire: the bear rears up and swipes, the wolf and the cheetah trot, and shifting puffs leaves or spirit wisps. Travel forms are only told to the Crew once held for half a minute.
+- *(patch)* The knob of an on switch in Settings is dark and a bit bigger now, so it stands out on the ember.
+
 ## 2.6.0
 <sub>2026-11-15</sub>
 
