@@ -6,7 +6,18 @@
     "height": 520,
     "title": "Best Friends in Forever",
     "caption": "Keep up with your friends in WoW: Forever, even when you play at different times.",
-    "shots": []
+    "shots": [
+      {
+        "file": "pocket.png",
+        "crop": [
+          0,
+          0,
+          634,
+          215
+        ],
+        "pixelated": true
+      }
+    ]
   },
   {
     "id": "01-hero",
@@ -35,7 +46,25 @@
     ]
   },
   {
-    "id": "02-camp",
+    "id": "02-pocket",
+    "layout": "left",
+    "title": "A campfire on screen",
+    "caption": "Keep your friends with you while you play: each one shown fighting, fishing, crafting or resting, with a gold star for every ding.",
+    "shots": [
+      {
+        "file": "pocket.png",
+        "crop": [
+          0,
+          0,
+          634,
+          215
+        ],
+        "pixelated": true
+      }
+    ]
+  },
+  {
+    "id": "03-camp",
     "layout": "right",
     "title": "Gather round the fire",
     "caption": "Your friends around one campfire: awake while they play, asleep while they don’t, with a grave for each recent death.",
@@ -52,7 +81,7 @@
     ]
   },
   {
-    "id": "03-roster",
+    "id": "04-roster",
     "layout": "left",
     "title": "Your whole crew",
     "caption": "Every friend's characters, levels and whereabouts, and when each was last seen.",
@@ -69,7 +98,7 @@
     ]
   },
   {
-    "id": "04-feed",
+    "id": "05-feed",
     "layout": "right",
     "title": "Cheer every ding",
     "caption": "One click sends a cheer for a ding, respects for a death, or a welcome for someone new.",
@@ -86,7 +115,7 @@
     ]
   },
   {
-    "id": "05-goals",
+    "id": "06-goals",
     "layout": "left",
     "title": "Level up together",
     "caption": "Goals the whole crew works towards, and the trophies you earn along the way. Nobody is ranked.",
@@ -103,7 +132,7 @@
     ]
   },
   {
-    "id": "06-spares",
+    "id": "07-spares",
     "layout": "right",
     "title": "Pass on spare gear",
     "caption": "Offer an item to your friends. Whoever claims it first gets it by in‑game mail.",
@@ -120,7 +149,7 @@
     ]
   },
   {
-    "id": "07-when",
+    "id": "08-when",
     "layout": "left",
     "title": "When everyone plays",
     "caption": "A heatmap of the hours each friend usually plays, in your own time zone.",
@@ -137,7 +166,7 @@
     ]
   },
   {
-    "id": "08-professions",
+    "id": "09-professions",
     "layout": "right",
     "title": "Who crafts what",
     "caption": "Every friend’s professions and skill in one grid, so you know who to ask for a craft.",
@@ -154,7 +183,7 @@
     ]
   },
   {
-    "id": "09-together",
+    "id": "10-together",
     "layout": "left",
     "title": "Dungeons together",
     "caption": "See which friends are close to your level, and the dungeons you can run together.",
@@ -171,7 +200,7 @@
     ]
   },
   {
-    "id": "10-crew",
+    "id": "11-crew",
     "layout": "steps",
     "title": "Start a crew",
     "caption": "No server, no account, and no shared guild needed.",

@@ -111,6 +111,13 @@
   .banner .copy { gap: 24px; }
   .banner h1 { font-size: 84px; }
   .banner p.caption { font-size: 32px; max-width: none; text-wrap: balance; }
+  /* With a shot (the Pocket Camp), it takes the right and the copy narrows. */
+  .banner.with-shot { gap: 56px; padding: 0 80px 0 90px; }
+  .banner.with-shot > img { width: 168px; height: 168px; }
+  .banner.with-shot .copy { flex: none; width: 560px; }
+  .banner.with-shot h1 { font-size: 72px; }
+  .banner.with-shot p.caption { font-size: 28px; }
+  .banner .shots { flex: 1; height: 400px; }
 
   /* Draft renders say so, so they can't be mistaken for finished images. */
   .draft { position: absolute; top: 28px; right: 28px; z-index: 9; padding: 6px 14px;
@@ -142,11 +149,13 @@
 
   const copy = `<div class="copy"><h1>${esc(s.title)}</h1>${braid}<p class="caption">${esc(s.caption)}</p></div>`;
   const frames = shots.map((shot, i) => shot.url
-    ? `<div class="frame" data-i="${i}"><img src="${shot.url}"></div>`
+    ? `<div class="frame" data-i="${i}"><img src="${shot.url}"${shot.pixelated ? ' style="image-rendering:pixelated"' : ""}></div>`
     : `<div class="frame missing" data-i="${i}">shots/${esc(shot.file)}</div>`).join("");
 
   if (s.layout === "banner") {
-    html += `<div class="banner"><img src="${ICON}">${copy}</div>`;
+    html += shots.length
+      ? `<div class="banner with-shot"><img src="${ICON}">${copy}<div class="shots">${frames}</div></div>`
+      : `<div class="banner"><img src="${ICON}">${copy}</div>`;
   } else if (s.layout === "steps") {
     const list = `<ol class="steps">${(s.steps || []).map((t) => `<li><span>${marks(t)}</span></li>`).join("")}</ol>`;
     html += `<div class="split">${copy}<div>${list}</div></div>`;
