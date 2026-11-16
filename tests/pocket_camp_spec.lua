@@ -163,29 +163,58 @@ describe("The Pocket Camp", function()
     assert.is_nil(actorFor(a.core:pocketCamp(), b).spark)
   end)
 
-  it("comes with how it's shown: opacity, lock, hiding in combat, position, scale and a worded tooltip", function()
+  it("comes with how it's shown: opacity, lock, what it does in combat, position, scale and a worded tooltip", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     local view = a.core:pocketCamp()
-    assert.same({ 0.6, false, false, nil, 1 },
-      { view.opacity, view.locked, view.hideInCombat, view.position, view.scale })
+    assert.same({ 0.6, false, "stay", 0.25, nil, 1 },
+      { view.opacity, view.locked, view.inCombat, view.combatFade, view.position, view.scale })
+    assert.is_nil(view.hideInCombat)
     assert.same({ title = "Pocket Camp", lines = { "You: by the fire", "Bob: by the fire" },
       hint = "Click to open BFF. Drag to move." }, view.tooltip)
 
     a.core:setSetting("pocketCampOpacity", 0)
     a.core:setSetting("pocketCampLocked", true)
-    a.core:setSetting("pocketCampCombat", true)
+    a.core:setSetting("pocketCampCombat", "fade")
+    a.core:setSetting("pocketCampCombatFade", 40)
     a.core:setPocketCampPosition(120.4, 300)
     a.core:setPocketCampScale(1.5)
     b:move({ instance = "The Deadmines" })
     b:play({ zone = "The Deadmines" })
     net:run(15)
     view = a.core:pocketCamp()
-    assert.same({ 0, true, true }, { view.opacity, view.locked, view.hideInCombat })
+    assert.same({ 0, true, "fade", 0.4 }, { view.opacity, view.locked, view.inCombat, view.combatFade })
     assert.same({ x = 120.4, y = 300 }, view.position)
     assert.equal(1.5, view.scale)
     assert.same({ "You: by the fire", "Bob: in The Deadmines" }, view.tooltip.lines)
     assert.equal("Click to open BFF.", view.tooltip.hint)
+  end)
+
+  it("reads an old saved Hide in combat as Hide, and nothing saved as Stay", function()
+    local _, clients = crew({ "Ann", "Bob" })
+    local core = clients[1].core
+    assert.equal("stay", core:pocketCamp().inCombat)
+    core.db.pocketCampCombatHide = true
+    assert.equal("hide", core:pocketCamp().inCombat)
+    core.db.pocketCampCombatHide = false
+    assert.equal("stay", core:pocketCamp().inCombat)
+  end)
+
+  it("sends nothing more for what it does in combat", function()
+    local function sentBy(choice)
+      local net, clients = crew({ "Ann", "Bob" })
+      local a = clients[1]
+      local mark = #net.wire
+      a.core:setSetting("pocketCampCombat", choice)
+      a.core:setSetting("pocketCampCombatFade", 40)
+      a.core:pocketCamp()
+      net:run(6 * 60)
+      local types = {}
+      for _, message in ipairs(net:sent(mark, "Ann")) do types[#types + 1] = message.type end
+      return types
+    end
+    assert.same(sentBy("stay"), sentBy("fade"))
+    assert.same(sentBy("stay"), sentBy("hide"))
   end)
 
   it("keeps its scale within its limits, in whole percents, and goes back to 1 on nil", function()

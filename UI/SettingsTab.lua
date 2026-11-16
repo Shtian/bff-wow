@@ -4,11 +4,13 @@
 -- per section of Core's settings(), each a section label over rows split
 -- by Hairlines: the setting's label on the left, wrapping in a narrow
 -- window, and its control at the right. An on/off setting is a switch
--- (Skin.switch), and its whole row is clickable; Map pin size is a
--- segmented control, the toast sound a picker with Play, the Pocket
--- Camp's backdrop opacity a slider, and Move toasts and Reset BFF window
--- small buttons. Leave Crew sits under Appear offline. A control greys out
--- while what it needs is off. Out of a Crew there's a Back button on top,
+-- (Skin.switch), and its whole row is clickable; Map pin size and the
+-- Pocket Camp's In combat are segmented controls, the toast sound a
+-- picker with Play, the Pocket Camp's backdrop opacity and Fade to
+-- sliders, and Move toasts and Reset BFF window small buttons. Leave Crew
+-- sits under Appear offline. A control greys out while what it needs is
+-- off, and a row Core marks hidden (Fade to, while the Pocket Camp doesn't
+-- fade in combat) is left off. Out of a Crew there's a Back button on top,
 -- to the setup view. Panel owns the scroll view; this fills its content.
 -- Everything is read and written through Core. See
 -- docs/design/settings-and-release.md.
@@ -385,13 +387,17 @@ function SettingsTab.draw(scrollView, theCore, width, backToSetup)
   local crew = core:crew()
 
   -- The values, and which controls they leave usable.
-  local values = {}
+  local values, hidden = {}, {}
   for _, section in ipairs(core:settings()) do
-    for _, setting in ipairs(section.settings) do values[setting.key] = setting.value end
+    for _, setting in ipairs(section.settings) do
+      values[setting.key] = setting.value
+      hidden[setting.key] = setting.hidden
+    end
   end
   for key, row in pairs(rows) do
     if row.draw then row.draw(values[key]) end
     if row.setEnabled then row.setEnabled(enabled(row, values, crew)) end
+    row:SetShown(not hidden[key])
   end
 
   local box = nameRow.box

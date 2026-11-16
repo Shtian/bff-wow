@@ -98,7 +98,8 @@ local SETTINGS = {
   { key = "pocketCamp", default = false, other = true },
   { key = "pocketCampOpacity", default = 60, other = 25 },
   { key = "pocketCampLocked", default = false, other = true },
-  { key = "pocketCampCombat", default = false, other = true },
+  { key = "pocketCampCombat", default = "stay", other = "fade" },
+  { key = "pocketCampCombatFade", default = 25, other = 40 },
   { key = "pocketCampAlts", default = true, other = false },
   { key = "pocketCampSpares", default = true, other = false },
   { key = "pocketCampPosition", default = nil, other = { x = 300, y = 200 } },
@@ -124,7 +125,7 @@ describe("Settings list", function()
     end
     assert.same({ "paused", "chatLines", "awayPopup", "minimap", "camp", "mapPins", "mapPinSize", "panelPlace", "toasts",
       "toastSound", "toastPosition", "pocketCamp", "pocketCampOpacity", "pocketCampLocked", "pocketCampCombat",
-      "pocketCampAlts", "pocketCampSpares" }, keys)
+      "pocketCampCombatFade", "pocketCampAlts", "pocketCampSpares" }, keys)
   end)
 
   it("gives the Settings page sections with finished labels and current values", function()
@@ -133,7 +134,7 @@ describe("Settings list", function()
     local sections = core:settings()
     assert.same({ "Sharing", "Notifications and display", "Toasts", "Pocket Camp", "Shown in the Pocket Camp" },
       { sections[1].title, sections[2].title, sections[3].title, sections[4].title, sections[5].title })
-    assert.same({ "Show the Pocket Camp", "Backdrop opacity", "Lock its position and size", "Hide in combat" },
+    assert.same({ "Show the Pocket Camp", "Backdrop opacity", "Lock its position and size", "In combat" },
       { sections[4].settings[1].label, sections[4].settings[2].label, sections[4].settings[3].label,
         sections[4].settings[4].label })
     assert.same({ key = "pocketCampAlts", kind = "toggle", label = "ALT over a friend playing an alt", value = true,
@@ -162,6 +163,45 @@ describe("Settings list", function()
     }, size)
     core:setSetting("mapPinSize", "huge")
     assert.equal("medium", core:setting("mapPinSize"))
+  end)
+
+  -- A setting as the Settings page gives it, by key.
+  local function onPage(core, key)
+    for _, section in ipairs(core:settings()) do
+      for _, setting in ipairs(section.settings) do
+        if setting.key == key then return setting end
+      end
+    end
+  end
+
+  it("offers Stay, Fade and Hide in combat, reading an old saved Hide in combat as Hide", function()
+    assert.same({
+      key = "pocketCampCombat", kind = "choice", label = "In combat", value = "stay",
+      choices = { { key = "stay", label = "Stay" }, { key = "fade", label = "Fade" }, { key = "hide", label = "Hide" } },
+    }, onPage(newCore(), "pocketCampCombat"))
+    assert.equal("hide", newCore({ pocketCampCombatHide = true }):setting("pocketCampCombat"))
+    assert.equal("stay", newCore({ pocketCampCombatHide = false }):setting("pocketCampCombat"))
+    assert.equal("stay", newCore({}):setting("pocketCampCombat"))
+
+    local core, deps = newCore()
+    for _, choice in ipairs({ "hide", "fade", "stay", "hide" }) do
+      core:setSetting("pocketCampCombat", choice)
+      assert.equal(choice, newCore(deps.db):setting("pocketCampCombat"))
+    end
+    core:setSetting("pocketCampCombat", "loud")
+    assert.equal("stay", core:setting("pocketCampCombat"))
+    assert.equal("stay", newCore(deps.db):setting("pocketCampCombat"))
+  end)
+
+  it("shows Fade to on the Settings page only while Fade is picked", function()
+    local core = newCore()
+    assert.same({ key = "pocketCampCombatFade", kind = "percent", label = "Fade to", value = 25, hidden = true },
+      onPage(core, "pocketCampCombatFade"))
+    core:setSetting("pocketCampCombat", "fade")
+    assert.same({ key = "pocketCampCombatFade", kind = "percent", label = "Fade to", value = 25 },
+      onPage(core, "pocketCampCombatFade"))
+    core:setSetting("pocketCampCombat", "hide")
+    assert.is_true(onPage(core, "pocketCampCombatFade").hidden)
   end)
 
   it("refuses a key that isn't in the list", function()
