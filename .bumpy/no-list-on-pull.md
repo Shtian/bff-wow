@@ -1,5 +1,7 @@
 ---
-'bff': patch
+"bff": patch
 ---
 
-BFF no longer asks for its channel's member list just as a boss pull locks chat down. The answer came back unreadable and showed up in chat as a line like "[5. BFF…] *You". It now asks once the lockdown lifts.
+Your Crew's member list no longer shows up in chat after a boss pull.
+
+BFF asked for it just as the pull locked chat down, and the answer came back unreadable, as a line like "[5. BFF…] *You". It now waits until the lockdown lifts.

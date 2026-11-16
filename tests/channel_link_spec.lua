@@ -371,20 +371,34 @@ describe("The channel link", function()
     assert.same({ "Bob", "Cat-Realm" }, targets(game, mark))
   end)
 
-  it("asks for the member list when a restriction lifts, not when one starts", function()
-    -- The game reports chat lockdown only after the first restriction
-    -- events of a pull, and a list asked for then comes back with its
-    -- names secret: unreadable, and printed in chat.
+  it("asks for the member list when a restriction lifts, not while one starts", function()
+    -- A boss pull, as a trace showed it: lockdown is reported only once
+    -- the restrictions are active, after their events.
     local game = linked()
     local mark = #game.listed
     game.fire("ADDON_RESTRICTION_STATE_CHANGED", 1, 1)
     game.fire("ADDON_RESTRICTION_STATE_CHANGED", 5, 1)
+    -- A stranger's whisper wants a list too, and waits as well.
+    whisperFrom(game, "Dan")
+    assert.equal(mark, #game.listed)
     game.lockdown = true
+    game.advance(0)
     game.fire("ADDON_RESTRICTION_STATE_CHANGED", 0, 1)
+    game.advance(60)
     assert.equal(mark, #game.listed)
 
     game.lockdown = false
     game.fire("ADDON_RESTRICTION_STATE_CHANGED", 0, 0)
+    assert.same({ CHANNEL }, { select(mark + 1, unpack(game.listed)) })
+  end)
+
+  it("asks for the member list again a frame after a restriction that doesn't lock chat starts", function()
+    -- Ordinary combat: no lockdown.
+    local game = linked()
+    game.fire("ADDON_RESTRICTION_STATE_CHANGED", 0, 1)
+    game.advance(0)
+    local mark = #game.listed
+    whisperFrom(game, "Dan")
     assert.same({ CHANNEL }, { select(mark + 1, unpack(game.listed)) })
   end)
 

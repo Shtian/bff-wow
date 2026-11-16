@@ -30,6 +30,11 @@ local LEAVE_MAX = 15
 -- we asked for stays out of chat.
 local LIST_REFRESH = 60
 local LIST_HIDE = 5
+-- ADDON_RESTRICTION_STATE_CHANGED's states (Enum.AddOnRestrictionState):
+-- the event fires as a restriction is activating, before it is active, and
+-- again once it is inactive.
+local RESTRICTION_INACTIVE = 0
+local RESTRICTION_ACTIVATING = 1
 
 -- Channel events whose system notices for our channels don't print.
 local FILTERED_EVENTS = {
@@ -52,6 +57,12 @@ local failed = false
 local settled = false
 local isUp = false
 local listAsked
+-- Set from a restriction's activating event until the next frame, when
+-- lockdown() reports it if it restricts chat. Nothing asks for the member
+-- list meanwhile: it would come back with its names secret, unreadable and
+-- printed in chat. A fresh table per event, so an earlier event's frame
+-- doesn't clear a later one's.
+local restrictionStarting
 -- The member lists traced since joining the channel, by their channel
 -- arguments and what became of them: BFF asks every minute, and the same
 -- list again says nothing new.
@@ -199,7 +210,7 @@ end
 -- Asks the game for the channel's member list (CHAT_MSG_CHANNEL_LIST, as
 -- /chatlist prints it).
 local function askList()
-  if not target or not joined or lockdown() then return end
+  if not target or not joined or lockdown() or restrictionStarting then return end
   listAsked = GetTime()
   ListChannelByName(target.channel)
 end
@@ -474,15 +485,21 @@ function events.GROUP_LEFT()
   if trace then trace("left the group, or it disbanded") end
 end
 
--- Whoever joined or left during lockdown: ask again once it lifts. Not
--- when a restriction starts (state 1): the game reports chat lockdown only
--- after the first of a pull's restriction events, and a list asked for in
--- between comes back with its names secret, unreadable and printed in chat.
+-- Whoever joined or left during lockdown: ask again once it lifts. While a
+-- restriction is activating, lockdown() doesn't report it yet, so nothing
+-- asks until the next frame (restrictionStarting).
 function events.ADDON_RESTRICTION_STATE_CHANGED(kind, state)
   if trace then trace(("chat restriction: type %s, state %s"):format(tostring(kind), tostring(state))) end
+  if state == RESTRICTION_ACTIVATING then
+    local stamp = {}
+    restrictionStarting = stamp
+    C_Timer.After(0, function()
+      if restrictionStarting == stamp then restrictionStarting = nil end
+    end)
+  end
   update("chat restriction changed")
   tryJoin()
-  if state == 0 then askList() end
+  if state == RESTRICTION_INACTIVE then askList() end
 end
 
 -- A send to one peer failed (a general error, a logout, lockdown, or an
