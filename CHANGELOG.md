@@ -26,6 +26,15 @@
 
 
 
+
+## 2.8.1
+<sub>2026-11-16</sub>
+
+- *(patch)*
+  The sync log in `/bff report` now notes the Crew channel's member list: the first one after joining, and every one BFF ignores and why. This helps track down friends who can't see each other.
+- *(patch)*
+  A friend in your Crew can reach you even when your game doesn't give BFF the Crew channel's member list. Before, BFF dropped their messages and you couldn't see each other online. Now a message from a Member BFF already knows makes them count as in the channel. It can take up to 5 minutes to see each other again. Messages from Characters BFF doesn't know are still dropped.
+
 ## 2.8.0
 <sub>2026-11-16</sub>
 
