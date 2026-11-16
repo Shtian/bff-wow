@@ -14,6 +14,8 @@ return function()
     frames = {},
     lockdown = false,
     channels = {},
+    -- Every channel a member list was asked for (ListChannelByName).
+    listed = {},
     -- What UnitName("player") returns. On Forever a Character's last name
     -- comes second, where retail puts the realm.
     player = { "Me" },
@@ -106,7 +108,7 @@ return function()
     GetChannelList = function() return end,
     JoinTemporaryChannel = function(name) game.channels[name:upper()] = 5 end,
     LeaveChannelByName = function(name) game.channels[name:upper()] = nil end,
-    ListChannelByName = function() end,
+    ListChannelByName = function(name) game.listed[#game.listed + 1] = name end,
     RemoveChatWindowChannel = function() end,
     NUM_CHAT_WINDOWS = 0,
     Ambiguate = function(name) return (name:gsub("%-.*$", "")) end,
