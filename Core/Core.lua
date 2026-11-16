@@ -1796,7 +1796,7 @@ local SETTINGS = {
   {
     key = "pocketCampCombatFade", section = POCKET_CAMP, kind = "percent",
     label = "Fade to", shownWhen = { key = "pocketCampCombat", value = "fade" },
-    saved = percent("pocketCampCombatFade", 25),
+    saved = percent("pocketCampCombatFadeTo", 25),
   },
   -- What the Pocket Camp marks on its figures, each on by default, so a
   -- player can opt out (pocketView passes them to Camp.pocket as shown):

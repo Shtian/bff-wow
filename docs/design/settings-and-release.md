@@ -67,7 +67,7 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `pocketCampOpacity` | `pocketCampOpacity`, a whole percentage from 0 to 100; nil for the default 60 |
   | `pocketCampLocked` | `pocketCampLocked = true`, or nil while off |
   | `pocketCampCombat` | Hide: `pocketCampCombatHide = true`, as Hide in combat was saved, so a save from before reads as Hide; Fade: `pocketCampCombatFades = true`; nil for both while Stay |
-  | `pocketCampCombatFade` | `pocketCampCombatFade`, a whole percentage from 0 to 100; nil for the default 25 |
+  | `pocketCampCombatFade` | `pocketCampCombatFadeTo`, a whole percentage from 0 to 100; nil for the default 25 |
   | `pocketCampAlts` | `pocketCampAltsOff = true`, or nil while on |
   | `pocketCampSpares` | `pocketCampSparesOff = true`, or nil while on |
   | `pocketCampPosition` | `{ x, y }` from the screen's bottom left: the bottom left corner the Pocket Camp would have at its usual width, so it's anchored on the fire whatever width it grows to; nil where it starts |

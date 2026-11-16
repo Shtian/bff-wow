@@ -38,7 +38,7 @@ local core
 local frame
 -- What Core last gave: the Pocket Camp, or nil while there's none.
 local view
-local inCombat = false
+local fighting = false
 -- The Member whose tooltip is up, "crate" or "cup" for theirs, false
 -- for the Pocket Camp's own, nil while none is.
 local tooltipFor
@@ -370,10 +370,10 @@ local function create()
   frame:RegisterEvent("PLAYER_REGEN_DISABLED")
   frame:RegisterEvent("PLAYER_REGEN_ENABLED")
   frame:SetScript("OnEvent", function(_, event)
-    inCombat = event == "PLAYER_REGEN_DISABLED"
+    fighting = event == "PLAYER_REGEN_DISABLED"
     PocketCamp.refresh()
   end)
-  inCombat = InCombatLockdown() and true or false
+  fighting = InCombatLockdown() and true or false
 
   frame.band = ns.CampScene.new(frame, {
     target = ns.CampScene.FIGURE_TARGET, shadow = true, names = false, backdrop = ns.CampSheet.pocketBackdrop,
@@ -396,11 +396,11 @@ function PocketCamp.refresh()
   end
   if not frame then create() end
   -- Hidden in combat, nothing is drawn until it's over.
-  if view.inCombat == "hide" and inCombat then
+  if view.inCombat == "hide" and fighting then
     frame:Hide()
     return
   end
-  frame:SetAlpha(view.inCombat == "fade" and inCombat and view.combatFade or 1)
+  frame:SetAlpha(view.inCombat == "fade" and fighting and view.combatFade or 1)
   frame.band:SetBackdropAlpha(view.opacity)
   if frame.scaling then
     -- Mid-drag it keeps the size it's dragged to.

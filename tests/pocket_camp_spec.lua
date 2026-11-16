@@ -200,6 +200,23 @@ describe("The Pocket Camp", function()
     assert.equal("stay", core:pocketCamp().inCombat)
   end)
 
+  it("sends nothing more for what it does in combat", function()
+    local function sentBy(choice)
+      local net, clients = crew({ "Ann", "Bob" })
+      local a = clients[1]
+      local mark = #net.wire
+      a.core:setSetting("pocketCampCombat", choice)
+      a.core:setSetting("pocketCampCombatFade", 40)
+      a.core:pocketCamp()
+      net:run(6 * 60)
+      local types = {}
+      for _, message in ipairs(net:sent(mark, "Ann")) do types[#types + 1] = message.type end
+      return types
+    end
+    assert.same(sentBy("stay"), sentBy("fade"))
+    assert.same(sentBy("stay"), sentBy("hide"))
+  end)
+
   it("keeps its scale within its limits, in whole percents, and goes back to 1 on nil", function()
     local _, clients = crew({ "Ann", "Bob" })
     local core = clients[1].core

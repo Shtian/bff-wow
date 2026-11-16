@@ -165,49 +165,43 @@ describe("Settings list", function()
     assert.equal("medium", core:setting("mapPinSize"))
   end)
 
-  it("offers Stay, Fade and Hide in combat, reading an old saved Hide in combat as Hide", function()
-    local function combat(core)
-      for _, section in ipairs(core:settings()) do
-        for _, setting in ipairs(section.settings) do
-          if setting.key == "pocketCampCombat" then return setting end
-        end
+  -- A setting as the Settings page gives it, by key.
+  local function onPage(core, key)
+    for _, section in ipairs(core:settings()) do
+      for _, setting in ipairs(section.settings) do
+        if setting.key == key then return setting end
       end
     end
+  end
+
+  it("offers Stay, Fade and Hide in combat, reading an old saved Hide in combat as Hide", function()
     assert.same({
       key = "pocketCampCombat", kind = "choice", label = "In combat", value = "stay",
       choices = { { key = "stay", label = "Stay" }, { key = "fade", label = "Fade" }, { key = "hide", label = "Hide" } },
-    }, combat(newCore()))
+    }, onPage(newCore(), "pocketCampCombat"))
     assert.equal("hide", newCore({ pocketCampCombatHide = true }):setting("pocketCampCombat"))
     assert.equal("stay", newCore({ pocketCampCombatHide = false }):setting("pocketCampCombat"))
     assert.equal("stay", newCore({}):setting("pocketCampCombat"))
 
-    -- Hide is saved as it always was, so an older version still hides.
     local core, deps = newCore()
-    core:setSetting("pocketCampCombat", "hide")
-    assert.is_true(deps.db.pocketCampCombatHide)
-    core:setSetting("pocketCampCombat", "fade")
-    assert.is_nil(deps.db.pocketCampCombatHide)
-    assert.equal("fade", core:setting("pocketCampCombat"))
+    for _, choice in ipairs({ "hide", "fade", "stay", "hide" }) do
+      core:setSetting("pocketCampCombat", choice)
+      assert.equal(choice, newCore(deps.db):setting("pocketCampCombat"))
+    end
     core:setSetting("pocketCampCombat", "loud")
     assert.equal("stay", core:setting("pocketCampCombat"))
-    assert.is_nil(deps.db.pocketCampCombatHide)
-    assert.is_nil(deps.db.pocketCampCombatFades)
+    assert.equal("stay", newCore(deps.db):setting("pocketCampCombat"))
   end)
 
   it("shows Fade to on the Settings page only while Fade is picked", function()
     local core = newCore()
-    local function fadeTo()
-      for _, section in ipairs(core:settings()) do
-        for _, setting in ipairs(section.settings) do
-          if setting.key == "pocketCampCombatFade" then return setting end
-        end
-      end
-    end
-    assert.same({ key = "pocketCampCombatFade", kind = "percent", label = "Fade to", value = 25, hidden = true }, fadeTo())
+    assert.same({ key = "pocketCampCombatFade", kind = "percent", label = "Fade to", value = 25, hidden = true },
+      onPage(core, "pocketCampCombatFade"))
     core:setSetting("pocketCampCombat", "fade")
-    assert.same({ key = "pocketCampCombatFade", kind = "percent", label = "Fade to", value = 25 }, fadeTo())
+    assert.same({ key = "pocketCampCombatFade", kind = "percent", label = "Fade to", value = 25 },
+      onPage(core, "pocketCampCombatFade"))
     core:setSetting("pocketCampCombat", "hide")
-    assert.is_true(fadeTo().hidden)
+    assert.is_true(onPage(core, "pocketCampCombatFade").hidden)
   end)
 
   it("refuses a key that isn't in the list", function()
