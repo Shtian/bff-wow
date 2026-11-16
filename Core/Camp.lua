@@ -321,6 +321,12 @@ local function poseOf(row, doing)
   return said or "seated"
 end
 
+-- A status with how long, from a minute on: "fighting · 3m". Under a
+-- minute it's too soon to say.
+local function withTime(status, seconds)
+  return seconds < 60 and status or status .. " · " .. ns.Text.ago(seconds)
+end
+
 -- Each online Member's pose as the Pocket Camp shows it awake, by Member
 -- id, as a key that differs whenever the pose does: the pose ("fighting"),
 -- with the instance for one adventuring ("adventuring:The Deadmines"). A
@@ -557,9 +563,7 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
   for i, actor in ipairs(view.actors) do
     actor.row = byMember[actor.memberId]
     if actor.pose == "asleep" then
-      -- Under a minute it's too soon to say how long.
-      local since = now - bedrolls[actor.memberId]
-      actor.status = since < 60 and "asleep" or "asleep · " .. ns.Text.ago(since)
+      actor.status = withTime("asleep", now - bedrolls[actor.memberId])
     else
       actor.pose = poses[actor.memberId]
       actor.instance = actor.row.instance
@@ -578,7 +582,7 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
       local began = actor.pose ~= "seated" and doing.since and doing.since[actor.memberId]
       if began and now - began >= 60 then
         actor.since = now - began
-        actor.status = actor.status .. " · " .. ns.Text.ago(actor.since)
+        actor.status = withTime(actor.status, actor.since)
       end
     end
     -- On an Alt: the Character shown isn't their Main.

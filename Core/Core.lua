@@ -351,7 +351,8 @@ local function trophiesTooltip(trophies)
 end
 
 -- What each Member on `rows` is doing, as Camp.pocket takes it, with
--- since: when each one's pose began (poseSince, brought up to date here).
+-- since: when each one's pose began (poseSince, brought up to date here:
+-- see notePoses).
 local function doingOf(self, rows, now)
   local doing = { said = {}, form = {}, fishing = {}, working = {} }
   for _, row in ipairs(rows) do
@@ -384,6 +385,18 @@ local function doingOf(self, rows, now)
   end
   doing.since = since
   return doing
+end
+
+-- Brings poseSince up to date, so a pose's start doesn't wait for the
+-- next read. Forgets it all with the Pocket Camp off: nothing shows, and
+-- it counts afresh once on.
+local function notePoses(self)
+  if not pocketCampOn(self) then
+    self.poseSince = {}
+    return
+  end
+  local now = self.now()
+  doingOf(self, ns.Roster.rows(self.ledger, now), now)
 end
 
 -- The Pocket Camp as Camp.pocket gives it.
@@ -1198,14 +1211,7 @@ function Core:tick()
   ended = self.doings:expire() or ended
   ended = self.doings:noteState() or ended
   if ended and pocketCampOn(self) then self.listener("changed") end
-  -- Each second, so a pose's start doesn't wait for the next redraw.
-  -- With the Pocket Camp off nothing shows, and it counts afresh once on.
-  if pocketCampOn(self) then
-    local now = self.now()
-    doingOf(self, ns.Roster.rows(self.ledger, now), now)
-  else
-    self.poseSince = {}
-  end
+  notePoses(self)
   checkOnline(self)
 end
 
