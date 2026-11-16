@@ -226,6 +226,19 @@ function Presence:heard(name, message)
   end
 end
 
+-- Whether whispers from a name are held: they aren't a peer, and
+-- whispered in the last 10 s.
+function Presence:holds(name)
+  return self.strangers[self.key(name)] ~= nil
+end
+
+-- A held stranger the channel link vouches for: one of their whispers is
+-- from a Member this client knows. They become a peer, and what was held
+-- is delivered. No member list or join notice is needed.
+function Presence:vouched(name)
+  add(self, name, "known Member")
+end
+
 -- The link went up or came down. Silence is only counted while it is up.
 -- When it comes up every silent peer is due a try, so the DIGEST Core sends
 -- then reaches them: whatever kept them from hearing us may have ended
