@@ -930,7 +930,7 @@ end
 -- (maxColumns, the pocketCampColumns setting), or past it for a doorway's
 -- set to fit on one side.
 -- { columns, rows, maxColumns, actors, doorways, more, moreText, tooltip, opacity, locked,
--- hideInCombat, position, scale, spares, sparesTooltip, trophies, trophiesTooltip }. actors are the online Members, you
+-- inCombat, combatFade, position, scale, spares, sparesTooltip, trophies, trophiesTooltip }. actors are the online Members, you
 -- first, then those in your party or raid (group()), marked group, as
 -- many as fit, each as in camp() plus pose ("seated",
 -- "adventuring": the Character being played is in an instance,
@@ -960,7 +960,9 @@ end
 -- tent; more counts the online Members that didn't fit ("+2"). tooltip is
 -- { title, lines ("Bob: in The Deadmines", one per actor), hint }. The
 -- rest is how UI shows it: opacity (the backdrop's, 0 to 1), locked (it
--- can't be dragged), hideInCombat and position ({ x, y }: its bottom left
+-- can't be dragged), inCombat (what it does in combat: "stay", "fade" or
+-- "hide"), combatFade (the opacity, 0 to 1, the whole frame fades to in
+-- combat while it fades) and position ({ x, y }: its bottom left
 -- corner from the screen's, or nil where it hasn't been moved) and scale
 -- (1 is its usual size). spares is how many Spare notices are unseen
 -- (unseenSpares()), nil at none or with the pocketCampSpares setting off: a crate by the fire, whose tooltip is
@@ -978,7 +980,8 @@ function Core:pocketCamp()
   local view = pocketView(self)
   view.opacity = self:setting("pocketCampOpacity") / 100
   view.locked = self:setting("pocketCampLocked")
-  view.hideInCombat = self:setting("pocketCampCombat")
+  view.inCombat = self:setting("pocketCampCombat")
+  view.combatFade = self:setting("pocketCampCombatFade") / 100
   view.position = self:setting("pocketCampPosition")
   view.scale = self:setting("pocketCampScale") / 100
   view.maxColumns = self:setting("pocketCampColumns")
@@ -1544,6 +1547,24 @@ local function oneOf(field, choices, default)
   }
 end
 
+-- What the Pocket Camp does in combat: "stay", "fade" or "hide". Hide is
+-- saved as Hide in combat always was (hideField = true), so a save from
+-- before reads as Hide and an older version still hides; Fade is
+-- fadeField = true; Stay saves nothing.
+local function combatChoice(hideField, fadeField)
+  return {
+    read = function(db)
+      if db[hideField] == true then return "hide" end
+      if db[fadeField] == true then return "fade" end
+      return "stay"
+    end,
+    write = function(db, value)
+      db[hideField] = value == "hide" or nil
+      db[fadeField] = value == "fade" or nil
+    end,
+  }
+end
+
 -- A value saved as nil while it's the default.
 local function nilAsDefault(field, default)
   return {
@@ -1647,6 +1668,13 @@ Core.MAP_PIN_SIZES = {
   { key = "large", label = "Large" },
 }
 
+-- What the Pocket Camp can do in combat.
+Core.POCKET_CAMP_COMBAT = {
+  { key = "stay", label = "Stay" },
+  { key = "fade", label = "Fade" },
+  { key = "hide", label = "Hide" },
+}
+
 -- The Pocket Camp's scale limits, in percent of its usual size.
 Core.POCKET_CAMP_MIN_SCALE, Core.POCKET_CAMP_MAX_SCALE = 50, 300
 
@@ -1741,8 +1769,9 @@ local SETTINGS = {
     saved = screenPosition("toastPosition"),
   },
   -- The Pocket Camp (pocketCamp()), in a section of its own: whether it shows, its backdrop's
-  -- opacity as a percentage, whether it can be dragged, and hiding it in
-  -- combat.
+  -- opacity as a percentage, whether it can be dragged, and what it does
+  -- in combat: stays, fades to Fade to (a percentage, on the page only
+  -- while Fade is picked) or hides.
   {
     key = "pocketCamp", section = POCKET_CAMP, kind = "toggle",
     label = "Show the Pocket Camp",
@@ -1759,9 +1788,15 @@ local SETTINGS = {
     saved = onFlag("pocketCampLocked"),
   },
   {
-    key = "pocketCampCombat", section = POCKET_CAMP, kind = "toggle",
-    label = "Hide in combat",
-    saved = onFlag("pocketCampCombatHide"),
+    key = "pocketCampCombat", section = POCKET_CAMP, kind = "choice",
+    label = "In combat",
+    choices = Core.POCKET_CAMP_COMBAT,
+    saved = combatChoice("pocketCampCombatHide", "pocketCampCombatFades"),
+  },
+  {
+    key = "pocketCampCombatFade", section = POCKET_CAMP, kind = "percent",
+    label = "Fade to", shownWhen = { key = "pocketCampCombat", value = "fade" },
+    saved = percent("pocketCampCombatFade", 25),
   },
   -- What the Pocket Camp marks on its figures, each on by default, so a
   -- player can opt out (pocketView passes them to Camp.pocket as shown):
@@ -1907,7 +1942,9 @@ end
 
 -- The Settings page, ready to render: sections in order, { title,
 -- settings }, each setting { key, kind, label, value }, and button, the
--- text of the button for a setting set by one (Reset, Move). Settings with no
+-- text of the button for a setting set by one (Reset, Move), and hidden,
+-- true for a setting left off the page while another's value doesn't call
+-- for it (Fade to, while the Pocket Camp doesn't fade). Settings with no
 -- section (the Together tab's Show menu) aren't on it.
 function Core:settings()
   local sections, byTitle = {}, {}
@@ -1927,6 +1964,7 @@ function Core:settings()
         choices = setting.choices,
         needs = setting.needs,
         button = setting.button,
+        hidden = setting.shownWhen and self:setting(setting.shownWhen.key) ~= setting.shownWhen.value or nil,
       }
     end
   end

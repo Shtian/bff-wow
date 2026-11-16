@@ -33,7 +33,8 @@ A **Settings** view inside the BFF panel, drawn by `UI/SettingsTab.lua` in the p
 | **Pocket Camp** | Show the Pocket Camp | off | #161, `docs/design/pocket-camp.md` |
 | | Backdrop opacity, a slider from 0% to 100% | 60% | `docs/design/pocket-camp.md` |
 | | Lock its position and size | off | `docs/design/pocket-camp.md` |
-| | Hide in combat | off | `docs/design/pocket-camp.md` |
+| | In combat: Stay, Fade or Hide | Stay | #211, `docs/design/pocket-camp.md` |
+| | Fade to, a slider from 0% to 100%, shown only while In combat is Fade | 25% | #211, `docs/design/pocket-camp.md` |
 
 Not in a Crew: the Crew code and Leave Crew are hidden, Appear offline is greyed out, and the panel's setup view handles joining. The panel has no sidebar there, so Settings (from the minimap menu or `/bff settings`) takes the window's full width with a **Back** button on top to the setup view, and the panel comes back to setup next time it opens.
 
@@ -65,7 +66,8 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `pocketCamp` | `pocketCamp = true`, or nil while off |
   | `pocketCampOpacity` | `pocketCampOpacity`, a whole percentage from 0 to 100; nil for the default 60 |
   | `pocketCampLocked` | `pocketCampLocked = true`, or nil while off |
-  | `pocketCampCombat` | `pocketCampCombatHide = true`, or nil while off |
+  | `pocketCampCombat` | Hide: `pocketCampCombatHide = true`, as Hide in combat was saved, so a save from before reads as Hide; Fade: `pocketCampCombatFades = true`; nil for both while Stay |
+  | `pocketCampCombatFade` | `pocketCampCombatFade`, a whole percentage from 0 to 100; nil for the default 25 |
   | `pocketCampAlts` | `pocketCampAltsOff = true`, or nil while on |
   | `pocketCampSpares` | `pocketCampSparesOff = true`, or nil while on |
   | `pocketCampPosition` | `{ x, y }` from the screen's bottom left: the bottom left corner the Pocket Camp would have at its usual width, so it's anchored on the fire whatever width it grows to; nil where it starts |
