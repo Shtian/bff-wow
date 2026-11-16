@@ -329,9 +329,7 @@ describe("The Pocket Camp", function()
       net:run(40)
       a.core:setSetting("pocketCamp", true)
       local menu = actorFor(a.core:pocketCamp(), b).menu
-      assert.equal("Bob Stone", menu.title)
       assert.equal("Bob Stone", menu.fullName)
-      assert.equal(b.memberId, menu.memberId)
     end)
 
     it("is never on your own figure", function()

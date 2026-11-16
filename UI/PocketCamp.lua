@@ -306,17 +306,24 @@ end
 -- A right-click on another Member's figure: Whisper and Invite (the
 -- Roster's own), Show on map (greyed out with no known spot) and Open in
 -- panel. Nothing on your own figure, a bedroll, the fire or empty space.
+-- An entry picked once combat began does nothing, as a click there does.
+local function outOfCombat(action)
+  return function()
+    if not InCombatLockdown() then action() end
+  end
+end
+
 local function showMenu()
   local actor = not (overCrate() or overCup()) and hovered()
   local menu = actor and actor.menu
   if not menu then return end
   hideTooltip()
   MenuUtil.CreateContextMenu(frame, function(_, root)
-    root:CreateTitle(menu.title)
+    root:CreateTitle(menu.fullName)
     root:CreateButton("Whisper", function() ns.Panel.whisper(menu.fullName) end)
     root:CreateButton("Invite", function() ns.Panel.invite(menu.fullName) end)
-    root:CreateButton("Show on map", function() openMap(menu.mapId) end):SetEnabled(menu.mapId ~= nil)
-    root:CreateButton("Open in panel", function() ns.Panel.show("roster") end)
+    root:CreateButton("Show on map", outOfCombat(function() openMap(menu.mapId) end)):SetEnabled(menu.mapId ~= nil)
+    root:CreateButton("Open in panel", outOfCombat(function() ns.Panel.show("roster") end))
   end)
 end
 

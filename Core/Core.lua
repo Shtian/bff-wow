@@ -946,8 +946,8 @@ end
 -- (its name, while in one), raid (true if it's a raid), status (the
 -- pose in words: "by the fire", "in The Deadmines", "at a vendor") and,
 -- on another Member's figure (not yours, not a bedroll), menu, what its
--- right-click menu needs: { memberId, title and fullName (the Character's
--- "First Last", which Whisper and Invite need), mapId (the map of their
+-- right-click menu needs: { fullName (the Character's "First Last", its
+-- title, and what Whisper and Invite need), mapId (the map of their
 -- map pin, live spot first, whatever the map setting; nil with none) }. A
 -- flying figure's griffin reaches CAMP_LAYOUT.griffinFore past it towards
 -- the fire and griffinAft away from it. Adventuring figures in the same
@@ -994,10 +994,8 @@ function Core:pocketCamp()
   for _, actor in ipairs(view.actors) do
     local row = actor.row
     if row and not row.own and actor.pose ~= "asleep" then
-      actor.menu = {
-        memberId = row.memberId, title = row.fullName, fullName = row.fullName,
-        mapId = (shownSpot(self, row) or {}).mapId,
-      }
+      local spot = shownSpot(self, row)
+      actor.menu = { fullName = row.fullName, mapId = spot and spot.mapId }
     end
   end
   return view
