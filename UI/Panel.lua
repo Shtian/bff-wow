@@ -181,19 +181,6 @@ local function className(classFilename)
   return LOCALIZED_CLASS_NAMES_MALE[classFilename] or classFilename or ""
 end
 
--- Whisper and Invite, guarded since Midnight moved some chat functions.
--- On Forever a Character is whispered and invited as "First Last"; the
--- first name alone reaches no one (or someone else). The Pocket Camp's
--- menu uses them too.
-function Panel.whisper(name)
-  local sendTell = ChatFrameUtil and ChatFrameUtil.SendTell or ChatFrame_SendTell
-  if sendTell then sendTell(name) end
-end
-
-function Panel.invite(name)
-  if C_PartyInfo and C_PartyInfo.InviteUnit then C_PartyInfo.InviteUnit(name) end
-end
-
 StaticPopupDialogs.BFF_REMOVE_MEMBER = {
   text = "Remove %s? Only you stop seeing them; the rest of the Crew still does.",
   button1 = YES,
@@ -284,8 +271,8 @@ local function showMenu(owner)
         root:CreateButton("Main: most recently played", function() core:setMain(nil) end)
       end
     else
-      root:CreateButton("Whisper", function() Panel.whisper(character.fullName) end):SetEnabled(character.playing)
-      root:CreateButton("Invite", function() Panel.invite(character.fullName) end):SetEnabled(character.playing)
+      root:CreateButton("Whisper", function() ns.Actions.whisper(character.fullName) end):SetEnabled(character.playing)
+      root:CreateButton("Invite", function() ns.Actions.invite(character.fullName) end):SetEnabled(character.playing)
       local name = row.displayName or character.name
       root:CreateButton(("When does %s play?"):format(name), function() Panel.showWhen(row.memberId) end)
       root:CreateButton(("Remove %s..."):format(name), function()

@@ -293,16 +293,6 @@ local function hideTooltip()
   GameTooltip:Hide()
 end
 
--- Opens the world map on a map, guarded in case Forever lacks the helper.
-local function openMap(mapId)
-  if OpenWorldMap then
-    OpenWorldMap(mapId)
-  elseif WorldMapFrame then
-    ShowUIPanel(WorldMapFrame)
-    WorldMapFrame:SetMapID(mapId)
-  end
-end
-
 -- A right-click on another Member's figure: Whisper and Invite (the
 -- Roster's own), Show on map (greyed out with no known spot) and Open in
 -- panel. Nothing on your own figure, a bedroll, the fire or empty space.
@@ -320,9 +310,9 @@ local function showMenu()
   hideTooltip()
   MenuUtil.CreateContextMenu(frame, function(_, root)
     root:CreateTitle(menu.fullName)
-    root:CreateButton("Whisper", function() ns.Panel.whisper(menu.fullName) end)
-    root:CreateButton("Invite", function() ns.Panel.invite(menu.fullName) end)
-    root:CreateButton("Show on map", outOfCombat(function() openMap(menu.mapId) end)):SetEnabled(menu.mapId ~= nil)
+    root:CreateButton("Whisper", function() ns.Actions.whisper(menu.fullName) end)
+    root:CreateButton("Invite", function() ns.Actions.invite(menu.fullName) end)
+    root:CreateButton("Show on map", outOfCombat(function() ns.Actions.openMap(menu.mapId) end)):SetEnabled(menu.mapId ~= nil)
     root:CreateButton("Open in panel", outOfCombat(function() ns.Panel.show("roster") end))
   end)
 end
