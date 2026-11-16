@@ -7,7 +7,8 @@
 -- A crate by the fire says Spare notices wait unseen, and a gold cup
 -- over it that a Trophy was reached this session, as Core says. A click toggles
 -- the panel, or on the crate opens the Spares tab and on the cup the
--- Trophies tab (not in combat), a drag moves it unless Core
+-- Trophies tab, and a right-click on another Member's figure opens its
+-- menu (neither in combat), a drag moves it unless Core
 -- says it's locked, and where it's dropped is saved through Core. It's as
 -- wide as Core says, growing out from the fire as more of the Crew comes
 -- online. Unlocked, a grip shows in its bottom right corner while the mouse
@@ -292,12 +293,36 @@ local function hideTooltip()
   GameTooltip:Hide()
 end
 
+-- A right-click on another Member's figure: Whisper and Invite (the
+-- Roster's own), Show on map (greyed out with no known spot) and Open in
+-- panel. Nothing on your own figure, a bedroll, the fire or empty space.
+-- An entry picked once combat began does nothing, as a click there does.
+local function outOfCombat(action)
+  return function()
+    if not InCombatLockdown() then action() end
+  end
+end
+
+local function showMenu()
+  local actor = not (overCrate() or overCup()) and hovered()
+  local menu = actor and actor.menu
+  if not menu then return end
+  hideTooltip()
+  MenuUtil.CreateContextMenu(frame, function(_, root)
+    root:CreateTitle(menu.fullName)
+    root:CreateButton("Whisper", function() ns.Actions.whisper(menu.fullName) end)
+    root:CreateButton("Invite", function() ns.Actions.invite(menu.fullName) end)
+    root:CreateButton("Show on map", outOfCombat(function() ns.Actions.openMap(menu.mapId) end)):SetEnabled(menu.mapId ~= nil)
+    root:CreateButton("Open in panel", outOfCombat(function() ns.Panel.show("roster") end))
+  end)
+end
+
 local function create()
   frame = CreateFrame("Button", "BFFPocketCamp", UIParent)
   frame:SetFrameStrata("LOW")
   frame:SetClampedToScreen(true)
   frame:SetMovable(true)
-  frame:RegisterForClicks("LeftButtonUp")
+  frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   frame:RegisterForDrag("LeftButton")
   frame:SetScript("OnDragStart", function()
     if view and not view.locked then
@@ -306,12 +331,14 @@ local function create()
     end
   end)
   frame:SetScript("OnDragStop", dropped)
-  -- The panel can't open in combat, so a click does nothing there. On the
-  -- crate it opens the Spares tab, which marks the notices seen, and on
-  -- the cup the Trophies tab.
-  frame:SetScript("OnClick", function()
+  -- The panel can't open in combat, so a click does nothing there, nor
+  -- does a right-click open the menu. On the crate it opens the Spares
+  -- tab, which marks the notices seen, and on the cup the Trophies tab.
+  frame:SetScript("OnClick", function(_, button)
     if InCombatLockdown() then return end
-    if overCrate() then
+    if button == "RightButton" then
+      showMenu()
+    elseif overCrate() then
       ns.Panel.show("spares")
     elseif overCup() then
       ns.Panel.show("goals")

@@ -848,6 +848,20 @@ end
 -- it; your own dot (no memberIds) changes nothing.
 Core.selectTogether = ns.Together.select
 
+-- Where another Member's shown Character is, from their Roster row:
+-- { mapId, x, y, instance }, or nil with no known spot. A spot heard in a
+-- WHERE since their record was written wins over the record's, and isn't
+-- in an instance.
+local function shownSpot(self, row)
+  local record = self.ledger:record(row.memberId)
+  local live = record and self.where:spot(row.memberId, row.guid, record.version)
+  if live then return { mapId = live.mapId, x = live.x, y = live.y } end
+  if row.mapId and row.x and row.y then
+    return { mapId = row.mapId, x = row.x, y = row.y, instance = row.instance }
+  end
+  return nil
+end
+
 -- The world map's pins: one per other Member the panel shows whose shown
 -- Character (being played while online, else the Main) has a known spot,
 -- unsorted. A pin has memberId, displayName, name, fullName, classFilename, level,
@@ -865,10 +879,8 @@ function Core:mapPins()
   local campOn = self:setting("camp")
   local size = self:setting("mapPinSize")
   for _, row in ipairs(ns.Roster.rows(self.ledger, self.now())) do
-    local record = not row.own and self.ledger:record(row.memberId)
-    local live = record and self.where:spot(row.memberId, row.guid, record.version)
-    if live then row.mapId, row.x, row.y, row.instance = live.mapId, live.x, live.y, nil end
-    if not row.own and row.mapId and row.x and row.y then
+    local spot = not row.own and shownSpot(self, row)
+    if spot then
       pins[#pins + 1] = {
         memberId = row.memberId,
         displayName = row.displayName,
@@ -876,11 +888,11 @@ function Core:mapPins()
         fullName = row.fullName,
         classFilename = row.classFilename,
         level = row.level,
-        mapId = row.mapId,
-        x = row.x,
-        y = row.y,
+        mapId = spot.mapId,
+        x = spot.x,
+        y = spot.y,
         zone = row.zone,
-        instance = row.instance,
+        instance = spot.instance,
         figure = campOn and row.classFilename or nil,
         size = size,
         online = row.online,
@@ -931,8 +943,12 @@ end
 -- is true for the forms that trot, wolf and travel, and the sprite reaches
 -- CAMP_LAYOUT.formFore past the figure towards the fire and formAft, plus
 -- formTrot if it trots, away from it), instance
--- (its name, while in one), raid (true if it's a raid) and status (the
--- pose in words: "by the fire", "in The Deadmines", "at a vendor"). A
+-- (its name, while in one), raid (true if it's a raid), status (the
+-- pose in words: "by the fire", "in The Deadmines", "at a vendor") and,
+-- on another Member's figure (not yours, not a bedroll), menu, what its
+-- right-click menu needs: { fullName (the Character's "First Last", its
+-- title, and what Whisper and Invite need), mapId (the map of their
+-- map pin, live spot first, whatever the map setting; nil with none) }. A
 -- flying figure's griffin reaches CAMP_LAYOUT.griffinFore past it towards
 -- the fire and griffinAft away from it. Adventuring figures in the same
 -- instance sit side by side and share a doorway: doorways lists them ({ x,
@@ -975,6 +991,13 @@ function Core:pocketCamp()
   end
   view.trophies = sessionTrophies(self)
   view.trophiesTooltip = view.trophies and trophiesTooltip(view.trophies)
+  for _, actor in ipairs(view.actors) do
+    local row = actor.row
+    if row and not row.own and actor.pose ~= "asleep" then
+      local spot = shownSpot(self, row)
+      actor.menu = { fullName = row.fullName, mapId = spot and spot.mapId }
+    end
+  end
   return view
 end
 

@@ -75,6 +75,8 @@ stds.wow = {
     "IsFlying",
     "IsModifiedClick",
     "IsResting",
+    "OpenWorldMap",
+    "ShowUIPanel",
     "UnitIsAFK",
     "IsShiftKeyDown",
     "IsMouseButtonDown",
