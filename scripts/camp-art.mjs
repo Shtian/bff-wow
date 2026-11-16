@@ -108,6 +108,13 @@ const COINS = outlined([".GYYG.", "GYWWYG", "OGYYGO", "GOGGOG", "OGYYGO", "GOGGO
 // The Pocket Camp's crate by the fire, there while Spare notices wait
 // unseen: a wooden crate, its lid lifted on something gold. Outlined.
 const CRATE = outlined([".GYG..", "AAAAAA", "aAaaAa", "aAaaAa", "AAAAAA"]);
+// The Pocket Camp's banner behind the fire, there while a Trophy reached
+// this session is under an hour old: a pole with a gold finial, flying a
+// red swallowtail pennant with a gold cup on it. Outlined.
+const BANNER = outlined([
+  "Y.....", "BRRRRR", "BRGYGR", "BRGYGR", "BRRGRR", "BRGGGR", "BRRRRR", "BRR.RR", "BR...R",
+  "B.....", "B.....", "B.....", "B.....", "B.....", "b.....",
+]);
 // An inn's sign over a resting figure's head: a post on the side away from
 // the fire (mirrored on its right), and a tankard on a board hung by chains.
 const INN_SIGN = [
@@ -354,7 +361,7 @@ const SPRITES = [
   ["flare3", paint(flare(FIRE[2]), FLARE_PAL)],
   ["blade", skin(BLADE)], ["torch", skin(TORCH)], ["hammer", skin(HAMMER)], ["pick", skin(PICK)], ["anvil", skin(ANVIL)],
   ["arch", skin(ARCH)], ["archRaid", skin(ARCH_RAID)],
-  ["bag", skin(BAG)], ["coins", skin(COINS)], ["innSign", skin(INN_SIGN)], ["quest", skin(QUEST)], ["crate", skin(CRATE)],
+  ["bag", skin(BAG)], ["coins", skin(COINS)], ["innSign", skin(INN_SIGN)], ["quest", skin(QUEST)], ["crate", skin(CRATE)], ["banner", skin(BANNER)],
   ["griffin", skin(GRIFFIN)], ["griffinWing", skin(GRIFFIN_WING)], ["griffinWingUp", skin(GRIFFIN_WING_UP)],
   ["afk", skin(AFK)],
   ["walkCloth1", cloth(WALK[0], CLOTH)], ["walk1", skin(WALK[0])],

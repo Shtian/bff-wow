@@ -4,9 +4,10 @@
 -- soft-edged backdrop of the opacity Core gives, and for a while those who
 -- just went offline, asleep in a bedroll. It shows no names: the mouse over a figure
 -- shows that Member's Roster tooltip, and over the fire who is doing what.
--- A crate by the fire says Spare notices wait unseen, as Core says. A
--- click toggles the panel, or on the crate opens the Spares tab (not in
--- combat), a drag moves it unless Core
+-- A crate by the fire says Spare notices wait unseen, and a banner behind
+-- it that a Trophy was reached this session, as Core says. A click toggles
+-- the panel, or on the crate opens the Spares tab and on the banner the
+-- Trophies tab (not in combat), a drag moves it unless Core
 -- says it's locked, and where it's dropped is saved through Core. It's as
 -- wide as Core says, growing out from the fire as more of the Crew comes
 -- online. Unlocked, a grip shows in its bottom right corner while the mouse
@@ -37,8 +38,8 @@ local frame
 -- What Core last gave: the Pocket Camp, or nil while there's none.
 local view
 local inCombat = false
--- The Member whose tooltip is up, "crate" for the crate's, false for the
--- Pocket Camp's own, nil while none is.
+-- The Member whose tooltip is up, "crate" or "banner" for theirs, false
+-- for the Pocket Camp's own, nil while none is.
 local tooltipFor
 
 -- Its usual width (Core.CAMP_LAYOUT.pocketColumns) in UI units, at the
@@ -233,15 +234,24 @@ local function overCrate()
   return frame.band:CrateAt(x - frame:GetLeft(), y - frame:GetBottom())
 end
 
--- What the tooltip is for where the mouse is: "crate", a Member's id, or
--- false for the Pocket Camp's own.
+-- Whether the mouse is over the banner.
+local function overBanner()
+  local x, y = cursor()
+  return frame.band:BannerAt(x - frame:GetLeft(), y - frame:GetBottom())
+end
+
+-- What the tooltip is for where the mouse is: "crate", "banner", a
+-- Member's id, or false for the Pocket Camp's own. The crate stands in
+-- front of the banner.
 local function pointedAt()
   if overCrate() then return "crate" end
+  if overBanner() then return "banner" end
   local actor = hovered()
   return actor and actor.memberId or false
 end
 
 -- Over the crate, how many Spare notices wait and that a click shows them;
+-- over the banner, each Trophy reached this session and how long ago;
 -- over a figure, that Member's tooltip as the Roster shows it, and "In
 -- your group" when they are; over a bedroll, who is asleep and since when;
 -- anywhere else, who is doing what.
@@ -252,6 +262,14 @@ local function showTooltip()
   if tooltipFor == "crate" then
     GameTooltip:AddLine(view.sparesTooltip.title)
     GameTooltip:AddLine(view.sparesTooltip.hint, MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:Show()
+    return
+  end
+  if tooltipFor == "banner" then
+    local tip = view.trophiesTooltip
+    GameTooltip:AddLine(tip.title)
+    for _, line in ipairs(tip.lines) do GameTooltip:AddLine(line, 1, 1, 1) end
+    GameTooltip:AddLine(tip.hint, MUTED[1], MUTED[2], MUTED[3])
     GameTooltip:Show()
     return
   end
@@ -290,11 +308,14 @@ local function create()
   end)
   frame:SetScript("OnDragStop", dropped)
   -- The panel can't open in combat, so a click does nothing there. On the
-  -- crate it opens the Spares tab, which marks the notices seen.
+  -- crate it opens the Spares tab, which marks the notices seen, and on
+  -- the banner the Trophies tab.
   frame:SetScript("OnClick", function()
     if InCombatLockdown() then return end
     if overCrate() then
       ns.Panel.show("spares")
+    elseif overBanner() then
+      ns.Panel.show("goals")
     else
       ns.Panel.toggle()
     end
@@ -309,7 +330,8 @@ local function create()
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
     updateGrip()
-    -- The tooltip follows the mouse from figure to figure, and the crate.
+    -- The tooltip follows the mouse from figure to figure, the crate and
+    -- the banner.
     if tooltipFor ~= nil and GameTooltip:IsOwned(frame) then
       if pointedAt() ~= tooltipFor then showTooltip() end
     end

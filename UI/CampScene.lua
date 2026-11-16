@@ -53,7 +53,7 @@ local BOUNCE_TICKS = 3
 -- sprite's bottom sits on it (from the prototype).
 local ROW = {
   seat = 3, seated = 4, hop = 6, standing = 3, asleep = 3, grave = 3, flower = 2,
-  logs = 3, fire = 5, tent = 5, ember = 16, crate = 1,
+  logs = 3, fire = 5, tent = 5, ember = 16, crate = 1, banner = 4,
 }
 -- The Pocket Camp's crate (unseen Spare notices) stands in front of the
 -- fire's right half, its left edge this far from the fire's centre. Its 8
@@ -61,6 +61,15 @@ local ROW = {
 -- LAYOUT.fire + OFFSET.seat) and of a doorway there (LAYOUT.fire -
 -- LAYOUT.doorway).
 local CRATE_X = -1
+-- The Pocket Camp's banner (a Trophy reached this session) stands behind
+-- the fire's left half, its pole's foot hidden by the logs, its left edge
+-- this far from the fire's centre. Its 8 columns stay clear of the first
+-- seat on the left and of a doorway there (-(LAYOUT.fire - LAYOUT.doorway)),
+-- and its pennant flies above the crate. BANNER_FLAG is how many rows from its top the pennant
+-- fills; below it only the pole's POLE columns count for the mouse.
+local BANNER_X = -7
+local BANNER_FLAG = 10
+local BANNER_POLE = 3
 -- Each sprite's x from its actor's (or grave's) left edge. A spark sits
 -- by a seated figure's head, or on a sleeper's blanket, so even the short
 -- band never crops it.
@@ -718,6 +727,12 @@ local function drawFrame(scene, f)
   -- A Crew goal flares the fire for a moment.
   setSprite(scene.flame, (playing(scene, "goal", nil) and "flare" or "fire") .. (f % 3 + 1), unit)
   put(scene, scene.flame, -5, ROW.fire)
+  if view.trophies then
+    setSprite(scene.banner, "banner", unit)
+    put(scene, scene.banner, BANNER_X, ROW.banner)
+  else
+    scene.banner:Hide()
+  end
   if view.spares then
     setSprite(scene.crate, "crate", unit)
     put(scene, scene.crate, CRATE_X, ROW.crate)
@@ -894,6 +909,9 @@ function CampScene.new(parent, options)
   scene.backdrop = scene.art:CreateTexture(nil, "BACKGROUND", nil, 1)
   scene.backdrop:SetTexture(scene.backdropArt.file, "CLAMP", "CLAMP", "NEAREST")
   scene.tent = texture(scene.art, "BORDER", 0)
+  -- Behind the logs and the fire.
+  scene.banner = texture(scene.art, "BORDER", 1)
+  scene.banner:Hide()
   scene.logs = texture(scene.art, "ARTWORK", 0)
   scene.flame = texture(scene.art, "ARTWORK", 1)
   -- In front of the logs and the fire's base.
@@ -989,6 +1007,16 @@ function CampScene.new(parent, options)
     local s = Sheet.sprites.crate
     local at, row = x / scene.unit - scene.fire, y / scene.unit
     return at >= CRATE_X and at < CRATE_X + s[3] and row >= ROW.crate and row < ROW.crate + s[4]
+  end
+
+  -- Whether x, y (UI units from the band's bottom left) is over the banner
+  -- (the view's trophies): its pennant, or its pole below it.
+  function band:BannerAt(x, y)
+    if not (scene.view and scene.view.trophies and scene.unit) then return false end
+    local s = Sheet.sprites.banner
+    local at, row = x / scene.unit - scene.fire - BANNER_X, y / scene.unit - ROW.banner
+    if at < 0 or at >= s[3] or row < 0 or row >= s[4] then return false end
+    return row >= s[4] - BANNER_FLAG or at < BANNER_POLE
   end
 
   -- Plays a one-off animation: "ding", "maxLevel", "death", "rareFind",
