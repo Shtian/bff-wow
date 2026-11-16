@@ -25,6 +25,25 @@
 
 
 
+
+## 2.8.0
+<sub>2026-11-16</sub>
+
+- *(minor)*
+  A crate by the Pocket Camp's fire says Spare notices are waiting.
+
+  While there are Spare notices you haven't seen (new Spares, Claims and Gives, with chat lines and toasts off), a small crate sits by the Pocket Camp's fire. Its tooltip says how many, and a click on it opens the Spares tab, which clears it. Turn it off under Shown in the Pocket Camp in Settings.
+- *(minor)*
+  A gold cup over the Pocket Camp's fire marks a Trophy reached while you play.
+
+  For an hour after the Crew reaches a Trophy during your session (a Crew goal, a dungeon or raid cleared, or a Rare slain), a small gold cup floats and sparkles over the Pocket Camp's fire. Its tooltip lists each one and how long ago, newest first, and a click on it opens the Trophies tab. Trophies reached while you were away don't raise it.
+- *(minor)*
+  Right-click a friend in the Pocket Camp to whisper, invite or find them.
+
+  A right-click on another Member's figure opens a menu with their Character's full name: Whisper and Invite (the same as in the Roster), Show on map, which opens the world map where their map pin is (greyed out when BFF doesn't know where they are), and Open in panel. Your own figure, bedrolls and the fire have no menu, and it doesn't open in combat.
+- *(minor)*
+  The Pocket Camp can now fade in combat instead of hiding. In Settings, "Hide in combat" is now "In combat": Stay, Fade or Hide. With Fade, the whole Pocket Camp drops to the "Fade to" opacity (25% unless you change it) while you fight and comes back when combat ends. If you had Hide in combat on, it's still set to Hide.
+
 ## 2.7.0
 <sub>2026-11-15</sub>
 
