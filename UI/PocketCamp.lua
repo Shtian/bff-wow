@@ -4,9 +4,9 @@
 -- soft-edged backdrop of the opacity Core gives, and for a while those who
 -- just went offline, asleep in a bedroll. It shows no names: the mouse over a figure
 -- shows that Member's Roster tooltip, and over the fire who is doing what.
--- A crate by the fire says Spare notices wait unseen, and a banner behind
--- it that a Trophy was reached this session, as Core says. A click toggles
--- the panel, or on the crate opens the Spares tab and on the banner the
+-- A crate by the fire says Spare notices wait unseen, and a gold cup
+-- over it that a Trophy was reached this session, as Core says. A click toggles
+-- the panel, or on the crate opens the Spares tab and on the cup the
 -- Trophies tab (not in combat), a drag moves it unless Core
 -- says it's locked, and where it's dropped is saved through Core. It's as
 -- wide as Core says, growing out from the fire as more of the Crew comes
@@ -38,7 +38,7 @@ local frame
 -- What Core last gave: the Pocket Camp, or nil while there's none.
 local view
 local inCombat = false
--- The Member whose tooltip is up, "crate" or "banner" for theirs, false
+-- The Member whose tooltip is up, "crate" or "cup" for theirs, false
 -- for the Pocket Camp's own, nil while none is.
 local tooltipFor
 
@@ -234,24 +234,23 @@ local function overCrate()
   return frame.band:CrateAt(x - frame:GetLeft(), y - frame:GetBottom())
 end
 
--- Whether the mouse is over the banner.
-local function overBanner()
+-- Whether the mouse is over the trophy cup.
+local function overCup()
   local x, y = cursor()
-  return frame.band:BannerAt(x - frame:GetLeft(), y - frame:GetBottom())
+  return frame.band:CupAt(x - frame:GetLeft(), y - frame:GetBottom())
 end
 
--- What the tooltip is for where the mouse is: "crate", "banner", a
--- Member's id, or false for the Pocket Camp's own. The crate stands in
--- front of the banner.
+-- What the tooltip is for where the mouse is: "crate", "cup", a
+-- Member's id, or false for the Pocket Camp's own.
 local function pointedAt()
   if overCrate() then return "crate" end
-  if overBanner() then return "banner" end
+  if overCup() then return "cup" end
   local actor = hovered()
   return actor and actor.memberId or false
 end
 
 -- Over the crate, how many Spare notices wait and that a click shows them;
--- over the banner, each Trophy reached this session and how long ago;
+-- over the cup, each Trophy reached this session and how long ago;
 -- over a figure, that Member's tooltip as the Roster shows it, and "In
 -- your group" when they are; over a bedroll, who is asleep and since when;
 -- anywhere else, who is doing what.
@@ -265,7 +264,7 @@ local function showTooltip()
     GameTooltip:Show()
     return
   end
-  if tooltipFor == "banner" then
+  if tooltipFor == "cup" then
     local tip = view.trophiesTooltip
     GameTooltip:AddLine(tip.title)
     for _, line in ipairs(tip.lines) do GameTooltip:AddLine(line, 1, 1, 1) end
@@ -309,12 +308,12 @@ local function create()
   frame:SetScript("OnDragStop", dropped)
   -- The panel can't open in combat, so a click does nothing there. On the
   -- crate it opens the Spares tab, which marks the notices seen, and on
-  -- the banner the Trophies tab.
+  -- the cup the Trophies tab.
   frame:SetScript("OnClick", function()
     if InCombatLockdown() then return end
     if overCrate() then
       ns.Panel.show("spares")
-    elseif overBanner() then
+    elseif overCup() then
       ns.Panel.show("goals")
     else
       ns.Panel.toggle()
@@ -331,7 +330,7 @@ local function create()
   frame:SetScript("OnUpdate", function(_, elapsed)
     updateGrip()
     -- The tooltip follows the mouse from figure to figure, the crate and
-    -- the banner.
+    -- the cup.
     if tooltipFor ~= nil and GameTooltip:IsOwned(frame) then
       if pointedAt() ~= tooltipFor then showTooltip() end
     end

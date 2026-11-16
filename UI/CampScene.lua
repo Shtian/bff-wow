@@ -53,7 +53,7 @@ local BOUNCE_TICKS = 3
 -- sprite's bottom sits on it (from the prototype).
 local ROW = {
   seat = 3, seated = 4, hop = 6, standing = 3, asleep = 3, grave = 3, flower = 2,
-  logs = 3, fire = 5, tent = 5, ember = 16, crate = 1, banner = 4,
+  logs = 3, fire = 5, tent = 5, ember = 16, crate = 1, cup = 19,
 }
 -- The Pocket Camp's crate (unseen Spare notices) stands in front of the
 -- fire's right half, its left edge this far from the fire's centre. Its 8
@@ -61,15 +61,16 @@ local ROW = {
 -- LAYOUT.fire + OFFSET.seat) and of a doorway there (LAYOUT.fire -
 -- LAYOUT.doorway).
 local CRATE_X = -1
--- The Pocket Camp's banner (a Trophy reached this session) stands behind
--- the fire's left half, its pole's foot hidden by the logs, its left edge
--- this far from the fire's centre. Its 8 columns stay clear of the first
--- seat on the left and of a doorway there (-(LAYOUT.fire - LAYOUT.doorway)),
--- and its pennant flies above the crate. BANNER_FLAG is how many rows from its top the pennant
--- fills; below it only the pole's POLE columns count for the mouse.
-local BANNER_X = -7
-local BANNER_FLAG = 10
-local BANNER_POLE = 3
+-- The Pocket Camp's trophy cup (a Trophy reached this session) floats
+-- over the fire, its left edge this far from the fire's centre and its
+-- bottom at ROW.cup, bobbing up a row and back every CUP_BOB ticks, in
+-- front of the flames and embers. Every CUP_SPARKLE_EVERY ticks two
+-- sparkles twinkle by it for CUP_SPARKLE_FOR, at CUP_SPARKLES ({ x, row }).
+local CUP_X = -6
+local CUP_BOB = 4
+local CUP_SPARKLE_EVERY = 18
+local CUP_SPARKLE_FOR = 4
+local CUP_SPARKLES = { { -9, 24 }, { 5, 21 } }
 -- Each sprite's x from its actor's (or grave's) left edge. A spark sits
 -- by a seated figure's head, or on a sleeper's blanket, so even the short
 -- band never crops it.
@@ -727,12 +728,6 @@ local function drawFrame(scene, f)
   -- A Crew goal flares the fire for a moment.
   setSprite(scene.flame, (playing(scene, "goal", nil) and "flare" or "fire") .. (f % 3 + 1), unit)
   put(scene, scene.flame, -5, ROW.fire)
-  if view.trophies then
-    setSprite(scene.banner, "banner", unit)
-    put(scene, scene.banner, BANNER_X, ROW.banner)
-  else
-    scene.banner:Hide()
-  end
   if view.spares then
     setSprite(scene.crate, "crate", unit)
     put(scene, scene.crate, CRATE_X, ROW.crate)
@@ -744,6 +739,23 @@ local function drawFrame(scene, f)
     local ex = math.floor(math.sin((i - 1) * 2 + f * 0.35) * 3 + (i - 2) * 2 + 0.5)
     setSprite(ember, life < 7 and "ember" or "emberCool", unit)
     put(scene, ember, ex, ROW.ember + life)
+  end
+  -- This session's Trophies: the cup over the fire, and now and then its
+  -- sparkles.
+  local twinkle = view.trophies and f % CUP_SPARKLE_EVERY < CUP_SPARKLE_FOR
+  if view.trophies then
+    setSprite(scene.cup, "trophyCup", unit)
+    put(scene, scene.cup, CUP_X, ROW.cup + math.floor(f / CUP_BOB) % 2)
+  else
+    scene.cup:Hide()
+  end
+  for i, sparkle in ipairs(scene.cupSparkles) do
+    if twinkle then
+      setSprite(sparkle, "cupSparkle" .. ((f + i) % 2 + 1), unit)
+      put(scene, sparkle, CUP_SPARKLES[i][1], CUP_SPARKLES[i][2])
+    else
+      sparkle:Hide()
+    end
   end
 
   scene.doorParts.used = 0
@@ -909,15 +921,17 @@ function CampScene.new(parent, options)
   scene.backdrop = scene.art:CreateTexture(nil, "BACKGROUND", nil, 1)
   scene.backdrop:SetTexture(scene.backdropArt.file, "CLAMP", "CLAMP", "NEAREST")
   scene.tent = texture(scene.art, "BORDER", 0)
-  -- Behind the logs and the fire.
-  scene.banner = texture(scene.art, "BORDER", 1)
-  scene.banner:Hide()
   scene.logs = texture(scene.art, "ARTWORK", 0)
   scene.flame = texture(scene.art, "ARTWORK", 1)
   -- In front of the logs and the fire's base.
   scene.crate = texture(scene.art, "ARTWORK", 2)
   scene.crate:Hide()
   scene.embers = { texture(scene.art, "ARTWORK", 2), texture(scene.art, "ARTWORK", 2), texture(scene.art, "ARTWORK", 2) }
+  -- Over the flames and embers.
+  scene.cup = texture(scene.art, "ARTWORK", 3)
+  scene.cup:Hide()
+  scene.cupSparkles = { texture(scene.art, "ARTWORK", 3), texture(scene.art, "ARTWORK", 3) }
+  for _, sparkle in ipairs(scene.cupSparkles) do sparkle:Hide() end
   -- Hidden until there's a view, so the more label has a home too.
   scene.more = shadowed(Skin.label(band, "small", Skin.MUTED, "OVERLAY"))
   scene.more:SetPoint("BOTTOMRIGHT", -6, 4)
@@ -1009,14 +1023,13 @@ function CampScene.new(parent, options)
     return at >= CRATE_X and at < CRATE_X + s[3] and row >= ROW.crate and row < ROW.crate + s[4]
   end
 
-  -- Whether x, y (UI units from the band's bottom left) is over the banner
-  -- (the view's trophies): its pennant, or its pole below it.
-  function band:BannerAt(x, y)
+  -- Whether x, y (UI units from the band's bottom left) is over the
+  -- trophy cup (the view's trophies), with the row it bobs up to.
+  function band:CupAt(x, y)
     if not (scene.view and scene.view.trophies and scene.unit) then return false end
-    local s = Sheet.sprites.banner
-    local at, row = x / scene.unit - scene.fire - BANNER_X, y / scene.unit - ROW.banner
-    if at < 0 or at >= s[3] or row < 0 or row >= s[4] then return false end
-    return row >= s[4] - BANNER_FLAG or at < BANNER_POLE
+    local s = Sheet.sprites.trophyCup
+    local at, row = x / scene.unit - scene.fire - CUP_X, y / scene.unit - ROW.cup
+    return at >= 0 and at < s[3] and row >= 0 and row < s[4] + 1
   end
 
   -- Plays a one-off animation: "ding", "maxLevel", "death", "rareFind",

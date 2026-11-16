@@ -190,7 +190,7 @@ function Core.new(deps)
   -- for While you were away.
   self.sessionStart = deps.now()
   -- Trophies reached from then on are this session's, for the Pocket
-  -- Camp's banner: from the start after a /reload, which catches nothing
+  -- Camp's trophy cup: from the start after a /reload, which catches nothing
   -- up, and else from when the Feed settles, so a Trophy caught up at
   -- login (reached while you were away) isn't one. In memory only.
   self.trophiesSince = self.log:isSettled() and self.sessionStart or nil
@@ -312,11 +312,11 @@ end
 -- bedroll, from when this client saw them go.
 local BEDROLL_FOR = 10 * 60
 
--- How long the Pocket Camp's banner shows a Trophy, from when it was
+-- How long the Pocket Camp's trophy cup shows a Trophy, from when it was
 -- reached.
-local TROPHY_BANNER_FOR = 60 * 60
+local TROPHY_CUP_FOR = 60 * 60
 
--- The Trophies the Pocket Camp's banner shows, newest first, as { name
+-- The Trophies the Pocket Camp's trophy cup shows, newest first, as { name
 -- (as the Trophies tab names it: "Crew deaths: 25", "Dungeons cleared:
 -- Deadmines"), ago ("just now", "12m ago") }: reached this session (from
 -- trophiesSince), not quietly, under an hour ago. Nil when there's none.
@@ -326,7 +326,7 @@ local function sessionTrophies(self)
   local list = {}
   for _, trophy in ipairs(self.crewGoals:trophies().shelf) do
     local age = now - trophy.time
-    if not trophy.quiet and trophy.time >= self.trophiesSince and age < TROPHY_BANNER_FOR then
+    if not trophy.quiet and trophy.time >= self.trophiesSince and age < TROPHY_CUP_FOR then
       list[#list + 1] = {
         name = trophy.title .. ": " .. trophy.label,
         ago = age < 60 and "just now" or ns.Text.since(age),
@@ -336,7 +336,7 @@ local function sessionTrophies(self)
   return list[1] and list or nil
 end
 
--- The banner's tooltip: { title ("2 Trophies reached"), lines (one per
+-- The cup's tooltip: { title ("2 Trophies reached"), lines (one per
 -- Trophy: "Crew deaths: 25 · 12m ago"), hint }.
 local function trophiesTooltip(trophies)
   local lines = {}
@@ -951,7 +951,7 @@ end
 -- sparesTooltip { title ("2 Spare notices"), hint }, and a click on it
 -- opens the Spares tab. trophies lists the Trophies reached this
 -- session in the last hour, newest first, as { name ("Crew deaths: 25"),
--- ago ("12m ago") }, nil at none: a banner by the fire, whose tooltip is
+-- ago ("12m ago") }, nil at none: a gold cup over the fire, whose tooltip is
 -- trophiesTooltip { title ("2 Trophies reached"), lines, hint }, and a
 -- click on it opens the Trophies tab. One caught up at login, reached
 -- while you were away, never shows. Derived on

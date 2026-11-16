@@ -1227,7 +1227,7 @@ describe("The Spares crate", function()
   end)
 end)
 
-describe("The Trophy banner", function()
+describe("The trophy cup", function()
   local HOUR = 60 * 60
   local FINALS = { [101] = "The Deadmines" }
 
@@ -1277,7 +1277,7 @@ describe("The Trophy banner", function()
     assert.equal("deaths", a.core:trophies().shelf[1].track)
   end)
 
-  it("makes one banner of several, newest first", function()
+  it("makes one cup of several, newest first", function()
     local net, a, b = pair()
     b:play({ deaths = 25 })
     net:run(3)
