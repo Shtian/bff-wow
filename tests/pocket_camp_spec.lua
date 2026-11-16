@@ -319,6 +319,75 @@ describe("The Pocket Camp", function()
     assert.is_true(actorFor(view, a).row.own)
   end)
 
+  describe("menu", function()
+    it("comes on another Member's figure, titled and aimed at the full Character name", function()
+      local ns = load()
+      local net = ns.FakeNet.new()
+      local a = net:add("Ann", { character = character("Ann") }):login()
+      local b = net:add("Bob", { character = character("Bob", { lastName = "Stone" }) }):login()
+      b:join(a:join())
+      net:run(40)
+      a.core:setSetting("pocketCamp", true)
+      local menu = actorFor(a.core:pocketCamp(), b).menu
+      assert.equal("Bob Stone", menu.title)
+      assert.equal("Bob Stone", menu.fullName)
+      assert.equal(b.memberId, menu.memberId)
+    end)
+
+    it("is never on your own figure", function()
+      local _, clients = crew({ "Ann", "Bob" })
+      local a = clients[1]
+      assert.is_nil(actorFor(a.core:pocketCamp(), a).menu)
+    end)
+
+    it("is never on a bedroll", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      b:logout()
+      skip(net, 10)
+      local actor = actorFor(a.core:pocketCamp(), b)
+      assert.equal("asleep", actor.pose)
+      assert.is_nil(actor.menu)
+    end)
+
+    it("has no map without a known spot", function()
+      local _, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      assert.is_nil(actorFor(a.core:pocketCamp(), b).menu.mapId)
+    end)
+
+    it("has the map of the Member's pin: the record's spot, then the live one", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      b:move({ mapId = 1429, x = 0.4, y = 0.6 })
+      skip(net, 6 * 60)
+      assert.equal(1429, actorFor(a.core:pocketCamp(), b).menu.mapId)
+      b:move({ mapId = 1436, x = 0.3, y = 0.4 })
+      net:run(15)
+      assert.equal(1436, actorFor(a.core:pocketCamp(), b).menu.mapId)
+    end)
+
+    it("keeps the map of the last spot outside while the Member is in an instance", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      b:move({ mapId = 1436, x = 0.42, y = 0.71 })
+      net:run(4)
+      b:move({ instance = "The Deadmines" })
+      b:play({ zone = "The Deadmines" })
+      net:run(12)
+      assert.equal(1436, actorFor(a.core:pocketCamp(), b).menu.mapId)
+    end)
+
+    it("has the map whatever the map pins setting", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      b:move({ mapId = 1429, x = 0.4, y = 0.6 })
+      skip(net, 6 * 60)
+      a.core:setSetting("mapPins", false)
+      assert.equal(1429, actorFor(a.core:pocketCamp(), b).menu.mapId)
+    end)
+  end)
+
   it("changes no record and sends nothing when read", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a = clients[1]
