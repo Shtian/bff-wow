@@ -474,12 +474,15 @@ function events.GROUP_LEFT()
   if trace then trace("left the group, or it disbanded") end
 end
 
--- Whoever joined or left during lockdown: ask again once it lifts.
+-- Whoever joined or left during lockdown: ask again once it lifts. Not
+-- when a restriction starts (state 1): the game reports chat lockdown only
+-- after the first of a pull's restriction events, and a list asked for in
+-- between comes back with its names secret, unreadable and printed in chat.
 function events.ADDON_RESTRICTION_STATE_CHANGED(kind, state)
   if trace then trace(("chat restriction: type %s, state %s"):format(tostring(kind), tostring(state))) end
   update("chat restriction changed")
   tryJoin()
-  askList()
+  if state == 0 then askList() end
 end
 
 -- A send to one peer failed (a general error, a logout, lockdown, or an

@@ -371,6 +371,23 @@ describe("The channel link", function()
     assert.same({ "Bob", "Cat-Realm" }, targets(game, mark))
   end)
 
+  it("asks for the member list when a restriction lifts, not when one starts", function()
+    -- The game reports chat lockdown only after the first restriction
+    -- events of a pull, and a list asked for then comes back with its
+    -- names secret: unreadable, and printed in chat.
+    local game = linked()
+    local mark = #game.listed
+    game.fire("ADDON_RESTRICTION_STATE_CHANGED", 1, 1)
+    game.fire("ADDON_RESTRICTION_STATE_CHANGED", 5, 1)
+    game.lockdown = true
+    game.fire("ADDON_RESTRICTION_STATE_CHANGED", 0, 1)
+    assert.equal(mark, #game.listed)
+
+    game.lockdown = false
+    game.fire("ADDON_RESTRICTION_STATE_CHANGED", 0, 0)
+    assert.same({ CHANNEL }, { select(mark + 1, unpack(game.listed)) })
+  end)
+
   it("doesn't count silence while the link is down", function()
     local game, link = linked()
     link.send("1|digest")
