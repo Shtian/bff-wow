@@ -623,4 +623,59 @@ describe("The channel link", function()
     game.fire("CHAT_MSG_CHANNEL_LEAVE", notice(game.secret(), game.secret(), game.secret(), nil))
     assert.same({ "channel leave: secret · arg 4 secret · arg 8 secret · arg 9 nil (other channel)" }, lines)
   end)
+
+  describe("member list trace", function()
+    -- Member list arguments: text, ..., arg 4 (channel name), ..., arg 8
+    -- (channel index), arg 9 (base name).
+    local function list(text, arg4, index, base)
+      return text, "", "", arg4, "", "", 0, index, base
+    end
+
+    -- A traced link with the Crew set, not yet in its channel.
+    local function joining()
+      local game = wow()
+      local link = game.load("Game/ChannelLink.lua", {}).ChannelLink
+      local lines = {}
+      link.setTrace(function(line) lines[#lines + 1] = line end)
+      link.start(fakeCore(), function() end)
+      link.setCrew({ channel = CHANNEL, password = "pw" })
+      return game, lines
+    end
+
+    local function listLines(lines)
+      local found = {}
+      for _, line in ipairs(lines) do
+        if line:find("^member list") then found[#found + 1] = line end
+      end
+      return found
+    end
+
+    it("traces the first Crew member list after joining, with its channel arguments, and no later one", function()
+      local game, lines = joining()
+      game.advance(11)
+      game.fire("CHAT_MSG_CHANNEL_LIST", list("*Bob, Cat-Realm", "5. " .. CHANNEL, 5, CHANNEL))
+      game.fire("CHAT_MSG_CHANNEL_LIST", list("*Bob, Cat-Realm, Dan", "5. " .. CHANNEL, 5, CHANNEL))
+      assert.same({
+        'member list: 2 names · arg 4 "5. ' .. CHANNEL .. '" · arg 8 5 · arg 9 "' .. CHANNEL .. '" (Crew channel)',
+      }, listLines(lines))
+    end)
+
+    it("traces every member list it ignores, and why", function()
+      local game, lines = joining()
+      game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob", "5. " .. CHANNEL, 5, CHANNEL))
+      game.advance(11)
+      game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob, Dan", "7. Friends", 7, "Friends"))
+      game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob, Dan", "7. Friends", 7, "Friends"))
+      game.fire("CHAT_MSG_CHANNEL_LIST", list(game.secret(), "5. " .. CHANNEL, 5, CHANNEL))
+      game.fire("CHAT_MSG_CHANNEL_LIST", list(game.secret(), game.secret(), game.secret(), game.secret()))
+      local crew = '"5. ' .. CHANNEL .. '" · arg 8 5 · arg 9 "' .. CHANNEL .. '"'
+      assert.same({
+        "member list: 1 name · arg 4 " .. crew .. " (ignored: not in the Crew channel yet)",
+        'member list: 2 names · arg 4 "7. Friends" · arg 8 7 · arg 9 "Friends" (other channel)',
+        'member list: 2 names · arg 4 "7. Friends" · arg 8 7 · arg 9 "Friends" (other channel)',
+        "member list: text unreadable · arg 4 " .. crew .. " (Crew channel, ignored: text unreadable)",
+        "member list: text unreadable · arg 4 secret · arg 8 secret · arg 9 secret (other channel)",
+      }, listLines(lines))
+    end)
+  end)
 end)
