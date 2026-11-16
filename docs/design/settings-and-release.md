@@ -146,6 +146,14 @@ When `CF_API_KEY` and `CURSEFORGE_PROJECT_ID` are both set, step 2 runs without 
 
 On CurseForge the file is a `release` (the build tag `v<version>` has no alpha or beta in it). Its changelog is `CHANGELOG.md` (`manual-changelog`), and its game versions come from the `.toc`'s interfaces: Forever (CurseForge's game version type 88568) for `16001`, retail for `120105`. When CurseForge doesn't list the exact version, the packager picks the closest lower one.
 
+### Discord announcement
+
+After `publish` succeeds, `release.yml`'s `notify-discord` job posts the new release (title, link and the first 1500 characters of its notes, cut at a word with a link to the rest) to a Discord webhook. Each entry starts with an icon for its bump level (🚨 major, ✨ minor, 🔧 patch), and the biggest level in the release sets the embed's colour (red, gold, teal) and a footer line, and the title always has its own 🔥, so a major release, where the whole Crew should update together, stands out. Bumpy's "Published to" list and metadata comment are cut from the notes. It can't fail a release: it runs after `publish`, and `continue-on-error: true` keeps a bad webhook from failing the run. It skips itself while the `DISCORD_WEBHOOK_URL` secret is unset. The post turns off mentions, so a stray `@everyone` in a changelog pings nobody.
+
+It's a job in the workflow, not a `release: published` workflow: it works with or without `BUMPY_GH_TOKEN`, and only runs once the zip and the CurseForge upload are done. It looks the release up by the version in `package.json` at the release commit and skips a draft, so a release bumpy couldn't finalise is never announced as the previous one.
+
+Setup: in the Discord channel, Edit Channel → Integrations → Webhooks → New Webhook → Copy Webhook URL, then add it as the **secret** `DISCORD_WEBHOOK_URL` (Settings → Secrets and variables → Actions).
+
 ### CurseForge setup
 
 1. Create the project on CurseForge (authors.curseforge.com → Create Project, game World of Warcraft) and wait for approval.
