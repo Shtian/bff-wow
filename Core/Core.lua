@@ -2299,7 +2299,9 @@ end
 -- isn't removed. The channel link asks this about a whisper from a
 -- Character it doesn't know to be in the channel, so a friend whose client
 -- gets no member list is still heard. Leaving a Crew forgets every other
--- record, so an old Crew's Members aren't known.
+-- record, so an old Crew's Members aren't known. A Member who left this
+-- Crew still counts, on purpose: one who whispers you is rejoining, and
+-- their new record comes with the whisper.
 function Core:fromKnownMember(message)
   if type(message) ~= "string" or not self.db.crew then return false end
   local decoded = ns.Codec.decode(message)

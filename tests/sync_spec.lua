@@ -835,6 +835,17 @@ describe("A message from a Character not known to be in the channel", function()
     assert.is_true(a.core:fromKnownMember(lastFrom(net, "Bob")))
   end)
 
+  it("is from a known Member when they left the Crew: one who whispers you is rejoining", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local message = lastFrom(net, "Bob")
+    b.core:leaveCrew()
+    net:run(5)
+    -- Gone from Ann's Roster: Ann holds only Bob's tombstone.
+    assert.is_nil(a:rowFor(b))
+    assert.is_true(a.core:fromKnownMember(message))
+  end)
+
   it("isn't when it is your own, from a Member you removed, unknown or not a message", function()
     local net, clients, ns = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
