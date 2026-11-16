@@ -189,6 +189,11 @@ function Core.new(deps)
   -- Catches from here on happen with you online, so they aren't news
   -- for While you were away.
   self.sessionStart = deps.now()
+  -- Trophies reached from then on are this session's, for the Pocket
+  -- Camp's trophy cup: from the start after a /reload, which catches nothing
+  -- up, and else from when the Feed settles, so a Trophy caught up at
+  -- login (reached while you were away) isn't one. In memory only.
+  self.trophiesSince = self.log:isSettled() and self.sessionStart or nil
   -- The Spares module (self.spares is the method that reads its tab).
   self.spareLife = ns.Spares.new({
     db = deps.db,
@@ -306,6 +311,41 @@ end
 -- How long the Pocket Camp keeps a Member who went offline, asleep in a
 -- bedroll, from when this client saw them go.
 local BEDROLL_FOR = 10 * 60
+
+-- How long the Pocket Camp's trophy cup shows a Trophy, from when it was
+-- reached.
+local TROPHY_CUP_FOR = 60 * 60
+
+-- The Trophies the Pocket Camp's trophy cup shows, newest first, as { name
+-- (as the Trophies tab names it: "Crew deaths: 25", "Dungeons cleared:
+-- Deadmines"), ago ("just now", "12m ago") }: reached this session (from
+-- trophiesSince), not quietly, under an hour ago. Nil when there's none.
+local function sessionTrophies(self)
+  if not self.trophiesSince then return nil end
+  local now = self.now()
+  local list = {}
+  for _, trophy in ipairs(self.crewGoals:trophies().shelf) do
+    local age = now - trophy.time
+    if not trophy.quiet and trophy.time >= self.trophiesSince and age < TROPHY_CUP_FOR then
+      list[#list + 1] = {
+        name = trophy.title .. ": " .. trophy.label,
+        ago = age < 60 and "just now" or ns.Text.since(age),
+      }
+    end
+  end
+  return list[1] and list or nil
+end
+
+-- The cup's tooltip: { title ("2 Trophies reached"), lines (one per
+-- Trophy: "Crew deaths: 25 · 12m ago"), hint }.
+local function trophiesTooltip(trophies)
+  local lines = {}
+  for i, trophy in ipairs(trophies) do lines[i] = trophy.name .. " · " .. trophy.ago end
+  if #trophies == 1 then
+    return { title = "A Trophy reached", lines = lines, hint = "Click to see it in Trophies." }
+  end
+  return { title = #trophies .. " Trophies reached", lines = lines, hint = "Click to see them in Trophies." }
+end
 
 -- The Pocket Camp as Camp.pocket gives it.
 local function pocketView(self)
@@ -878,7 +918,7 @@ end
 -- (maxColumns, the pocketCampColumns setting), or past it for a doorway's
 -- set to fit on one side.
 -- { columns, rows, maxColumns, actors, doorways, more, moreText, tooltip, opacity, locked,
--- hideInCombat, position, scale, spares, sparesTooltip }. actors are the online Members, you
+-- hideInCombat, position, scale, spares, sparesTooltip, trophies, trophiesTooltip }. actors are the online Members, you
 -- first, then those in your party or raid (group()), marked group, as
 -- many as fit, each as in camp() plus pose ("seated",
 -- "adventuring": the Character being played is in an instance,
@@ -909,7 +949,12 @@ end
 -- (1 is its usual size). spares is how many Spare notices are unseen
 -- (unseenSpares()), nil at none or with the pocketCampSpares setting off: a crate by the fire, whose tooltip is
 -- sparesTooltip { title ("2 Spare notices"), hint }, and a click on it
--- opens the Spares tab. Derived on
+-- opens the Spares tab. trophies lists the Trophies reached this
+-- session in the last hour, newest first, as { name ("Crew deaths: 25"),
+-- ago ("12m ago") }, nil at none: a gold cup over the fire, whose tooltip is
+-- trophiesTooltip { title ("2 Trophies reached"), lines, hint }, and a
+-- click on it opens the Trophies tab. One caught up at login, reached
+-- while you were away, never shows. Derived on
 -- read, from what the Roster, Feed and Doing know: it can lag, and reading
 -- it sends nothing. See docs/design/pocket-camp.md.
 function Core:pocketCamp()
@@ -928,6 +973,8 @@ function Core:pocketCamp()
     view.sparesTooltip = spares == 1 and { title = "1 Spare notice", hint = "Click to see it in Spares." }
       or { title = spares .. " Spare notices", hint = "Click to see them in Spares." }
   end
+  view.trophies = sessionTrophies(self)
+  view.trophiesTooltip = view.trophies and trophiesTooltip(view.trophies)
   return view
 end
 
@@ -1083,7 +1130,10 @@ function Core:tick()
   self.gossip:tick()
   shareWhere(self)
   shareDoing(self)
-  if self.log:tick() then awaySummary(self) end
+  if self.log:tick() then
+    self.trophiesSince = self.now()
+    awaySummary(self)
+  end
   if self.db.crew and self.crewGoals:tick() then
     -- A Crew's first sync: what it has isn't news to you, as for its goals.
     self.db.catchTypesTold = self.db.catchTypesTold or ns.Catches.markTold({}, self:catches())

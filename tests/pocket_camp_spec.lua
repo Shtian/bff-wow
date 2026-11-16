@@ -1226,3 +1226,139 @@ describe("The Spares crate", function()
     assert.same(sentBy(false), sentBy(true))
   end)
 end)
+
+describe("The trophy cup", function()
+  local HOUR = 60 * 60
+  local FINALS = { [101] = "The Deadmines" }
+
+  -- Ann and Bob in a Crew, settled, Ann with the Pocket Camp on. start
+  -- maps a name to what its Character starts with.
+  local function pair(start)
+    local ns = load()
+    local net = ns.FakeNet.new({ finalBosses = FINALS })
+    local a = net:add("Ann", { character = character("Ann", start and start.Ann) }):login()
+    local b = net:add("Bob", { character = character("Bob", start and start.Bob) }):login()
+    b:join(a:join())
+    net:run(40)
+    a.core:setSetting("pocketCamp", true)
+    return net, a, b
+  end
+
+  local function names(view)
+    local list = {}
+    for i, trophy in ipairs(view.trophies or {}) do list[i] = trophy.name .. " · " .. trophy.ago end
+    return list
+  end
+
+  it("isn't there before a Trophy is reached", function()
+    local _, a = pair()
+    local view = a.core:pocketCamp()
+    assert.is_nil(view.trophies)
+    assert.is_nil(view.trophiesTooltip)
+  end)
+
+  it("holds a Trophy reached this session, as the Trophies tab names it, for an hour", function()
+    local net, a, b = pair()
+    b:play({ deaths = 25 })
+    net:run(3)
+    local view = a.core:pocketCamp()
+    assert.same({ { name = "Crew deaths: 25", ago = "just now" } }, view.trophies)
+    assert.same({
+      title = "A Trophy reached",
+      lines = { "Crew deaths: 25 · just now" },
+      hint = "Click to see it in Trophies.",
+    }, view.trophiesTooltip)
+    skip(net, 58 * 60)
+    assert.same({ "Crew deaths: 25 · 58m ago" }, names(a.core:pocketCamp()))
+    skip(net, 2 * 60)
+    assert.is_nil(a.core:pocketCamp().trophies)
+    assert.is_nil(a.core:pocketCamp().trophiesTooltip)
+    -- Still on the Trophies tab.
+    assert.equal("deaths", a.core:trophies().shelf[1].track)
+  end)
+
+  it("makes one cup of several, newest first", function()
+    local net, a, b = pair()
+    b:play({ deaths = 25 })
+    net:run(3)
+    skip(net, 10 * 60)
+    a:play({ deaths = 25 })
+    net:run(3)
+    local view = a.core:pocketCamp()
+    assert.same({ "Crew deaths: 50 · just now", "Crew deaths: 25 · 10m ago" }, names(view))
+    assert.same({
+      title = "2 Trophies reached",
+      lines = { "Crew deaths: 50 · just now", "Crew deaths: 25 · 10m ago" },
+      hint = "Click to see them in Trophies.",
+    }, view.trophiesTooltip)
+    -- The older goes at its hour, the newer stays.
+    skip(net, 50 * 60)
+    assert.same({ "Crew deaths: 50 · 50m ago" }, names(a.core:pocketCamp()))
+  end)
+
+  it("holds a clear, by the time it was made", function()
+    local net, a, b = pair()
+    skip(net, 5 * 60)
+    b.core:encounterEnded({
+      encounterId = 101, success = true, instanceType = "party",
+      party = { { guid = b.character.guid, name = b.character.name } },
+    })
+    net:run(70)
+    assert.same({ "Dungeons cleared: Deadmines · 1m ago" }, names(a.core:pocketCamp()))
+  end)
+
+  it("never shows a Trophy reached while you were away, caught up at login", function()
+    local net, a, b = pair()
+    a:logout()
+    net:run(5)
+    b:play({ deaths = 25 })
+    net:run(5)
+    a:login()
+    net:run(40)
+    local shelf = a.core:trophies().shelf
+    assert.equal("deaths", shelf[1].track)
+    assert.is_false(shelf[1].quiet)
+    assert.is_nil(a.core:pocketCamp().trophies)
+  end)
+
+  it("never shows one from before a /reload", function()
+    local net, a, b = pair()
+    b:play({ deaths = 25 })
+    net:run(3)
+    a:reload()
+    net:run(5)
+    assert.is_nil(a.core:pocketCamp().trophies)
+    b:play({ deaths = 50 })
+    net:run(3)
+    assert.same({ "Crew deaths: 50 · just now" }, names(a.core:pocketCamp()))
+  end)
+
+  it("never shows a quiet Trophy", function()
+    local net, a = pair({ Ann = { deaths = 25 } })
+    local deaths
+    for _, trophy in ipairs(a.core:trophies().shelf) do
+      if trophy.track == "deaths" then deaths = trophy end
+    end
+    assert.is_true(deaths.quiet)
+    -- The baseline's, reached this session and within the hour.
+    assert.is_true(net:now() - deaths.time < HOUR)
+    assert.is_nil(a.core:pocketCamp().trophies)
+  end)
+
+  it("sends nothing it wouldn't send without the Pocket Camp", function()
+    local function sentBy(pocket)
+      local net, a, b = pair()
+      if not pocket then a.core:setSetting("pocketCamp", false) end
+      local mark = #net.wire
+      b:play({ deaths = 25 })
+      net:run(3)
+      a.core:pocketCamp()
+      skip(net, 6 * 60)
+      a.core:pocketCamp()
+      local types = {}
+      for _, message in ipairs(net:sent(mark, "Ann")) do types[#types + 1] = message.type end
+      return types
+    end
+    assert.same(sentBy(false), sentBy(true))
+  end)
+end)
