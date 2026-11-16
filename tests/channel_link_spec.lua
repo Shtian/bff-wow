@@ -660,22 +660,35 @@ describe("The channel link", function()
       }, listLines(lines))
     end)
 
-    it("traces every member list it ignores, and why", function()
+    it("traces each member list it ignores, and why, once per channel arguments and why", function()
       local game, lines = joining()
       game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob", "5. " .. CHANNEL, 5, CHANNEL))
       game.advance(11)
       game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob, Dan", "7. Friends", 7, "Friends"))
-      game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob, Dan", "7. Friends", 7, "Friends"))
+      -- BFF asks every minute: the same list again, even with other names, isn't.
+      game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob", "7. Friends", 7, "Friends"))
+      game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob", "8. Trade", 8, "Trade"))
+      game.fire("CHAT_MSG_CHANNEL_LIST", list(game.secret(), "5. " .. CHANNEL, 5, CHANNEL))
       game.fire("CHAT_MSG_CHANNEL_LIST", list(game.secret(), "5. " .. CHANNEL, 5, CHANNEL))
       game.fire("CHAT_MSG_CHANNEL_LIST", list(game.secret(), game.secret(), game.secret(), game.secret()))
       local crew = '"5. ' .. CHANNEL .. '" · arg 8 5 · arg 9 "' .. CHANNEL .. '"'
       assert.same({
         "member list: 1 name · arg 4 " .. crew .. " (ignored: not in the Crew channel yet)",
         'member list: 2 names · arg 4 "7. Friends" · arg 8 7 · arg 9 "Friends" (other channel)',
-        'member list: 2 names · arg 4 "7. Friends" · arg 8 7 · arg 9 "Friends" (other channel)',
+        'member list: 1 name · arg 4 "8. Trade" · arg 8 8 · arg 9 "Trade" (other channel)',
         "member list: text unreadable · arg 4 " .. crew .. " (Crew channel, ignored: text unreadable)",
         "member list: text unreadable · arg 4 secret · arg 8 secret · arg 9 secret (other channel)",
       }, listLines(lines))
+    end)
+
+    it("traces them again after joining the channel again", function()
+      local game, lines = joining()
+      game.advance(11)
+      game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob", "7. Friends", 7, "Friends"))
+      game.fire("CHAT_MSG_CHANNEL_NOTICE", "YOU_LEFT", "", "", "", "", "", "", 5, CHANNEL)
+      game.fire("ADDON_RESTRICTION_STATE_CHANGED", 1, 0)
+      game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob", "7. Friends", 7, "Friends"))
+      assert.equal(2, #listLines(lines))
     end)
   end)
 end)
