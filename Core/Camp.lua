@@ -321,6 +321,23 @@ local function poseOf(row, doing)
   return said or "seated"
 end
 
+-- Each online Member's pose as the Pocket Camp shows it awake, by Member
+-- id, as a key that differs whenever the pose does: the pose ("fighting"),
+-- with the instance for one adventuring ("adventuring:The Deadmines"). A
+-- form doesn't count: by the fire there's no time to show, and fighting in
+-- one is still fighting. doing is as Camp.pocket takes it. Core keeps when
+-- each began from these (doing.since).
+function Camp.poseKeys(rows, doing)
+  local keys = {}
+  for _, row in ipairs(rows) do
+    if row.own or row.online then
+      local pose = poseOf(row, doing)
+      keys[row.memberId] = pose == "adventuring" and pose .. ":" .. row.instance or pose
+    end
+  end
+  return keys
+end
+
 -- A Pocket Camp width in art pixels, the nearest of its steps: from
 -- LAYOUT.pocketColumns, in steps of pocketStep, up to pocketMaxColumns.
 -- Anything but a number is the usual width.
@@ -457,13 +474,16 @@ end
 -- of the widest can hold them. doing is what they're
 -- up to, each by Member id: said (what they last said they're doing, as
 -- Doing gives it), fishing (true while fishing) and working ("crafting"
--- or "gathering" while at a profession), and form (the shapeshift form
--- each was last said to be in). Each actor is as in view(), with
+-- or "gathering" while at a profession), form (the shapeshift form
+-- each was last said to be in) and since (when each one's pose began, as
+-- this client saw it: see Camp.poseKeys). Each actor is as in view(), with
 -- pose (see Core:pocketCamp()), instance (its name, while in one), raid
 -- (true if that's a raid), form (the shapeshift form drawn in its place,
 -- seated or fighting, with trots true for one that trots, and the room
 -- its sprite needs: LAYOUT.formFore and formAft), status (the pose in
--- words, or by the fire the form's: "in bear form") and row (the
+-- words, or by the fire the form's: "in bear form"; from a minute in a
+-- pose other than by the fire, with how long: "fighting · 3m", and since,
+-- those seconds) and row (the
 -- Member's Roster row, for the tooltip over the figure), and onAlt (true
 -- while the Character shown isn't their Main; the tooltip line says "on
 -- alt" too). A flying figure takes its griffin's room. Members that
@@ -553,6 +573,12 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
         actor.status = FORM_STATUS[actor.form]
       else
         actor.status = STATUS[actor.pose]
+      end
+      -- How long they've been at it, from a minute on; never by the fire.
+      local began = actor.pose ~= "seated" and doing.since and doing.since[actor.memberId]
+      if began and now - began >= 60 then
+        actor.since = now - began
+        actor.status = actor.status .. " · " .. ns.Text.ago(actor.since)
       end
     end
     -- On an Alt: the Character shown isn't their Main.

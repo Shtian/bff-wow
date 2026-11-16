@@ -176,6 +176,9 @@ function Core.new(deps)
     -- Your party or raid as the game last read it (group()), for the
     -- Pocket Camp. In memory only too.
     party = {},
+    -- When each online Member's pose (Camp.poseKeys) began, as this client
+    -- saw it: Member id to { key, at }. A lower bound, in memory only.
+    poseSince = {},
     -- When Gossip's link came up (updateLink), kept through a short break,
     -- and when it went down, nil while it's up.
     upSince = nil,
@@ -347,10 +350,9 @@ local function trophiesTooltip(trophies)
   return { title = #trophies .. " Trophies reached", lines = lines, hint = "Click to see them in Trophies." }
 end
 
--- The Pocket Camp as Camp.pocket gives it.
-local function pocketView(self)
-  local now = self.now()
-  local rows = ns.Roster.rows(self.ledger, now)
+-- What each Member on `rows` is doing, as Camp.pocket takes it, with
+-- since: when each one's pose began (poseSince, brought up to date here).
+local function doingOf(self, rows, now)
   local doing = { said = {}, form = {}, fishing = {}, working = {} }
   for _, row in ipairs(rows) do
     local id = row.memberId
@@ -366,6 +368,29 @@ local function pocketView(self)
   for id, work in pairs(self.working) do
     if work.ends > now then doing.working[id] = work.kind end
   end
+  -- A pose that's new, or differs from the one held, begins now; one
+  -- that's the same goes on. Those no longer online are forgotten.
+  local keys, since = ns.Camp.poseKeys(rows, doing), {}
+  for id, key in pairs(keys) do
+    local held = self.poseSince[id]
+    if not held or held.key ~= key then
+      held = { key = key, at = now }
+      self.poseSince[id] = held
+    end
+    since[id] = held.at
+  end
+  for id in pairs(self.poseSince) do
+    if not keys[id] then self.poseSince[id] = nil end
+  end
+  doing.since = since
+  return doing
+end
+
+-- The Pocket Camp as Camp.pocket gives it.
+local function pocketView(self)
+  local now = self.now()
+  local rows = ns.Roster.rows(self.ledger, now)
+  local doing = doingOf(self, rows, now)
   local bedrolls = {}
   for id, since in pairs(self.bedrolls) do
     if now - since < BEDROLL_FOR then bedrolls[id] = since end
@@ -1173,6 +1198,14 @@ function Core:tick()
   ended = self.doings:expire() or ended
   ended = self.doings:noteState() or ended
   if ended and pocketCampOn(self) then self.listener("changed") end
+  -- Each second, so a pose's start doesn't wait for the next redraw.
+  -- With the Pocket Camp off nothing shows, and it counts afresh once on.
+  if pocketCampOn(self) then
+    local now = self.now()
+    doingOf(self, ns.Roster.rows(self.ledger, now), now)
+  else
+    self.poseSince = {}
+  end
   checkOnline(self)
 end
 

@@ -1458,3 +1458,136 @@ describe("The trophy cup", function()
     assert.same(sentBy(false), sentBy(true))
   end)
 end)
+
+describe("How long a Member has been at it", function()
+  local function status(viewer, client)
+    local actor = actorFor(viewer.core:pocketCamp(), client)
+    return actor and actor.status
+  end
+
+  local function tooltipLine(viewer, client)
+    local wanted = client.name .. ": "
+    for _, line in ipairs(viewer.core:pocketCamp().tooltip.lines) do
+      if line:sub(1, #wanted) == wanted then return line end
+    end
+    return nil
+  end
+
+  it("shows no time under a minute, then the time, in the status and the tooltip", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b.core:doing({ combat = true })
+    net:run(3)
+    assert.equal("fighting", status(a, b))
+    assert.is_nil(actorFor(a.core:pocketCamp(), b).since)
+    net:run(60)
+    assert.equal("fighting · 1m", status(a, b))
+    assert.equal("Bob: fighting · 1m", tooltipLine(a, b))
+    assert.is_true(actorFor(a.core:pocketCamp(), b).since >= 60)
+  end)
+
+  it("isn't reset by the same DOING said again, with nobody reading in between", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local mark = #net.wire
+    b.core:doing({ combat = true })
+    net:run(2 * 60 + 10)
+    -- Said again at 2 minutes.
+    assert.equal(2, #net:sent(mark, "Bob", "DOING"))
+    assert.equal("fighting · 2m", status(a, b))
+  end)
+
+  it("starts over when what they're doing changes", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b.core:doing({ resting = true })
+    net:run(2 * 60 + 20)
+    assert.equal("resting · 2m", status(a, b))
+    b.core:doing({ vendor = true })
+    net:run(30)
+    assert.equal("at a vendor", status(a, b))
+    net:run(60)
+    assert.equal("at a vendor · 1m", status(a, b))
+  end)
+
+  it("counts an instance from when the row's instance changed", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b:move({ instance = "The Deadmines" })
+    b:play({ zone = "The Deadmines" })
+    net:run(15)
+    assert.equal("in The Deadmines", status(a, b))
+    net:run(25 * 60)
+    assert.equal("in The Deadmines · 25m", status(a, b))
+    b:move({ instance = "Shadowfang Keep" })
+    b:play({ zone = "Shadowfang Keep" })
+    net:run(15)
+    assert.equal("in Shadowfang Keep", status(a, b))
+  end)
+
+  it("counts fishing on through each catch", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b.core:caught(catch(SMALLFISH))
+    untilFishing(net, a, b, 70)
+    net:run(30)
+    b.core:caught(catch(SMALLFISH))
+    b:play({ level = 11 })
+    net:run(35)
+    assert.equal("fishing", poseOf(a, b))
+    assert.equal("fishing · 1m", status(a, b))
+  end)
+
+  it("shows your own time too", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    a.core:doing({ resting = true })
+    net:run(70)
+    assert.equal("resting · 1m", status(a, a))
+  end)
+
+  it("never shows a time by the fire, in a form or not", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    skip(net, 5 * 60)
+    assert.equal("by the fire", status(a, b))
+    assert.is_nil(actorFor(a.core:pocketCamp(), b).since)
+    b.core:doing({ form = "bear" })
+    net:run(90)
+    assert.equal("in bear form", status(a, b))
+  end)
+
+  it("counts from the first read after a reload", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b.core:doing({ resting = true })
+    net:run(5 * 60)
+    a:reload()
+    a.core:setSetting("pocketCamp", true)
+    -- What Bob is doing is heard again when he says it again.
+    for _ = 1, 3 * 60 do
+      if poseOf(a, b) == "resting" then break end
+      net:step()
+    end
+    assert.equal("resting", status(a, b))
+    net:run(60)
+    assert.equal("resting · 1m", status(a, b))
+  end)
+
+  it("sends nothing it wouldn't send without the Pocket Camp", function()
+    local function sentBy(pocket)
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      if not pocket then a.core:setSetting("pocketCamp", false) end
+      local mark = #net.wire
+      a.core:doing({ resting = true })
+      b.core:doing({ combat = true })
+      net:run(3 * 60)
+      a.core:pocketCamp()
+      local types = {}
+      for _, message in ipairs(net:sent(mark)) do types[#types + 1] = message.type end
+      return types
+    end
+    assert.same(sentBy(false), sentBy(true))
+  end)
+end)
