@@ -105,6 +105,9 @@ const ARCH_RAID = [
 // stacked gold.
 const BAG = outlined(["..A.A..", "...a...", "..AAA..", ".AAAAA.", "AAAGAAa", "AAGGGAa", "AAAGAAa", ".AAAAa."]);
 const COINS = outlined([".GYYG.", "GYWWYG", "OGYYGO", "GOGGOG", "OGYYGO", "GOGGOG", "OGYYGO", ".OGGO."]);
+// The Pocket Camp's crate by the fire, there while Spare notices wait
+// unseen: a wooden crate, its lid lifted on something gold. Outlined.
+const CRATE = outlined([".GYG..", "AAAAAA", "aAaaAa", "aAaaAa", "AAAAAA"]);
 // An inn's sign over a resting figure's head: a post on the side away from
 // the fire (mirrored on its right), and a tankard on a board hung by chains.
 const INN_SIGN = [
@@ -351,7 +354,7 @@ const SPRITES = [
   ["flare3", paint(flare(FIRE[2]), FLARE_PAL)],
   ["blade", skin(BLADE)], ["torch", skin(TORCH)], ["hammer", skin(HAMMER)], ["pick", skin(PICK)], ["anvil", skin(ANVIL)],
   ["arch", skin(ARCH)], ["archRaid", skin(ARCH_RAID)],
-  ["bag", skin(BAG)], ["coins", skin(COINS)], ["innSign", skin(INN_SIGN)], ["quest", skin(QUEST)],
+  ["bag", skin(BAG)], ["coins", skin(COINS)], ["innSign", skin(INN_SIGN)], ["quest", skin(QUEST)], ["crate", skin(CRATE)],
   ["griffin", skin(GRIFFIN)], ["griffinWing", skin(GRIFFIN_WING)], ["griffinWingUp", skin(GRIFFIN_WING_UP)],
   ["afk", skin(AFK)],
   ["walkCloth1", cloth(WALK[0], CLOTH)], ["walk1", skin(WALK[0])],

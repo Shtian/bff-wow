@@ -4,7 +4,9 @@
 -- soft-edged backdrop of the opacity Core gives, and for a while those who
 -- just went offline, asleep in a bedroll. It shows no names: the mouse over a figure
 -- shows that Member's Roster tooltip, and over the fire who is doing what.
--- A click toggles the panel (not in combat), a drag moves it unless Core
+-- A crate by the fire says Spare notices wait unseen, as Core says. A
+-- click toggles the panel, or on the crate opens the Spares tab (not in
+-- combat), a drag moves it unless Core
 -- says it's locked, and where it's dropped is saved through Core. It's as
 -- wide as Core says, growing out from the fire as more of the Crew comes
 -- online. Unlocked, a grip shows in its bottom right corner while the mouse
@@ -35,8 +37,8 @@ local frame
 -- What Core last gave: the Pocket Camp, or nil while there's none.
 local view
 local inCombat = false
--- The Member whose tooltip is up, false for the Pocket Camp's own, nil
--- while none is.
+-- The Member whose tooltip is up, "crate" for the crate's, false for the
+-- Pocket Camp's own, nil while none is.
 local tooltipFor
 
 -- Its usual width (Core.CAMP_LAYOUT.pocketColumns) in UI units, at the
@@ -221,18 +223,39 @@ end
 
 -- The actor whose figure the mouse is over, or nil.
 local function hovered()
-  local x = GetCursorPosition()
-  return frame.band:ActorAt(x / frame:GetEffectiveScale() - frame:GetLeft())
+  local x = cursor()
+  return frame.band:ActorAt(x - frame:GetLeft())
 end
 
--- Over a figure, that Member's tooltip as the Roster shows it, and "In
+-- Whether the mouse is over the crate.
+local function overCrate()
+  local x, y = cursor()
+  return frame.band:CrateAt(x - frame:GetLeft(), y - frame:GetBottom())
+end
+
+-- What the tooltip is for where the mouse is: "crate", a Member's id, or
+-- false for the Pocket Camp's own.
+local function pointedAt()
+  if overCrate() then return "crate" end
+  local actor = hovered()
+  return actor and actor.memberId or false
+end
+
+-- Over the crate, how many Spare notices wait and that a click shows them;
+-- over a figure, that Member's tooltip as the Roster shows it, and "In
 -- your group" when they are; over a bedroll, who is asleep and since when;
 -- anywhere else, who is doing what.
 local function showTooltip()
   if not view then return end
-  local actor = hovered()
-  tooltipFor = actor and actor.memberId or false
+  tooltipFor = pointedAt()
   GameTooltip:SetOwner(frame, "ANCHOR_TOP")
+  if tooltipFor == "crate" then
+    GameTooltip:AddLine(view.sparesTooltip.title)
+    GameTooltip:AddLine(view.sparesTooltip.hint, MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:Show()
+    return
+  end
+  local actor = tooltipFor and hovered()
   if actor and actor.pose == "asleep" then
     GameTooltip:AddLine(("%s: %s"):format(actor.label, actor.status), 1, 1, 1)
   elseif actor then
@@ -266,9 +289,15 @@ local function create()
     end
   end)
   frame:SetScript("OnDragStop", dropped)
-  -- The panel can't open in combat, so a click does nothing there.
+  -- The panel can't open in combat, so a click does nothing there. On the
+  -- crate it opens the Spares tab, which marks the notices seen.
   frame:SetScript("OnClick", function()
-    if not InCombatLockdown() then ns.Panel.toggle() end
+    if InCombatLockdown() then return end
+    if overCrate() then
+      ns.Panel.show("spares")
+    else
+      ns.Panel.toggle()
+    end
   end)
   frame:SetScript("OnEnter", showTooltip)
   frame:SetScript("OnLeave", hideTooltip)
@@ -280,10 +309,9 @@ local function create()
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
     updateGrip()
-    -- The tooltip follows the mouse from figure to figure.
+    -- The tooltip follows the mouse from figure to figure, and the crate.
     if tooltipFor ~= nil and GameTooltip:IsOwned(frame) then
-      local actor = hovered()
-      if (actor and actor.memberId or false) ~= tooltipFor then showTooltip() end
+      if pointedAt() ~= tooltipFor then showTooltip() end
     end
     sinceRedraw = sinceRedraw + elapsed
     if sinceRedraw >= REDRAW_EVERY then

@@ -878,7 +878,7 @@ end
 -- (maxColumns, the pocketCampColumns setting), or past it for a doorway's
 -- set to fit on one side.
 -- { columns, rows, maxColumns, actors, doorways, more, moreText, tooltip, opacity, locked,
--- hideInCombat, position }. actors are the online Members, you
+-- hideInCombat, position, scale, spares, sparesTooltip }. actors are the online Members, you
 -- first, then those in your party or raid (group()), marked group, as
 -- many as fit, each as in camp() plus pose ("seated",
 -- "adventuring": the Character being played is in an instance,
@@ -906,7 +906,10 @@ end
 -- rest is how UI shows it: opacity (the backdrop's, 0 to 1), locked (it
 -- can't be dragged), hideInCombat and position ({ x, y }: its bottom left
 -- corner from the screen's, or nil where it hasn't been moved) and scale
--- (1 is its usual size). Derived on
+-- (1 is its usual size). spares is how many Spare notices are unseen
+-- (unseenSpares()), nil at none or with the pocketCampSpares setting off: a crate by the fire, whose tooltip is
+-- sparesTooltip { title ("2 Spare notices"), hint }, and a click on it
+-- opens the Spares tab. Derived on
 -- read, from what the Roster, Feed and Doing know: it can lag, and reading
 -- it sends nothing. See docs/design/pocket-camp.md.
 function Core:pocketCamp()
@@ -919,6 +922,12 @@ function Core:pocketCamp()
   view.scale = self:setting("pocketCampScale") / 100
   view.maxColumns = self:setting("pocketCampColumns")
   view.tooltip.hint = view.locked and "Click to open BFF." or "Click to open BFF. Drag to move."
+  local spares = self:setting("pocketCampSpares") and self:unseenSpares() or 0
+  if spares > 0 then
+    view.spares = spares
+    view.sparesTooltip = spares == 1 and { title = "1 Spare notice", hint = "Click to see it in Spares." }
+      or { title = spares .. " Spare notices", hint = "Click to see them in Spares." }
+  end
   return view
 end
 
@@ -1358,7 +1367,8 @@ function Core:withdrawClaim(owner, id)
   return ok, reason
 end
 
--- How many Spare notices haven't been shown yet, for the sidebar.
+-- How many Spare notices haven't been shown yet, for the sidebar and the
+-- Pocket Camp's crate.
 function Core:unseenSpares()
   return self.spareLife:unseen()
 end
@@ -1682,11 +1692,17 @@ local SETTINGS = {
   },
   -- What the Pocket Camp marks on its figures, each on by default, so a
   -- player can opt out (pocketView passes them to Camp.pocket as shown):
-  -- "ALT" over a Member on an Alt.
+  -- "ALT" over a Member on an Alt, and the crate by the fire while Spare
+  -- notices wait unseen (read in pocketCamp()).
   {
     key = "pocketCampAlts", section = POCKET_CAMP_SHOWN, kind = "toggle", needs = "pocketCamp",
     label = "ALT over a friend playing an alt",
     saved = offFlag("pocketCampAltsOff"),
+  },
+  {
+    key = "pocketCampSpares", section = POCKET_CAMP_SHOWN, kind = "toggle", needs = "pocketCamp",
+    label = "A crate by the fire for unseen Spare notices",
+    saved = offFlag("pocketCampSparesOff"),
   },
   -- Where the Pocket Camp was dragged to: its bottom left corner, as
   -- { x, y } from the screen's bottom left; nil where it starts. Not on

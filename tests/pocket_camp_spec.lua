@@ -1120,3 +1120,109 @@ describe("Playing together", function()
     assert.same(sentBy(false), sentBy(true))
   end)
 end)
+
+describe("The Spares crate", function()
+  local BARB = "|cff1eff00|Hitem:5191::::::::18:::::::|h[Cruel Barb]|h|r"
+
+  -- Ann and Bob in a Crew, Ann with the Pocket Camp on and chat lines and
+  -- toasts off, so Spare notices wait for the Spares tab.
+  local function quietCrew()
+    local ns = load()
+    local net = ns.FakeNet.new({ items = { ["item:5191"] = "[Cruel Barb]" } })
+    local a = net:add("Ann", { character = character("Ann", { level = 20 }) }):login()
+    local b = net:add("Bob", { character = character("Bob", { level = 20 }) }):login()
+    b:join(a:join())
+    net:run(40)
+    a.core:setSetting("pocketCamp", true)
+    a.core:setChatLines(false)
+    a.core:setToasts(false)
+    return net, a, b
+  end
+
+  local function claimed(net, a, b)
+    local id = assert(a.core:postSpare(BARB, 18))
+    net:run(3)
+    assert(b.core:claimSpare(a.memberId, id))
+    net:run(5)
+    return id
+  end
+
+  local function redraws(client)
+    local n = 0
+    for _, event in ipairs(client.events) do
+      if event[1] == "changed" then n = n + 1 end
+    end
+    return n
+  end
+
+  it("isn't there while every Spare notice has been seen", function()
+    local _, a = quietCrew()
+    assert.equal(0, a.core:unseenSpares())
+    assert.is_nil(a.core:pocketCamp().spares)
+    assert.is_nil(a.core:pocketCamp().sparesTooltip)
+  end)
+
+  it("holds the unseen Spare notices' count, worded for its tooltip", function()
+    local net, a, b = quietCrew()
+    local before = redraws(a)
+    local id = claimed(net, a, b)
+    assert.is_true(redraws(a) > before)
+    assert.equal(1, a.core:unseenSpares())
+    local view = a.core:pocketCamp()
+    assert.equal(1, view.spares)
+    assert.same({ title = "1 Spare notice", hint = "Click to see it in Spares." }, view.sparesTooltip)
+    assert(b.core:withdrawClaim(a.memberId, id))
+    net:run(5)
+    assert(b.core:claimSpare(a.memberId, id))
+    net:run(5)
+    local count = a.core:unseenSpares()
+    assert.is_true(count > 1)
+    view = a.core:pocketCamp()
+    assert.equal(count, view.spares)
+    assert.same({ title = count .. " Spare notices", hint = "Click to see them in Spares." }, view.sparesTooltip)
+  end)
+
+  it("goes once the Spares tab is opened, with a redraw", function()
+    local net, a, b = quietCrew()
+    claimed(net, a, b)
+    local before = redraws(a)
+    a.core:sparesSeen()
+    assert.equal(before + 1, redraws(a))
+    assert.is_nil(a.core:pocketCamp().spares)
+    assert.is_nil(a.core:pocketCamp().sparesTooltip)
+  end)
+
+  it("isn't there with its setting off, and comes back with it on, the notices still unseen", function()
+    local net, a, b = quietCrew()
+    claimed(net, a, b)
+    a.core:setSetting("pocketCampSpares", false)
+    assert.is_nil(a.core:pocketCamp().spares)
+    assert.is_nil(a.core:pocketCamp().sparesTooltip)
+    assert.equal(1, a.core:unseenSpares())
+    a.core:setSetting("pocketCampSpares", true)
+    assert.equal(1, a.core:pocketCamp().spares)
+  end)
+
+  it("isn't there for notices already told in chat or a toast", function()
+    local net, a, b = quietCrew()
+    a.core:setToasts(true)
+    claimed(net, a, b)
+    assert.is_nil(a.core:pocketCamp().spares)
+  end)
+
+  it("sends nothing it wouldn't send without the Pocket Camp", function()
+    local function sentBy(pocket)
+      local net, a, b = quietCrew()
+      if not pocket then a.core:setSetting("pocketCamp", false) end
+      local mark = #net.wire
+      claimed(net, a, b)
+      a.core:pocketCamp()
+      a.core:sparesSeen()
+      skip(net, 6 * 60)
+      local types = {}
+      for _, message in ipairs(net:sent(mark, "Ann")) do types[#types + 1] = message.type end
+      return types
+    end
+    assert.same(sentBy(false), sentBy(true))
+  end)
+end)
