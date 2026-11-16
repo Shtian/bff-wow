@@ -27,6 +27,16 @@
 
 
 
+
+## 2.9.0
+<sub>2026-11-16</sub>
+
+- *(minor)* The Pocket Camp's tooltips now say how long a friend has been at it: "fighting · 3m", "in The Deadmines · 25m".
+- *(patch)*
+  Your Crew's member list no longer shows up in chat after a boss pull.
+
+  BFF asked for it just as the pull locked chat down, and the answer came back unreadable, as a line like "[5. BFF…] *You". It now waits until the lockdown lifts.
+
 ## 2.8.1
 <sub>2026-11-16</sub>
 
