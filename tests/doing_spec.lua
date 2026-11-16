@@ -102,7 +102,7 @@ describe("What a Member is doing", function()
     -- The record didn't change: over the next DIGESTs no one asks for it.
     net:run(70)
     assert.equal(0, #net:sent(mark, nil, "DATA"))
-    assert.same({ "vendor", "at a vendor" }, shown(a, b))
+    assert.same({ "vendor", "at a vendor · 1m" }, shown(a, b))
 
     b.core:doing({})
     net:run(20)

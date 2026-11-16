@@ -252,7 +252,8 @@ end
 
 -- Over the crate, how many Spare notices wait and that a click shows them;
 -- over the cup, each Trophy reached this session and how long ago;
--- over a figure, that Member's tooltip as the Roster shows it, and "In
+-- over a figure, how long they've been at it (with a time to say), then
+-- that Member's tooltip as the Roster shows it, and "In
 -- your group" when they are; over a bedroll, who is asleep and since when;
 -- anywhere else, who is doing what.
 local function showTooltip()
@@ -277,6 +278,8 @@ local function showTooltip()
   if actor and actor.pose == "asleep" then
     GameTooltip:AddLine(("%s: %s"):format(actor.label, actor.status), 1, 1, 1)
   elseif actor then
+    -- How long they've been at it, when Core says: "fighting · 3m".
+    if actor.since then GameTooltip:AddLine(actor.status, 1, 1, 1) end
     ns.Panel.characterTooltip(actor.row, actor.row)
     if actor.group then GameTooltip:AddLine("In your group", 1, 1, 1) end
   else
