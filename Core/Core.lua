@@ -320,16 +320,16 @@ local TROPHY_BANNER_FOR = 60 * 60
 -- (as the Trophies tab names it: "Crew deaths: 25", "Dungeons cleared:
 -- Deadmines"), ago ("just now", "12m ago") }: reached this session (from
 -- trophiesSince), not quietly, under an hour ago. Nil when there's none.
-local function liveTrophies(self)
+local function sessionTrophies(self)
   if not self.trophiesSince then return nil end
   local now = self.now()
   local list = {}
   for _, trophy in ipairs(self.crewGoals:trophies().shelf) do
-    local ago = now - trophy.time
-    if not trophy.quiet and trophy.time >= self.trophiesSince and ago < TROPHY_BANNER_FOR then
+    local age = now - trophy.time
+    if not trophy.quiet and trophy.time >= self.trophiesSince and age < TROPHY_BANNER_FOR then
       list[#list + 1] = {
         name = trophy.title .. ": " .. trophy.label,
-        ago = ago < 60 and "just now" or ns.Text.since(ago),
+        ago = age < 60 and "just now" or ns.Text.since(age),
       }
     end
   end
@@ -973,7 +973,7 @@ function Core:pocketCamp()
     view.sparesTooltip = spares == 1 and { title = "1 Spare notice", hint = "Click to see it in Spares." }
       or { title = spares .. " Spare notices", hint = "Click to see them in Spares." }
   end
-  view.trophies = liveTrophies(self)
+  view.trophies = sessionTrophies(self)
   view.trophiesTooltip = view.trophies and trophiesTooltip(view.trophies)
   return view
 end
