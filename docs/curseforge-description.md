@@ -137,6 +137,7 @@ Have an idea? Leave a comment.
 
 ## Links
 
-- **Bugs and ideas:** [GitHub issues](https://github.com/Shtian/bff-wow/issues)
+- **Discord:** [join the BFF Discord](https://discord.gg/5bgyqhHFv) to chat, share an idea, or follow new releases
+- **Bugs and ideas:** a comment here, [GitHub issues](https://github.com/Shtian/bff-wow/issues), or the Discord
 - **Source code:** [github.com/Shtian/bff-wow](https://github.com/Shtian/bff-wow)
 - **Support:** if BFF brings your crew together and you'd like to say thanks, you can [buy me a coffee](https://buymeacoffee.com/mltdwymkxn). It's never expected.

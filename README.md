@@ -95,6 +95,10 @@ npx bumpy add --packages "bff:patch" --message "What changed, for the changelog.
 
 Merging to `main` opens or updates the "Versioned release" PR. Merging that publishes the GitHub release `bff@X.Y.Z` with the zip and `release.json`, and uploads the zip to CurseForge once the `CF_API_KEY` secret and `CURSEFORGE_PROJECT_ID` variable are set.
 
+## Community
+
+Join the [BFF Discord](https://discord.gg/5bgyqhHFv) to chat, share an idea, or follow new releases. Bugs and ideas are just as welcome in [GitHub issues](https://github.com/Shtian/bff-wow/issues) or in the comments on [CurseForge](https://www.curseforge.com/wow/addons/bff-best-friends-in-forever).
+
 ## Support
 
 If BFF brings your crew together and you'd like to say thanks, you can [buy me a coffee](https://buymeacoffee.com/mltdwymkxn). It's never expected.
