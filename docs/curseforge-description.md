@@ -1,79 +1,142 @@
-# BFF – Best Friends in Forever
+![BFF – Best Friends in Forever](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/00-banner.png)
 
 **Keep up with your friends in WoW: Forever, even when you play at different times.**
 
-BFF is for a small group of friends who don't always play at the same time. It shows everyone's characters, levels and whereabouts, and tells you what your friends did while you were away. No server, no account, and no shared guild needed.
+BFF is for a small group of friends who don't always play at the same time. It shows everyone's characters, levels and whereabouts, tells you what your friends did while you were away, and can keep a little campfire on screen with every friend who's online. No server, no account, and no shared guild needed.
 
-## What it does
-
-- **While you were away:** when you log in, see every ding, death and new character your friends had since you last played.
-- **Gather round the fire:** the Camp, a small pixel campsite at the top of the panel and in While you were away. Friends who are online sit by the fire and the rest sleep in bedrolls. A recent death leaves a grave, respects put a flower on it, and a fresh max level gets a spark. You can switch it off in Settings.
-- **Keep the fire on screen:** the Pocket Camp, an optional small Camp you can keep up while you play.
-  - Shows the fire and every friend who's online, you included.
-  - Each friend is shown doing what they're doing: sitting by the fire, fighting with a sword raised, holding a torch in a dungeon or raid doorway, at a vendor or the auction house, with AFK over their head while away, resting under an inn's sign, flying on a griffin, crafting, gathering, or holding a fishing rod after a catch.
-  - Reacts to news for about 10 seconds: a ding gets a gold star and a bounce, a max level bursts into sparks, a death turns the figure into a skeleton, a rare find is held up, a handed-in quest pops a gold question mark, and a crew goal makes the fire flare purple.
-  - Hover a friend to see their character, level, zone and professions. Hover the fire to see who's doing what.
-  - Click it to open BFF. Drag it anywhere on screen.
-  - Its own Settings section: backdrop opacity from see-through to solid, lock its position, and hide it in combat.
-  - Off by default. BFF offers it once when you log in, and you can turn it on or off any time in Settings.
-- **Your whole crew:** every friend's characters, levels and whereabouts, and when each was last seen. Alts are grouped under the person who plays them.
-- **Cheer every ding:** one click sends a cheer for a ding, respects for a death, or a welcome for someone new. Toasts can play an optional sound.
-- **Level up together:** goals the whole crew works towards, like everyone reaching level 60, and trophies for what you do together, like clearing a dungeon or a raid, or catching every type of fish. Nobody is ranked.
-- **Who crafts what:** every friend's professions and skill in one grid, so you know who to ask for a craft. Hover a tile to see which characters have that profession. You also get feed entries when friends pick up a profession, reach a new rank or max it.
-- **Fish together:** a field guide of the crew's fishing catches. Every type of fish and fishing find is filled in by whoever caught it first, with when and where. Group it by where to fish or by type, and see what the crew still hasn't caught. Rare finds, like Nat Pagle's fish, are news you can cheer.
-- **Pass on spare gear:** offer an item to your friends. Whoever claims it first gets it by in-game mail.
-- **When everyone plays:** a heatmap of the hours each friend usually plays, in your own time zone.
-- **Dungeons together:** see which friends are close to your level, and the dungeons you can run together. Click a friend to see the dungeons that fit you both.
-- **Map pins** show where your friends' characters are.
-
-## Start a crew
+## Get started
 
 1. Everyone in the group installs BFF.
 2. One friend types `/bff start` and shares the crew code (on Discord, by text, however you like).
 3. The others type `/bff join <code>`.
+
+That's it. Type `/bff` or click the minimap button to open the panel.
+
+## What it does
+
+### The Pocket Camp: a campfire on screen
+
+A small pixel campfire you can keep on screen while you play, with every friend who's online sitting around it, you included. Players asked for it in the comments here.
+
+- **See what everyone's doing right now:** fighting, fishing, crafting, gathering, flying, shopping at the auction house, resting at an inn, AFK, or standing in a dungeon doorway. Druids and shamans show up in their forms.
+- **Watch the news happen:** a ding gets a gold star, a max level bursts into sparks, a death turns into a skeleton, and a crew goal makes the fire flare purple.
+- **Hover a friend** to see their character, level and zone. Click the Camp to open BFF, and drag it anywhere.
+
+It's off by default: BFF offers it once when you log in, or turn it on in Settings.
+
+![A campfire on screen](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/02-pocket.png)
+
+### While you were away
+
+When you log in, see every level-up (ding), death and new character your friends had since you last played.
+
+![While you were away](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/01-hero.png)
+
+### Gather round the fire
+
+The Camp is a small pixel campsite at the top of the panel. Friends who are online sit by the fire and the rest sleep in bedrolls. A recent death leaves a grave, paying respects puts a flower on it, and a fresh max level gets a spark.
+
+![Gather round the fire](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/03-camp.png)
+
+### Your whole crew
+
+Every friend's characters, levels and whereabouts, and when each was last seen. Alts are grouped under the person who plays them, and map pins show where everyone is.
+
+![Your whole crew](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/04-roster.png)
+
+### Cheer every ding
+
+One click sends a cheer for a ding, respects for a death, or a welcome for someone new. Your friend sees it as a pop-up, with an optional sound.
+
+![Cheer every ding](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/05-feed.png)
+
+### Level up together
+
+Goals the whole crew works towards, like everyone reaching level 60, and trophies for what you do together, like clearing a dungeon or a raid. Nobody is ranked.
+
+![Level up together](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/06-goals.png)
+
+### Who crafts what
+
+Every friend's professions and skill in one grid, so you know who to ask for a craft. Hover a tile to see which characters have it.
+
+![Who crafts what](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/09-professions.png)
+
+### Pass on spare gear
+
+Offer an item from your bags to your friends. Whoever claims it first gets it by in-game mail.
+
+![Pass on spare gear](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/07-spares.png)
+
+### When everyone plays
+
+A heatmap of the hours each friend usually plays, in your own time zone, so you can find a time to play together.
+
+![When everyone plays](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/08-when.png)
+
+### Dungeons together
+
+See which friends are close to your level, and the dungeons you can run together. Click a friend to see the dungeons that fit you both.
+
+![Dungeons together](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/10-together.png)
+
+### Fish together
+
+A field guide of the crew's fishing catches. Every type of fish is filled in by whoever caught it first, with when and where, and you can see what the crew still hasn't caught. Rare finds, like Nat Pagle's fish, are news you can cheer.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
 | `/bff` | Open or close the panel (also a key binding and the minimap button) |
-| `/bff feed`, `/bff goals`, `/bff when`, `/bff spares`, `/bff professions`, `/bff catches`, `/bff together` | Open the panel on that tab: Feed, Trophies, Play Times, Spare Items, Professions, Catches or Dungeons |
-| `/bff spares add <item>` | Offer an item from your bags: shift-click it in after `add` |
 | `/bff start`, `/bff join <code>`, `/bff leave` | Start, join or leave a crew |
-| `/bff code` | Show your crew code |
+| `/bff code` | Show your crew code, to invite another friend |
 | `/bff name <name>` | Set the name your friends see |
+| `/bff feed`, `/bff goals`, `/bff when`, `/bff spares`, `/bff professions`, `/bff catches`, `/bff together` | Open the panel on that tab |
+| `/bff spares add <item>` | Offer an item: type `add`, then shift-click the item in your bags |
 | `/bff settings` | Open Settings |
 | `/bff minimap` | Bring back a hidden minimap button |
-| `/bff report` | Open a report to copy into a bug report: versions, link state and the recent sync log. It includes your crew's character names |
-| `/bff debug sync` | Print the sync trace in chat: a line for each message sent and received. Off again after a reload |
-| `/bff help` | List the commands |
+| `/bff help` | List every command |
 
-## How it works, and its limits
+## FAQ
 
-BFF has no server. Each player's addon keeps their own data and passes it to the other crew members' addons in game: they find each other in a hidden chat channel and whisper updates directly. That keeps it simple and private, but it comes with limits:
+**Do all my friends need BFF?**
+Yes. Everyone in the crew needs it installed, and everyone joins with the same crew code.
 
-- **Someone has to be online to pass news on.** Updates travel only between players who are online at the same time. When anyone who has your news is online alongside a friend, that friend gets it, even if you are offline. A crew whose members are never online at the same time won't see each other's news.
-- **Same realm and same faction.** WoW's chat channels and whispers don't cross factions or reach other realms. Whether connected realms work hasn't been tested.
-- **Paused in combat and instances.** WoW blocks addon messages there. Your news goes out as soon as you leave, and nothing is lost.
-- **Delivery is best effort.** A message can occasionally get lost. The next sync fills in the gap, so data catches up but isn't instant.
-- **One crew at a time.** BFF uses one of your character's custom chat channels, and there's a cap of about 10. If you're at the cap, leave a channel and `/reload`.
-- **The crew code is the only key.** Anyone with the code can join and see the crew's data. There's no owner, kick or ban. You can hide someone just for yourself with Remove. To shut someone out, start a new crew and share the new code with the others.
-- **History is short.** The feed keeps 30 days or 200 entries, whichever runs out first. Friends unseen for 30 days are hidden from the panel.
-- **Settings has an "Appear offline" option** if you want to stop sharing for a while.
+**Do we need to be in the same guild?**
+No. You do need to be on the same realm and the same faction: WoW's chat doesn't cross factions or reach other realms. Connected realms haven't been tested yet.
 
-## Feedback
+**How does my news reach a friend who's offline?**
+BFF has no server, so news travels between players who are online at the same time. Any crew member who has your news passes it on, even if you're offline. A crew whose members are never online together won't see each other's news.
 
-Bugs and ideas are welcome on [GitHub](https://github.com/Shtian/bff-wow/issues).
+**Why is my friend's news late?**
+WoW blocks addon messages in combat, dungeons and raids, so BFF waits until you leave and then sends everything. A message can also get lost now and then. The next sync fills the gap, so things catch up but aren't instant.
 
-## Support
+**Who can see my data?**
+Only people with your crew code. There's no owner, kick or ban. To hide someone just for yourself, use Remove. To shut someone out, start a new crew and share the new code with the others. You can also turn on **Appear offline** in Settings to stop sharing for a while.
 
-If BFF brings your crew together and you'd like to say thanks, you can [buy me a coffee](https://buymeacoffee.com/mltdwymkxn). It's never expected.
+**I can't join a crew, or nothing happens.**
+BFF uses one of your character's custom chat channels, and WoW allows about 10. If you're at the cap, leave a channel and `/reload`. BFF works with one crew at a time.
+
+**How long is history kept?**
+The feed keeps 30 days or 200 entries, whichever runs out first. Friends unseen for 30 days are hidden from the panel.
+
+**Something's broken. How do I report it?**
+Type `/bff report`, copy the text, and paste it into a [GitHub issue](https://github.com/Shtian/bff-wow/issues) or a comment here, with what you did and what went wrong. The report includes your crew's character names.
 
 ## Thanks
 
-Some of BFF came from ideas players left in the comments on CurseForge:
+Some of BFF came from ideas players left in the comments here:
 
 - **kayloohoo** asked for a small campfire to keep on screen, with little animations for what friends are doing. That became the Pocket Camp.
 - **absolutezabba12** asked for a setting to turn the map location off, more accurate positions, and the Camp's characters on the map in place of dots. That became the map pin setting, live positions and the Camp figures as map pins.
 - **TheDolmenDuke** asked for the Pocket Camp to show a friend at a shop or the auction house, in combat and handing in a quest, and for a dungeon icon of its own. That became the Pocket Camp's poses for what each friend is doing right now.
 - **Moonghost** asked for the Pocket Camp to show friends in their shapeshift forms. That became the bear, cat, travel, aquatic and moonkin forms and Ghost Wolf by the fire.
+
+Have an idea? Leave a comment.
+
+## Links
+
+- **Bugs and ideas:** [GitHub issues](https://github.com/Shtian/bff-wow/issues)
+- **Source code:** [github.com/Shtian/bff-wow](https://github.com/Shtian/bff-wow)
+- **Support:** if BFF brings your crew together and you'd like to say thanks, you can [buy me a coffee](https://buymeacoffee.com/mltdwymkxn). It's never expected.
