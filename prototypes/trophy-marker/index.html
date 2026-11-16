@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trophy Banner Prototype</title>
+<!-- PROTOTYPE, throwaway: seven ways to mark a Trophy reached this session in the Pocket Camp (#209), switchable via ?variant=A..G. -->
+<style>
+:root{--bg:#14121b;--fg:#e8e4d8;--muted:#9a95a8;--panel:#1d1a26;--line:#2e2a3a}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif;padding:24px 16px 96px}
+main{max-width:1000px;margin:0 auto}
+h1{font-size:20px;margin:0 0 4px}p{color:var(--muted);margin:0 0 14px;max-width:70ch}
+h2{font-size:17px;margin:0 0 2px}
+.row{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+canvas{image-rendering:pixelated;display:block;max-width:100%}
+.world{border-radius:6px;padding:20px}
+.tip{background:rgba(0,0,8,.92);border:1px solid #8a8aa0;border-radius:4px;padding:6px 9px;font:13px/1.45 system-ui;min-width:220px}
+.tip .h{color:#9a95a8}
+label{color:var(--muted);font-size:14px;margin-right:16px;cursor:pointer;white-space:nowrap}
+.caption{color:var(--muted);font-size:13px;margin-top:8px}
+.controls{margin:10px 0 14px;display:flex;flex-wrap:wrap;gap:6px 0}
+.state{font:12px/1.5 ui-monospace,monospace;color:var(--muted);white-space:pre;margin-top:10px}
+#bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;background:#f4f1e8;color:#16131d;border-radius:999px;padding:6px 8px;box-shadow:0 6px 24px rgba(0,0,0,.5);font:600 14px system-ui;z-index:9}
+#bar button{border:0;background:#16131d;color:#f4f1e8;border-radius:999px;width:34px;height:34px;font-size:16px;cursor:pointer}
+#bar span{min-width:220px;text-align:center}
+</style></head><body><main>
+<h1>Trophy marker: alternatives</h1>
+<p>All sprites are drawn in the art script's palette and outline style, at the same scale as the real Pocket Camp (112 × 34 art pixels). Variant A is the sprite in the PR, taken from <code>CampSprites.tga</code>. B–G are new grids drawn just for this page. Use ← → or the bar at the bottom.</p>
+<h2 id="vname"></h2><p id="vdesc"></p>
+<div class="controls">
+<label>Trophies this session <select id="count"><option>1</option><option selected>2</option><option>3</option><option>5</option></select></label>
+<label><input type="checkbox" id="crate"> Spares crate</label>
+<label>Dragon (F, G) <select id="dragon"><option value="red">Red</option><option value="green">Green</option><option value="black">Black</option></select></label>
+<label>World <select id="world"><option value="grass">Grass</option><option value="snow">Snow</option><option value="night">Dark dungeon</option></select></label>
+<label>Scale <select id="scale"><option>2</option><option selected>5</option><option>7</option></select>×</label>
+</div>
+<div class="row">
+ <div class="card world" id="worldbg"><canvas id="c"></canvas><div class="caption">Pocket Camp, usual width, backdrop at 60%.</div></div>
+ <div>
+  <div class="tip" id="tip"></div>
+  <div class="caption">Tooltip over the marker (unchanged across variants).</div>
+  <div class="card" style="margin-top:16px"><canvas id="z"></canvas><div class="caption" id="zcap"></div></div>
+  <div class="state" id="state"></div>
+ </div>
+</div>
+</main>
+<div id="bar"><button id="prev" aria-label="Previous">←</button><span id="label"></span><button id="next" aria-label="Next">→</button></div>
+<script>
+const PAL={K:"#0b0a12",S:"#e8b890",s:"#b98465",W:"#fff3c4",Y:"#ffe9a0",G:"#ffd14a",O:"#f0a21c",R:"#c9481c",B:"#5a3a24",b:"#3a2518",T:"#8c8796",t:"#5d5966",L:"#70e370",P:"#f2b8d0",Z:"#adabb8",F:"#7fc4ee",f:"#3f7fb8",N:"#ece8d8",A:"#c89a5a",a:"#8f6a3a",r:"#5a1620",
+ V:"#9b59d0",v:"#5e2f8c"};
+function outlined(rows){const w=rows[0].length+2,h=rows.length+2;const at=(x,y)=>(rows[y-1]&&rows[y-1][x-1]&&rows[y-1][x-1]!=="."?rows[y-1][x-1]:null);const out=[];for(let y=0;y<h;y++){let l="";for(let x=0;x<w;x++){const o=at(x,y);if(o){l+=o;continue}let n=false;for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++)if(at(x+i,y+j))n=true;l+=n?"K":"."}out.push(l)}return out}
+function grid(rows){const h=rows.length,w=rows[0].length;const o=document.createElement('canvas');o.width=w;o.height=h;const g=o.getContext('2d');rows.forEach((r,y)=>[...r].forEach((ch,x)=>{if(ch!=='.'){g.fillStyle=PAL[ch];g.fillRect(x,y,1,1)}}));return o}
+
+// New grids for B–E.
+const MEDAL=grid(outlined(["BBBBBBB","B..RrR.","B..RrR.","B...R..","B..GGG.","B.GYWYG","B.GYYOG","B.GOYOG","B..GGG.","B......","B......","B......","B......","B......","b......"]));
+const CUP=grid(outlined(["GYYYYYG","GYWYYOG",".GYYYO.","..GYO..","...O...","..GYO..",".BBBBB.",".bbbbb."]));
+const CUP_FLOAT=grid(outlined(["G.GYYYYYG.G","GGGYWYYOGGG",".G.GYYYO.G.","....GYO....",".....O.....","....GYO....","...GGOOO..."]));
+const FLAG_COLOURS=[["R","G"],["F","W"],["V","Y"],["L","W"],["G","R"]];
+function pennant(i){const [c,d]=FLAG_COLOURS[i%FLAG_COLOURS.length];return grid(outlined([c+d+c,c+c+c,"."+c+"."]))}
+const POLE=grid(outlined(["Y","B","B","B","B","B","B","B","B","B","B","B","B","B","B","B","B","b"]));
+// F: a mounted dragon head on a wooden plaque, on a post. Faces right, towards the fire.
+const DRAGON_ROWS=outlined([
+"..O.GG..........",
+".aOOAGG.........",
+".aAAAAGrR.......",
+".aAArRRRRRR.....",
+".aAArRWKRRRRR...",
+".aAArRRRRRRRRRR.",
+".aAAArRRRRRRRKR.",
+".aAAArrRWRWRWRr.",
+".aAAAAr.........",
+".aAAAArWrWrWrr..",
+".aAAAAArrrrrr...",
+".aAAAAAa........",
+"..aAAAa.........",
+"...aAa..........",
+"....B...........",
+"....B...........",
+"....B...........",
+"....B...........",
+"....B...........",
+"....B...........",
+"....b..........."]);
+const DRAGON_PAL={red:{R:"#b8321e",r:"#6a1414"},green:{R:"#3f8a3a",r:"#1f4a22"},black:{R:"#4a4458",r:"#221e2c"}};
+function dragon(){const p=DRAGON_PAL[$('dragon').value];const save={R:PAL.R,r:PAL.r};Object.assign(PAL,p);const g=grid(DRAGON_ROWS);Object.assign(PAL,save);return g}
+// G: a dragon's head on a pike, jaw hanging, eye shut. Faces right, towards the fire.
+const SPIKE_ROWS=outlined([
+"....Z.......",
+"....Z.......",
+"GG..Z.......",
+".GGrRr......",
+"..rRRRRRR...",
+".rRttRRRRRR.",
+".rRRRRRRRRKR",
+".rrRRWRWRWr.",
+"..rr........",
+"...rW.W.....",
+"...rrrrW....",
+"....rrr.....",
+"....B.......",
+"....B.......",
+"....B.......",
+"....B.......",
+"....B.......",
+"....B.......",
+"....B.......",
+"....b......."]);
+function spiked(){const p=DRAGON_PAL[$('dragon').value];const save={R:PAL.R,r:PAL.r};Object.assign(PAL,p);const g=grid(SPIKE_ROWS);Object.assign(PAL,save);return g}
+const PUFF=[grid([".O.","OGO",".O."]),grid(["..O",".G.","O.."]),grid(["...","..R","..."])];
+const SPARKLE=[grid(["..W..",".WGW.","..W.."]),grid(["W...W","..G..","W...W"])];
+
+const S={seatedCloth:[1,1,12,13],seated:[15,1,12,13],fire1:[1,16,11,12],fire2:[14,16,11,12],fire3:[27,16,11,12],logs:[40,16,15,4],seat:[57,16,14,3],ember:[91,16,1,1],crate:[24,79,8,7],banner:[34,79,8,17],arch:null,griffin:null};
+const COLS=112,ROWS=34,FIRE=56;
+const sheet=new Image(),back=new Image();let loaded=0;
+sheet.src='sprites.png';back.src='backdrop.png';sheet.onload=back.onload=()=>{if(++loaded==2)start()};
+const c=document.getElementById('c'),x=c.getContext('2d');
+let f=0,cloth;
+const $=id=>document.getElementById(id);
+function sheetCanvas(name){const [sx,sy,w,h]=S[name];const o=document.createElement('canvas');o.width=w;o.height=h;o.getContext('2d').drawImage(sheet,sx,sy,w,h,0,0,w,h);return o}
+// Bottom-left at art x from the fire's centre, row from the band's bottom.
+function put(src,ax,row,mirror,alpha){const w=src.width,h=src.height;x.save();if(alpha!=null)x.globalAlpha=alpha;if(mirror){x.translate(FIRE+ax+w,0);x.scale(-1,1);x.drawImage(src,0,ROWS-row-h)}else x.drawImage(src,FIRE+ax,ROWS-row-h);x.restore()}
+function tinted(src,col){const o=document.createElement('canvas');o.width=src.width;o.height=src.height;const g=o.getContext('2d');g.drawImage(src,0,0);g.globalCompositeOperation='multiply';g.fillStyle=col;g.fillRect(0,0,o.width,o.height);g.globalCompositeOperation='destination-in';g.drawImage(src,0,0);return o}
+
+const figs=[{x:-21,col:'#c79c6e'},{x:-37,col:'#3fc7eb'},{x:9,col:'#f48cba'},{x:25,col:'#aad372'}];
+let SP={};
+const n=()=>+$('count').value;
+
+const VARIANTS={
+ A:{name:'Pennant on a pole',desc:'What the PR ships: a red swallowtail pennant with a gold cup, behind the fire’s left half. It looks the same whatever the count.',
+   back(){put(SP.banner,-7,4)},front(){},zoom:()=>SP.banner,hit:'pennant + pole'},
+ B:{name:'Medal on a post',desc:'A gibbet-style post behind the fire’s left half, with a gold medal hanging on a red ribbon. The medal glints every few seconds. It reads as an award rather than a flag.',
+   back(){put(MEDAL,-8,4);if(f%30<3){put(SPARKLE[f%2],-5,13+((f%30)>1?1:0))}},front(){},zoom:()=>MEDAL,hit:'medal + post'},
+ C:{name:'Cup on a plinth',desc:'A small gold cup on a wooden block, in front of the fire’s left half like the crate on the right. Short and close to the ground, so nothing is hidden behind it. When both show, it meets the crate in the middle.',
+   back(){},front(){put(CUP,-8,1)},zoom:()=>CUP,hit:'cup'},
+ D:{name:'Bunting, one flag per Trophy',desc:'A rope between two poles over the fire, with a small flag for each Trophy reached this session (up to 5). The count shows without hovering. It is the widest and most festive, and spans the whole fire.',
+   back(){const k=Math.min(n(),5);put(POLE,-9,4);put(POLE,7,4);
+     const y0=22;x.fillStyle=PAL.a;for(let ax=-7;ax<=7;ax++){const sag=Math.round(2.2*(1-(ax/7.5)**2));x.fillRect(FIRE+ax+1,ROWS-y0-1+sag,1,1)}
+     for(let i=0;i<k;i++){const ax=Math.round(-6+(12*(i+.5)/k)-1.5);const sag=Math.round(2.2*(1-((ax+1.5)/7.5)**2));const flap=((f+i*3)%12<6)?0:1;put(SP.pennants[i],ax,y0-sag-3-flap+1)}},
+   front(){},zoom:()=>{const o=document.createElement('canvas');o.width=24;o.height=6;const g=o.getContext('2d');for(let i=0;i<5;i++)g.drawImage(SP.pennants[i],i*5,0);return o},hit:'rope + flags'},
+ F:{name:'Mounted dragon head',desc:'A dragon’s head on a wooden plaque, wall-mount style, on a post behind the fire’s left half. It faces the fire and its jaw sits just over the flames. Every few seconds it puffs a small ember from its mouth. It’s the most characterful, and the biggest (18 × 23); its snout reaches past the fire’s centre, so it would need the crate moved down or right.',
+   back(){put(SP.dragon,-7,4);const t=f%36;if(t<6){put(PUFF[Math.min(2,Math.floor(t/2))],9+Math.floor(t/2),16+Math.floor(t/3))}},front(){},zoom:()=>SP.dragon,hit:'plaque + head + post'},
+ G:{name:'Dragon head on a pike',desc:'A slain dragon’s head on a pike behind the fire’s left half: eye shut, jaw hanging, the metal tip through its crown. It’s the same 8-column slot as A plus 6 columns over the fire (14 × 22), so it clears the first seat on the right. Static: it’s a trophy, not a pet.',
+   back(){put(SP.spike,-7,4)},front(){},zoom:()=>SP.spike,hit:'head + pike'},
+ E:{name:'Gold cup in the fire’s glow',desc:'No prop: a gold cup floats above the flames and bobs slowly, with sparkles. It ties the Trophy to the fire, like the goal flare does. Nothing new stands on the ground, but it covers the embers.',
+   back(){},front(){const bob=Math.floor(f/4)%2;put(CUP_FLOAT,-6,19+bob);if(f%18<4){put(SPARKLE[f%2],-9,24);put(SPARKLE[(f+1)%2],5,21)}},zoom:()=>CUP_FLOAT,hit:'cup above the fire'},
+};
+const KEYS=Object.keys(VARIANTS).sort();
+function current(){const v=new URLSearchParams(location.search).get('variant');return KEYS.includes(v)?v:'A'}
+function go(d){const i=(KEYS.indexOf(current())+d+KEYS.length)%KEYS.length;const u=new URL(location);u.searchParams.set('variant',KEYS[i]);history.replaceState(null,'',u);render()}
+$('prev').onclick=()=>go(-1);$('next').onclick=()=>go(1);
+addEventListener('keydown',e=>{if(e.target.closest('input,select,textarea,[contenteditable]'))return;if(e.key==='ArrowLeft')go(-1);if(e.key==='ArrowRight')go(1)});
+const WORLDS={grass:'linear-gradient(#5c7a4a,#3b5233 60%,#6b6250)',snow:'linear-gradient(#e9eef5,#c9d4e2 60%,#f4f6fa)',night:'linear-gradient(#141019,#22182a 60%,#0b0a10)'};
+const NAMES=["Crew deaths: 50","Dungeons cleared: Deadmines","Rares slain: Rak’shiri","Crew levels: 250","Everyone at a level: 30"];
+const AGES=["just now","12m ago","31m ago","44m ago","58m ago"];
+
+function render(){const v=VARIANTS[current()];$('label').textContent=current()+' ('+v.name+')';$('vname').textContent=current()+'. '+v.name;$('vdesc').textContent=v.desc;
+ const k=n();$('tip').innerHTML='<div style="color:#fff">'+(k==1?'A Trophy reached':k+' Trophies reached')+'</div>'+NAMES.slice(0,k).map((s,i)=>'<div style="color:#fff">'+s+' · '+AGES[i]+'</div>').join('')+'<div class="h">Click to see '+(k==1?'it':'them')+' in Trophies.</div>';
+ $('worldbg').style.background=WORLDS[$('world').value];
+ const z=$('z'),g=z.getContext('2d'),src=v.zoom();z.width=src.width;z.height=src.height;z.style.width=src.width*10+'px';z.style.height=src.height*10+'px';g.clearRect(0,0,z.width,z.height);g.drawImage(src,0,0);$('zcap').textContent='The sprite alone at 10× ('+src.width+' × '+src.height+').';
+ $('state').textContent=JSON.stringify({variant:current(),trophies:k,crate:$('crate').checked,hitArea:v.hit},null,1);
+ draw()}
+['count','crate','world','scale'].forEach(id=>$(id).onchange=render);
+$('dragon').onchange=()=>{SP.dragon=dragon();SP.spike=spiked();render()};
+
+function draw(){const v=VARIANTS[current()];const k=+$('scale').value;c.width=COLS;c.height=ROWS;c.style.width=COLS*k+'px';c.style.height=ROWS*k+'px';
+ x.clearRect(0,0,COLS,ROWS);x.globalAlpha=.6;x.drawImage(back,256-56,2,COLS,ROWS,0,0,COLS,ROWS);x.globalAlpha=1;
+ v.back();
+ put(SP.logs,-7,3);put(SP['fire'+(f%3+1)],-5,5);
+ for(let i=0;i<3;i++){const life=Math.floor((f*.7+i*5)%14);const ex=Math.floor(Math.sin(i*2+f*.35)*3+(i-1)*2+.5);if(life<10)put(SP.ember,ex,16+life,false,1-life/10)}
+ if($('crate').checked)put(SP.crate,-1,1);
+ v.front();
+ figs.forEach((fg,i)=>{const right=fg.x>0;put(SP.seat,fg.x-1,3,right);put(cloth[i],fg.x,4,right);put(SP.seated,fg.x,4,right)});
+ f++}
+function start(){for(const k in S)if(S[k])SP[k]=sheetCanvas(k);SP.pennants=[0,1,2,3,4].map(pennant);SP.dragon=dragon();SP.spike=spiked();cloth=figs.map(fg=>tinted(SP.seatedCloth,fg.col));render();setInterval(draw,1000/6)}
+</script></body></html>
