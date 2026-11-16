@@ -88,3 +88,71 @@ jobs:
           # scripts/package.sh uploads to CurseForge when both are set.
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+
+  # Tells Discord about the release. Never fails the release: it runs after
+  # publish, and continue-on-error keeps a failure here from failing the
+  # workflow run. Does nothing until the DISCORD_WEBHOOK_URL secret is set.
+  # Not a `release: published` trigger: bumpy finalises the release with the
+  # workflow's own token, and events made by that token don't start workflows.
+  notify-discord:
+    needs: publish
+    if: needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Post the release to Discord
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL isn't set, skipping."
+            exit 0
+          fi
+
+          # The release bumpy just finalised is the latest one.
+          release=$(gh release view --json tagName,url,body)
+          tag=$(jq -r .tagName <<<"$release")
+          version=${tag#bff@}
+
+          # Each entry's bump level becomes an icon, and the biggest level in the
+          # release sets the title's icon, the embed's colour and its footer.
+          # Embed descriptions hold 4096 characters; keep it a short read.
+          payload=$(jq -n \
+            --argjson release "$release" \
+            --arg version "$version" \
+            '($release.body // "") as $body
+            | (if ($body | test("\\*\\(major\\)\\*")) then "major"
+               elif ($body | test("\\*\\(minor\\)\\*")) then "minor"
+               else "patch" end) as $level
+            | { major: { icon: "🚨", color: 15548997, label: "Major release: everyone in the crew should update together" },
+                minor: { icon: "✨", color: 16765258, label: "Minor release: something new" },
+                patch: { icon: "🔧", color: 4183776, label: "Patch release: fixes and tweaks" } } as $levels
+            | {
+              username: "BFF releases",
+              allowed_mentions: { parse: [] },
+              embeds: [{
+                title: ("🔥 BFF " + $version + " is out"),
+                url: $release.url,
+                description: (
+                  $body
+                  # Bumpy appends a "Published to" list and a metadata comment.
+                  | sub("(?s)\\n*#### Published to.*$"; "")
+                  # "- *(patch)*" then the entry on the next line becomes "- 🔧 entry".
+                  | gsub("- \\*\\((?<l>major|minor|patch)\\)\\*\\s+"; "- " + $levels[.l].icon + " ")
+                  | .[0:1500]
+                ),
+                color: $levels[$level].color,
+                footer: { text: $levels[$level].label }
+              }]
+            }')
+
+          status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            -d "$payload" "$DISCORD_WEBHOOK_URL")
+          echo "Discord answered $status"
+          case "$status" in 2??) ;; *) exit 1 ;; esac
