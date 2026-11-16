@@ -100,6 +100,7 @@ local SETTINGS = {
   { key = "pocketCampLocked", default = false, other = true },
   { key = "pocketCampCombat", default = false, other = true },
   { key = "pocketCampAlts", default = true, other = false },
+  { key = "pocketCampSpares", default = true, other = false },
   { key = "pocketCampPosition", default = nil, other = { x = 300, y = 200 } },
   { key = "pocketCampScale", default = 100, other = 150 },
   { key = "pocketCampColumns", default = 112, other = 176 },
@@ -123,7 +124,7 @@ describe("Settings list", function()
     end
     assert.same({ "paused", "chatLines", "awayPopup", "minimap", "camp", "mapPins", "mapPinSize", "panelPlace", "toasts",
       "toastSound", "toastPosition", "pocketCamp", "pocketCampOpacity", "pocketCampLocked", "pocketCampCombat",
-      "pocketCampAlts" }, keys)
+      "pocketCampAlts", "pocketCampSpares" }, keys)
   end)
 
   it("gives the Settings page sections with finished labels and current values", function()
@@ -137,6 +138,8 @@ describe("Settings list", function()
         sections[4].settings[4].label })
     assert.same({ key = "pocketCampAlts", kind = "toggle", label = "ALT over a friend playing an alt", value = true,
       needs = "pocketCamp" }, sections[5].settings[1])
+    assert.same({ key = "pocketCampSpares", kind = "toggle", label = "A crate by the fire for unseen Spare notices",
+      value = true, needs = "pocketCamp" }, sections[5].settings[2])
     local chat = sections[2].settings[1]
     assert.same({ key = "chatLines", kind = "toggle", label = "Chat message for live events", value = false }, chat)
     assert.equal("Appear offline: send nothing, so your Crew sees you as offline", sections[1].settings[1].label)
