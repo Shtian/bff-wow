@@ -52,6 +52,10 @@ local failed = false
 local settled = false
 local isUp = false
 local listAsked
+-- The member lists traced since joining the channel, by their channel
+-- arguments and what became of them: BFF asks every minute, and the same
+-- list again says nothing new.
+local listsTraced = {}
 local lastChannelUpdate
 -- Who is in the channel and can be whispered (Link/Presence.lua). Made
 -- below, once what it calls is defined.
@@ -108,14 +112,19 @@ local function shown(value)
   return tostring(value)
 end
 
+-- A chat event's arguments that say which channel it is, for the trace.
+local function channelArgs(arg4, arg8, arg9)
+  return ("arg 4 %s · arg 8 %s · arg 9 %s"):format(shown(arg4), shown(arg8), shown(arg9))
+end
+
 -- Every join and leave notice, ours or not, with the arguments that say
 -- which channel it is (#162: whether Forever sends them for the Crew's
 -- channel, and how).
 local function traceNotice(kind, sender, arg4, arg8, arg9, isCrew)
   if not trace then return end
   local who = readable(sender) and sender or shown(sender)
-  trace(("channel %s: %s · arg 4 %s · arg 8 %s · arg 9 %s (%s)"):format(
-    kind, who, shown(arg4), shown(arg8), shown(arg9), isCrew and "Crew channel" or "other channel"))
+  trace(("channel %s: %s · %s (%s)"):format(
+    kind, who, channelArgs(arg4, arg8, arg9), isCrew and "Crew channel" or "other channel"))
 end
 
 -- Names may be "First Last" on Forever, and "Name-Realm" in chat events.
@@ -198,6 +207,7 @@ end
 local function onJoined()
   joining = false
   joined = true
+  listsTraced = {}
   hide(target.channel)
   presence:start()
   askList()
@@ -390,9 +400,37 @@ function events.CHAT_MSG_SYSTEM(text)
   if name then presence:notFound(name) end
 end
 
--- The member list: "*Owner, @Moderator, First Last, Name-Realm".
-function events.CHAT_MSG_CHANNEL_LIST(text, _, _, arg4, _, _, _, _, arg9)
-  if not joined or not isTarget(baseName(arg4, arg9)) or not readable(text) then return end
+-- A member list with the arguments that say which channel it is, and
+-- what became of it, unless one with the same arguments and verdict was
+-- traced since joining.
+local function traceList(text, where, verdict)
+  local key = where .. " (" .. verdict .. ")"
+  if not trace or listsTraced[key] then return end
+  listsTraced[key] = true
+  local names = "text unreadable"
+  if readable(text) then
+    local count = select(2, text:gsub("[^,]+", ""))
+    names = count == 1 and "1 name" or ("%d names"):format(count)
+  end
+  trace(("member list: %s · %s"):format(names, key))
+end
+
+-- The member list: "*Owner, @Moderator, First Last, Name-Realm". The trace
+-- gets each kind of list once per join (see traceList), so a report shows
+-- whether the list arrives and how its channel is named.
+function events.CHAT_MSG_CHANNEL_LIST(text, _, _, arg4, _, _, _, arg8, arg9)
+  local where = channelArgs(arg4, arg8, arg9)
+  if not joined then
+    traceList(text, where, "ignored: not in the Crew channel yet")
+    return
+  elseif not isTarget(baseName(arg4, arg9)) then
+    traceList(text, where, "other channel")
+    return
+  elseif not readable(text) then
+    traceList(text, where, "Crew channel, ignored: text unreadable")
+    return
+  end
+  traceList(text, where, "Crew channel")
   local names = {}
   for entry in text:gmatch("[^,]+") do
     local name = entry:gsub("^%s*[%*@%+]*", ""):gsub("%s+$", "")
