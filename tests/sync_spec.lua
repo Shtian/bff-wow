@@ -820,3 +820,41 @@ describe("A Crew with a Member on an older BFF", function()
     end
   end)
 end)
+
+describe("A message from a Character not known to be in the channel", function()
+  -- The last message on the wire from a client.
+  local function lastFrom(net, name)
+    for i = #net.wire, 1, -1 do
+      if net.wire[i].from == name then return net.wire[i].message end
+    end
+  end
+
+  it("is from a known Member when another Member's record is held", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    assert.is_true(a.core:fromKnownMember(lastFrom(net, "Bob")))
+  end)
+
+  it("is from a known Member when they left the Crew: one who whispers you is rejoining", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local message = lastFrom(net, "Bob")
+    b.core:leaveCrew()
+    net:run(5)
+    -- Gone from Ann's Roster: Ann holds only Bob's tombstone.
+    assert.is_nil(a:rowFor(b))
+    assert.is_true(a.core:fromKnownMember(message))
+  end)
+
+  it("isn't when it is your own, from a Member you removed, unknown or not a message", function()
+    local net, clients, ns = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    assert.is_false(a.core:fromKnownMember(lastFrom(net, "Ann")))
+    assert.is_false(a.core:fromKnownMember(ns.Codec.encode({ type = "DIGEST", from = "unknown1", versions = {} })))
+    assert.is_false(a.core:fromKnownMember("2|not a message"))
+    assert.is_false(a.core:fromKnownMember(nil))
+    local message = lastFrom(net, "Bob")
+    assert.is_true(a.core:removeMember(b.memberId))
+    assert.is_false(a.core:fromKnownMember(message))
+  end)
+end)

@@ -2295,6 +2295,21 @@ function Core:gone(name)
   if self.ledger:wentAway(name) then checkOnline(self) end
 end
 
+-- Whether a message is from another Member whose record is held and who
+-- isn't removed. The channel link asks this about a whisper from a
+-- Character it doesn't know to be in the channel, so a friend whose client
+-- gets no member list is still heard. Leaving a Crew forgets every other
+-- record, so an old Crew's Members aren't known. A Member who left this
+-- Crew still counts, on purpose: one who whispers you is rejoining, and
+-- their new record comes with the whisper.
+function Core:fromKnownMember(message)
+  if type(message) ~= "string" or not self.db.crew then return false end
+  local decoded = ns.Codec.decode(message)
+  local id = type(decoded) == "table" and decoded.from
+  return type(id) == "string" and id ~= self.ledger:memberId()
+    and self.ledger:record(id) ~= nil and not self.ledger:isRemoved(id)
+end
+
 -- A send to the Character of this name failed: they may have missed it, so
 -- they get a DIGEST of their own shortly after. Sync with everyone else
 -- carries on.

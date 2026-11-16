@@ -10,6 +10,13 @@ local function fakeCore()
       core.calls[#core.calls + 1] = { method, ... }
     end
   end
+  -- Messages from a Member this client knows: those set in core.known, and
+  -- what was asked.
+  core.known, core.asked = {}, {}
+  function core.fromKnownMember(_, message)
+    core.asked[#core.asked + 1] = message
+    return core.known[message] == true
+  end
   function core.count(method, arg)
     local n = 0
     for _, call in ipairs(core.calls) do
@@ -402,6 +409,69 @@ describe("The channel link", function()
     -- Someone new while up: Core hears down and up, for a fresh DIGEST.
     assert.equal(1, core.count("down"))
     assert.equal(2, core.count("up"))
+  end)
+
+  describe("a whisper from a stranger", function()
+    -- A link up without a member list, as on a client that gets none.
+    local function listless()
+      local game = wow()
+      local ns = game.load("Game/ChannelLink.lua", {})
+      local link = ns.ChannelLink
+      local core = fakeCore()
+      local lines = {}
+      link.setTrace(function(line) lines[#lines + 1] = line end)
+      link.start(core, function() end)
+      link.setCrew({ channel = CHANNEL, password = "pw" })
+      game.advance(16)
+      assert.equal(1, core.count("up"))
+      assert.equal(0, link.state().peers)
+      return game, link, core, ns, lines
+    end
+
+    it("from a known Member is delivered at once, and they are whispered from then on", function()
+      local game, link, core, _, lines = listless()
+      core.known["1|digest"] = true
+      whisperFrom(game, "Dan Duke")
+      assert.same({ "received", "1|digest", "Dan Duke" }, core.calls[#core.calls])
+      assert.equal(1, link.state().peers)
+      assert.truthy(table.concat(lines, "\n"):find("peer added: Dan Duke (known Member)", 1, true))
+      link.send("1|short")
+      assert.same({ "Dan Duke" }, targets(game))
+    end)
+
+    it("of several chunks from a known Member is delivered once, when whole", function()
+      local game, link, core, ns = listless()
+      local long = "2|" .. ("y"):rep(700)
+      core.known[long] = true
+      local chunks = chunksOf(ns, long)
+      assert.equal(3, #chunks)
+      for _, chunk in ipairs(chunks) do whisperFrom(game, "Dan", chunk) end
+      assert.equal(1, core.count("received"))
+      assert.same({ "received", long, "Dan" }, core.calls[#core.calls])
+      assert.equal(1, link.state().peers)
+      -- The next message from them comes through the peer's own framing.
+      local again = "2|" .. ("z"):rep(700)
+      for _, chunk in ipairs(chunksOf(ns, again)) do whisperFrom(game, "Dan", chunk) end
+      assert.equal(2, core.count("received"))
+      assert.same({ "received", again, "Dan" }, core.calls[#core.calls])
+    end)
+
+    it("from an unknown Member is dropped after 10 s, as before", function()
+      local game, link, core = listless()
+      whisperFrom(game, "Dan")
+      assert.same({ "1|digest" }, core.asked)
+      game.advance(10)
+      assert.equal(0, core.count("received"))
+      assert.equal(0, link.state().peers)
+      game.fire("CHAT_MSG_CHANNEL_LIST", "Dan", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
+      assert.equal(0, core.count("received"))
+    end)
+
+    it("from a peer isn't asked about", function()
+      local game, _, core = linked()
+      whisperFrom(game, "Bob")
+      assert.same({}, core.asked)
+    end)
   end)
 
   it("comes up 5 s after joining when no member list arrives", function()

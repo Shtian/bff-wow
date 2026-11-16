@@ -63,6 +63,10 @@ local presence
 -- Splits messages into chunks and puts the chunks received back together,
 -- per sender's peer key. Made below, like presence.
 local framing
+-- Puts a held stranger's chunks together on the side, to see whether the
+-- message is from a known Member. Apart from framing, since the held chunks
+-- go through framing again once they are a peer.
+local strangerFraming
 -- What is still to send, per peer: key -> { name, flying (chunks handed to
 -- ChatThrottleLib and not yet out), busy (the long message one of them
 -- belongs to, or false), messages (each { chunks, next }, the multi-chunk messages
@@ -176,6 +180,7 @@ local function update(cause)
   if not up then
     for key in pairs(outbox) do dropUnsent(key, "link down") end
     framing:clear()
+    strangerFraming:clear()
   end
   if up then core:up() else core:down() end
 end
@@ -560,10 +565,25 @@ local function onWhisper(text, name)
   core:received(message, Ambiguate(name, "none"))
 end
 
+-- A held stranger's whisper: once it makes a whole message, and that is
+-- from a Member Core knows, Presence makes them a peer and delivers what it
+-- held. A client that gets no member list still hears a friend this way.
+local function vouchIfKnown(name, text)
+  local message = text
+  if ns.Framing.isChunk(text) then
+    message = strangerFraming:receive(peerKey(name), text)
+    if not message then return end
+  end
+  if core:fromKnownMember(message) then
+    strangerFraming:forget(peerKey(name))
+    presence:vouched(name)
+  end
+end
+
 -- A message only counts from someone in the Crew channel: over the channel
--- itself (password-protected), or whispered by a Character in it. Any other
--- way (party, guild) it is dropped. Presence holds a whisper from someone
--- not known to be in the channel yet.
+-- itself (password-protected), or whispered by a Character in it or by a
+-- known Member. Any other way (party, guild) it is dropped. Presence holds
+-- a whisper from someone not known to be in the channel yet.
 local function onComm(_, message, distribution, sender)
   if trace then trace(("%s from %s · %d B"):format(distribution, tostring(sender), #message)) end
   if distribution == "CHANNEL" then
@@ -572,6 +592,7 @@ local function onComm(_, message, distribution, sender)
   end
   if distribution ~= "WHISPER" or not target or not readable(sender) or isSelf(sender) then return end
   presence:heard(sender, message)
+  if presence:holds(sender) then vouchIfKnown(sender, message) end
 end
 
 presence = ns.Presence.new({
@@ -612,6 +633,10 @@ framing = ns.Framing.new({
   end,
 })
 
+-- No report when a stranger's message stays incomplete: Presence drops
+-- what it held of it anyway.
+strangerFraming = ns.Framing.new({ now = GetTime })
+
 -- Starts the link. core gets up(), down(), gone(name) and received(message, from); notice
 -- gets "tooManyChannels" or "wrongPassword" when the channel can't be joined.
 function ChannelLink.start(theCore, notice)
@@ -636,6 +661,7 @@ function ChannelLink.start(theCore, notice)
   C_Timer.NewTicker(1, function()
     presence:tick()
     framing:tick()
+    strangerFraming:tick()
   end)
 end
 
