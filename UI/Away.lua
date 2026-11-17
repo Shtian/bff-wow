@@ -390,9 +390,16 @@ local function drawUpdate(update, y)
   return below
 end
 
+-- Core's campReaction: a Reaction just attached plays in the popup's
+-- Camp, while it shows.
+function Away.campReaction(reaction)
+  if frame and frame:IsShown() then frame.camp:React(reaction) end
+end
+
 -- Shows the summary from Core's awaySummary: { members, goals,
 -- spares, professions, catches, count, intro, maxLevel, noticed, update }. With no Member news, only Your
 -- Crew noticed, Crew goals, Spares, Professions and Catches show.
+
 function Away.show(summary)
   if not frame then create() end
   local top = -Skin.HEADER_HEIGHT

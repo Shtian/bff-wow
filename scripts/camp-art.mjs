@@ -176,6 +176,12 @@ const EMBER = ["G"];
 const EMBER_COOL = ["R"];
 // Between the two, for an ember drifting down from the fire into the panel.
 const EMBER_WARM = ["O"];
+// A Cheer's burst over the hopping figure: pixels white, then pale gold,
+// then the ember's gold and warm orange (docs/design/camp.md, Reactions).
+const GLINT = ["W"];
+const GLINT_PALE = ["Y"];
+// A petal drifting up from a Grave's flower as it blooms.
+const PETAL = ["P"];
 
 // The tent: a pavilion after the game's own, cone roof laced down the
 // middle over a scalloped valance and walls that flare a little, the front
@@ -352,6 +358,7 @@ const SPRITES = [
   ["fire1", skin(FIRE[0])], ["fire2", skin(FIRE[1])], ["fire3", skin(FIRE[2])],
   ["logs", skin(LOGS)], ["seat", skin(SEAT)], ["sleep1", skin(SLEEP[0])], ["sleep2", skin(SLEEP[1])], ["sleep3", skin(SLEEP[2])],
   ["ember", skin(EMBER)], ["emberCool", skin(EMBER_COOL)], ["emberWarm", skin(EMBER_WARM)],
+  ["glint", skin(GLINT)], ["glintPale", skin(GLINT_PALE)], ["petal", skin(PETAL)],
   ["tent", tent()],
   ["rod", skin(ROD)], ["star", skin(STAR)], ["fish", skin(FISH)],
   ["smoke1", skin(SMOKE[0])], ["smoke2", skin(SMOKE[1])], ["skeleton", skin(SKELETON)],

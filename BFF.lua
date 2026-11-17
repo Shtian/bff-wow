@@ -156,6 +156,10 @@ local function onCoreEvent(event, arg, more)
     showTip(arg)
   elseif event == "pocketCampAnimation" then
     ns.PocketCamp.animate(arg)
+  elseif event == "campReaction" then
+    ns.Panel.campReaction(arg)
+    ns.Away.campReaction(arg)
+    ns.PocketCamp.campReaction(arg)
   elseif event == "awaySummary" then
     showAway(arg)
   elseif event == "spareGone" then

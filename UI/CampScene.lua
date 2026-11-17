@@ -32,10 +32,24 @@ CampScene.SHORT_HEIGHT = 78
 -- Animation ticks per second, and how long a Cheer's hop lasts.
 local FPS = 6
 local HOP_FOR = 0.7
+-- A Cheer's burst over the hopping figure: a pixel flies out each way from
+-- `row` rows over the head and x from the figure's left edge, `reach`
+-- further each tick, in one colour a tick (a sprite each), the last at
+-- `fade` alpha. It's over with the hop.
+local CHEER_BURST = { x = 5.5, row = 2, reach = 0.9, fade = 0.6,
+  colors = { "glint", "glintPale", "ember", "emberWarm" },
+  ways = { { 0, 1 }, { 0.75, 0.75 }, { -0.75, 0.75 }, { 1, 0.1 }, { -1, 0.1 }, { 0.4, 1 }, { -0.4, 1 } } }
+-- Respects bloom a Grave's flower: it grows in a row each `step` ticks from
+-- the stem up, then each of `petals` ({ x from the flower's left, row up
+-- from its bottom }) drifts up a row a tick, a tick after the one before,
+-- swaying a column out every other tick and fading to `fade` alpha after
+-- `solid` ticks, until the bloom ends after `lasts` seconds.
+local BLOOM = { step = 1.5, lasts = 1.6, solid = 3, fade = 0.5,
+  petals = { { -1, 3 }, { 3, 3 }, { 1, 4 } } }
 -- How long each one-off animation plays (band:Animate), in seconds: a
 -- quick opening, then a tail long enough to notice at a glance.
 local ANIMATION_FOR = { ding = 10, maxLevel = 10, death = 10, rareFind = 10, goal = 10, quest = 6, arrive = 6,
-  shift = 1 }
+  welcome = 4, shift = 1 }
 -- The openings: a ding's star rises for this long, and a death's smoke
 -- rises while the figure flickers. A max level's burst repeats this often.
 local STAR_RISES_FOR = 1.2
@@ -270,6 +284,16 @@ local function setSpriteTop(t, name, unit, rows)
   t:Show()
 end
 
+-- Shows the bottom `rows` art rows of a sprite on a texture.
+local function setSpriteBottom(t, name, unit, rows)
+  local s = Sheet.sprites[name]
+  t:SetTexCoord(s[1] / Sheet.width, (s[1] + s[3]) / Sheet.width, (s[2] + s[4] - rows) / Sheet.height,
+    (s[2] + s[4]) / Sheet.height)
+  t.sprite = name .. " bottom"
+  t:SetSize(s[3] * unit, rows * unit)
+  t:Show()
+end
+
 -- Just the seated figure's head, the same two layers and tint, for the
 -- Dungeons tab's friends on the level line. :SetClass(classFilename) draws
 -- it at FIGURE_TARGET.
@@ -332,9 +356,11 @@ local function put(scene, t, x, row)
   t:SetPoint("BOTTOMLEFT", scene.art, "BOTTOMLEFT", (scene.fire + x) * scene.unit, row * scene.unit)
 end
 
+-- How many seconds a Cheer's hop has played, or nil when it isn't.
 local function hopping(scene, actor)
-  local untilTime = actor.pose ~= "asleep" and scene.hops[actor.memberId]
-  return untilTime ~= nil and untilTime and untilTime > GetTime()
+  local start = actor.pose ~= "asleep" and scene.hops[actor.memberId]
+  local played = start and GetTime() - start
+  return played and played < HOP_FOR and played or nil
 end
 
 -- How many seconds a one-off animation has played, or nil when it isn't
@@ -365,10 +391,10 @@ local function celebrating(scene, actor, f)
 end
 
 -- A mark's bottom row: `row`, or as near under it as keeps the mark inside
--- a band of a set height (the Pocket Camp's), where a raised figure's head
--- is close to the top.
+-- the band: the Pocket Camp's set height, where a raised figure's head is
+-- close to the top, or the panel's short band.
 local function markRow(scene, name, row)
-  local rows = scene.view.rows
+  local rows = scene.view.rows or scene.rows
   if not rows then return row end
   return math.min(row, rows - Sheet.sprites[name][4])
 end
@@ -460,6 +486,7 @@ local function hideExtras(parts)
   if parts.burst then
     for _, spark in ipairs(parts.burst) do spark:Hide() end
   end
+  for _, glint in ipairs(parts.cheer) do glint:Hide() end
   parts.cloth:SetAlpha(1)
   parts.skin:SetAlpha(1)
   parts.back:SetAlpha(1)
@@ -468,8 +495,9 @@ end
 -- Draws a Member coming online, `played` seconds into it: walking in from
 -- the band's nearer edge to their place for WALK_FOR, facing the way they
 -- go, then standing there waving with "hi!" over their head. Their seat
--- (if their pose has one) waits for them. Returns the figure's x and the
--- row above its head.
+-- (if their pose has one) waits for them. With `played` nil (a Welcome) it
+-- is only the wave, in their place, facing the fire. Returns the figure's
+-- x and the row above its head.
 local function drawArrival(scene, parts, actor, f, played)
   local unit, x = scene.unit, actor.x
   local pose = POSE[actor.pose] or {}
@@ -484,7 +512,7 @@ local function drawArrival(scene, parts, actor, f, played)
   -- right of it from the right edge, mirrored.
   local fromRight = actor.x > 0
   local frame = math.floor(f / WALK_STEP) % 2 + 1
-  local walking = played < WALK_FOR
+  local walking = played ~= nil and played < WALK_FOR
   if walking then
     local edge = fromRight and scene.view.columns - scene.fire or -scene.fire - actor.width
     x = math.floor(edge + (actor.x - edge) * played / WALK_FOR + 0.5)
@@ -575,6 +603,27 @@ local function drawPuff(scene, parts, actor)
   parts.puff:SetAlpha(age >= PUFF.solid and PUFF.fade or 1)
 end
 
+-- A Cheer's burst over a hopping figure whose head's top is under `top`,
+-- `played` seconds into the hop (CHEER_BURST); hidden when it's over.
+local function drawCheer(scene, parts, actor, top, played)
+  local step = played and math.floor(played * FPS) + 1
+  local color = step and CHEER_BURST.colors[step]
+  for i, way in ipairs(CHEER_BURST.ways) do
+    local glint = parts.cheer[i]
+    if color then
+      glint = glint or scene.texture("OVERLAY", 1)
+      parts.cheer[i] = glint
+      local reach = 1 + (step - 1) * CHEER_BURST.reach
+      setSprite(glint, color, scene.unit)
+      glint:SetAlpha(step == #CHEER_BURST.colors and CHEER_BURST.fade or 1)
+      put(scene, glint, actor.x + math.floor(CHEER_BURST.x + way[1] * reach + 0.5),
+        top + CHEER_BURST.row + math.floor(way[2] * reach + 0.5))
+    elseif glint then
+      glint:Hide()
+    end
+  end
+end
+
 -- Draws one actor's figure, seat or sleep marks, what its pose adds, spark
 -- and name, for the animation frame f. Upright poses: "seated" and the
 -- Pocket Camp's (POSE), or its shapeshift form (FORM). After a death the
@@ -583,9 +632,10 @@ end
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
   local top
-  -- Seconds into walking in, or nil.
+  -- Seconds into walking in, or nil; or waving for a Welcome.
   local walkedIn = actor.pose ~= "asleep" and playing(scene, "arrive", actor.memberId)
-  if walkedIn then
+  local welcomed = not walkedIn and actor.pose ~= "asleep" and playing(scene, "welcome", actor.memberId) ~= nil
+  if walkedIn or welcomed then
     x, top = drawArrival(scene, parts, actor, f, walkedIn)
   elseif actor.form and not playing(scene, "death", actor.memberId) then
     parts.seat:Hide()
@@ -639,6 +689,8 @@ local function drawActor(scene, parts, actor, f)
     else
       parts.front:Hide()
     end
+    -- A Cheer's burst, over the hop.
+    drawCheer(scene, parts, actor, top, not dead and hopping(scene, actor))
     -- A head mark (or a death) takes ALT's place while it shows. ALT goes
     -- over a tool held up or the inn sign.
     local marked = drawAnimations(scene, parts, actor, f, row, top, pose.away)
@@ -690,7 +742,7 @@ local function drawActor(scene, parts, actor, f)
   if actor.spark then
     setSprite(parts.spark, "spark", scene.unit)
     local upright = actor.pose ~= "asleep"
-    local lift = upright and not walkedIn and celebrating(scene, actor, f) and ROW.hop - ROW.seated or 0
+    local lift = upright and not (walkedIn or welcomed) and celebrating(scene, actor, f) and ROW.hop - ROW.seated or 0
     put(scene, parts.spark, x + (upright and OFFSET.seatedSpark or OFFSET.asleepSpark),
       (upright and SPARK_ROW.seated or SPARK_ROW.asleep) + lift)
   else
@@ -720,6 +772,29 @@ local function drawDoorway(scene, parts, doorway)
 end
 
 -- Draws the fire, embers and everything Core placed, for frame f.
+-- A Grave's flower blooming, `played` seconds in (BLOOM): growing in from
+-- the stem up, then petals drifting up and fading.
+local function drawBloom(scene, parts, grave, played)
+  local unit, tick = scene.unit, math.floor(played * FPS)
+  local x = grave.x + OFFSET.flower
+  local rows = Sheet.sprites.flower[4]
+  setSpriteBottom(parts.flower, "flower", unit, math.min(rows, 1 + math.floor(tick / BLOOM.step)))
+  put(scene, parts.flower, x, ROW.flower)
+  -- The petals start once it's whole.
+  local after = tick - math.ceil((rows - 1) * BLOOM.step) - 1
+  for i, petal in ipairs(parts.petals) do
+    local at, t = BLOOM.petals[i], after - (i - 1)
+    if t >= 0 then
+      local sway = (t + i - 1) % 2 == 0 and 0 or (i == 1 and -1 or 1)
+      setSprite(petal, "petal", unit)
+      petal:SetAlpha(t < BLOOM.solid and 1 or BLOOM.fade)
+      put(scene, petal, x + at[1] + sway, ROW.flower + at[2] + t)
+    else
+      petal:Hide()
+    end
+  end
+end
+
 local function drawFrame(scene, f)
   local view = scene.view
   local unit = scene.unit
@@ -771,11 +846,18 @@ local function drawFrame(scene, f)
     local parts = take(scene.graveParts)
     setSprite(parts.grave, "grave", unit)
     put(scene, parts.grave, grave.x, ROW.grave)
-    if grave.flower then
-      setSprite(parts.flower, "flower", unit)
-      put(scene, parts.flower, grave.x + OFFSET.flower, ROW.flower)
+    local bloom = grave.key and scene.blooms[grave.key]
+    bloom = bloom and GetTime() - bloom
+    if bloom and bloom < BLOOM.lasts then
+      drawBloom(scene, parts, grave, bloom)
     else
-      parts.flower:Hide()
+      for _, petal in ipairs(parts.petals) do petal:Hide() end
+      if grave.flower then
+        setSprite(parts.flower, "flower", unit)
+        put(scene, parts.flower, grave.x + OFFSET.flower, ROW.flower)
+      else
+        parts.flower:Hide()
+      end
     end
   end
   hideRest(scene.graveParts)
@@ -800,6 +882,9 @@ local function onUpdate(band)
   scene.frame = f
   for i = #scene.animations, 1, -1 do
     if scene.animations[i].ends <= now then table.remove(scene.animations, i) end
+  end
+  for key, start in pairs(scene.blooms) do
+    if now - start >= BLOOM.lasts then scene.blooms[key] = nil end
   end
   drawFrame(scene, f)
 end
@@ -861,7 +946,10 @@ function CampScene.new(parent, options)
     backdropArt = options.backdrop or Sheet.backdrop,
     target = options.target or CampScene.BAND_TARGET,
     crisp = options.crisp ~= false,
+    -- When each Member's Cheer hop started, by Member id.
     hops = {},
+    -- When each Grave's bloom started, by its key (Core's camp() graves).
+    blooms = {},
     -- Each actor's form at the last Draw (false for none), to puff on a
     -- change.
     forms = {},
@@ -885,6 +973,8 @@ function CampScene.new(parent, options)
         mark = texture(band.art, "OVERLAY", 1),
         alt = texture(band.art, "OVERLAY", 1),
         puff = texture(band.art, "OVERLAY", 2),
+        -- A Cheer's burst, made as it's first needed.
+        cheer = {},
         label = shadowed(nameLabel(band.art)),
       }
     end),
@@ -901,6 +991,11 @@ function CampScene.new(parent, options)
       return {
         grave = texture(band.art, "ARTWORK", 0),
         flower = texture(band.art, "ARTWORK", 1),
+        petals = {
+          texture(band.art, "ARTWORK", 2),
+          texture(band.art, "ARTWORK", 2),
+          texture(band.art, "ARTWORK", 2),
+        },
       }
     end),
   }
@@ -967,6 +1062,7 @@ function CampScene.new(parent, options)
     local columns = math.floor(width / scene.unit)
     local rows = math.floor(height / scene.unit)
     scene.fire = math.floor(columns / 2)
+    scene.rows = rows
     return columns, rows * scene.unit
   end
 
@@ -991,6 +1087,7 @@ function CampScene.new(parent, options)
   function band:Fit(columns, rows)
     scene.unit = scene.crisp and CampScene.artUnit(band, scene.target) or scene.target
     scene.fire = math.floor(columns / 2)
+    scene.rows = rows
     return columns * scene.unit, rows * scene.unit
   end
 
@@ -1049,8 +1146,32 @@ function CampScene.new(parent, options)
     if not scene.view then return end
     for _, actor in ipairs(scene.view.actors) do
       if actor.memberId == memberId and actor.pose ~= "asleep" then
-        scene.hops[memberId] = GetTime() + HOP_FOR
+        scene.hops[memberId] = GetTime()
         scene.frame = nil
+      end
+    end
+  end
+
+  -- Core's campReaction ({ kind, memberId, grave }): a Cheer hops the
+  -- Member, a Welcome waves them, if they're up by the fire here, and
+  -- Respects bloom the Grave keyed `grave`, if it's here (a sleeper's too).
+  -- Another for the same figure or Grave starts it over.
+  function band:React(reaction)
+    if not scene.view then return end
+    if reaction.kind == "cheer" then
+      self:Hop(reaction.memberId)
+    elseif reaction.kind == "welcome" then
+      for _, actor in ipairs(scene.view.actors) do
+        if actor.memberId == reaction.memberId and actor.pose ~= "asleep" then
+          self:Animate("welcome", reaction.memberId)
+        end
+      end
+    elseif reaction.kind == "respects" and reaction.grave then
+      for _, grave in ipairs(scene.view.graves or {}) do
+        if grave.key == reaction.grave then
+          scene.blooms[grave.key] = GetTime()
+          scene.frame = nil
+        end
       end
     end
   end

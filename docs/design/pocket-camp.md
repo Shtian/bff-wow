@@ -122,6 +122,8 @@ A mark over a raised figure (flying) is kept inside the band, so it sits over th
 
 The lengths are CampScene's (`ANIMATION_FOR` in `UI/CampScene.lua`). A second animation of the same kind for the same Member starts it over. They're kept in UI only, so a `/reload` drops one that's playing.
 
+Reactions that reach you live play here too, through their own event, `campReaction`: a Cheer's hop with its burst, and a Welcome's wave with "hi!" (4 s). See docs/design/camp.md, Reactions, live.
+
 No other kind animates. Core decides, in `animate()`:
 
 - Only while `pocketCamp()` isn't nil.

@@ -432,6 +432,12 @@ function PocketCamp.cheered(memberId)
   if frame and frame:IsShown() then frame.band:Hop(memberId) end
 end
 
+-- Core's campReaction: a Reaction just attached plays here too, while it
+-- shows. It has no Graves, so Respects play nothing.
+function PocketCamp.campReaction(reaction)
+  if frame and frame:IsShown() then frame.band:React(reaction) end
+end
+
 function PocketCamp.start(theCore)
   core = theCore
   PocketCamp.refresh()

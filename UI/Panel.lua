@@ -2149,6 +2149,12 @@ function Panel.cheered(memberId)
   ns.PocketCamp.cheered(memberId)
 end
 
+-- Core's campReaction: a Reaction this client just attached plays in the
+-- panel's Camp, while it shows.
+function Panel.campReaction(reaction)
+  if camp and frame:IsShown() then camp:React(reaction) end
+end
+
 function Panel.toggle()
   if not frame then create() end
   frame:SetShown(not frame:IsShown())

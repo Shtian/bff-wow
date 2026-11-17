@@ -193,10 +193,11 @@ end
 -- The Reactions in after that weren't in before, attached to the entries
 -- they point at. A Reaction whose entry isn't in the log is ignored. Only
 -- those to your own entries can be news, and never on first sight.
--- Returns the news as { entry, reaction }.
+-- Returns the news as { entry, reaction }, and every Reaction attached
+-- the same way, on anyone's entry, but not on first sight.
 local function reactionsChanged(self, before, after)
-  local news = {}
-  if after.left then return news end
+  local news, attached = {}, {}
+  if after.left then return news, attached end
   local had = {}
   for _, item in ipairs(Reactions.inRecord(before)) do had[Reactions.id(item.key)] = true end
   for _, item in ipairs(Reactions.inRecord(after)) do
@@ -204,9 +205,10 @@ local function reactionsChanged(self, before, after)
     if entry then
       local reaction = attach(entry, after.id, item.key, item.time, before == nil or not entry.own)
       if reaction and not reaction.seen then news[#news + 1] = { entry = entry, reaction = reaction } end
+      if reaction and before ~= nil then attached[#attached + 1] = { entry = entry, reaction = reaction } end
     end
   end
-  return news
+  return news, attached
 end
 
 local function joinedAfterYou(self, record)
@@ -277,8 +279,9 @@ local function rareEntries(self, had, record, own, list)
 end
 
 -- Someone else's record was kept: before is the copy held until now (nil
--- on first sight) and after the new one. Returns the new entries, and the
--- new Reactions to your own entries as { entry, reaction }.
+-- on first sight) and after the new one. Returns the new entries, the
+-- new Reactions to your own entries as { entry, reaction }, and every
+-- Reaction newly attached (not on first sight), the same way.
 function Feed:recordChanged(before, after)
   local list = {}
   local joins = self.db.feedJoins
@@ -504,8 +507,9 @@ end
 
 -- Your Reaction to someone else's entry. Ignores your own entries, Removed
 -- Members, entries that can't be reacted to or aren't in the log, and
--- entries you already reacted to. Returns the key to store, or nil and
--- "reacted" when you already had.
+-- entries you already reacted to. Returns the key to store and the
+-- Reaction attached as { entry, reaction }, or nil and "reacted" when you
+-- already had.
 function Feed:react(key)
   key = Reactions.validKey(key)
   if not key then return nil end
@@ -514,8 +518,31 @@ function Feed:react(key)
   local entry = find(self, key)
   if not entry or entry.own then return nil end
   if hasReacted(self, entry) then return nil, "reacted" end
-  attach(entry, me, key, self.now(), true)
-  return key
+  local reaction = attach(entry, me, key, self.now(), true)
+  return key, { entry = entry, reaction = reaction }
+end
+
+-- A Reaction just attached ({ entry, reaction }), as the Camp plays it:
+-- { kind ("cheer", "respects" or "welcome"), memberId (whose entry), grave
+-- (for Respects: the death's Reaction key as a string, as Camp keys its
+-- graves) }. Nil when it plays nothing: a Removed Member's Reaction, one
+-- on a Removed or Left Member's entry, or Respects on a death that
+-- already had some (its Grave already has its flower).
+function Feed:campReaction(item)
+  local entry, reaction = item.entry, item.reaction
+  local ledger = self.ledger
+  if ledger:isRemoved(reaction.by) or ledger:isRemoved(entry.memberId) then return nil end
+  local owner = ledger:record(entry.memberId)
+  if not owner or owner.left then return nil end
+  local kind = Reactions.forKind(entry.kind)
+  local played = { kind = kind, memberId = entry.memberId }
+  if kind == "respects" then
+    for _, other in ipairs(entry.reactions) do
+      if other ~= reaction and shown(self, other) then return nil end
+    end
+    played.grave = Reactions.id(Reactions.keyOf(entry))
+  end
+  return played
 end
 
 -- The link came up in a Crew: settling starts, if it hasn't.
