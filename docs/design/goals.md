@@ -77,7 +77,7 @@ Clears are trophies too: see `docs/design/trophies.md`.
 
 ## Dev
 
-The `/bffdev` console's **Goal** button makes the first simulated Member online die as often as the Crew needs to reach the next Crew deaths rung. `/bffdev toast` includes a sample goal toast.
+The `/bffdev` console's **Goal** button makes the first simulated Member online die as often as the Crew needs to reach the next Crew deaths rung. `/bffdev toast` includes a sample goal toast. `/bffdev unveil [days]` opens the Trophies tab as if it was last opened that many days ago (7 by default), so the Trophies that reached you since unveil again: run it again to replay.
 
 ## Not in this
 

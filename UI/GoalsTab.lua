@@ -96,6 +96,17 @@ local function take(p)
   return item
 end
 
+-- Each draw's number: the plate, empty state, See all, tiles and cabinet
+-- header drawn in it carry it, and the others are hidden after. Hiding
+-- one only to show it again would stop its animations, and with the sim
+-- running the panel redraws every second.
+local drawCount = 0
+
+local function shown(frame)
+  frame.drawn = drawCount
+  frame:Show()
+end
+
 local function startPools()
   for _, p in pairs(pools) do p.used = 0 end
 end
@@ -367,7 +378,7 @@ local function drawPlate(trophies, y, width)
   plate.sub:ClearAllPoints()
   plate.sub:SetPoint("TOPLEFT", plate.title, "BOTTOMLEFT", 0, -3)
   plate:SetHeight(height)
-  plate:Show()
+  shown(plate)
   return y - height
 end
 
@@ -404,7 +415,7 @@ local function drawEmpty(settled, y, width)
   empty.group:ClearAllPoints()
   empty.group:SetPoint("LEFT", empty, "LEFT", math.max(0, (width - groupWidth) / 2), 0)
   empty.group:SetWidth(groupWidth)
-  empty:Show()
+  shown(empty)
   return y - EMPTY_HEIGHT
 end
 
@@ -521,7 +532,7 @@ local function drawTiles(rows, y, width)
   tiles:ClearAllPoints()
   tiles:SetPoint("TOPLEFT", view.content, "TOPLEFT", INSET, y)
   tiles:SetSize(width, height)
-  tiles:Show()
+  shown(tiles)
   return y - height
 end
 
@@ -564,7 +575,7 @@ local function drawGoalsView(trophies, width)
     local more = #trophies.shelf - SHELF
     seeAll.more:SetText(more > 0 and ("+%d"):format(more) or "…")
     seeAll.total:SetText(("%d %s"):format(trophies.count, trophies.count == 1 and "trophy" or "trophies"))
-    seeAll:Show()
+    shown(seeAll)
     shelf[#shelf + 1] = seeAll
     y = flow(shelf, SHELF_MEDAL, SHELF_GAP, y, width) - 6
     if not unveiled then unveil(trophies, shelf) end
@@ -603,7 +614,7 @@ local function drawCabinet(trophies, width)
   cabinetHead:ClearAllPoints()
   cabinetHead:SetPoint("TOPLEFT", view.content, "TOPLEFT", 0, 0)
   cabinetHead:SetPoint("RIGHT", view.content, "RIGHT")
-  cabinetHead:Show()
+  shown(cabinetHead)
   local y = -CABINET_HEAD - 4
   local grids = {
     { "DUNGEONS CLEARED", trophies.dungeons, trophies.dungeons.cleared },
@@ -640,8 +651,7 @@ function GoalsTab.draw(scrollView, theCore, width, onChange)
   -- Nothing to show in the cabinet: back to the Goals view.
   if trophies.count == 0 then cabinetOpen = false end
   startPools()
-  -- pairs: the ones not made yet are nil.
-  for _, frame in pairs({ plate, empty, seeAll, tiles, cabinetHead }) do frame:Hide() end
+  drawCount = drawCount + 1
   local inner = width - 2 * INSET
   local y
   if cabinetOpen then
@@ -650,6 +660,10 @@ function GoalsTab.draw(scrollView, theCore, width, onChange)
     y = drawGoalsView(trophies, inner)
   end
   hideUnused()
+  -- pairs: the ones not made yet are nil.
+  for _, frame in pairs({ plate, empty, seeAll, tiles, cabinetHead }) do
+    if frame.drawn ~= drawCount then frame:Hide() end
+  end
   view.content:SetHeight(-y + INSET)
   -- Opening on the cabinet (the panel hidden there) unveils nothing.
   unveiled = true
