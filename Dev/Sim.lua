@@ -1323,7 +1323,9 @@ end
 -- runs Sim.purge; /bffdev clear [raid] makes the simulated Members online
 -- clear the next dungeon (or raid); /bffdev rare makes one slay the
 -- next Rare; /bffdev encounters [clear] and /bffdev rares [clear] show
--- (or empty) the encounter and Rare logs.
+-- (or empty) the encounter and Rare logs; /bffdev unveil [days] opens the
+-- Trophies tab as if last opened that many days ago (default 7), so the
+-- Trophies that reached you since unveil again.
 SlashCmdList.BFFDEV = function(input)
   if not ns.core then return end
   local command, count = (input or ""):match("^%s*(%S*)%s*(%d*)")
@@ -1339,6 +1341,15 @@ SlashCmdList.BFFDEV = function(input)
     local name, reason = Sim.clear(ns.core, rest == "raid" and "raid" or nil)
     print(name and ("BFF dev: the simulated Members online clear %s."):format(name)
       or ("BFF dev: no clear (%s)."):format(reason))
+    return
+  end
+  if command == "unveil" then
+    local days = tonumber(count) or 7
+    -- Hidden first, so the open visit ends and the next one reads seen.
+    ns.Panel.hide()
+    BFF_DB.goals.seen = GetServerTime() - days * 24 * 60 * 60
+    ns.Panel.show("goals")
+    print(("BFF dev: Trophies tab opened as if last looked at %d days ago."):format(days))
     return
   end
   if command == "purge" then

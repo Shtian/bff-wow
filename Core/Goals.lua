@@ -596,6 +596,8 @@ local function trophy(self, track, key, fields)
   fields.track = track
   fields.title = TRACK[track].name
   fields.quiet = self.db.goals.quiet[track][key] == true
+  -- A rung's time is when this client recorded it.
+  fields.arrived = fields.time
   fields.fresh = not fields.quiet and self.now() - fields.time < FRESH
   return fields
 end
@@ -670,6 +672,7 @@ local function clearTrophies(self)
     local dungeon = Clears.instance(name)
     if dungeon then
       local quiet = saved.quiet == true
+      local arrived = saved.seen or saved.time
       list[name] = {
         track = "clears",
         kind = dungeon.kind,
@@ -682,7 +685,8 @@ local function clearTrophies(self)
         quality = CLEAR_QUALITIES[dungeon.kind],
         quiet = quiet,
         -- Fresh from when it reached you: a clear can sync days late.
-        fresh = not quiet and self.now() - (saved.seen or saved.time) < FRESH,
+        arrived = arrived,
+        fresh = not quiet and self.now() - arrived < FRESH,
         party = partyNames(self, saved.members),
       }
     end
@@ -697,6 +701,7 @@ local function rareKillTrophies(self)
     local r = Rares.byId(id)
     if r then
       local quiet = saved.quiet == true
+      local arrived = saved.seen or saved.time
       local held = self.ledger:record(saved.memberId)
       local character = held and saved.character and type(held.characters) == "table" and held.characters[saved.character]
       list[id] = {
@@ -713,7 +718,8 @@ local function rareKillTrophies(self)
         quality = r.elite and RARE_ELITE_QUALITY or RARE_QUALITY,
         quiet = quiet,
         -- Fresh from when it reached you: a kill can sync days late.
-        fresh = not quiet and self.now() - (saved.seen or saved.time) < FRESH,
+        arrived = arrived,
+        fresh = not quiet and self.now() - arrived < FRESH,
         by = killer(self, saved.memberId),
         character = character and character.name or nil,
       }
@@ -759,7 +765,7 @@ end
 
 -- The Goals tab was opened: call it on every draw. It starts a visit if
 -- none is open, and remembers when the tab was opened before it, for
--- trophies()' sinceSeen, through the visit.
+-- trophies()' unseen and sinceSeen, through the visit.
 function Goals:open()
   if self.visiting then return end
   self.visiting = true
@@ -777,7 +783,9 @@ end
 -- "Journeyman", "Engineering"), text (its Feed entry's), time, quality
 -- ("uncommon", "rare", "epic" or "legendary"), quiet (reached without
 -- news: the baseline's, or by who counts changing), fresh (reached in the
--- last 3 days and not quiet, so still news), icon (Every profession's: the profession's) }.
+-- last 3 days and not quiet, so still news), arrived (when it reached
+-- this client), unseen (see below), icon (Every profession's: the
+-- profession's) }.
 -- A clear's trophy has track "clears", kind ("dungeon" or "raid"),
 -- instance (its name), title ("Dungeons cleared" or "Raids cleared"), rung
 -- (its place in the dungeon table), label ("Deadmines"), text, time (the
@@ -798,8 +806,11 @@ end
 -- grid: { slain, total, slots }, a slot per Rare in level order: { npcId,
 -- name, label, kind "rare", zone, level, levels ("37"), elite, slain, trophy
 -- (nil until slain) }), latest (the newest trophy, or
--- nil) and sinceSeen (how many others were reached, not quietly, since
--- the Goals tab was last opened: 0 if it never was) }.
+-- nil) and sinceSeen (how many of the others are unseen) }.
+-- A trophy is unseen when it isn't quiet and reached this client after
+-- the Goals tab was last opened before this visit (by when it arrived, not
+-- its own time, so a clear that syncs days late is unseen). None is the
+-- first time the tab is opened.
 function Goals:trophies()
   local result = { settled = self.db.goals.baselined == true, count = 0, shelf = {}, cabinet = {}, sinceSeen = 0 }
   local progress = Goals.progress(counted(self))
@@ -832,10 +843,9 @@ function Goals:trophies()
   result.latest = result.shelf[1]
   local since = self.db.goals.seen
   if self.visiting then since = self.since end
-  if since then
-    for i = 2, #result.shelf do
-      if result.shelf[i].time > since and not result.shelf[i].quiet then result.sinceSeen = result.sinceSeen + 1 end
-    end
+  for i, item in ipairs(result.shelf) do
+    item.unseen = since ~= nil and not item.quiet and item.arrived > since
+    if i > 1 and item.unseen then result.sinceSeen = result.sinceSeen + 1 end
   end
   return result
 end

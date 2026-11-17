@@ -41,6 +41,17 @@ local CABINET_GAP = 4
 local MEDAL_ROW_GAP = 10
 -- The shelf's newest medals; the rest are behind See all.
 local SHELF = 7
+-- Unveiling unseen Trophies, once a visit (docs/design/goals.md): the
+-- latest win's medal stamps in, a soft gold band sweeps the plate, then
+-- each other unseen medal's edge flares gold, one after another. Chosen
+-- from prototypes in #237.
+local STAMP_SCALE = 1.25
+local STAMP_TIME = 0.3
+local SWEEP_WIDTH = 110
+local SWEEP_COLOR = { 1, 0.914, 0.627, 0.32 }
+local SWEEP_TIME = 0.6
+local SHINE_TIME = 0.45
+local SHINE_GAP = 0.15
 -- Working on: tiles in two columns, one when the panel is narrow.
 local TILE_HEIGHT = 74
 local TILE_PAD = 10
@@ -61,8 +72,11 @@ local EMPTY_UNSETTLED = { "Counting up the Crew", "Goals the Crew has already re
 local EMPTY_NONE = { "No trophies yet", "Every goal the Crew reaches puts a medal on this shelf." }
 
 local view
+local core
 local cabinetOpen = false
 local redraw
+-- Whether this visit has had its first draw, which unveils: redraws don't.
+local unveiled = false
 local pools = {}
 local plate, empty, seeAll, tiles, cabinetHead
 
@@ -82,6 +96,17 @@ local function take(p)
   return item
 end
 
+-- Each draw's number: the plate, empty state, See all, tiles and cabinet
+-- header drawn in it carry it, and the others are hidden after. Hiding
+-- one only to show it again would stop its animations, and with the sim
+-- running the panel redraws every second.
+local drawCount = 0
+
+local function shown(frame)
+  frame.drawn = drawCount
+  frame:Show()
+end
+
 local function startPools()
   for _, p in pairs(pools) do p.used = 0 end
 end
@@ -96,7 +121,30 @@ local function hideTooltip()
   GameTooltip:Hide()
 end
 
+-- Every frame a pool has made, taken or not.
+local function made(name)
+  return pools[name] and pools[name].items or {}
+end
+
+-- Ends the unveil at once, leaving everything in its final state.
+local function stopUnveil()
+  if plate then
+    plate.stamp:Stop()
+    plate.sweep:Stop()
+  end
+  for _, medal in ipairs(made("medals")) do
+    medal.shine:Stop()
+    medal.shining = nil
+  end
+end
+
+-- Which trophy a medal shows, across redraws (each draw reads new tables).
+local function trophyKey(trophy)
+  return ("%s:%s:%s"):format(trophy.track, trophy.label, trophy.time)
+end
+
 local function open(on)
+  stopUnveil()
   cabinetOpen = on
   view:SetVerticalScroll(0)
   redraw()
@@ -189,6 +237,7 @@ local function createMedal()
   medal:SetScript("OnLeave", hideTooltip)
   medal.picture = Skin.feedPicture(medal, MEDAL_ICON)
   medal.picture:SetPoint("TOP")
+  medal.shine = Skin.shine(medal.picture, GOLD, SHINE_TIME)
   medal.foot = medal.picture:CreateTexture(nil, "ARTWORK", nil, 4)
   medal.foot:SetPoint("BOTTOMLEFT")
   medal.foot:SetPoint("BOTTOMRIGHT")
@@ -216,6 +265,11 @@ end
 
 local function drawMedal(trophy, width)
   local medal = newMedal(width)
+  -- A redraw that moved another trophy here ends its shine.
+  if medal.shining and medal.shining ~= trophyKey(trophy) then
+    medal.shine:Stop()
+    medal.shining = nil
+  end
   medal.trophy, medal.slot = trophy, nil
   local quality = Skin.TROPHY_QUALITIES[trophy.quality] or MUTED
   medal.picture:SetPicture(iconOf(trophy))
@@ -291,6 +345,13 @@ local function createPlate()
   frame.title = Skin.label(frame, "title", GOLD)
   frame.title:SetWordWrap(true)
   frame.sub = Skin.label(frame, "small", MUTED)
+  frame.stamp = Skin.stamp(frame.picture, STAMP_SCALE, STAMP_TIME)
+  -- As the stamp lands, on the Master channel like toasts.
+  frame.stamp.group:SetScript("OnFinished", function()
+    local sound = core:unveilSound()
+    if sound then ns.Toasts.play(sound) end
+  end)
+  frame.sweep = Skin.sweep(frame, SWEEP_WIDTH, SWEEP_COLOR, SWEEP_TIME)
   return frame
 end
 
@@ -317,7 +378,7 @@ local function drawPlate(trophies, y, width)
   plate.sub:ClearAllPoints()
   plate.sub:SetPoint("TOPLEFT", plate.title, "BOTTOMLEFT", 0, -3)
   plate:SetHeight(height)
-  plate:Show()
+  shown(plate)
   return y - height
 end
 
@@ -354,7 +415,7 @@ local function drawEmpty(settled, y, width)
   empty.group:ClearAllPoints()
   empty.group:SetPoint("LEFT", empty, "LEFT", math.max(0, (width - groupWidth) / 2), 0)
   empty.group:SetWidth(groupWidth)
-  empty:Show()
+  shown(empty)
   return y - EMPTY_HEIGHT
 end
 
@@ -471,11 +532,33 @@ local function drawTiles(rows, y, width)
   tiles:ClearAllPoints()
   tiles:SetPoint("TOPLEFT", view.content, "TOPLEFT", INSET, y)
   tiles:SetSize(width, height)
-  tiles:Show()
+  shown(tiles)
   return y - height
 end
 
-local function drawGoalsView(core, trophies, width)
+-- Unveils the unseen Trophies on the shelf: the latest win's plate stamps
+-- and sweeps if it's unseen, then the other unseen medals shine, newest
+-- first, from when the stamp lands (at once without one). Those behind See
+-- all don't.
+local function unveil(trophies, medals)
+  local start = 0
+  if trophies.latest.unseen then
+    plate.stamp:Play()
+    plate.sweep:Play(STAMP_TIME)
+    start = STAMP_TIME
+  end
+  local nth = 0
+  for _, medal in ipairs(medals) do
+    local trophy = medal.trophy
+    if trophy and trophy.unseen and trophy ~= trophies.latest then
+      medal.shine:Play(start + nth * SHINE_GAP)
+      medal.shining = trophyKey(trophy)
+      nth = nth + 1
+    end
+  end
+end
+
+local function drawGoalsView(trophies, width)
   local y = -INSET
   if not trophies.latest then
     y = drawEmpty(trophies.settled, y, width)
@@ -492,9 +575,10 @@ local function drawGoalsView(core, trophies, width)
     local more = #trophies.shelf - SHELF
     seeAll.more:SetText(more > 0 and ("+%d"):format(more) or "…")
     seeAll.total:SetText(("%d %s"):format(trophies.count, trophies.count == 1 and "trophy" or "trophies"))
-    seeAll:Show()
+    shown(seeAll)
     shelf[#shelf + 1] = seeAll
     y = flow(shelf, SHELF_MEDAL, SHELF_GAP, y, width) - 6
+    if not unveiled then unveil(trophies, shelf) end
   end
   y = drawHeading("WORKING ON", nil, y)
   return drawTiles(core:goals(), y, width)
@@ -530,7 +614,7 @@ local function drawCabinet(trophies, width)
   cabinetHead:ClearAllPoints()
   cabinetHead:SetPoint("TOPLEFT", view.content, "TOPLEFT", 0, 0)
   cabinetHead:SetPoint("RIGHT", view.content, "RIGHT")
-  cabinetHead:Show()
+  shown(cabinetHead)
   local y = -CABINET_HEAD - 4
   local grids = {
     { "DUNGEONS CLEARED", trophies.dungeons, trophies.dungeons.cleared },
@@ -561,26 +645,39 @@ end
 
 -- Draws the tab into Panel's scroll view, `width` wide. onChange redraws
 -- the panel (See all and Back).
-function GoalsTab.draw(scrollView, core, width, onChange)
-  view, redraw = scrollView, onChange
+function GoalsTab.draw(scrollView, theCore, width, onChange)
+  view, core, redraw = scrollView, theCore, onChange
   local trophies = core:trophies()
   -- Nothing to show in the cabinet: back to the Goals view.
   if trophies.count == 0 then cabinetOpen = false end
   startPools()
-  -- pairs: the ones not made yet are nil.
-  for _, frame in pairs({ plate, empty, seeAll, tiles, cabinetHead }) do frame:Hide() end
+  drawCount = drawCount + 1
   local inner = width - 2 * INSET
   local y
   if cabinetOpen then
     y = drawCabinet(trophies, inner)
   else
-    y = drawGoalsView(core, trophies, inner)
+    y = drawGoalsView(trophies, inner)
   end
   hideUnused()
+  -- pairs: the ones not made yet are nil.
+  for _, frame in pairs({ plate, empty, seeAll, tiles, cabinetHead }) do
+    if frame.drawn ~= drawCount then frame:Hide() end
+  end
   view.content:SetHeight(-y + INSET)
+  -- Opening on the cabinet (the panel hidden there) unveils nothing.
+  unveiled = true
 end
 
--- The tab was left: it opens on the Goals view next time.
+-- The panel was hidden: the unveil stops, and the next visit unveils
+-- again if there's anything new.
+function GoalsTab.hidden()
+  stopUnveil()
+  unveiled = false
+end
+
+-- The tab was left: as hidden, and it opens on the Goals view next time.
 function GoalsTab.leave()
+  GoalsTab.hidden()
   cabinetOpen = false
 end

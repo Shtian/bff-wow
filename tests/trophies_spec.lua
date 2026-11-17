@@ -2,6 +2,11 @@ local load = require("tests.load")
 
 local DAY = 24 * 60 * 60
 
+-- A made-up final boss for The Deadmines (tests/clears_spec.lua), and a
+-- listed Rare.
+local FINALS = { [101] = "The Deadmines" }
+local RAKSHIRI = 10200
+
 local function playing(name, extra)
   local character = {
     guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
@@ -15,7 +20,7 @@ end
 -- settle is false. start maps a name to what its Character starts with.
 local function crew(names, start, settle)
   local ns = load()
-  local net = ns.FakeNet.new()
+  local net = ns.FakeNet.new({ finalBosses = FINALS })
   local clients = {}
   for i, name in ipairs(names) do
     clients[i] = net:add(name, { character = playing(name, start and start[name]) }):login()
@@ -23,7 +28,7 @@ local function crew(names, start, settle)
   local code = clients[1]:join()
   for i = 2, #clients do clients[i]:join(code) end
   net:run(settle == false and 2 or 40)
-  return net, clients
+  return net, clients, code
 end
 
 -- Jumps the clock on by seconds, in one step.
@@ -34,6 +39,28 @@ end
 local function labels(trophies)
   local list = {}
   for i, trophy in ipairs(trophies) do list[i] = trophy.track .. " " .. trophy.label end
+  return list
+end
+
+-- Each client kills The Deadmines' final boss, in one party.
+local function clear(clients)
+  local party = {}
+  for i, client in ipairs(clients) do party[i] = { guid = client.character.guid, name = client.character.name } end
+  for _, client in ipairs(clients) do
+    client.core:encounterEnded({ encounterId = 101, success = true, instanceType = "party", party = party })
+  end
+end
+
+local function killRakshiri(client)
+  client.core:rareKilled({ npcId = RAKSHIRI, zone = "Winterspring", subzone = "Everlook", mapId = 1452, signal = "loot" })
+end
+
+-- The shelf's unseen trophies, as labels, newest first.
+local function unseen(trophies)
+  local list = {}
+  for _, trophy in ipairs(trophies.shelf) do
+    if trophy.unseen then list[#list + 1] = trophy.track .. " " .. trophy.label end
+  end
   return list
 end
 
@@ -226,5 +253,102 @@ describe("Trophies", function()
     local trophies = a.core:trophies()
     assert.is_false(trophies.settled)
     assert.same({}, trophies.shelf)
+  end)
+
+  describe("unseen", function()
+    it("are the rungs, clears and Rare kills that arrived since the tab was last opened, through the visit", function()
+      local net, clients = crew({ "Ann", "Bob" }, { Ann = { level = 10 }, Bob = { level = 10 } })
+      local a, b = clients[1], clients[2]
+      b.core:openGoals()
+      b.core:leaveGoals()
+      later(net, DAY)
+      a:play({ deaths = 25 })
+      net:run(3)
+      later(net, 60)
+      clear({ a })
+      net:run(3)
+      later(net, 60)
+      killRakshiri(a)
+      net:run(3)
+
+      b.core:openGoals()
+      local trophies = b.core:trophies()
+      assert.same({ "rareKills Rak'shiri", "clears Deadmines", "deaths 25" }, unseen(trophies))
+      assert.is_true(trophies.latest.unseen)
+      -- The baseline's Everyone at 10: quiet, so never unseen.
+      assert.equal("everyone 10", trophies.shelf[4].track .. " " .. trophies.shelf[4].label)
+      assert.is_false(trophies.shelf[4].unseen)
+      -- A redraw within the visit keeps the same answer.
+      b.core:openGoals()
+      assert.same({ "rareKills Rak'shiri", "clears Deadmines", "deaths 25" }, unseen(b.core:trophies()))
+
+      b.core:leaveGoals()
+      b.core:openGoals()
+      trophies = b.core:trophies()
+      assert.same({}, unseen(trophies))
+      assert.is_false(trophies.latest.unseen)
+    end)
+
+    it("count a clear from when it reached this client, so one synced days late is unseen", function()
+      local net, clients = crew({ "Ann", "Bob" }, { Ann = { level = 10 }, Bob = { level = 10 } })
+      local a, b = clients[1], clients[2]
+      -- Ann clears it locked down, so her record waits.
+      a:lockdown(true)
+      clear({ a })
+      later(net, 2 * DAY)
+      b:play({ deaths = 25 })
+      net:run(3)
+      b.core:openGoals()
+      b.core:leaveGoals()
+      later(net, 60)
+      a:lockdown(false)
+      net:run(10)
+
+      b.core:openGoals()
+      local trophies = b.core:trophies()
+      assert.same({ "clears Deadmines" }, unseen(trophies))
+      -- Older than Bob's deaths by its own time, so not the latest win,
+      -- which was seen.
+      assert.equal("deaths 25", trophies.latest.track .. " " .. trophies.latest.label)
+      assert.is_false(trophies.latest.unseen)
+      -- Counted since you last looked, as it's unseen.
+      assert.equal(1, trophies.sinceSeen)
+    end)
+
+    it("are none the first time the tab is opened, as nothing is counted since then", function()
+      local net, clients = crew({ "Ann" }, { Ann = { level = 10 } })
+      local a = clients[1]
+      a:play({ deaths = 25 })
+      net:run(3)
+      a.core:openGoals()
+      assert.same({}, unseen(a.core:trophies()))
+    end)
+
+    it("are unveiled with a sound unless the toast sound is None", function()
+      local _, clients = crew({ "Ann" }, { Ann = { level = 10 } })
+      local core = clients[1].core
+      assert.equal("UI_LEGENDARY_LOOT_TOAST", core:unveilSound())
+      core:setToastSound("none")
+      assert.is_nil(core:unveilSound())
+    end)
+
+    it("are never quiet ones: a Member first seen brings their rungs quietly", function()
+      local net, clients, code = crew({ "Ann" }, { Ann = { level = 30 } })
+      local a = clients[1]
+      a.core:openGoals()
+      a.core:leaveGoals()
+      later(net, DAY)
+      -- Bob joins already at 30 with deaths: what he brings is who counts changing.
+      local b = net:add("Bob", { character = playing("Bob", { level = 30, deaths = 30 }) }):login()
+      b:join(code)
+      net:run(40)
+      a.core:openGoals()
+      local trophies = a.core:trophies()
+      -- Crew levels 50 with Bob's 30, reached here after the last look, but
+      -- quietly.
+      assert.equal("crewLevels 50", trophies.latest.track .. " " .. trophies.latest.label)
+      assert.is_true(trophies.latest.quiet)
+      assert.same({}, unseen(trophies))
+    end)
   end)
 end)
