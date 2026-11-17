@@ -2031,7 +2031,7 @@ function Core:toastSound() return self:setting("toastSound") end
 
 -- The sound the Trophies tab plays as it unveils the latest win, by its
 -- SOUNDKIT name: none when the toast sound is None.
-Core.UNVEIL_SOUND = "UI_EPICLOOT_TOAST"
+Core.UNVEIL_SOUND = "UI_LEGENDARY_LOOT_TOAST"
 function Core:unveilSound()
   if self:toastSound() == "none" then return nil end
   return Core.UNVEIL_SOUND

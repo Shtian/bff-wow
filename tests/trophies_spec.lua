@@ -327,7 +327,7 @@ describe("Trophies", function()
     it("are unveiled with a sound unless the toast sound is None", function()
       local _, clients = crew({ "Ann" }, { Ann = { level = 10 } })
       local core = clients[1].core
-      assert.equal("UI_EPICLOOT_TOAST", core:unveilSound())
+      assert.equal("UI_LEGENDARY_LOOT_TOAST", core:unveilSound())
       core:setToastSound("none")
       assert.is_nil(core:unveilSound())
     end)
