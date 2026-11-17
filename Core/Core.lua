@@ -1378,9 +1378,9 @@ end
 -- Respects bloom the Grave and your Welcome waves the newcomer
 -- (campReaction); your Cheer's hop is UI's own, so it plays none here.
 function Core:react(key)
-  local attached
-  key, attached = self.log:react(key)
-  if not key then return false, attached end
+  local reason, attached
+  key, reason, attached = self.log:react(key)
+  if not key then return false, reason end
   self.ledger:addReaction(key)
   self.gossip:ownChanged("now")
   self.listener("changed")

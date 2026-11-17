@@ -564,9 +564,10 @@ describe("Reactions in the Camp", function()
 
     d.core:leaveCrew()
     net:run(3)
-    a.events = {}
-    react(a, "Dee dinged 11")
+    assert.is_true(react(a, "Dee dinged 11"))
     net:run(5)
+    assert.same({ "You" }, reactors(a, "Dee dinged 11"))
+    assert.same({ "Ann" }, reactors(b, "Dee dinged 11"))
     assert.same({}, played(b, clients))
 
     assert.is_true(b.core:removeMember(a.memberId))

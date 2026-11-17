@@ -35,7 +35,8 @@ local HOP_FOR = 0.7
 -- A Cheer's burst over the hopping figure: a pixel flies out each way from
 -- `row` rows over the head and x from the figure's left edge, `reach`
 -- further each tick, in one colour a tick (a sprite each), the last at
--- `fade` alpha. It's over with the hop.
+-- `fade` alpha. It's over with the hop. Kept inside the band: in a short
+-- one it's pulled down so its furthest pixel stays in.
 local CHEER_BURST = { x = 5.5, row = 2, reach = 0.9, fade = 0.6,
   colors = { "glint", "glintPale", "ember", "emberWarm" },
   ways = { { 0, 1 }, { 0.75, 0.75 }, { -0.75, 0.75 }, { 1, 0.1 }, { -1, 0.1 }, { 0.4, 1 }, { -0.4, 1 } } }
@@ -608,6 +609,10 @@ end
 local function drawCheer(scene, parts, actor, top, played)
   local step = played and math.floor(played * FPS) + 1
   local color = step and CHEER_BURST.colors[step]
+  local furthest = math.floor(1 + (#CHEER_BURST.colors - 1) * CHEER_BURST.reach + 0.5)
+  local centre = top + CHEER_BURST.row
+  local rows = scene.view and scene.view.rows or scene.rows
+  if rows then centre = math.min(centre, rows - 1 - furthest) end
   for i, way in ipairs(CHEER_BURST.ways) do
     local glint = parts.cheer[i]
     if color then
@@ -617,7 +622,7 @@ local function drawCheer(scene, parts, actor, top, played)
       setSprite(glint, color, scene.unit)
       glint:SetAlpha(step == #CHEER_BURST.colors and CHEER_BURST.fade or 1)
       put(scene, glint, actor.x + math.floor(CHEER_BURST.x + way[1] * reach + 0.5),
-        top + CHEER_BURST.row + math.floor(way[2] * reach + 0.5))
+        centre + math.floor(way[2] * reach + 0.5))
     elseif glint then
       glint:Hide()
     end
@@ -771,7 +776,6 @@ local function drawDoorway(scene, parts, doorway)
   put(scene, parts.right, x + doorway.width - rim, ROW.standing)
 end
 
--- Draws the fire, embers and everything Core placed, for frame f.
 -- A Grave's flower blooming, `played` seconds in (BLOOM): growing in from
 -- the stem up, then petals drifting up and fading.
 local function drawBloom(scene, parts, grave, played)
@@ -795,6 +799,7 @@ local function drawBloom(scene, parts, grave, played)
   end
 end
 
+-- Draws the fire, embers and everything Core placed, for frame f.
 local function drawFrame(scene, f)
   local view = scene.view
   local unit = scene.unit
@@ -846,10 +851,10 @@ local function drawFrame(scene, f)
     local parts = take(scene.graveParts)
     setSprite(parts.grave, "grave", unit)
     put(scene, parts.grave, grave.x, ROW.grave)
-    local bloom = grave.key and scene.blooms[grave.key]
-    bloom = bloom and GetTime() - bloom
-    if bloom and bloom < BLOOM.lasts then
-      drawBloom(scene, parts, grave, bloom)
+    local started = grave.key and scene.blooms[grave.key]
+    local bloomed = started and GetTime() - started
+    if bloomed and bloomed < BLOOM.lasts then
+      drawBloom(scene, parts, grave, bloomed)
     else
       for _, petal in ipairs(parts.petals) do petal:Hide() end
       if grave.flower then
@@ -1142,13 +1147,18 @@ function CampScene.new(parent, options)
 
   -- A Cheer for a Member: if they're up by the fire here, they hop for a
   -- moment.
+  -- Whether the Member is up by the fire here (drawn, and not asleep).
+  local function upByFire(memberId)
+    for _, actor in ipairs(scene.view and scene.view.actors or {}) do
+      if actor.memberId == memberId and actor.pose ~= "asleep" then return true end
+    end
+    return false
+  end
+
   function band:Hop(memberId)
-    if not scene.view then return end
-    for _, actor in ipairs(scene.view.actors) do
-      if actor.memberId == memberId and actor.pose ~= "asleep" then
-        scene.hops[memberId] = GetTime()
-        scene.frame = nil
-      end
+    if upByFire(memberId) then
+      scene.hops[memberId] = GetTime()
+      scene.frame = nil
     end
   end
 
@@ -1161,11 +1171,7 @@ function CampScene.new(parent, options)
     if reaction.kind == "cheer" then
       self:Hop(reaction.memberId)
     elseif reaction.kind == "welcome" then
-      for _, actor in ipairs(scene.view.actors) do
-        if actor.memberId == reaction.memberId and actor.pose ~= "asleep" then
-          self:Animate("welcome", reaction.memberId)
-        end
-      end
+      if upByFire(reaction.memberId) then self:Animate("welcome", reaction.memberId) end
     elseif reaction.kind == "respects" and reaction.grave then
       for _, grave in ipairs(scene.view.graves or {}) do
         if grave.key == reaction.grave then

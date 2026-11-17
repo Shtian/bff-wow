@@ -399,7 +399,6 @@ end
 -- Shows the summary from Core's awaySummary: { members, goals,
 -- spares, professions, catches, count, intro, maxLevel, noticed, update }. With no Member news, only Your
 -- Crew noticed, Crew goals, Spares, Professions and Catches show.
-
 function Away.show(summary)
   if not frame then create() end
   local top = -Skin.HEADER_HEIGHT

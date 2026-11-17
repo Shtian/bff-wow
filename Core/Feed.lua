@@ -507,8 +507,8 @@ end
 
 -- Your Reaction to someone else's entry. Ignores your own entries, Removed
 -- Members, entries that can't be reacted to or aren't in the log, and
--- entries you already reacted to. Returns the key to store and the
--- Reaction attached as { entry, reaction }, or nil and "reacted" when you
+-- entries you already reacted to. Returns the key to store, nil and the
+-- Reaction attached as { entry, reaction }; or nil and "reacted" when you
 -- already had.
 function Feed:react(key)
   key = Reactions.validKey(key)
@@ -519,7 +519,7 @@ function Feed:react(key)
   if not entry or entry.own then return nil end
   if hasReacted(self, entry) then return nil, "reacted" end
   local reaction = attach(entry, me, key, self.now(), true)
-  return key, { entry = entry, reaction = reaction }
+  return key, nil, { entry = entry, reaction = reaction }
 end
 
 -- A Reaction just attached ({ entry, reaction }), as the Camp plays it:
