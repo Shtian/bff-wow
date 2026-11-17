@@ -1723,6 +1723,7 @@ local function create()
     if frame.sizing or frame.moving then savePlace() end
     core:leaveFeed()
     core:leaveGoals()
+    ns.GoalsTab.leave()
     core:leaveWhatsNew()
     ns.WhatsNewTab.leave()
     ns.SettingsTab.leave()

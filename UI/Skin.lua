@@ -886,3 +886,128 @@ function Skin.window(name, width, titleText)
   frame.headerRight:SetPoint("RIGHT", frame.close, "LEFT", -6, 0)
   return frame
 end
+
+-- Animations: small reusable ones built on CreateAnimationGroup. Each
+-- returns an object with :Play(delay), which starts it over after delay
+-- seconds (none by default), :Stop(), which ends it at once, leaving the
+-- frame as it's drawn without it, and group, its AnimationGroup (for
+-- OnFinished and such).
+local Animation = {}
+Animation.__index = Animation
+
+function Animation:Play(delay)
+  self.group:Stop()
+  if self.prepare then self.prepare() end
+  for _, animation in ipairs(self.first) do animation:SetStartDelay(delay or 0) end
+  self.group:Play()
+end
+
+function Animation:Stop()
+  self.group:Stop()
+end
+
+local function animation(group, first, prepare)
+  return setmetatable({ group = group, first = first, prepare = prepare }, Animation)
+end
+
+-- A stamp: `frame` lands from `scale` times its size and clear to its own
+-- size and opaque, over `duration` seconds, easing out. It fades in over
+-- the first 60%. Play it with no delay: until it starts, the frame shows
+-- as drawn.
+function Skin.stamp(frame, scale, duration)
+  local group = frame:CreateAnimationGroup()
+  local grow = group:CreateAnimation("Scale")
+  grow:SetScaleFrom(scale, scale)
+  grow:SetScaleTo(1, 1)
+  grow:SetOrigin("CENTER", 0, 0)
+  grow:SetDuration(duration)
+  grow:SetSmoothing("OUT")
+  local fade = group:CreateAnimation("Alpha")
+  fade:SetFromAlpha(0)
+  fade:SetToAlpha(1)
+  fade:SetDuration(duration * 0.6)
+  fade:SetSmoothing("OUT")
+  return animation(group, { grow, fade })
+end
+
+-- A sweep: a band of light `width` wide crosses `frame` once, left to
+-- right, over `duration` seconds, clipped to the frame and drawn over
+-- everything in it. `color` is the band's middle, fading to clear at both
+-- its edges, added to what's under it.
+function Skin.sweep(frame, width, color, duration)
+  local clip = CreateFrame("Frame", nil, frame)
+  clip:SetAllPoints()
+  clip:SetClipsChildren(true)
+  clip:SetFrameLevel(frame:GetFrameLevel() + 5)
+  local band = CreateFrame("Frame", nil, clip)
+  band:SetPoint("TOPRIGHT", clip, "TOPLEFT")
+  band:SetPoint("BOTTOMRIGHT", clip, "BOTTOMLEFT")
+  band:SetWidth(width)
+  local clear = Skin.alpha(color, 0)
+  for i, side in ipairs({ "LEFT", "RIGHT" }) do
+    local half = band:CreateTexture(nil, "OVERLAY")
+    half:SetColorTexture(1, 1, 1, 1)
+    half:SetBlendMode("ADD")
+    half:SetPoint("TOP" .. side)
+    half:SetPoint("BOTTOM" .. side)
+    half:SetWidth(width / 2)
+    Skin.gradient(half, "HORIZONTAL", i == 1 and clear or color, i == 1 and color or clear)
+  end
+  local group = band:CreateAnimationGroup()
+  local move = group:CreateAnimation("Translation")
+  move:SetDuration(duration)
+  move:SetSmoothing("IN_OUT")
+  -- Across the frame as it's sized when played.
+  return animation(group, { move }, function() move:SetOffset(clip:GetWidth() + width, 0) end)
+end
+
+-- A ring of `color` round `frame`, `thickness` wide, its outer edge
+-- `outset` pixels out from the frame's edge, added to what's under it.
+local function ring(frame, outset, thickness, color)
+  local function line()
+    local texture = frame:CreateTexture(nil, "OVERLAY")
+    texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+    texture:SetBlendMode("ADD")
+    return texture
+  end
+  local top, bottom, left, right = line(), line(), line(), line()
+  top:SetPoint("TOPLEFT", -outset, outset)
+  top:SetPoint("TOPRIGHT", outset, outset)
+  top:SetHeight(thickness)
+  bottom:SetPoint("BOTTOMLEFT", -outset, -outset)
+  bottom:SetPoint("BOTTOMRIGHT", outset, -outset)
+  bottom:SetHeight(thickness)
+  left:SetPoint("TOPLEFT", top, "BOTTOMLEFT")
+  left:SetPoint("BOTTOMLEFT", bottom, "TOPLEFT")
+  left:SetWidth(thickness)
+  right:SetPoint("TOPRIGHT", top, "BOTTOMRIGHT")
+  right:SetPoint("BOTTOMRIGHT", bottom, "TOPRIGHT")
+  right:SetWidth(thickness)
+end
+
+-- A shine: `frame`'s edge flares in `color` and fades, over `duration`
+-- seconds (rising over the first third): a 2px ring across the edge and a
+-- faint one just outside it, added to what's under them. Hidden between
+-- plays.
+function Skin.shine(frame, color, duration)
+  local glow = CreateFrame("Frame", nil, frame)
+  glow:SetAllPoints()
+  glow:SetFrameLevel(frame:GetFrameLevel() + 5)
+  glow:SetAlpha(0)
+  ring(glow, 1, 2, color)
+  ring(glow, 3, 2, Skin.alpha(color, 0.35))
+  local group = glow:CreateAnimationGroup()
+  local rise = group:CreateAnimation("Alpha")
+  rise:SetFromAlpha(0)
+  rise:SetToAlpha(1)
+  rise:SetDuration(duration / 3)
+  rise:SetSmoothing("OUT")
+  rise:SetOrder(1)
+  local fall = group:CreateAnimation("Alpha")
+  fall:SetFromAlpha(1)
+  fall:SetToAlpha(0)
+  fall:SetDuration(duration * 2 / 3)
+  fall:SetSmoothing("IN")
+  fall:SetOrder(2)
+  return animation(group, { rise })
+end
