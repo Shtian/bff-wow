@@ -898,7 +898,7 @@ Animation.__index = Animation
 function Animation:Play(delay)
   self.group:Stop()
   if self.prepare then self.prepare() end
-  for _, animation in ipairs(self.first) do animation:SetStartDelay(delay or 0) end
+  for _, animation in ipairs(self.delayed) do animation:SetStartDelay(delay or 0) end
   self.group:Play()
 end
 
@@ -906,8 +906,10 @@ function Animation:Stop()
   self.group:Stop()
 end
 
-local function animation(group, first, prepare)
-  return setmetatable({ group = group, first = first, prepare = prepare }, Animation)
+-- delayed: the animations that wait out Play's delay (those that start
+-- the group); prepare, if any, runs just before each play.
+local function animation(group, delayed, prepare)
+  return setmetatable({ group = group, delayed = delayed, prepare = prepare }, Animation)
 end
 
 -- A stamp: `frame` lands from `scale` times its size and clear to its own
@@ -957,8 +959,9 @@ function Skin.sweep(frame, width, color, duration)
   local move = group:CreateAnimation("Translation")
   move:SetDuration(duration)
   move:SetSmoothing("IN_OUT")
-  -- Across the frame as it's sized when played.
-  return animation(group, { move }, function() move:SetOffset(clip:GetWidth() + width, 0) end)
+  -- Across the frame as it's sized when played: its own width, which is
+  -- there as soon as it's set, unlike the clip's, worked out from anchors.
+  return animation(group, { move }, function() move:SetOffset(frame:GetWidth() + width, 0) end)
 end
 
 -- A ring of `color` round `frame`, `thickness` wide, its outer edge

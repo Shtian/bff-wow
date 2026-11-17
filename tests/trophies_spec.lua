@@ -324,6 +324,14 @@ describe("Trophies", function()
       assert.same({}, unseen(a.core:trophies()))
     end)
 
+    it("are unveiled with a sound unless the toast sound is None", function()
+      local _, clients = crew({ "Ann" }, { Ann = { level = 10 } })
+      local core = clients[1].core
+      assert.equal("UI_EPICLOOT_TOAST", core:unveilSound())
+      core:setToastSound("none")
+      assert.is_nil(core:unveilSound())
+    end)
+
     it("are never quiet ones: a Member first seen brings their rungs quietly", function()
       local net, clients, code = crew({ "Ann" }, { Ann = { level = 30 } })
       local a = clients[1]

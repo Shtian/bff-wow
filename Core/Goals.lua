@@ -672,6 +672,7 @@ local function clearTrophies(self)
     local dungeon = Clears.instance(name)
     if dungeon then
       local quiet = saved.quiet == true
+      local arrived = saved.seen or saved.time
       list[name] = {
         track = "clears",
         kind = dungeon.kind,
@@ -684,8 +685,8 @@ local function clearTrophies(self)
         quality = CLEAR_QUALITIES[dungeon.kind],
         quiet = quiet,
         -- Fresh from when it reached you: a clear can sync days late.
-        arrived = saved.seen or saved.time,
-        fresh = not quiet and self.now() - (saved.seen or saved.time) < FRESH,
+        arrived = arrived,
+        fresh = not quiet and self.now() - arrived < FRESH,
         party = partyNames(self, saved.members),
       }
     end
@@ -700,6 +701,7 @@ local function rareKillTrophies(self)
     local r = Rares.byId(id)
     if r then
       local quiet = saved.quiet == true
+      local arrived = saved.seen or saved.time
       local held = self.ledger:record(saved.memberId)
       local character = held and saved.character and type(held.characters) == "table" and held.characters[saved.character]
       list[id] = {
@@ -716,8 +718,8 @@ local function rareKillTrophies(self)
         quality = r.elite and RARE_ELITE_QUALITY or RARE_QUALITY,
         quiet = quiet,
         -- Fresh from when it reached you: a kill can sync days late.
-        arrived = saved.seen or saved.time,
-        fresh = not quiet and self.now() - (saved.seen or saved.time) < FRESH,
+        arrived = arrived,
+        fresh = not quiet and self.now() - arrived < FRESH,
         by = killer(self, saved.memberId),
         character = character and character.name or nil,
       }

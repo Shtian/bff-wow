@@ -52,9 +52,6 @@ local SWEEP_COLOR = { 1, 0.914, 0.627, 0.32 }
 local SWEEP_TIME = 0.6
 local SHINE_TIME = 0.45
 local SHINE_GAP = 0.15
--- As the stamp lands, on the Master channel like toasts: the first of
--- these the client has.
-local UNVEIL_SOUNDS = { "UI_EPICLOOT_TOAST", "IG_QUEST_LIST_COMPLETE" }
 -- Working on: tiles in two columns, one when the panel is narrow.
 local TILE_HEIGHT = 74
 local TILE_PAD = 10
@@ -78,8 +75,8 @@ local view
 local core
 local cabinetOpen = false
 local redraw
--- Whether this visit's first draw has been, so redraws don't unveil again.
-local played = false
+-- Whether this visit has had its first draw, which unveils: redraws don't.
+local unveiled = false
 local pools = {}
 local plate, empty, seeAll, tiles, cabinetHead
 
@@ -113,13 +110,26 @@ local function hideTooltip()
   GameTooltip:Hide()
 end
 
+-- Every frame a pool has made, taken or not.
+local function made(name)
+  return pools[name] and pools[name].items or {}
+end
+
 -- Ends the unveil at once, leaving everything in its final state.
 local function stopUnveil()
   if plate then
     plate.stamp:Stop()
     plate.sweep:Stop()
   end
-  for _, medal in ipairs(pools.medals and pools.medals.items or {}) do medal.shine:Stop() end
+  for _, medal in ipairs(made("medals")) do
+    medal.shine:Stop()
+    medal.shining = nil
+  end
+end
+
+-- Which trophy a medal shows, across redraws (each draw reads new tables).
+local function trophyKey(trophy)
+  return ("%s:%s:%s"):format(trophy.track, trophy.label, trophy.time)
 end
 
 local function open(on)
@@ -244,6 +254,11 @@ end
 
 local function drawMedal(trophy, width)
   local medal = newMedal(width)
+  -- A redraw that moved another trophy here ends its shine.
+  if medal.shining and medal.shining ~= trophyKey(trophy) then
+    medal.shine:Stop()
+    medal.shining = nil
+  end
   medal.trophy, medal.slot = trophy, nil
   local quality = Skin.TROPHY_QUALITIES[trophy.quality] or MUTED
   medal.picture:SetPicture(iconOf(trophy))
@@ -320,11 +335,10 @@ local function createPlate()
   frame.title:SetWordWrap(true)
   frame.sub = Skin.label(frame, "small", MUTED)
   frame.stamp = Skin.stamp(frame.picture, STAMP_SCALE, STAMP_TIME)
+  -- As the stamp lands, on the Master channel like toasts.
   frame.stamp.group:SetScript("OnFinished", function()
-    if core:toastSound() == "none" then return end
-    for _, key in ipairs(UNVEIL_SOUNDS) do
-      if SOUNDKIT and SOUNDKIT[key] then return ns.Toasts.play(key) end
-    end
+    local sound = core:unveilSound()
+    if sound then ns.Toasts.play(sound) end
   end)
   frame.sweep = Skin.sweep(frame, SWEEP_WIDTH, SWEEP_COLOR, SWEEP_TIME)
   return frame
@@ -527,6 +541,7 @@ local function unveil(trophies, medals)
     local trophy = medal.trophy
     if trophy and trophy.unseen and trophy ~= trophies.latest then
       medal.shine:Play(start + nth * SHINE_GAP)
+      medal.shining = trophyKey(trophy)
       nth = nth + 1
     end
   end
@@ -552,9 +567,8 @@ local function drawGoalsView(trophies, width)
     seeAll:Show()
     shelf[#shelf + 1] = seeAll
     y = flow(shelf, SHELF_MEDAL, SHELF_GAP, y, width) - 6
-    if not played then unveil(trophies, shelf) end
+    if not unveiled then unveil(trophies, shelf) end
   end
-  played = true
   y = drawHeading("WORKING ON", nil, y)
   return drawTiles(core:goals(), y, width)
 end
@@ -620,8 +634,8 @@ end
 
 -- Draws the tab into Panel's scroll view, `width` wide. onChange redraws
 -- the panel (See all and Back).
-function GoalsTab.draw(scrollView, coreObject, width, onChange)
-  view, core, redraw = scrollView, coreObject, onChange
+function GoalsTab.draw(scrollView, theCore, width, onChange)
+  view, core, redraw = scrollView, theCore, onChange
   local trophies = core:trophies()
   -- Nothing to show in the cabinet: back to the Goals view.
   if trophies.count == 0 then cabinetOpen = false end
@@ -637,13 +651,19 @@ function GoalsTab.draw(scrollView, coreObject, width, onChange)
   end
   hideUnused()
   view.content:SetHeight(-y + INSET)
+  -- Opening on the cabinet (the panel hidden there) unveils nothing.
+  unveiled = true
 end
 
--- The tab was left, or the panel hidden: the unveil stops, and the tab
--- opens on the Goals view next time, unveiling again if there's anything
--- new.
-function GoalsTab.leave()
+-- The panel was hidden: the unveil stops, and the next visit unveils
+-- again if there's anything new.
+function GoalsTab.hidden()
   stopUnveil()
-  played = false
+  unveiled = false
+end
+
+-- The tab was left: as hidden, and it opens on the Goals view next time.
+function GoalsTab.leave()
+  GoalsTab.hidden()
   cabinetOpen = false
 end
