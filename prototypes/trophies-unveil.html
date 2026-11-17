@@ -1,0 +1,393 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway (#237). Question: how should the Trophies tab unveil Trophies you haven't seen yet?
+  Three panels side by side compare one choice at a time ("Compare"); the other two use what's picked in their rows.
+    Stamp  (the latest-win plate's medal): A subtle 1.15× over 0.25 s · B the spec's 1.25× over 0.3 s · C bold 1.4× over 0.35 s with an overshoot.
+    Sweep  (a gold band across the plate after the stamp, 0.6 s): A narrow and bright · B wide and soft · C none (stamp only).
+    Shine  (each other unseen shelf medal, 0.15 s apart, newest first): A a glint across the icon · B a gold edge pulse · C a brief brighten.
+  Unseen 1 / 3 / 6 judges the stagger. "Latest win unseen" off: no stamp, the shelf shines at once.
+  Replay (R) plays a fresh visit; Leave tab (S) stops mid-animation and leaves the final state.
+  The chime is a stand-in for the SOUNDKIT key picked in game. Icons are Camp sprites from scripts/camp-art.mjs standing in
+  for the game's icons; Camp backdrop draws the band at 2 px per art pixel. Data is fake. Run: open the file in a browser.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trophies unveil</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;600&family=Cinzel:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold:#ffd14a; --gold-rgb:255,209,74; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99;
+    --window:#0e0d14; --header:#1a1821; --warm:255,236,200; --hair:rgba(var(--warm),.075); --border:rgba(var(--warm),.10);
+    --narrow:"Arial Narrow","Archivo Narrow",sans-serif; --friz:"Friz Quadrata TT","Friz Quadrata",Cinzel,Georgia,serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; color:var(--text); font:14px/1.2 var(--narrow);
+    background:radial-gradient(ellipse at 30% 20%, #6b4a33 0%, #2b2219 45%, #0d0b09 100%); }
+  .controls { display:flex; flex-direction:column; gap:6px; align-items:center; padding:14px 16px 6px; }
+  .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; justify-content:center; }
+  .row .k { color:#d9cbb8; width:120px; text-align:right; margin-right:4px; font-size:13px; }
+  .row button { font:13px var(--narrow); color:var(--text); background:rgba(14,13,20,.85); border:1px solid rgba(255,255,255,.14);
+    padding:4px 10px; cursor:pointer; }
+  .row button.on { background:var(--gold); color:#1a1400; border-color:var(--gold); }
+  .row button.cmp { outline:1px dashed rgba(var(--gold-rgb),.7); outline-offset:2px; }
+  .row button.go { background:#2b2a36; border-color:rgba(var(--gold-rgb),.6); }
+  .note { text-align:center; color:#d9cbb8; font-size:13px; max-width:860px; margin:4px auto 12px; padding:0 16px; }
+  .stage { display:flex; flex-wrap:wrap; gap:24px; justify-content:center; padding:0 16px 40px; }
+  .col { display:flex; flex-direction:column; gap:6px; }
+  .cap { color:#f0e2c8; font-size:14px; }
+  .cap b { color:var(--gold); font-weight:600; margin-right:6px; }
+  .zoom2 { zoom:2; }
+
+  .panel { position:relative; background:rgba(14,13,20,.97); border:1px solid var(--border); overflow:hidden; }
+  .head { height:30px; background:var(--header); border-bottom:1px solid var(--hair); display:flex; align-items:center; padding:0 8px 0 12px; }
+  .head .t { font-family:var(--friz); color:var(--gold); font-size:13px; flex:1; }
+  .head .x { color:#8a8a8a; }
+  .band { display:block; image-rendering:pixelated; }
+  .content { position:relative; padding:12px 0 14px; }
+  .firelight { position:absolute; left:0; right:0; top:0; height:260px; pointer-events:none;
+    background:radial-gradient(ellipse 42% 100% at 50% 0%, rgba(240,140,40,.13), rgba(240,140,40,0) 100%); }
+
+  .plate { position:relative; margin:0 12px; min-height:60px; display:flex; align-items:center; gap:10px; padding:10px 10px 10px 12px;
+    background:linear-gradient(90deg, rgba(var(--gold-rgb),.15), rgba(var(--gold-rgb),.03));
+    border:1px solid rgba(var(--gold-rgb),.3); border-top-color:rgba(var(--gold-rgb),.55); overflow:hidden; }
+  .plate .ttl { font-family:var(--friz); color:var(--gold); font-size:14px; line-height:1.25; }
+  .plate .sub { color:var(--muted); font-size:12px; margin-top:3px; }
+  .sweep { position:absolute; top:0; bottom:0; left:0; pointer-events:none; mix-blend-mode:plus-lighter; opacity:0; }
+
+  .pic { position:relative; width:40px; height:40px; flex:none; background:var(--window); }
+  .pic canvas { position:absolute; left:1px; top:1px; width:38px; height:38px; image-rendering:pixelated; }
+  .pic .edge { position:absolute; inset:0; border:1px solid; pointer-events:none; }
+  .pic .foot { position:absolute; left:0; right:0; bottom:0; height:3px; }
+  .pic .fx { position:absolute; inset:1px; overflow:hidden; pointer-events:none; mix-blend-mode:plus-lighter; }
+  .pic .fx i { position:absolute; display:block; opacity:0; }
+  .pic .glint { top:-20px; bottom:-20px; width:12px; left:0;
+    background:linear-gradient(90deg, rgba(255,243,196,0), rgba(255,243,196,.85) 45%, rgba(255,209,74,.9) 55%, rgba(255,209,74,0)); transform-origin:center; }
+  .pic .bright { inset:0; background:rgba(var(--gold-rgb),1); }
+  .pic .pulse { position:absolute; inset:-1px; border:2px solid var(--gold); box-shadow:0 0 6px rgba(var(--gold-rgb),.8); opacity:0; pointer-events:none; }
+
+  .heading { display:flex; align-items:center; gap:8px; height:28px; padding:0 12px; margin-top:4px; }
+  .heading .l { font-family:var(--friz); font-size:12px; color:var(--dim); letter-spacing:.04em; }
+  .heading .r { flex:1; height:1px; background:linear-gradient(90deg, rgba(var(--warm),.11), rgba(var(--warm),0)); }
+  .heading .c { color:var(--muted); font-size:12px; }
+  .shelf { display:flex; flex-wrap:wrap; gap:10px 6px; padding:0 12px; }
+  .medal { width:52px; height:72px; display:flex; flex-direction:column; align-items:center; }
+  .medal .v { font-size:12px; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:clip; max-width:52px; }
+  .medal .d { font-size:11px; color:var(--dim); margin-top:1px; }
+  .medal .v.fresh { color:var(--gold); }
+  .seeall .pic { background:rgba(var(--warm),.06); border:1px solid rgba(var(--warm),.1); display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .tiles { margin:0 12px; height:74px; border-right:1px solid var(--hair); border-bottom:1px solid var(--hair); display:flex; align-items:center; gap:10px; padding:0 10px; color:var(--muted); }
+  .unseen-dot { position:absolute; right:-3px; top:-3px; width:5px; height:5px; background:var(--gold); border-radius:50%; display:none; }
+  body.marks .medal.u .unseen-dot { display:block; }
+</style>
+</head>
+<body>
+<div class="controls" id="controls"></div>
+<div class="note" id="note"></div>
+<div class="stage" id="stage"></div>
+<script>
+// ---- Art: grids and palette from scripts/camp-art.mjs ----
+const PAL = {
+  K:"#0b0a12", S:"#e8b890", s:"#b98465", W:"#fff3c4", Y:"#ffe9a0", G:"#ffd14a", O:"#f0a21c",
+  R:"#c9481c", B:"#5a3a24", b:"#3a2518", T:"#8c8796", t:"#5d5966", L:"#70e370", P:"#f2b8d0",
+  Z:"#adabb8", F:"#7fc4ee", f:"#3f7fb8", N:"#ece8d8", A:"#c89a5a", a:"#8f6a3a", r:"#5a1620",
+};
+function outlined(rows) {
+  const w = rows[0].length + 2, h = rows.length + 2;
+  const at = (x, y) => (rows[y - 1] && rows[y - 1][x - 1] && rows[y - 1][x - 1] !== "." ? rows[y - 1][x - 1] : null);
+  const out = [];
+  for (let y = 0; y < h; y++) { let line = "";
+    for (let x = 0; x < w; x++) { const own = at(x, y); if (own) { line += own; continue; }
+      let near = false; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (at(x + i, y + j)) near = true;
+      line += near ? "K" : "."; }
+    out.push(line); }
+  return out;
+}
+const STAR = outlined(["..G..", "GGYGG", ".GYG.", ".G.G.", "G...G"]);
+const FISH = outlined([".FFF...F", "FFKFFFFF", "FfffFFFF", ".fff...f"]);
+const SKULL = ["....KKKK....", "...KNNNNK...", "..KNNNNNNK..", "..KNKNNKNK..", "..KNKNNKNK..", "..KNNNNNNK..", "...KNNNNK...", "...KKNNKK..."];
+const BLADE = outlined(["..W..", ".WZt.", ".WZt.", ".WZt.", ".WZt.", ".WZt.", ".WZt.", "GGGGG", "..B..", "..G.."]);
+const HAMMER = outlined(["ZZZZZt", "ZNZZZt", "ZZZZZt", "..Aa..", "..Aa..", "..Aa..", "..Aa..", "..Aa.."]);
+const PICK = outlined(["..ZZZZZZ..", ".ZZtAatZZ.", "ZZ..Aa..ZZ", "Z...Aa...Z", "....Aa....", "....Aa....", "....Aa....", "....Aa...."]);
+const ARCH = [".....TTTTTT.....", "...TTTTTTTTTt...", "..TTTttttttTTt..", ".TTTtKKKKKKtTTt.", ".TTtKKKKKKKKtTt.", "TTTtKKKKKKKKtTTt",
+  "TTtKKKKKKKKKKtTt", "TttKKKKKKKKKKtTt", "TTtKKKKKKKKKKttt", "TTtKKKKKKKKKKtTt", "TTtKKKKKKKKKKtTt", "tttKKKKKKKKKKtTt",
+  "TTtKKKKKKKKKKtTt", "TTtKKKKKKKKKKttt", "TttKKKKKKKKKKtTt", "TTtKKKKKKKKKKtTt", "TTtKKKKKKKKKKtTt"];
+const ARCH_RAID = [".....NNNNNN.....", "....NNNNNNNN....", "...TNRRNNRRNT...", "..TTNNNKKNNNTT..", ".TTTtNKNNKNtTTt.",
+  ...ARCH.slice(4).map((row) => row.replaceAll("K", "r"))];
+const CUP = outlined(["G.GYYYYYG.G", "GGGYWYYOGGG", ".G.GYYYO.G.", "....GYO....", ".....O.....", "....GYO....", "...GGOOO..."]);
+const FIRE = [
+  [".....R.....", "....RR.....", "....ROR..R.", "...ROOR.RR.", ".R.ROOORRR.", ".RRROGGORR.", ".RROOGGOOR.", "RROOGYYGOOR", "ROOGGYYGGOR", "ROGGYYYYGOR", ".ROGYYWYGO.", "..ROGGGGO.."],
+  [".........R.", "..R..R.....", "..RR.RR....", ".RORROR..R.", ".ROORROR.R.", ".ROOOOORRR.", ".ROGGOOGOR.", "RROGYGOGOOR", "ROOGYYGGGOR", "ROGGYYYYGOR", ".ROGYWYYGO.", "..ROGGGGO.."],
+  ["...R.......", "...RR...R..", "..RORR..R..", "..ROOR.RR..", ".RROOORRO..", ".ROOGOOROR.", ".ROGGGOOOR.", "RROGGYGGOOR", "ROOGYYYGGOR", "ROGGYYYYGOR", ".ROGYYWYGO.", "..ROGGGGO.."],
+];
+const LOGS = ["..BB.......BB..", ".BBBBb...bBBBB.", "bbBBBBBBBBBBBbb", "..bbbbbbbbbbb.."];
+const SIT = ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...", "..KCCDDCCK..", ".KCCCDDCCCK.", ".KSCCDDCCSK.", ".KKCCCCCCKK.", "..KDDKKDDK..", "..KKK..KKK.."];
+
+function drawGrid(ctx, rows, x0, y0, px, pal) {
+  rows.forEach((row, y) => [...row].forEach((ch, x) => { const c = pal[ch] || PAL[ch]; if (ch === "." || !c) return;
+    ctx.fillStyle = c; ctx.fillRect(x0 + x * px, y0 + y * px, px, px); }));
+}
+function iconCanvas(rows) {
+  const c = document.createElement("canvas"); c.width = 38; c.height = 38;
+  const ctx = c.getContext("2d");
+  const g = ctx.createRadialGradient(19, 16, 2, 19, 19, 26); g.addColorStop(0, "#2a2533"); g.addColorStop(1, "#141219");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 38, 38);
+  const w = rows[0].length, h = rows.length, px = Math.max(1, Math.floor(32 / Math.max(w, h)));
+  drawGrid(ctx, rows, Math.floor((38 - w * px) / 2), Math.floor((38 - h * px) / 2), px, {});
+  return c;
+}
+
+// ---- Fake Crew trophies, newest first ----
+const Q = { uncommon:"#1fff00", rare:"#3b9cff", epic:"#b55cf5", legendary:"#ff8000" };
+const TROPHIES = [
+  { icon:ARCH, q:"epic", label:"Deadmines", date:"17 Nov", fresh:true, text:"The Crew cleared The Deadmines!" },
+  { icon:STAR, q:"epic", label:"150", date:"16 Nov", fresh:true, text:"The Crew reached 150 Crew levels!" },
+  { icon:BLADE, q:"rare", label:"Rak'shiri", date:"16 Nov", fresh:true, text:"The Crew slew Rak'shiri!" },
+  { icon:HAMMER, q:"rare", label:"Journeyman", date:"15 Nov", fresh:true, text:"Everyone is a Journeyman!" },
+  { icon:FISH, q:"rare", label:"30 types", date:"14 Nov", fresh:false, text:"The Crew caught 30 types of fish!" },
+  { icon:SKULL, q:"rare", label:"25", date:"12 Nov", fresh:false, text:"The Crew died 25 times!" },
+  { icon:PICK, q:"rare", label:"Mining", date:"10 Nov", fresh:false, text:"Mining joined the Crew!" },
+  { icon:ARCH_RAID, q:"legendary", label:"Molten Core", date:"9 Nov", fresh:false },
+  { icon:STAR, q:"rare", label:"100", date:"6 Nov", fresh:false },
+];
+TROPHIES.forEach((t) => { t.canvas = iconCanvas(t.icon); });
+
+// ---- Variants ----
+const STAMPS = {
+  A: { name:"Subtle", desc:"1.15× → 1 over 0.25 s", from:1.15, dur:0.25, over:false },
+  B: { name:"Spec", desc:"1.25× → 1 over 0.3 s", from:1.25, dur:0.3, over:false },
+  C: { name:"Bold", desc:"1.4× → 0.94 → 1 over 0.35 s", from:1.4, dur:0.35, over:true },
+};
+const SWEEPS = {
+  A: { name:"Narrow bright", desc:"a 22 px band, strong", w:22, peak:0.7, dur:0.6 },
+  B: { name:"Wide soft", desc:"a 110 px band, faint", w:110, peak:0.32, dur:0.6 },
+  C: { name:"None", desc:"stamp only", w:0, peak:0, dur:0 },
+};
+const SHINES = {
+  A: { name:"Glint", desc:"a slanted streak crosses the icon, 0.4 s", dur:0.4 },
+  B: { name:"Edge pulse", desc:"the edge flares gold and fades, 0.45 s", dur:0.45 },
+  C: { name:"Brighten", desc:"the icon lifts towards gold and back, 0.3 s", dur:0.3 },
+};
+const GAP = 0.15;
+
+const state = { compare:"stamp", stamp:"B", sweep:"A", shine:"A", unseen:3, latest:true, back:"camp", scale:1, width:"wide", sound:true, marks:false };
+// Any choice can come from the URL too: ?compare=shine&unseen=6&width=narrow&scale=2
+new URLSearchParams(location.search).forEach((v, k) => {
+  if (!(k in state)) return;
+  state[k] = typeof state[k] === "number" ? Number(v) : typeof state[k] === "boolean" ? v === "true" : v;
+});
+
+// ---- Controls ----
+const ctrl = document.getElementById("controls");
+function row(label, items, key, cmpKey) {
+  const r = document.createElement("div"); r.className = "row";
+  r.innerHTML = `<span class="k">${label}</span>`;
+  items.forEach(([v, text]) => { const b = document.createElement("button"); b.textContent = text;
+    b.onclick = () => { state[key] = v; build(); replay(); }; b.dataset.key = key; b.dataset.v = v; r.appendChild(b); });
+  if (cmpKey) { const b = document.createElement("button"); b.textContent = "Compare side by side"; b.dataset.cmp = cmpKey;
+    b.onclick = () => { state.compare = cmpKey; build(); replay(); }; r.appendChild(b); }
+  ctrl.appendChild(r);
+}
+const opts = (set) => Object.entries(set).map(([k, v]) => [k, `${k} · ${v.name}`]);
+row("Stamp", opts(STAMPS), "stamp", "stamp");
+row("Sweep", opts(SWEEPS), "sweep", "sweep");
+row("Shine", opts(SHINES), "shine", "shine");
+row("Unseen", [[1, "1"], [3, "3"], [6, "6"]], "unseen");
+row("Latest win unseen", [[true, "Yes: stamp"], [false, "No: shine at once"]], "latest");
+row("Backdrop", [["window", "Dark window"], ["camp", "Camp backdrop"]], "back");
+row("Scale", [[1, "1×"], [2, "2×"]], "scale");
+row("Panel", [["wide", "640 wide"], ["narrow", "460 wide (minimum)"]], "width");
+{ const r = document.createElement("div"); r.className = "row"; r.innerHTML = '<span class="k"></span>';
+  const mk = (t, f) => { const b = document.createElement("button"); b.className = "go"; b.textContent = t; b.onclick = f; r.appendChild(b); return b; };
+  mk("▶ Replay (R)", replay); mk("■ Leave tab (S)", stop);
+  const snd = mk("", () => { state.sound = !state.sound; paintControls(); });
+  const mrk = mk("", () => { state.marks = !state.marks; document.body.classList.toggle("marks", state.marks); paintControls(); });
+  r.dataset.snd = 1; ctrl.appendChild(r);
+  window.paintExtra = () => { snd.textContent = state.sound ? "Sound: on" : "Sound: off"; mrk.textContent = state.marks ? "Unseen dots: on" : "Unseen dots: off"; };
+}
+function paintControls() {
+  ctrl.querySelectorAll("button[data-key]").forEach((b) => {
+    const v = state[b.dataset.key]; b.classList.toggle("on", String(v) === b.dataset.v);
+    const cmp = { stamp:"stamp", sweep:"sweep", shine:"shine" }[b.dataset.key];
+    b.classList.toggle("cmp", cmp === state.compare);
+  });
+  ctrl.querySelectorAll("button[data-cmp]").forEach((b) => b.classList.toggle("on", b.dataset.cmp === state.compare));
+  paintExtra();
+}
+addEventListener("keydown", (e) => { if (e.key === "r" || e.key === "R") replay(); if (e.key === "s" || e.key === "S") stop(); });
+
+// ---- Panels ----
+const stage = document.getElementById("stage");
+let panels = [];
+function build() {
+  paintControls();
+  stage.innerHTML = ""; panels = [];
+  const set = { stamp:STAMPS, sweep:SWEEPS, shine:SHINES }[state.compare];
+  const contentW = state.width === "wide" ? 516 : 336;
+  Object.keys(set).forEach((k) => {
+    const v = { stamp:STAMPS[state.stamp], sweep:SWEEPS[state.sweep], shine:SHINES[state.shine] };
+    v[state.compare] = set[k];
+    const col = document.createElement("div"); col.className = "col";
+    col.innerHTML = `<div class="cap"><b>${k} · ${set[k].name}</b>${set[k].desc}</div>`;
+    const wrap = document.createElement("div"); if (state.scale === 2) wrap.className = "zoom2";
+    const p = document.createElement("div"); p.className = "panel"; p.style.width = contentW + "px";
+    p.innerHTML = `<div class="head"><span class="t">Trophies</span><span class="x">✕</span></div>`;
+    let band = null;
+    if (state.back === "camp") { band = document.createElement("canvas"); band.className = "band"; band.width = contentW; band.height = 120;
+      band.style.width = contentW + "px"; band.style.height = "120px"; p.appendChild(band); }
+    const content = document.createElement("div"); content.className = "content";
+    if (state.back === "camp") content.innerHTML = '<div class="firelight"></div>';
+    p.appendChild(content);
+
+    const latest = TROPHIES[0];
+    // Which shelf medals are unseen: with the latest unseen, the newest N (the plate stamps, the rest shine);
+    // otherwise N older ones that arrived late (a clear synced days after it was made).
+    const unseen = new Set();
+    if (state.latest) for (let i = 0; i < state.unseen; i++) unseen.add(i);
+    else for (let i = 0; i < state.unseen; i++) unseen.add([2, 4, 1, 3, 5, 6][i]);
+
+    // Plate
+    const plate = document.createElement("div"); plate.className = "plate";
+    const ppic = pic(latest, "#ffd14a", false);
+    plate.appendChild(ppic.el);
+    const words = document.createElement("div");
+    words.innerHTML = `<div class="ttl">${latest.text}</div><div class="sub">${latest.date} · ${Math.max(0, state.unseen - 1)} more since you last looked</div>`;
+    plate.appendChild(words);
+    const sweep = document.createElement("div"); sweep.className = "sweep";
+    const sv = v.sweep; sweep.style.width = sv.w + "px";
+    sweep.style.background = `linear-gradient(90deg, rgba(255,209,74,0), rgba(255,233,160,${sv.peak}) 50%, rgba(255,209,74,0))`;
+    plate.appendChild(sweep);
+    content.appendChild(plate);
+
+    content.insertAdjacentHTML("beforeend", `<div class="heading"><span class="l">TROPHY SHELF</span><span class="r"></span><span class="c">${TROPHIES.length}</span></div>`);
+    const shelf = document.createElement("div"); shelf.className = "shelf";
+    const shines = [];
+    TROPHIES.slice(0, 7).forEach((t, i) => {
+      const m = document.createElement("div"); m.className = "medal" + (unseen.has(i) ? " u" : "");
+      const pc = pic(t, Q[t.q], true); m.appendChild(pc.el);
+      m.insertAdjacentHTML("beforeend", `<div class="v${t.fresh ? " fresh" : ""}">${t.label}</div><div class="d">${t.date}</div>`);
+      shelf.appendChild(m);
+      if (unseen.has(i) && !(i === 0 && state.latest)) shines.push(pc);
+    });
+    shelf.insertAdjacentHTML("beforeend", `<div class="medal seeall"><div class="pic">+${TROPHIES.length - 7}</div><div class="v">See all</div><div class="d">${TROPHIES.length} trophies</div></div>`);
+    content.appendChild(shelf);
+    content.insertAdjacentHTML("beforeend", `<div class="heading" style="margin-top:6px"><span class="l">WORKING ON</span><span class="r"></span></div>
+      <div class="tiles">Crew levels · 212 / 250</div>`);
+
+    wrap.appendChild(p); col.appendChild(wrap); stage.appendChild(col);
+    panels.push({ v, ppic, sweep, plate, shines, band, stampOn: state.latest });
+  });
+  const parts = [];
+  parts.push(state.latest ? "The plate's medal stamps in, the sweep follows, and the chime plays as the stamp lands." : "The latest win was already seen: no stamp, no sound; the unseen shelf medals shine at once.");
+  parts.push(`${state.latest ? state.unseen - 1 : state.unseen} shelf medal(s) shine, ${GAP} s apart, newest first.`);
+  document.getElementById("note").textContent = parts.join(" ");
+}
+function pic(t, edge, foot) {
+  const el = document.createElement("div"); el.className = "pic";
+  const c = document.createElement("canvas"); c.width = 38; c.height = 38; c.getContext("2d").drawImage(t.canvas, 0, 0);
+  el.appendChild(c);
+  const e = document.createElement("div"); e.className = "edge"; e.style.borderColor = hexA(edge, 0.55); el.appendChild(e);
+  if (foot) { const f = document.createElement("div"); f.className = "foot"; f.style.background = edge; el.appendChild(f); }
+  const fx = document.createElement("div"); fx.className = "fx";
+  const glint = document.createElement("i"); glint.className = "glint";
+  const bright = document.createElement("i"); bright.className = "bright";
+  fx.append(glint, bright); el.appendChild(fx);
+  const pulse = document.createElement("div"); pulse.className = "pulse"; el.appendChild(pulse);
+  const dot = document.createElement("div"); dot.className = "unseen-dot"; el.appendChild(dot);
+  return { el, canvas:c, glint, bright, pulse };
+}
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
+
+// ---- Timeline: one clock for every panel, as an AnimationGroup per element would run in game ----
+let t0 = null, stopped = false;
+// ?t=0.4 freezes every panel at that moment of the visit (for screenshots).
+const FREEZE = (() => { const v = new URLSearchParams(location.search).get("t"); return v == null ? null : parseFloat(v); })();
+const chimed = new Set();
+function replay() { t0 = performance.now(); stopped = false; chimed.clear(); }
+function stop() { stopped = true; }
+const clamp = (x) => Math.max(0, Math.min(1, x));
+const easeOut = (x) => 1 - (1 - x) * (1 - x);
+const easeInOut = (x) => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2);
+const flash = (x) => (x <= 0 || x >= 1 ? 0 : x < 0.35 ? x / 0.35 : 1 - (x - 0.35) / 0.65);
+
+function frame(now) {
+  const t = FREEZE != null ? FREEZE : t0 == null || stopped ? Infinity : (now - t0) / 1000;
+  panels.forEach((p, idx) => {
+    const st = p.v.stamp, sw = p.v.sweep, sh = p.v.shine;
+    // Stamp: scale and alpha on the plate's medal.
+    let scale = 1, alpha = 1;
+    if (p.stampOn && t < st.dur) {
+      const x = clamp(t / st.dur);
+      alpha = easeOut(clamp(x / 0.6));
+      if (st.over) {
+        if (x < 0.7) scale = st.from + (0.94 - st.from) * easeOut(x / 0.7);
+        else scale = 0.94 + 0.06 * easeInOut((x - 0.7) / 0.3);
+      } else scale = st.from + (1 - st.from) * easeOut(x);
+    }
+    p.ppic.el.style.transform = `scale(${scale})`; p.ppic.el.style.opacity = alpha;
+    const landed = p.stampOn ? st.dur : 0;
+    if (p.stampOn && t >= st.dur && t < Infinity && idx === 0 && !chimed.has("c")) { chimed.add("c"); chime(); }
+    // Sweep: a band translated across the plate, clipped by it.
+    if (sw.w && t >= landed && t < landed + sw.dur && p.stampOn) {
+      const x = easeInOut((t - landed) / sw.dur), W = p.plate.clientWidth;
+      p.sweep.style.opacity = 1; p.sweep.style.transform = `translateX(${-sw.w + x * (W + sw.w)}px)`;
+    } else p.sweep.style.opacity = 0;
+    // Shines: one after another, newest first, from when the stamp lands.
+    p.shines.forEach((s, i) => {
+      const x = (t - landed - i * GAP) / sh.dur;
+      s.glint.style.opacity = 0; s.bright.style.opacity = 0; s.pulse.style.opacity = 0;
+      if (x <= 0 || x >= 1) return;
+      if (sh.name === "Glint") { s.glint.style.opacity = 1; s.glint.style.transform = `translateX(${-14 + easeInOut(x) * 66}px) rotate(25deg)`; }
+      else if (sh.name === "Edge pulse") s.pulse.style.opacity = flash(x);
+      else s.bright.style.opacity = 0.45 * flash(x);
+    });
+    if (p.band) drawBand(p.band, now);
+  });
+  requestAnimationFrame(frame);
+}
+
+// ---- Camp band: 2 px per art pixel, the fire animating at the Camp's tick ----
+const stars = Array.from({ length: 40 }, (_, i) => [((Math.sin(i * 91.7) + 1) / 2), ((Math.sin(i * 37.3) + 1) / 2) * 0.55]);
+function drawBand(c, now) {
+  const ctx = c.getContext("2d"), W = c.width, H = c.height, px = 2;
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#070a1e"); g.addColorStop(0.65, "#141530"); g.addColorStop(1, "#1d1726");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#c8c8e8"; stars.forEach(([x, y]) => ctx.fillRect(Math.floor(x * W / 2) * 2, Math.floor(y * H / 2) * 2, 2, 2));
+  ctx.fillStyle = "#0d0e1a"; ctx.beginPath(); ctx.moveTo(0, H - 30);
+  for (let x = 0; x <= W; x += 8) ctx.lineTo(x, H - 40 + Math.round(Math.sin(x * 0.05) * 6 + Math.sin(x * 0.13) * 4));
+  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.fill();
+  ctx.fillStyle = "#1c1611"; ctx.fillRect(0, H - 24, W, 24);
+  const glow = ctx.createRadialGradient(W / 2, H, 4, W / 2, H, 150); glow.addColorStop(0, "rgba(240,140,40,.45)"); glow.addColorStop(1, "rgba(240,140,40,0)");
+  ctx.fillStyle = glow; ctx.fillRect(0, H - 70, W, 70);
+  const tick = Math.floor(now / 150);
+  const cx = Math.floor(W / 2 / px) * px, fx = cx - 11, fy = H - 12 - 24;
+  drawGrid(ctx, LOGS, cx - 15, H - 14, px, {});
+  drawGrid(ctx, FIRE[tick % 3], fx, fy, px, {});
+  drawGrid(ctx, CUP, cx - 12, fy - 22 - ((tick >> 2) % 2) * px, px, {});
+  [["#69ccf0", -70], ["#f58cba", 46], ["#abd473", -116]].forEach(([col, dx]) => {
+    const n = parseInt(col.slice(1), 16), c1 = col, c2 = `rgb(${(n >> 16) * .62 | 0},${((n >> 8) & 255) * .62 | 0},${(n & 255) * .62 | 0})`;
+    drawGrid(ctx, SIT, cx + dx, H - 12 - 26, px, { C:c1, D:c2 });
+  });
+}
+
+// ---- Stand-in chime for the SOUNDKIT pick ----
+let ac = null;
+function chime() {
+  if (!state.sound) return;
+  try { ac = ac || new AudioContext(); } catch (e) { return; }
+  const now = ac.currentTime;
+  [[784, 0], [1175, 0.06], [1568, 0.12]].forEach(([f, d]) => {
+    const o = ac.createOscillator(), g = ac.createGain(); o.type = "triangle"; o.frequency.value = f;
+    g.gain.setValueAtTime(0, now + d); g.gain.linearRampToValueAtTime(0.12, now + d + 0.01); g.gain.exponentialRampToValueAtTime(0.001, now + d + 0.7);
+    o.connect(g).connect(ac.destination); o.start(now + d); o.stop(now + d + 0.75);
+  });
+}
+
+build();
+requestAnimationFrame(frame);
+setTimeout(replay, 400);
+</script>
+</body>
+</html>
