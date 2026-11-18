@@ -4,13 +4,15 @@
   and how should the alone state hand over the Crew code?
   Grids and palette are scripts/camp-art.mjs's (plus the backdrop's ground-glow tones u v w x), drawn at the
   band's 3 UI units per art pixel, so the chosen art copies straight across ("Copy grids" prints them).
-    Art       Detailed  ~36 columns: firelit ground, shading, small extras (stones, straw, a hammer, ripples).
+    Art       Detailed  40x22 each: outlined subject in a ~24x14 box on one ground line, lit from the left,
+                        cool ground (warm only under a fire).
               Minimal   ~22 columns: the subject alone, outlined like the Pocket Camp's tools, 3-4 tones.
     Layout    Stacked   vignette above, headline and line centred under it.
               Side      vignette left, text right (as the Trophies tab's empty state does today).
     Code      Box       the Settings code row's read-only box under the text, selects on focus, "Ctrl+C to copy".
               Plate     the code big on a gold-edged plate; click it to select, then Ctrl+C.
-  The vignettes animate on the band's 6-per-second tick (embers, smoke, water, the alone state's fire).
+  The vignettes animate on the band's 6-per-second tick (embers, smoke, the alone state's fire at 6/s; the hourglass
+  and the water at 3/s), and only while the Camp is on. "Alone, you" switches the alone state for someone who joined.
   Size: the smallest panel (460x380, the short 78px band), the largest (900x800), or both side by side.
   Crew data is fake. Run: open the file in a browser.
 -->
@@ -89,7 +91,9 @@
   .tool .grow { flex:1; }
   .sbtn { height:20px; padding:0 8px; font:14px var(--narrow); color:var(--text); background:rgba(255,255,255,.06); border:1px solid var(--border); display:inline-flex; align-items:center; }
   .fill { flex:1; min-height:0; display:flex; flex-direction:column; }
-  .centre { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:12px; }
+  .centre { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; padding:12px; }
+  /* The block's middle sits at ~40% of the space, not 50%: spacers above and below in a 2:3 ratio. */
+  .centre::before { content:""; flex:2 1 0; } .centre::after { content:""; flex:3 1 0; }
   .unchanged { color:var(--dim); font-style:italic; }
 
   /* Roster rows */
@@ -130,7 +134,7 @@
   .es.es-stack { flex-direction:column; text-align:center; gap:8px; }
   .es canvas { image-rendering:pixelated; flex:none; display:block; }
   .es .txt { max-width:300px; }
-  .es.es-side .txt { max-width:250px; }
+  .es.es-side .txt { max-width:250px; padding-top:10px; } /* every vignette's subject sits low on its canvas: line the text up with it */
   .es .title { font-family:var(--friz); font-size:12px; color:var(--text); margin-bottom:4px; }
   .es .line { font-size:12px; color:var(--muted); line-height:1.35; }
   .es .act { margin-top:10px; display:flex; align-items:center; gap:8px; }
@@ -147,8 +151,8 @@
     color:var(--gold); letter-spacing:.1em; }
   .plate input::selection { background:rgba(var(--gold-rgb),.28); color:#fff3c4; }
   .plate.sel { border-color:var(--gold); background:#26231c; }
-  .plate .lbl { position:absolute; left:0; right:0; top:-7px; text-align:center; }
-  .plate .lbl span { font-family:var(--friz); font-size:9px; color:var(--muted); background:var(--raised); padding:0 5px; letter-spacing:.08em; text-transform:uppercase; }
+  .plate .lbl { position:absolute; left:0; right:0; top:-8px; text-align:center; line-height:14px; }
+  .plate .lbl span { font-family:var(--friz); font-size:11px; color:var(--muted); background:var(--raised); padding:0 5px; letter-spacing:.06em; text-transform:uppercase; }
 </style>
 </head>
 <body>
@@ -158,6 +162,8 @@
   <span class="grp"><span class="lab">Layout</span><button data-k="layout" data-v="stacked">Stacked</button><button data-k="layout" data-v="side">Side</button></span>
   <span class="grp"><span class="lab">Code</span><button data-k="code" data-v="box">Box</button><button data-k="code" data-v="plate">Gold plate</button></span>
   <span class="grp"><span class="lab">Crew</span><button data-k="crew" data-v="alone">Alone</button><button data-k="crew" data-v="friends">With friends</button></span>
+  <span class="grp"><span class="lab">Alone, you</span><button data-k="you" data-v="founder">Started it</button><button data-k="you" data-v="joiner">Joined it</button></span>
+  <span class="grp"><span class="lab">Camp</span><button data-k="camp" data-v="on">On</button><button data-k="camp" data-v="off">Off</button></span>
   <span class="grp"><span class="lab">Size</span><button data-k="size" data-v="min">Smallest</button><button data-k="size" data-v="max">Largest</button><button data-k="size" data-v="both">Both</button></span>
   <span class="grp"><span class="lab">Zoom</span><button data-k="zoom" data-v="1">1x</button><button data-k="zoom" data-v="2">2x</button></span>
 </header>
@@ -178,8 +184,9 @@ const PAL = {
   K: "#0b0a12", S: "#e8b890", s: "#b98465", W: "#fff3c4", Y: "#ffe9a0", G: "#ffd14a", O: "#f0a21c",
   R: "#c9481c", B: "#5a3a24", b: "#3a2518", T: "#8c8796", t: "#5d5966", L: "#70e370", P: "#f2b8d0",
   Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8", N: "#ece8d8", A: "#c89a5a", a: "#8f6a3a", r: "#5a1620",
-  // NEW letters: the backdrop's own ground-glow tones (camp-art.mjs's glow ramp), for the vignettes' ground.
-  u: "#141019", v: "#201619", w: "#35231a", x: "#573518",
+  // NEW letters for the vignettes' ground. v w x: the backdrop's own firelit ground-glow tones (camp-art.mjs's
+  // glow ramp), only under a fire. g h: a cool unlit ground, just lighter than the window so K outlines read on it.
+  v: "#201619", w: "#35231a", x: "#573518", g: "#17151e", h: "#211e29",
 };
 const SIT = ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...", "..KCCDDCCK..", ".KCCCDDCCCK.", ".KSCCDDCCSK.", ".KKCCCCCCKK.", "..KDDKKDDK..", "..KKK..KKK.."];
 const FIRE = [
@@ -241,9 +248,19 @@ function grid(w, h) {
 
 // ---- The vignettes ----------------------------------------------------------------------------------
 // Each is frames(): a list of row-string frames played on the band's 6/s tick (one frame if static).
-const STONE = [".TT.", "TZTt", "tttt"];
-const STONE_S = ["TT", "tt"];
-const CHAR_LOGS = ["...bb.........bb...", "..bbKbb.....bbKbb..", ".KbbbRbbKKKbbRbbbK.", "KKbbbbbbbbbbbbbbbKK", "..KKKKKKKKKKKKKKK.."];
+// One rendering rule for the detailed set:
+//   - every vignette is the same 40 x 22 canvas, its subject inside a ~24 x 14 box, standing on one ground line;
+//   - the subject is outlined in K like the Pocket Camp's tools (light sources, fire and moon, are not);
+//   - light falls from the left: lit tones (N Z A F) on the left edge, shade (t a f) on the right;
+//   - the ground is a dithered patch under the subject: cool (g h) everywhere, warm (v w x) only where a fire burns.
+const VW = 40, VH = 22, BASE = 19; // BASE: the ground line, the row the subject's last pixel sits on
+const COOL = ["h", "g"], WARM = ["x", "w", "v"];
+const scene = (tones, cx = 20, rx = 15) => grid(VW, VH).ground(cx, BASE + 0.6, rx, 2.6, tones);
+// Stand an outlined sprite on the ground line, centred on cx (its K outline's bottom row goes one below BASE).
+const stand = (g, rows, cx, drop = 0) => g.stamp(rows, Math.round(cx - rows[0].length / 2), BASE + 1 + drop - rows.length + 1);
+const slow = (frames, n) => frames.flatMap((fr) => Array(n).fill(fr)); // hold each frame n ticks
+const STONE = outlined([".TT.", "TZTt", "Tttt"]);
+const STONE_S = outlined(["TZ", "tt"]);
 const HEAP = [
   ["....R..O....", "..RROGOGRR..", ".ROOGYGOOOR.", "RROGOOGORORR"],
   ["......R.....", "..RRGOOORR..", ".ROGOGYGOOR.", "RROOGOOGORRR"],
@@ -252,102 +269,104 @@ const HEAP = [
 
 const DETAILED = {
   feed() {
-    // Dying fire: embers on charred logs in a ring of stones, a thread of smoke going up.
+    // A fire burned down: charred logs (cracks still glowing) in a ring of stones, one thread of smoke going up.
+    const CHARRED = outlined(["..BB.......BB..", ".BBRBb...bBRBB.", "BBBBBBRBBBBBBBb", ".bbbbbbbbbbbbb."]);
     return [0, 1, 2, 3, 4, 5].map((f) => {
-      const g = grid(36, 20).ground(18, 17.5, 17, 3.2, ["x", "w", "v", "u"]);
-      g.stamp(STONE, 6, 14).stamp(STONE, 26, 14).stamp(STONE_S, 10, 17).stamp(STONE_S, 24, 17);
-      g.stamp(CHAR_LOGS, 8, 13).stamp(HEAP[f % 3], 12, 11);
-      // smoke: a thin wisp rising and swaying, pixels a row apart, fading to the darker grey
-      for (let k = 0; k < 6; k++) {
-        const y = 10 - k * 1.6 - (f % 2) * 0.8, x = 18 + Math.round(Math.sin(k * 0.9 + f * 0.6) * 1.5);
-        if (y >= 0) g.set(x, y, k < 2 ? "T" : "t");
+      const g = scene(WARM, 20, 16);
+      stand(g, STONE, 8);
+      stand(g, STONE, 32); stand(g, STONE_S, 11, 1); stand(g, STONE_S, 29, 1);
+      stand(g, CHARRED, 20);
+      g.stamp(HEAP[f % 3], 14, 13);
+      // Smoke: one pixel on every row so it reads as a line, swaying more as it rises, thinning out at the top.
+      for (let y = 12; y >= 2; y--) {
+        const k = 12 - y, x = 20 + Math.round(Math.sin(k * 0.55 - f * 0.8) * (0.3 + k * 0.16));
+        if (y <= 4 && (y + f) % 2) continue;
+        g.set(x, y, k < 4 ? "T" : "t");
       }
-      if (f % 3 === 1) g.set(22, 8, "O"); // a spark lifting off
-      if (f % 3 === 2) g.set(21, 6, "R");
+      if (f === 2) g.set(23, 9, "O"); // a spark lifting off, once a turn
       return g.rows();
     });
   },
   goals() {
-    // Empty plinth: a stone pedestal with a bare brass plate and a dust ring where a cup would stand.
-    const PLINTH = [
-      "...NZZZZTTTTZZZZZt...", "..TZZZZZZZZZZZZZZZt..", "..ttttttttttttttttt..", "....TZTTTTTTTTTTtt...",
-      "....TZTTTTTTTTTTtt...", "....TZTTaaaaaaTTtt...", "....TZTTaAAAAaTTtt...", "....TZTTaaaaaaTTtt...",
-      "....TZTTTTTTTTTTtt...", "....TZTTTTTTTTTTtt...", "...NZZZZZZZZZZZZZZt..", "..TTTTTTTTTTTTTTTTTt.",
-      ".TZZZZZZZZZZZZZZZZZTt", ".ttttttttttttttttttt.",
-    ];
-    return [0, 1, 2, 3, 4, 5].map((f) => {
-      const g = grid(30, 20).ground(15, 18.5, 14, 2.6, ["w", "v", "u"]).stamp(PLINTH, 4, 4);
-      if (f === 0) g.set(9, 3, "W"); // a glint off the empty top, once a turn
-      return g.rows();
-    });
+    // A wooden display stand with the Pocket Camp's cup missing from it: only its dotted ghost where it will stand.
+    const STAND = outlined([
+      "AAAAAAAAAAAAAAAAAAAa", "aaaaaaaaaaaaaaaaaaaa", ".Aa..............Aa.", ".Aa..............Aa.",
+      ".AAAAAAAAAAAAAAAAAa.", ".Aa..............Aa.", ".Aa..............Aa.",
+    ]);
+    const CUP = outlined(["G.GYYYYYG.G", "GGGYWYYOGGG", ".G.GYYYO.G.", "....GYO....", ".....O.....", "....GYO....", "...GGOOO..."]);
+    // The cup's outline in dim brass, hollow: the cup's own colour and shape, with nothing in it.
+    const GHOST = CUP.map((r) => [...r].map((c) => (c === "K" ? "a" : ".")).join(""));
+    const g = scene(COOL);
+    stand(g, STAND, 20);
+    g.stamp(GHOST, 14, 12 - GHOST.length + 2);
+    return [g.rows()];
   },
   when() {
-    // A moon over a sundial: a crescent, stars that twinkle, a stone dial with its brass gnomon.
-    const MOON = ["..NNN..", ".NNW...", "NNW....", "NNW....", "NNW....", ".NNW...", "..NNN.."];
-    const DIAL = [
-      "........aA........", ".......aAA........", "......aAAAa.......", ".ZZZZZaAAAZZZZZZt.", "NZtZZZZZZZZZZtZZZt",
-      "TTTTTTTTTTTTTTTTTt", "..tttttttttttttt..", "......TZTTTt......", "......TZTTTt......", "......TZTTTt......",
-      ".....TTZTTTtt.....", "....tttttttttt....",
-    ];
-    return [0, 1, 2, 3, 4, 5].map((f) => {
-      const g = grid(32, 22).ground(16, 20.5, 14, 2.4, ["v", "u"]).stamp(MOON, 3, 1).stamp(DIAL, 8, 9);
-      g.line(19, 10, 24, 15, "t"); // the gnomon's moon-shadow
-      [[14, 2], [27, 4], [22, 1], [11, 6]].forEach(([x, y], i) => g.set(x, y, (f + i) % 4 === 0 ? "W" : (f + i) % 4 === 2 ? "." : "Z"));
+    // An hourglass under a crescent moon: the top bulb still full, a grain falling, a small pile below.
+    const GLASS = (grain) => outlined([
+      "AAAAAAAAAAAAa", "aaaaaaaaaaaaa", ".Z.FYGGGGf.t.", ".Z.FYGGGGf.t.", ".Z..FGGGf..t.", ".Z...FGf...t.", ".Z....G....t.",
+      grain === 0 ? ".Z...FGf...t." : ".Z...F.f...t.", grain === 1 ? ".Z..F.G.f..t." : ".Z..F...f..t.",
+      ".Z.F..G..f.t.", ".Z.F.GGG.f.t.", "AAAAAAAAAAAAa", "aaaaaaaaaaaaa",
+    ]);
+    const MOON = [".NNN.", "NNW..", "NW...", "NW...", "NNW..", ".NNN."];
+    return slow([0, 1, 2], 2).map((grain, f) => {
+      const g = scene(COOL);
+      g.stamp(MOON, 7, 3);
+      stand(g, GLASS(grain), 20);
+      g.set(31, 4, "Z").set(28, 1, "t").set(34, 9, f < 3 ? "W" : "Z"); // one star twinkles, once a turn
       return g.rows();
     });
   },
   spares() {
-    // An open, empty crate: the inside dark, a wisp of straw, its lid leaning on the side.
-    const CRATE = [
-      ".aAAAAAAAAAAAAAAa.", "aAbbbbbbbbbbbbbbAa", "aAbKbbbbbbbbbbKbAa", "aAbbYbbbbAbbbYbbAa", "AAAAAAAAAAAAAAAAAA",
-      "AaAAAAaAAAAAaAAAAa", "AaAAAAaAAAAAaAAAAa", "aaaaaaaaaaaaaaaaaa", "AaAAAAaAAAAAaAAAAa", "AaAAAAaAAAAAaAAAAa",
-      "aaaaaaaaaaaaaaaaaa",
-    ];
-    const LID = ["....AA", "....Aa", "...AAa", "...Aa.", "...Aa.", "..AAa.", "..Aa..", "..Aa..", ".AAa..", ".Aa...", ".Aa...", "AAa..."];
-    const g = grid(34, 20).ground(17, 18, 16, 2.6, ["w", "v", "u"]);
-    g.stamp(CRATE, 6, 6).stamp(LID, 24, 6).stamp(["Y.A", ".Y."], 4, 17).stamp(["A"], 28, 18);
+    // The Pocket Camp's crate, emptied: open, dark inside, its lid leaning against its side.
+    const CRATE = outlined([
+      ".aaaaaaaaaaaa.", "abbbbbbbbbbbba", "abbbbbbbbbbbba", "AAAAAAAAAAAAAa",
+      "AAaaaaAAaaaaAa", "AAaaaaAAaaaaAa", "AAaaaaAAaaaaAa", "AAAAAAAAAAAAAa",
+    ]);
+    const LID = outlined(["AAa....", "AAAa...", ".AAa...", ".AAAa..", "..AAa..", "..AAAa.", "...AAa.", "...AAAa", "....AAa"]);
+    const g = scene(COOL);
+    stand(g, CRATE, 18);
+    g.stamp(LID, 24, BASE + 1 - LID.length + 1);
     return [g.rows()];
   },
   professions() {
-    // An anvil on a stump, a hammer leaning against it. Cold: nobody's working it.
-    const ANVIL = [
-      "......NZZZZZZZZZZZZt", "..ZZZZZZZZZZZZZZZZZt", "TTTTTZZZZZZZZZZZZZTt", "...ttTTTTTTTTTTTTtt.", ".......TTTTTTTtt....",
-      "........TTTTTt......", "........TTTTTt......", "......TTTTTTTTtt....", ".....TTTTTTTTTTtt...", "....ttttttttttttt...",
-    ];
-    const STUMP = [".aAAAAAAAAAAAAAAa.", "aAAaAAAAAAAAaAAAAa", "BBBBBBBBBBBBBBBBBB", "BbBBBbBBBBBbBBBBBb", "BbBBBbBBBBBbBBBBBb", "bbbbbbbbbbbbbbbbbb"];
-    const g = grid(34, 20).ground(16, 18.5, 15, 2.4, ["w", "v", "u"]);
-    g.stamp(STUMP, 6, 13).stamp(ANVIL, 5, 3).stamp(HAMMER, 25, 9);
+    // An anvil on a stump, a hammer propped by it. Cold: nobody's working it.
+    const raw = grid(16, 12).stamp([
+      "....NZZZZZZZZZZt", "NZZZZZZZZZZZZZZt", "..ZZZZZZZZZZZZZt", "....tTTTTTTTTtt.",
+      ".......TTTt.....", ".......TTTt.....", ".....TTTTTTTt...", "....tttttttttt..",
+    ], 0, 0).stamp([".aAAAAAAAAAAAAa.", "BBBBbBBBBBBbBBBb", "BbBBbBBBBBBbBBbb", ".bbbbbbbbbbbbbb."], 0, 8);
+    const g = scene(COOL);
+    stand(g, outlined(raw.rows()), 18);
+    stand(g, HAMMER, 30);
     return [g.rows()];
   },
   catches() {
-    // A rod over water: propped on a forked stick on the bank, the line down to a bobber, rings round it.
-    return [0, 1, 2, 3, 4, 5].map((f) => {
-      const g = grid(38, 20);
-      for (let y = 13; y < 20; y++) for (let x = 0; x < 38; x++) {
-        const band = (x + f * (y % 2 ? 1 : -1) + y * 3) % 9;
-        g.set(x, y, y === 13 ? (band < 5 ? "f" : "F") : band === 0 ? "F" : "f");
-      }
-      g.rect(0, 12, 9, 8, "b").rect(0, 12, 8, 1, "B").set(8, 13, "b").set(9, 14, "b");
-      g.stamp(["L.L", "LL."], 1, 10).stamp([".L", "LL"], 6, 10);
-      g.line(5, 12, 5, 9, "a").set(4, 8, "a").set(6, 8, "a");
-      g.line(1, 11, 26, 2, "B").line(24, 3, 26, 2, "A");
-      const bob = f % 3 === 2 ? 1 : 0;
-      g.line(26, 3, 28, 12 + bob, "Z");
-      g.set(28, 12 + bob, "R").set(28, 11 + bob, "W");
-      const r = f % 3; // rings spreading
-      g.set(28 - 2 - r, 13, "F").set(28 + 2 + r, 13, "F");
-      if (r > 0) g.set(28 - 1 - r, 14, "F").set(28 + 1 + r, 14, "F");
+    // A rod propped on a forked stick on the bank, its line down to a bobber in a pond that fades out at its edges.
+    const rod = grid(VW, VH);
+    rod.line(2, 18, 24, 6, "B").line(22, 7, 24, 6, "A");
+    rod.line(9, 19, 9, 16, "a").set(8, 15, "a").set(10, 15, "a");
+    const ROD = outlined(rod.rows()).slice(1, VH + 1).map((r) => r.slice(1, VW + 1));
+    return slow([0, 1, 2], 2).map((r) => {
+      const g = scene(COOL, 18, 17);
+      g.ground(27, BASE + 0.2, 12, 2.4, ["f", "f", "h"]);
+      [[22, 18], [31, 19], [26, 20]].forEach(([x, y], i) => g.set(x + ((r + i) % 3) - 1, y, "F")); // glints, drifting slowly
+      g.line(15, 19, 15, 16, "A").line(17, 19, 17, 17, "a").line(37, 19, 37, 17, "a"); // reeds at the water's edges
+      g.stamp(ROD, 0, 0);
+      const bob = r === 2 ? 1 : 0;
+      g.line(24, 6, 28, 17 + bob, "Z");
+      g.set(28, 17 + bob, "R").set(28, 16 + bob, "W");
+      g.set(28 - 2 - r, 18, "F").set(28 + 2 + r, 18, "F"); // a ring spreading
       return g.rows();
     });
   },
   alone() {
-    // A log by the fire with nobody on it.
-    const LOG = [".BBBBBBBBBBBBBAAa.", "BBBbBBBBBbBBBAaaAa", "BbBBBBBbBBBBBAaAaA", ".bbbbbbbbbbbbbaaa."];
+    // A log by the fire with nobody on it. (The fire stays: it's this state's own.)
+    const LOG = outlined([".BBBBBBBBBBBBBAAa.", "BBBbBBBBBbBBBAaaAa", "BbBBBBBbBBBBBAaAaA", ".bbbbbbbbbbbbbaaa."]);
     return [0, 1, 2].map((f) => {
-      const g = grid(40, 22).ground(14, 19.5, 18, 3.4, ["x", "w", "v", "u"]);
-      g.stamp(LOGS, 3, 15).stamp(FIRE[f], 5, 4).stamp(LOG, 21, 15);
-      g.stamp(STONE_S, 1, 18).stamp(STONE_S, 17, 19);
-      g.set(10 + (f - 1), 1, f === 1 ? "G" : "R"); // an ember above the flames
+      const g = scene(WARM, 16, 18);
+      g.stamp(LOGS, 4, 17).stamp(FIRE[f], 6, 6);
+      stand(g, LOG, 30); stand(g, STONE_S, 2, 1); stand(g, STONE_S, 20, 1);
+      g.set(11 + (f - 1), 3, f === 1 ? "G" : "R"); // an ember above the flames
       return g.rows();
     });
   },
@@ -397,7 +416,7 @@ const MINIMAL = {
 };
 
 const NAMES = {
-  feed: "Dying fire (Feed)", goals: "Empty plinth (Trophies)", when: "Moon and sundial (Play times)", spares: "Empty crate (Spares)",
+  feed: "Dying fire (Feed)", goals: "Empty stand, the cup's ghost (Trophies)", when: "Hourglass under the moon (Play times)", spares: "Empty crate (Spares)",
   professions: "Anvil (Professions)", catches: "Rod over water (Catches)", alone: "Empty log (the alone state)",
 };
 const ART = {};
@@ -472,18 +491,20 @@ const PARAMS = new URLSearchParams(location.search);
 const opts = {
   art: PARAMS.get("art") || "detailed", layout: PARAMS.get("layout") || "stacked", code: PARAMS.get("code") || "box",
   crew: PARAMS.get("crew") || "alone", size: PARAMS.get("size") || "both", zoom: PARAMS.get("zoom") || "1",
-  tab: PARAMS.get("tab") || "feed", settled: true, own: false,
+  tab: PARAMS.get("tab") || "feed", you: PARAMS.get("you") || "founder", camp: PARAMS.get("camp") || "on", settled: true, own: false,
 };
 const CODE = "K3F9-A2QX";
 const COPY = {
   feed: { title: "Quiet by the fire", text: "Dings, deaths, new Characters and Crew wins land here, and wait for you while you're away." },
   goals: { title: "The shelf is bare", text: "Every goal the Crew reaches, dungeon it clears and Rare it slays puts a medal here." },
   goalsUnsettled: { title: "Counting up the Crew", text: "Goals the Crew has already reached show here once everyone's records are in." },
-  when: { title: "No pattern yet", text: "It takes 2 weeks of play for an hour to count as one the Crew usually plays." },
-  spares: { title: "The crate is empty", text: "Got something a friend could use? Drop it on the slot above." },
+  when: { title: "Too soon to tell", text: "After 2 weeks of play, the hours the Crew usually plays show up here." },
+  spares: { title: "The crate is empty", text: "Got something your Crew could use? Drop it on the slot above." },
   professions: { title: "No trades yet", text: "When anyone learns a profession, it shows up here with their skill." },
   catches: { title: "No catches yet", text: "When anyone in the Crew catches a fish, it shows up here. Start in the waters for your level: Elwynn Forest." },
   alone: { title: "Your Crew hasn't arrived yet", text: "Give your friends the Crew code. They join with /bff join, and show up here once one of them is online." },
+  // You joined with someone's code, but haven't seen any of them yet: nothing to hand out, only to wait for.
+  aloneJoined: { title: "Waiting for the Crew", text: "You're in. The others show up here the first time one of them is online at the same time as you, or after." },
 };
 const TABS = [
   ["roster", "Roster"], ["feed", "Feed"], ["goals", "Trophies"], ["when", "Play Times"], ["spares", "Spare Items"],
@@ -588,7 +609,7 @@ function tabContent(width) {
   const wrap = document.createElement("div");
   wrap.className = "fill";
   const centred = (state) => { const c = document.createElement("div"); c.className = "centre"; c.appendChild(emptyState(state, width - 24)); wrap.appendChild(c); };
-  const aloneState = () => ({ art: "alone", ...COPY.alone, action: codeAction });
+  const aloneState = () => (opts.you === "joiner" ? { art: "alone", ...COPY.aloneJoined } : { art: "alone", ...COPY.alone, action: codeAction });
   const tool = (html) => wrap.insertAdjacentHTML("beforeend", `<div class="tool">${html}</div>`);
   switch (opts.tab) {
     case "roster": {
@@ -648,7 +669,7 @@ function panel(w, h) {
   p.style.width = w + "px"; p.style.height = h + "px";
   const alone = opts.crew === "alone";
   p.insertAdjacentHTML("beforeend", `<div class="phead"><span class="t">BFF</span><span class="s"><i class="${alone ? "off" : ""}"></i>${alone ? "Only you" : "2 online"}</span><span class="x">✕</span></div>`);
-  p.appendChild(camp(w - 2, h < 460 ? 78 : 120));
+  if (opts.camp === "on") p.appendChild(camp(w - 2, h < 460 ? 78 : 120));
   const body = document.createElement("div");
   body.className = "pbody";
   body.insertAdjacentHTML("beforeend", `<div class="firelight"></div><div class="settle"></div>`);
@@ -705,7 +726,7 @@ function sheet() {
 function dump() {
   const pre = document.getElementById("dump");
   const lines = [`// ${opts.art} vignettes for scripts/camp-art.mjs (#239). Each is a list of frames; one frame = static.`,
-    `// Palette letters: camp-art.mjs's PAL, plus u v w x = the backdrop's ground glow (#141019 #201619 #35231a #573518).`];
+    `// Palette letters: camp-art.mjs's PAL, plus v w x = the backdrop's ground glow (#201619 #35231a #573518), g h = cool ground (#17151e #211e29).`];
   for (const k of Object.keys(NAMES)) {
     const frames = ART[opts.art][k];
     lines.push(`const VIGNETTE_${k.toUpperCase()} = [`);
@@ -746,7 +767,7 @@ function render() {
   extra.innerHTML = bits.length ? `<br>${bits.join(" ")}` : "";
   document.getElementById("setl")?.addEventListener("click", () => { opts.settled = !opts.settled; render(); });
   document.getElementById("own")?.addEventListener("click", () => { opts.own = !opts.own; render(); });
-  const q = new URLSearchParams({ art: opts.art, layout: opts.layout, code: opts.code, crew: opts.crew, size: opts.size, zoom: opts.zoom, tab: opts.tab });
+  const q = new URLSearchParams({ art: opts.art, layout: opts.layout, code: opts.code, crew: opts.crew, you: opts.you, camp: opts.camp, size: opts.size, zoom: opts.zoom, tab: opts.tab });
   history.replaceState(null, "", "?" + q);
   sheet();
 }
@@ -755,7 +776,8 @@ document.getElementById("dumpBtn").addEventListener("click", dump);
 
 const FPS = 6;
 function tick(now) {
-  const f = Math.floor(now / 1000 * FPS);
+  // The vignettes move only while the Camp is on (the Camp setting off = everything still, frame 0).
+  const f = opts.camp === "on" ? Math.floor(now / 1000 * FPS) : 0;
   for (const item of live) {
     if (item.band) { drawBand(item, f); continue; }
     const { c, frames, scale, bg } = item;
