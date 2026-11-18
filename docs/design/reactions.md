@@ -85,6 +85,10 @@ Unseen Reactions to you can bring up the popup by themselves. They show in a sec
 
 After settling, a new Reaction to you goes through the same settings as entries: a chat line ("BFF: Bob cheered your ding to 30.") if chat lines are on, a Toast if toasts are on, and it's marked seen as it fires. With both off it stays unseen. Chat lines are never merged. A Reaction for an entry whose Reaction toast is still on screen merges into it ("Bob and Cleo cheered your ding to 30") and gives it its full time again. Reaction toasts use the kind's Reaction icon and play the toast sound like any other toast.
 
+### In the Camp
+
+Every Reaction this client attaches while running, on anyone's entry, also plays in the Camp: a Cheer hops the Member, the first Respects bloom their Grave's flower, a Welcome makes them wave. See docs/design/camp.md, Reactions, live.
+
 ### Unseen count
 
 Unseen Reactions count in the minimap's "N new in Feed", and their entries are tagged "new" in the Feed tab. Opening the Feed tab marks them seen.

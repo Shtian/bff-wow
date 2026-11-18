@@ -440,3 +440,157 @@ describe("Reactions", function()
     assert.equal(0, a.core:unseen())
   end)
 end)
+
+-- The Camp plays the Reactions this client attaches live (campReaction):
+-- docs/design/camp.md.
+describe("Reactions in the Camp", function()
+  -- The campReaction events the client's Core fired, as "kind:Name", with
+  -- the grave key for Respects.
+  local function played(client, clients)
+    local names = {}
+    for _, other in ipairs(clients) do names[other.memberId] = other.name end
+    local list = {}
+    for _, event in ipairs(events(client, "campReaction")) do
+      list[#list + 1] = event.kind .. ":" .. (names[event.memberId] or tostring(event.memberId))
+    end
+    return list
+  end
+
+  local function graveKeys(client)
+    local keys = {}
+    for i, grave in ipairs(client.core:camp(375).graves) do keys[i] = grave.key end
+    return keys
+  end
+
+  it("play a friend's Cheer on a third Member's entry, for everyone but the one who cheered", function()
+    local net, clients = crew({ "Ann", "Bob", "Cid" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    a:play({ level = 11 })
+    net:run(3)
+    assert.is_true(react(b, "Ann dinged 11"))
+    net:run(5)
+    assert.same({ "cheer:Ann" }, played(c, clients))
+    assert.same({ "cheer:Ann" }, played(a, clients))
+    -- Your own Cheer hops through the UI's own path, so Core plays none.
+    assert.same({}, played(b, clients))
+  end)
+
+  it("bloom a Grave on the first Respects only, keyed to the death it marks", function()
+    local net, clients = crew({ "Ann", "Bob", "Cid" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    a:play({ deaths = 1 })
+    net:run(3)
+    local grave = graveKeys(c)[1]
+    assert.is_string(grave)
+    assert.same({ grave }, graveKeys(a))
+    assert.is_true(react(b, "Ann died"))
+    net:run(5)
+    assert.same({ "respects:Ann" }, played(c, clients))
+    assert.equal(grave, events(c, "campReaction")[1].grave)
+    assert.same({ "respects:Ann" }, played(a, clients))
+    -- Your own Respects bloom it too, once.
+    assert.same({ "respects:Ann" }, played(b, clients))
+    assert.equal(grave, events(b, "campReaction")[1].grave)
+
+    -- A later Respects on a Grave that already has its flower plays nothing.
+    assert.is_true(react(c, "Ann died"))
+    net:run(5)
+    assert.same({ "respects:Ann" }, played(a, clients))
+    assert.same({ "respects:Ann" }, played(b, clients))
+    assert.same({ "respects:Ann" }, played(c, clients))
+  end)
+
+  it("wave a Member who was Welcomed, your own Welcome too", function()
+    local net, clients, _, code = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    local d = net:add("Dee", { character = playing("Dee") }):login()
+    d:join(code)
+    net:run(40)
+    local all = { a, b, d }
+    assert.is_true(react(a, "Dee joined the Crew"))
+    net:run(5)
+    assert.same({ "welcome:Dee" }, played(a, all))
+    assert.same({ "welcome:Dee" }, played(b, all))
+    assert.same({ "welcome:Dee" }, played(d, all))
+  end)
+
+  it("play whatever the chat-line and toast settings, and none with the Camp off", function()
+    local net, clients = crew({ "Ann", "Bob", "Cid" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    a.core:setChatLines(false)
+    a.core:setToasts(false)
+    c.core:setSetting("camp", false)
+    a:play({ level = 11 })
+    net:run(3)
+    react(b, "Ann dinged 11")
+    net:run(5)
+    assert.same({ "cheer:Ann" }, played(a, clients))
+    assert.equal(1, a.core:unseen())
+    assert.same({}, played(c, clients))
+  end)
+
+  it("play nothing caught up at login or on first sight", function()
+    local net, clients, _, code = crew({ "Ann", "Bob", "Cid" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    a:play({ level = 11 })
+    net:run(3)
+    c:logout()
+    net:run(5)
+    react(b, "Ann dinged 11")
+    net:run(5)
+
+    relog(net, c)
+    assert.same({ "Bob" }, reactors(c, "Ann dinged 11"))
+    assert.same({}, played(c, clients))
+
+    local d = net:add("Dee", { character = playing("Dee") }):login()
+    d:join(code)
+    net:run(40)
+    assert.same({}, played(d, clients))
+  end)
+
+  it("play nothing for a Removed Member's Reaction, or on a Removed or Left Member", function()
+    local net, clients = crew({ "Ann", "Bob", "Cid", "Dee" })
+    local a, b, c, d = clients[1], clients[2], clients[3], clients[4]
+    a:play({ level = 11 })
+    d:play({ level = 11 })
+    net:run(3)
+
+    assert.is_true(c.core:removeMember(b.memberId))
+    react(b, "Ann dinged 11")
+    net:run(5)
+    assert.same({}, played(c, clients))
+    assert.same({ "cheer:Ann" }, played(a, clients))
+
+    d.core:leaveCrew()
+    net:run(3)
+    assert.is_true(react(a, "Dee dinged 11"))
+    net:run(5)
+    assert.same({ "You" }, reactors(a, "Dee dinged 11"))
+    assert.same({ "Ann" }, reactors(b, "Dee dinged 11"))
+    assert.same({}, played(b, clients))
+
+    assert.is_true(b.core:removeMember(a.memberId))
+    react(c, "Ann dinged 11")
+    net:run(5)
+    assert.same({}, played(b, clients))
+  end)
+
+  it("send nothing more", function()
+    local function sentBy(camp)
+      local net, clients = crew({ "Ann", "Bob", "Cid" })
+      local a, b, c = clients[1], clients[2], clients[3]
+      for _, client in ipairs(clients) do client.core:setSetting("camp", camp) end
+      local mark = #net.wire
+      a:play({ level = 11, deaths = 1 })
+      net:run(3)
+      react(b, "Ann dinged 11")
+      react(c, "Ann died")
+      net:run(30)
+      local types = {}
+      for _, message in ipairs(net:sent(mark)) do types[#types + 1] = message.type end
+      return types
+    end
+    assert.same(sentBy(false), sentBy(true))
+  end)
+end)

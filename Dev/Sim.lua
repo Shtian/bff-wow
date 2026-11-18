@@ -415,6 +415,20 @@ local function reactToYou(client, you)
   return false
 end
 
+-- Gives the Reaction ("cheer", "respects" or "welcome") to the newest
+-- entry of anyone's that takes it and the client can still react to: a
+-- friend's ding or death, or a joined entry, for the Camp to play.
+local function reactWith(client, reaction)
+  for _, day in ipairs(client.core:feed().days) do
+    for _, entry in ipairs(day.entries) do
+      if entry.reaction == reaction and entry.canReact and not entry.reacted then
+        return client.core:react(entry.key)
+      end
+    end
+  end
+  return false
+end
+
 -- Test Spares, as links the way the game hands them out: one
 -- plain, one with an enchant, one with a scaling random suffix.
 local TEST_ITEMS = {
@@ -512,6 +526,9 @@ local ACTIONS = {
     client:play()
   end,
   react = function(client) reactToYou(client, yourId) end,
+  cheer = function(client) reactWith(client, "cheer") end,
+  respects = function(client) reactWith(client, "respects") end,
+  welcome = function(client) reactWith(client, "welcome") end,
   fish = fishUp,
   -- Steps through what a Member can be doing, then back to nothing.
   doing = function(client)
@@ -772,7 +789,7 @@ ns.Console = Console
 
 local Skin = ns.Skin
 
-local WIDTH = 930
+local WIDTH = 1090
 local HEIGHT = 510
 local INSET = 12
 local ROW_HEIGHT = 28
@@ -789,13 +806,14 @@ local TRACE = "e0a070"
 
 -- The console's action bar, left to right: each acts on the simulated
 -- Member selected in the list below it. Logging in and out is on each
--- Member's own row.
+-- Member's own row. React reacts to your newest entry; Cheer, Resp and
+-- Welc give that Reaction to anyone's newest entry that takes it.
 local BUTTONS = {
   { "ding", "Ding" }, { "xp", "XP" }, { "die", "Die" }, { "zone", "Zone" },
   { "alt", "Alt" }, { "max", "Max" }, { "skill", "Skill" }, { "fish", "Fish" }, { "doing", "Doing" }, { "form", "Form" },
   { "quest", "Quest" },
   { "inside", "Inst" }, { "group", "Group" },
-  { "react", "React" }, { "offer", "Offer" },
+  { "react", "React" }, { "cheer", "Cheer" }, { "respects", "Resp" }, { "welcome", "Welc" }, { "offer", "Offer" },
   { "claim", "Claim" },
 }
 
@@ -873,6 +891,8 @@ local function onEvent(event, arg)
     log(color(EVENT, "spare  ") .. arg.text)
   elseif event == "pocketCampAnimation" then
     log(color(EVENT, "pocket camp  ") .. arg.kind .. (arg.memberId and "  " .. nameOf(arg.memberId) or ""))
+  elseif event == "campReaction" then
+    log(color(EVENT, "camp  ") .. arg.kind .. "  " .. nameOf(arg.memberId))
   elseif event == "awaySummary" then
     log(color(EVENT, "away summary  ") .. tostring(arg.count) .. " entries from " .. #arg.members .. " Members")
   else

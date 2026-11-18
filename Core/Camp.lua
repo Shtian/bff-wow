@@ -97,9 +97,10 @@ local function news(entries, now)
         local list = graves[entry.memberId] or {}
         graves[entry.memberId] = list
         local flower = #entry.reactors > 0 or nil
+        local key = entry.key and ns.Reactions.id(entry.key)
         for _ = 1, entry.count or 1 do
           if #list < MEMBER_GRAVES and total < GRAVES then
-            list[#list + 1] = { flower = flower }
+            list[#list + 1] = { flower = flower, key = key }
             total = total + 1
           end
         end
@@ -260,7 +261,7 @@ function Camp.view(rows, entries, now, columns, options)
         you = row.own or nil,
       }
       for i, graveX in ipairs(graveXs) do
-        view.graves[#view.graves + 1] = { memberId = row.memberId, x = graveX, flower = own[i].flower }
+        view.graves[#view.graves + 1] = { memberId = row.memberId, x = graveX, flower = own[i].flower, key = own[i].key }
       end
     elseif seated or not options.onlineOnly then
       more = more + 1

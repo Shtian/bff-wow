@@ -483,6 +483,21 @@ local function animate(self, entries)
   end
 end
 
+-- Reactions this client just attached ({ entry, reaction }), made while
+-- running: the Camp plays each (campReaction), in the panel and the
+-- Pocket Camp, whatever the chat-line and toast settings are. Only once
+-- sync has settled, so login catch-up plays nothing, and never with the
+-- Camp off. Marks nothing seen.
+local function playReaction(self, item)
+  local played = self:setting("camp") and self.log:campReaction(item)
+  if played then self.listener("campReaction", played) end
+end
+
+local function playReactions(self, attached)
+  if not self.log:isSettled() then return end
+  for _, item in ipairs(attached) do playReaction(self, item) end
+end
+
 local function announce(self, entries, reactions, notices)
   if not self.log:isSettled() then return end
   animate(self, entries)
@@ -951,7 +966,8 @@ end
 -- name), classFilename (of the Character the Roster shows), x (the
 -- figure's left edge), width (the figure's), labelWidth (room for the name
 -- above it), spark (max level in the last day), you }. graves are { memberId,
--- x, flower (anyone paid Respects) }, a death each in the last day; tent is
+-- x, flower (anyone paid Respects), key (the death's Reaction key as a
+-- string, which campReaction's grave names) }, a death each in the last day; tent is
 -- { x } when there's room; more counts the Members that didn't fit, nil
 -- when all did, and moreText words it ("+2 more"). Derived on read: no record changes and nothing is sent.
 -- See docs/design/camp.md.
@@ -1358,14 +1374,17 @@ end
 -- summary. It goes into your record and out with your next DATA, so it
 -- works in combat and offline. Ignores your own entries, Removed Members,
 -- entries that can't be reacted to, and those you already reacted to.
--- Returns true, or false and "reacted" when you already had.
+-- Returns true, or false and "reacted" when you already had. Your
+-- Respects bloom the Grave and your Welcome waves the newcomer
+-- (campReaction); your Cheer's hop is UI's own, so it plays none here.
 function Core:react(key)
-  local reason
-  key, reason = self.log:react(key)
+  local reason, attached
+  key, reason, attached = self.log:react(key)
   if not key then return false, reason end
   self.ledger:addReaction(key)
   self.gossip:ownChanged("now")
   self.listener("changed")
+  if ns.Reactions.forKind(key.kind) ~= "cheer" then playReaction(self, attached) end
   return true
 end
 
@@ -2390,8 +2409,9 @@ local function dataReceived(self, records, from, whispered)
           startWorking(self, record.id, was and ns.Professions.practised(was.professions, character.professions))
         end
       end
-      local entries, reactions = self.log:recordChanged(before, record)
+      local entries, reactions, attached = self.log:recordChanged(before, record)
       announce(self, entries, reactions, self.spareLife:recordChanged(before, record))
+      playReactions(self, attached)
       -- A Member first seen, leaving or back, or professions first shared,
       -- change who counts.
       if ns.Goals.countedChanged(before, record) then checkGoals(self, true) end
