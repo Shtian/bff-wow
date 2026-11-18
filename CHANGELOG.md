@@ -29,6 +29,15 @@
 
 
 
+
+## 2.11.0
+<sub>2026-11-18</sub>
+
+- *(minor)*
+  The Camp plays your Crew's Reactions as they arrive.
+
+  A Cheered friend hops with a burst of gold, the first Respects grow a flower on the Grave, and a Welcomed Member stands and waves "hi!".
+
 ## 2.10.0
 <sub>2026-11-17</sub>
 
