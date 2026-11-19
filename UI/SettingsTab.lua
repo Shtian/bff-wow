@@ -310,7 +310,7 @@ end
 
 local function drawLook()
   local look = core:look()
-  drawGrid(lookRow.hats, look.hat, look.label, function(art, key) art:SetHat(key) end)
+  drawGrid(lookRow.hats, look.hat, look.hatLabel, function(art, key) art:SetHat(key) end)
   drawGrid(lookRow.pets, look.pet, look.petLabel, function(art, key) art:SetPet(key) end)
   local class = ownClass()
   if class then lookRow.preview:SetClass(class, look.hat, look.pet) else lookRow.preview:Hide() end

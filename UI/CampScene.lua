@@ -295,11 +295,11 @@ local function hopping(scene, actor, late)
   return played and played >= 0 and played < HOP_FOR and played or nil
 end
 
-local function playing(scene, kind, memberId)
-  local now = GetTime()
+local function playing(scene, kind, memberId, late)
+  local now = GetTime() - (late or 0) / FPS
   for i = #scene.animations, 1, -1 do
     local animation = scene.animations[i]
-    if animation.kind == kind and animation.memberId == memberId and now < animation.ends then
+    if animation.kind == kind and animation.memberId == memberId and animation.start <= now and now < animation.ends then
       return now - animation.start, animation
     end
   end
@@ -313,10 +313,9 @@ end
 local function celebrating(scene, actor, f, late)
   late = late or 0
   if hopping(scene, actor, late) then return true end
-  local ding = playing(scene, "ding", actor.memberId)
-  ding = ding and ding - late / FPS
-  if ding and ding >= 0 and ding < STAR_RISES_FOR then return true end
-  return (ding or playing(scene, "maxLevel", actor.memberId)) ~= nil and bounced(f - late)
+  local ding = playing(scene, "ding", actor.memberId, late)
+  if ding and ding < STAR_RISES_FOR then return true end
+  return (ding or playing(scene, "maxLevel", actor.memberId, late)) ~= nil and bounced(f - late)
 end
 
 local function markRow(scene, name, row)
@@ -795,7 +794,7 @@ local function onUpdate(band)
   if f == scene.frame then return end
   scene.frame = f
   for i = #scene.animations, 1, -1 do
-    if scene.animations[i].ends <= now then table.remove(scene.animations, i) end
+    if scene.animations[i].ends + PET_HOP_LATE / FPS <= now then table.remove(scene.animations, i) end
   end
   for key, start in pairs(scene.blooms) do
     if now - start >= BLOOM.lasts then scene.blooms[key] = nil end

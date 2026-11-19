@@ -1518,7 +1518,7 @@ end
 
 function Core:look()
   local hat, pet = ownLook(self)
-  return { hat = hat, label = ns.Look.label(hat), pet = pet, petLabel = ns.Look.petLabel(pet) }
+  return { hat = hat, hatLabel = ns.Look.hatLabel(hat), pet = pet, petLabel = ns.Look.petLabel(pet) }
 end
 
 local function chosenKey(key)
@@ -1527,7 +1527,7 @@ end
 
 function Core:setLook(look)
   if type(look) ~= "table" then return nil, "unknownHat" end
-  if look.hat ~= nil and not ns.Look.known(look.hat) then return nil, "unknownHat" end
+  if look.hat ~= nil and not ns.Look.knownHat(look.hat) then return nil, "unknownHat" end
   if look.pet ~= nil and not ns.Look.knownPet(look.pet) then return nil, "unknownPet" end
   local oldHat, oldPet = ownLook(self)
   local hat, pet = oldHat, oldPet

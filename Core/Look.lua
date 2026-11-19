@@ -46,11 +46,11 @@ local function chosen(labels, look, field)
   return key ~= "none" and labels[key] and key or nil
 end
 
-function Look.known(key)
+function Look.knownHat(key)
   return hatLabels[key] ~= nil
 end
 
-function Look.label(key)
+function Look.hatLabel(key)
   return hatLabels[key or "none"]
 end
 

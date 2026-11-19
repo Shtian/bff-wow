@@ -78,7 +78,7 @@ local function news(entries, now)
   return graves, sparks
 end
 
-local function placeOn(side, figure, graveCount, fore, aft, gap, pet)
+local function placeOn(side, figure, graveCount, fore, aft, pet, gap)
   aft = aft or 0
   local petRoom = pet and LAYOUT.petGap + LAYOUT.pet or 0
   local width = figure + aft + petRoom + graveCount * (LAYOUT.graveGap + LAYOUT.grave)
@@ -143,7 +143,7 @@ local function arrange(rows, entries, now, columns, options, petted)
   local function roomOf(row)
     if options.room then return options.room(row) end
   end
-  local owners = {}
+  local withPets = {}
   local function petOf(row)
     if row.pet and not (options.noPet and options.noPet(row)) then return row.pet end
   end
@@ -158,8 +158,7 @@ local function arrange(rows, entries, now, columns, options, petted)
       local spots = {}
       for j = first, last do
         local fore, aft = roomOf(list[j])
-        local x, _, petX = placeOn(copy, LAYOUT.seated, 0, fore, aft, j > first and gap or nil,
-          petted[list[j].memberId])
+        local x, _, petX = placeOn(copy, LAYOUT.seated, 0, fore, aft, petted[list[j].memberId], j > first and gap or nil)
         spots[#spots + 1] = x and { x = x, petX = petX, side = tried } or nil
       end
       if #spots == last - first + 1 then
@@ -171,7 +170,7 @@ local function arrange(rows, entries, now, columns, options, petted)
     local side = roomier(left, right)
     for j = first, last do
       local fore, aft = roomOf(list[j])
-      local x, _, petX = placeOn(side, LAYOUT.seated, 0, fore, aft, j > first and gap or nil, petted[list[j].memberId])
+      local x, _, petX = placeOn(side, LAYOUT.seated, 0, fore, aft, petted[list[j].memberId], j > first and gap or nil)
       if not x then break end
       placed[list[j]] = { x = x, petX = petX, side = side }
     end
@@ -194,7 +193,7 @@ local function arrange(rows, entries, now, columns, options, petted)
       for _, count in ipairs({ #own, 0 }) do
         for _, tried in ipairs({ first, second }) do
           if not x then
-            x, graveXs, petX = placeOn(tried, figure, count, fore, aft, nil, petted[row.memberId])
+            x, graveXs, petX = placeOn(tried, figure, count, fore, aft, petted[row.memberId])
             side = x and tried
           end
         end
@@ -202,7 +201,7 @@ local function arrange(rows, entries, now, columns, options, petted)
       end
     end
     if x then
-      if pet then owners[#owners + 1] = row.memberId end
+      if pet then withPets[#withPets + 1] = row.memberId end
       view.actors[#view.actors + 1] = {
         memberId = row.memberId,
         pose = seated and "seated" or "asleep",
@@ -233,7 +232,7 @@ local function arrange(rows, entries, now, columns, options, petted)
   end
   labelRoom(view.actors, leftEdge, rightEdge)
   for _, actor in ipairs(view.actors) do actor.side = nil end
-  return view, owners
+  return view, withPets
 end
 
 local function seats(view)
@@ -245,18 +244,18 @@ end
 
 function Camp.view(rows, entries, now, columns, options)
   options = options or {}
-  local base, owners = arrange(rows, entries, now, columns, options, {})
+  local base, withPets = arrange(rows, entries, now, columns, options, {})
   local wanted = seats(base)
-  for count = #owners, 1, -1 do
+  for count = #withPets, 1, -1 do
     local petted = {}
-    for i = 1, count do petted[owners[i]] = true end
+    for i = 1, count do petted[withPets[i]] = true end
     local view = arrange(rows, entries, now, columns, options, petted)
     if seats(view) == wanted then
-      view.petsLeftOut = count < #owners and #owners - count or nil
+      view.petsLeftOut = count < #withPets and #withPets - count or nil
       return view
     end
   end
-  base.petsLeftOut = #owners > 0 and #owners or nil
+  base.petsLeftOut = #withPets > 0 and #withPets or nil
   return base
 end
 
