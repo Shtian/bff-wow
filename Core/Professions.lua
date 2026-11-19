@@ -340,5 +340,9 @@ function Professions.tab(rows, sortBy)
     end)
   end
   for _, member in ipairs(members) do member.index = nil end
-  return { professions = professions, members = members }
+  local none = true
+  for _, profession in ipairs(professions) do
+    if profession.had then none = false end
+  end
+  return { professions = professions, members = members, none = none }
 end

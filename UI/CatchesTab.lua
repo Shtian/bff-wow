@@ -310,6 +310,10 @@ local function createView(parent)
   view.message.text:SetPoint("TOP", view.message.title, "BOTTOM", 0, -4)
   view.message.text:SetJustifyH("CENTER")
   view.message.text:SetWordWrap(true)
+  -- No catches yet: the empty state (UI/EmptyState.lua), or the alone
+  -- state while you're the only Member known (your own catches count: with
+  -- any, it isn't empty).
+  view.empty = ns.EmptyState.new(view.content)
 
   -- Hiding the tab closes a tile's tooltip, not anyone else's.
   view:SetScript("OnHide", function()
@@ -445,8 +449,21 @@ local function drawMessage(message, width, y)
   return y - height
 end
 
+local function drawEmpty(empty, width, y)
+  if not empty then
+    view.empty:Hide()
+    return y
+  end
+  view.empty:Set(ns.EmptyState.pick(core:crew(), { art = "catches", title = empty.title, text = empty.text },
+    not core:setting("camp")))
+  view.empty:ClearAllPoints()
+  view.empty:SetPoint("TOPLEFT", 0, y - EMPTY_PAD)
+  view.empty:Show()
+  return y - EMPTY_PAD - view.empty:Layout(width) - EMPTY_PAD
+end
+
 local function drawSections(data, width)
-  local y = drawMessage(data.empty or data.filtered, width, 0)
+  local y = drawEmpty(data.empty, width, drawMessage(data.filtered, width, 0))
   local columns = math.max(1, math.floor((width - 2 * INSET + GAP_X) / (TILE + GAP_X)))
   local tiles = 0
   for i, s in ipairs(data.sections) do

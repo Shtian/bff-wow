@@ -130,6 +130,25 @@ ns.CampSheet = {
     quarter = "Interface\\AddOns\\BFF\\Media\\Dither25",
     size = 8,
   },
+  -- The empty states' vignettes (UI/EmptyState.lua): every one is
+  -- `columns` x `rows` texels, its frames' top lefts in order, each
+  -- held for `hold` ticks of the band's 6 a second.
+  vignettes = {
+    file = "Interface\\AddOns\\BFF\\Media\\EmptyStates",
+    width = 256,
+    height = 128,
+    columns = 40,
+    rows = 22,
+    art = {
+      feed = { hold = 1, { 1, 1 }, { 43, 1 }, { 85, 1 }, { 127, 1 }, { 169, 1 }, { 211, 1 } },
+      goals = { hold = 1, { 1, 25 } },
+      when = { hold = 2, { 43, 25 }, { 85, 25 }, { 127, 25 } },
+      spares = { hold = 1, { 169, 25 } },
+      professions = { hold = 1, { 211, 25 } },
+      catches = { hold = 2, { 1, 49 }, { 43, 49 }, { 85, 49 } },
+      alone = { hold = 1, { 127, 49 }, { 169, 49 }, { 211, 49 } },
+    },
+  },
   -- The sky's top colour, above the backdrop's art.
   sky = { 0.027, 0.039, 0.118 },
 }

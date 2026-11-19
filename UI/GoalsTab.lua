@@ -64,12 +64,14 @@ local TRACK_LINE = 24
 local TRACK_ICON = 16
 local TRACK_GAP = 12
 local SMALL_BUTTON = 20
--- The empty state, in the latest win's and the shelf's place.
-local EMPTY_HEIGHT = 96
-local EMPTY_TEXT = 240
+-- The empty state (UI/EmptyState.lua), in the latest win's and the
+-- shelf's place, with room above and below it.
+local EMPTY_PAD = 10
 
-local EMPTY_UNSETTLED = { "Counting up the Crew", "Goals the Crew has already reached show here once everyone's records are in." }
-local EMPTY_NONE = { "No trophies yet", "Every goal the Crew reaches puts a medal on this shelf." }
+local EMPTY_UNSETTLED = { art = "goals", title = "Counting up the Crew",
+  text = "Goals the Crew has already reached show here once everyone's records are in." }
+local EMPTY_NONE = { art = "goals", title = "The shelf is bare",
+  text = "Every goal the Crew reaches, dungeon it clears and Rare it slays puts a medal here." }
 
 local view
 local core
@@ -382,41 +384,16 @@ local function drawPlate(trophies, y, width)
   return y - height
 end
 
--- Nothing on the shelf: a faint medal and what will come, centred.
-local function createEmpty()
-  local frame = CreateFrame("Frame", nil, view.content)
-  frame:SetHeight(EMPTY_HEIGHT)
-  frame.group = CreateFrame("Frame", nil, frame)
-  frame.group:SetHeight(MEDAL_ICON)
-  frame.picture = Skin.feedPicture(frame.group, MEDAL_ICON)
-  frame.picture:SetPoint("LEFT")
-  frame.picture:SetPicture(Skin.FEED_PICTURES.goal)
-  frame.picture.picture:SetDesaturated(true)
-  frame.picture.picture:SetAlpha(0.5)
-  frame.title = Skin.label(frame.group, "heading", TEXT)
-  frame.title:SetPoint("TOPLEFT", frame.picture, "TOPRIGHT", 10, -2)
-  frame.line = Skin.label(frame.group, "small", MUTED)
-  frame.line:SetWordWrap(true)
-  frame.line:SetPoint("TOPLEFT", frame.title, "BOTTOMLEFT", 0, -4)
-  return frame
-end
-
+-- Nothing on the shelf: the empty state, or the alone state while you're
+-- the only Member known.
 local function drawEmpty(settled, y, width)
-  empty = empty or createEmpty()
-  local words = settled and EMPTY_NONE or EMPTY_UNSETTLED
+  empty = empty or ns.EmptyState.new(view.content)
+  empty:Set(ns.EmptyState.pick(core:crew(), settled and EMPTY_NONE or EMPTY_UNSETTLED, not core:setting("camp")))
   empty:ClearAllPoints()
-  empty:SetPoint("TOPLEFT", view.content, "TOPLEFT", INSET, y)
-  empty:SetWidth(width)
-  empty.title:SetText(words[1])
-  local textWidth = math.min(EMPTY_TEXT, width - MEDAL_ICON - 10)
-  empty.line:SetWidth(textWidth)
-  empty.line:SetText(words[2])
-  local groupWidth = MEDAL_ICON + 10 + math.max(empty.title:GetStringWidth(), textWidth)
-  empty.group:ClearAllPoints()
-  empty.group:SetPoint("LEFT", empty, "LEFT", math.max(0, (width - groupWidth) / 2), 0)
-  empty.group:SetWidth(groupWidth)
+  empty:SetPoint("TOPLEFT", view.content, "TOPLEFT", INSET, y - EMPTY_PAD)
+  local height = empty:Layout(width)
   shown(empty)
-  return y - EMPTY_HEIGHT
+  return y - EMPTY_PAD - height - EMPTY_PAD
 end
 
 -- The tile of Every profession in the Crew names the ones nobody has yet.

@@ -4,7 +4,8 @@
 // Media/CampBackdrop.tga (the static night sky, hills, pines and the fire's
 // glow on the ground), Media/CampPocketBackdrop.tga (the Pocket Camp's
 // soft-edged piece of it), Media/CampLight.tga (the fire's light on the
-// window under the band) and UI/CampSheet.lua (where each sprite sits). The
+// window under the band), Media/EmptyStates.tga (the empty states'
+// vignettes) and UI/CampSheet.lua (where each sprite sits). The
 // grids come from the prototype (prototype/ui-personality). Run it after
 // changing a grid: node scripts/camp-art.mjs. See docs/design/camp.md.
 //
@@ -576,6 +577,202 @@ function dither(on) {
   return img;
 }
 
+// The empty states' vignettes (DESIGN.md, Empty states; chosen in #239):
+// one small scene per empty tab, and the alone state's. Every one is the
+// same VIGNETTE_W x VIGNETTE_H, its subject inside a ~24 x 14 box standing
+// on one ground line (VIGNETTE_BASE), outlined like the Pocket Camp's tools
+// (light sources, fire and moon, aren't), lit from the left, on a dithered
+// patch of ground: cool everywhere, warm only under a fire. Each is a list
+// of frames and how many ticks of the band's 6 a second each holds; one
+// frame is still. Packed into Media/EmptyStates.tga.
+const VIGNETTE_W = 40, VIGNETTE_H = 22, VIGNETTE_BASE = 19;
+// The ground's tones, on top of PAL: v w x the backdrop's firelit glow,
+// g h a cool unlit ground just lighter than the window, so outlines read.
+const VIGNETTE_PAL = { ...PAL, v: "#201619", w: "#35231a", x: "#573518", g: "#17151e", h: "#211e29" };
+const COOL = ["h", "g"], WARM = ["x", "w", "v"];
+
+// A small painter: everything ends as row strings.
+function canvas(w, h) {
+  const px = Array.from({ length: h }, () => Array(w).fill("."));
+  const c = {
+    set(x, y, ch) {
+      x = Math.round(x); y = Math.round(y);
+      if (x >= 0 && y >= 0 && x < w && y < h && ch && ch !== ".") px[y][x] = ch;
+      return c;
+    },
+    stamp(rows, x, y) { rows.forEach((r, j) => [...r].forEach((ch, i) => c.set(x + i, y + j, ch))); return c; },
+    line(x0, y0, x1, y1, ch) {
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let k = 0; k <= n; k++) c.set(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n, ch);
+      return c;
+    },
+    // A patch of ground: an ellipse, dithered from the first tone (middle)
+    // to the last (edge).
+    ground(cx, cy, rx, ry, tones) {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry, d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 1) continue;
+        const v = (1 - d) * tones.length, i = Math.floor(v), f = v - i;
+        const k = Math.min(tones.length - 1, i + (f > BAYER[y % 4][x % 4] ? 1 : 0));
+        if (k <= 0 && d > 0.92 && BAYER[y % 4][x % 4] > 0.5) continue;
+        c.set(x, y, tones[tones.length - 1 - Math.min(tones.length - 1, k)]);
+      }
+      return c;
+    },
+    rows() { return px.map((r) => r.join("")); },
+  };
+  return c;
+}
+const scene = (tones, cx = 20, rx = 15) => canvas(VIGNETTE_W, VIGNETTE_H).ground(cx, VIGNETTE_BASE + 0.6, rx, 2.6, tones);
+// An outlined sprite standing on the ground line, centred on cx; drop
+// sinks it that many rows.
+const stand = (c, rows, cx, drop = 0) => c.stamp(rows, Math.round(cx - rows[0].length / 2), VIGNETTE_BASE + 1 + drop - rows.length + 1);
+const STONE = outlined([".TT.", "TZTt", "Tttt"]);
+const STONE_S = outlined(["TZ", "tt"]);
+const EMBER_HEAP = [
+  ["....R..O....", "..RROGOGRR..", ".ROOGYGOOOR.", "RROGOOGORORR"],
+  ["......R.....", "..RRGOOORR..", ".ROGOGYGOOR.", "RROOGOOGORRR"],
+  [".....O..R...", "..RROOGORR..", ".ROOGOGYOOR.", "RRGOOGOORORR"],
+];
+
+const VIGNETTES = {
+  // The Feed: a fire burned down, charred logs with their cracks still
+  // glowing in a ring of stones, one thread of smoke going up.
+  feed() {
+    const charred = outlined(["..BB.......BB..", ".BBRBb...bBRBB.", "BBBBBBRBBBBBBBb", ".bbbbbbbbbbbbb."]);
+    const frames = [0, 1, 2, 3, 4, 5].map((f) => {
+      const c = scene(WARM, 20, 16);
+      stand(c, STONE, 8); stand(c, STONE, 32); stand(c, STONE_S, 11, 1); stand(c, STONE_S, 29, 1);
+      stand(c, charred, 20);
+      c.stamp(EMBER_HEAP[f % 3], 14, 13);
+      // A pixel on every row so it reads as a line, swaying more as it
+      // rises, thinning out at the top.
+      for (let y = 12; y >= 2; y--) {
+        const k = 12 - y, x = 20 + Math.round(Math.sin(k * 0.55 - f * 0.8) * (0.3 + k * 0.16));
+        if (y <= 4 && (y + f) % 2) continue;
+        c.set(x, y, k < 4 ? "T" : "t");
+      }
+      if (f === 2) c.set(23, 9, "O");
+      return c.rows();
+    });
+    return { frames, hold: 1 };
+  },
+  // Trophies: a wooden stand with the Pocket Camp's cup missing from it,
+  // only its outline in dim brass where it will stand.
+  goals() {
+    const stand_ = outlined([
+      "AAAAAAAAAAAAAAAAAAAa", "aaaaaaaaaaaaaaaaaaaa", ".Aa..............Aa.", ".Aa..............Aa.",
+      ".AAAAAAAAAAAAAAAAAa.", ".Aa..............Aa.", ".Aa..............Aa.",
+    ]);
+    const ghost = TROPHY_CUP.map((r) => [...r].map((ch) => (ch === "K" ? "a" : ".")).join(""));
+    const c = scene(COOL);
+    stand(c, stand_, 20);
+    c.stamp(ghost, 14, 12 - ghost.length + 2);
+    return { frames: [c.rows()], hold: 1 };
+  },
+  // Play times: an hourglass under a crescent moon, the top bulb still
+  // full, a grain falling, a small pile below.
+  when() {
+    const glass = (grain) => outlined([
+      "AAAAAAAAAAAAa", "aaaaaaaaaaaaa", ".Z.FYGGGGf.t.", ".Z.FYGGGGf.t.", ".Z..FGGGf..t.", ".Z...FGf...t.", ".Z....G....t.",
+      grain === 0 ? ".Z...FGf...t." : ".Z...F.f...t.", grain === 1 ? ".Z..F.G.f..t." : ".Z..F...f..t.",
+      ".Z.F..G..f.t.", ".Z.F.GGG.f.t.", "AAAAAAAAAAAAa", "aaaaaaaaaaaaa",
+    ]);
+    const moon = [".NNN.", "NNW..", "NW...", "NW...", "NNW..", ".NNN."];
+    const frames = [0, 1, 2].map((grain) => {
+      const c = scene(COOL);
+      c.stamp(moon, 7, 3);
+      stand(c, glass(grain), 20);
+      c.set(31, 4, "Z").set(28, 1, "t").set(34, 9, grain === 0 ? "W" : "Z");
+      return c.rows();
+    });
+    return { frames, hold: 2 };
+  },
+  // Spare Items: the Pocket Camp's crate, emptied: open, dark inside, its
+  // lid leaning against its side.
+  spares() {
+    const crate = outlined([
+      ".aaaaaaaaaaaa.", "abbbbbbbbbbbba", "abbbbbbbbbbbba", "AAAAAAAAAAAAAa",
+      "AAaaaaAAaaaaAa", "AAaaaaAAaaaaAa", "AAaaaaAAaaaaAa", "AAAAAAAAAAAAAa",
+    ]);
+    const lid = outlined(["AAa....", "AAAa...", ".AAa...", ".AAAa..", "..AAa..", "..AAAa.", "...AAa.", "...AAAa", "....AAa"]);
+    const c = scene(COOL);
+    stand(c, crate, 18);
+    c.stamp(lid, 24, VIGNETTE_BASE + 1 - lid.length + 1);
+    return { frames: [c.rows()], hold: 1 };
+  },
+  // Professions: an anvil on a stump, a hammer propped by it. Cold:
+  // nobody's working it.
+  professions() {
+    const raw = canvas(16, 12).stamp([
+      "....NZZZZZZZZZZt", "NZZZZZZZZZZZZZZt", "..ZZZZZZZZZZZZZt", "....tTTTTTTTTtt.",
+      ".......TTTt.....", ".......TTTt.....", ".....TTTTTTTt...", "....tttttttttt..",
+    ], 0, 0).stamp([".aAAAAAAAAAAAAa.", "BBBBbBBBBBBbBBBb", "BbBBbBBBBBBbBBbb", ".bbbbbbbbbbbbbb."], 0, 8);
+    const c = scene(COOL);
+    stand(c, outlined(raw.rows()), 18);
+    stand(c, HAMMER, 30);
+    return { frames: [c.rows()], hold: 1 };
+  },
+  // Catches: a rod propped on a forked stick on the bank, its line down to
+  // a bobber in a pond that fades out at its edges, a ring spreading.
+  catches() {
+    const rod = canvas(VIGNETTE_W, VIGNETTE_H);
+    rod.line(2, 18, 24, 6, "B").line(22, 7, 24, 6, "A");
+    rod.line(9, 19, 9, 16, "a").set(8, 15, "a").set(10, 15, "a");
+    const rodRows = outlined(rod.rows()).slice(1, VIGNETTE_H + 1).map((r) => r.slice(1, VIGNETTE_W + 1));
+    const frames = [0, 1, 2].map((r) => {
+      const c = scene(COOL, 18, 17);
+      c.ground(27, VIGNETTE_BASE + 0.2, 12, 2.4, ["f", "f", "h"]);
+      [[22, 18], [31, 19], [26, 20]].forEach(([x, y], i) => c.set(x + ((r + i) % 3) - 1, y, "F"));
+      c.line(15, 19, 15, 16, "A").line(17, 19, 17, 17, "a").line(37, 19, 37, 17, "a");
+      c.stamp(rodRows, 0, 0);
+      const bob = r === 2 ? 1 : 0;
+      c.line(24, 6, 28, 17 + bob, "Z");
+      c.set(28, 17 + bob, "R").set(28, 16 + bob, "W");
+      c.set(28 - 2 - r, 18, "F").set(28 + 2 + r, 18, "F");
+      return c.rows();
+    });
+    return { frames, hold: 2 };
+  },
+  // The alone state: a log by the fire with nobody on it.
+  alone() {
+    const log = outlined([".BBBBBBBBBBBBBAAa.", "BBBbBBBBBbBBBAaaAa", "BbBBBBBbBBBBBAaAaA", ".bbbbbbbbbbbbbaaa."]);
+    const frames = [0, 1, 2].map((f) => {
+      const c = scene(WARM, 16, 18);
+      c.stamp(LOGS, 4, 17).stamp(FIRE[f], 6, 6);
+      stand(c, log, 30); stand(c, STONE_S, 2, 1); stand(c, STONE_S, 20, 1);
+      c.set(11 + (f - 1), 3, f === 1 ? "G" : "R");
+      return c.rows();
+    });
+    return { frames, hold: 1 };
+  },
+};
+
+// Packs every vignette's frames in rows across a 256-wide file, each cell
+// with a 1-pixel gutter on every side.
+const VIGNETTE_FILE_W = 256;
+function vignetteSheet() {
+  const cellW = VIGNETTE_W + 2, cellH = VIGNETTE_H + 2, across = Math.floor(VIGNETTE_FILE_W / cellW);
+  const art = [];
+  let n = 0;
+  for (const [name, make] of Object.entries(VIGNETTES)) {
+    const { frames, hold } = make();
+    const cells = frames.map((rows) => {
+      const x = (n % across) * cellW + 1, y = Math.floor(n / across) * cellH + 1;
+      n++;
+      return { rows, x, y };
+    });
+    art.push({ name, hold, cells });
+  }
+  let height = 1;
+  while (height < Math.ceil(n / across) * cellH) height *= 2;
+  const img = image(VIGNETTE_FILE_W, height);
+  for (const { cells } of art) for (const { rows, x, y } of cells) {
+    rows.forEach((row, j) => [...row].forEach((ch, i) => set(img, x + i, y + j, VIGNETTE_PAL[ch])));
+  }
+  return { img, art };
+}
+
 const { img, placed } = sheet();
 const back = backdrop();
 writeFileSync(join(root, "Media", "CampSprites.tga"), tga(img));
@@ -584,9 +781,13 @@ writeFileSync(join(root, "Media", "CampPocketBackdrop.tga"), tga(pocketBackdrop(
 writeFileSync(join(root, "Media", "CampLight.tga"), tga(light()));
 writeFileSync(join(root, "Media", "Dither50.tga"), tga(dither((x, y) => (x + y) % 2 === 0)));
 writeFileSync(join(root, "Media", "Dither25.tga"), tga(dither((x, y) => x % 2 === 0 && y % 2 === 0)));
+const vignettes = vignetteSheet();
+writeFileSync(join(root, "Media", "EmptyStates.tga"), tga(vignettes.img));
 
 const [skyR, skyG, skyB] = hex(SKY_TOP).map((v) => +(v / 255).toFixed(3));
 const lines = placed.map((s) => `    ${s.name} = { ${s.x}, ${s.y}, ${s.w}, ${s.h} },`);
+const vignetteLines = vignettes.art.map((v) =>
+  `      ${v.name} = { hold = ${v.hold}, ${v.cells.map((c) => `{ ${c.x}, ${c.y} }`).join(", ")} },`);
 writeFileSync(join(root, "UI", "CampSheet.lua"), `-- CampSheet: where each Camp sprite sits in Media\\CampSprites.tga, as
 -- { x, y, width, height } in texels from the top left, and the backdrop's
 -- file. Generated by scripts/camp-art.mjs; edit the grids there and run it
@@ -635,8 +836,21 @@ ${lines.join("\n")}
     quarter = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\Dither25",
     size = ${DITHER},
   },
+  -- The empty states' vignettes (UI/EmptyState.lua): every one is
+  -- \`columns\` x \`rows\` texels, its frames' top lefts in order, each
+  -- held for \`hold\` ticks of the band's 6 a second.
+  vignettes = {
+    file = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\EmptyStates",
+    width = ${vignettes.img.width},
+    height = ${vignettes.img.height},
+    columns = ${VIGNETTE_W},
+    rows = ${VIGNETTE_H},
+    art = {
+${vignetteLines.join("\n")}
+    },
+  },
   -- The sky's top colour, above the backdrop's art.
   sky = { ${skyR}, ${skyG}, ${skyB} },
 }
 `);
-console.log(`CampSprites ${img.width}x${img.height}, ${placed.length} sprites; CampBackdrop ${FILE_W}x${FILE_H}`);
+console.log(`CampSprites ${img.width}x${img.height}, ${placed.length} sprites; CampBackdrop ${FILE_W}x${FILE_H}; EmptyStates ${vignettes.img.width}x${vignettes.img.height}`);

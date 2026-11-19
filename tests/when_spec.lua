@@ -62,7 +62,7 @@ describe("The When tab", function()
     assert.equal("The Crew", view.title)
     assert.equal("How many of the 3 Members usually play each hour: in 2 of the last 4 weeks. Your local time.",
       view.intro)
-    assert.equal("Nobody usually plays at any hour yet. It takes 2 weeks of play to show.", view.note)
+    assert.equal("After 2 weeks of play, the hours the Crew usually plays show up here.", view.note)
     assert.equal(1, mondayEvening(b.core:playTimes(a.memberId)))
 
     -- Two are, for each of the three Members, counted once each.
