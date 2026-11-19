@@ -30,6 +30,17 @@
 
 
 
+
+## 2.12.0
+<sub>2026-11-19</sub>
+
+- *(minor)*
+  Every empty tab now shows a small Camp scene with a headline and a line on what will fill it. While you're the only one in your Crew, the Roster shows the Crew code to hand out under your Characters, or, if you joined with someone's code, that you're waiting for the Crew.
+- *(minor)*
+  `/bff help` is a short grouped list, and `/bff help <command>` says more about one. Every tab has a command named after it: `/bff roster`, `/bff trophies`, `/bff playtimes`, `/bff dungeons` and `/bff whatsnew` are new, and the old `/bff goals`, `/bff when` and `/bff together` still work. A mistyped command suggests the one you probably meant instead of listing them all.
+- *(minor)*
+  Choose a head piece for your Camp figure in Settings › You › Look: a templar or centurion helmet, a dwarven or wolfskin helm, a cowboy, straw, top or wizard hat, a fez, beret, circlet, bandana, feathered cap, coonskin cap or horned helm. Your whole Crew sees it in the Camp, the Pocket Camp, While you were away, roster rows and toasts. Members on an older BFF don't see head pieces yet.
+
 ## 2.11.0
 <sub>2026-11-18</sub>
 
