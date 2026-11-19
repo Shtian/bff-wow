@@ -14,5 +14,7 @@ export PATH="$HOME/.luarocks/bin:$PATH"
 [ -d Libs ] || scripts/fetch-libs.sh
 
 luacheck -q .
-git ls-files --cached --others --exclude-standard '*.lua' | "$(command -v luajit || command -v lua)" scripts/check-comments.lua
+git ls-files --cached --others --exclude-standard '*.lua' \
+  | grep -vE '^(Libs|\.luarocks|lua_modules|\.install|\.lua)/' \
+  | "$(command -v luajit || command -v lua)" scripts/check-comments.lua
 busted "$@"
