@@ -19,10 +19,12 @@ local ROW_PAD = 8
 local CONTROL_GAP = 16
 local SMALL_BUTTON = 20
 local NAME_BOX = 160
-local LOOK_CELL = 26
+local LOOK_CELL = 30
 local LOOK_GAP = 2
 local LOOK_COLUMNS = 8
 local LOOK_PREVIEW_GAP = 12
+local LOOK_PREVIEW_WIDTH = 32
+local LOOK_NAME_HEIGHT = 18
 local CODE_BOX = 110
 local SLIDER = 120
 local SLIDER_VALUE = 36
@@ -250,18 +252,12 @@ local function nameFocusLost(box)
   if ok then showName() else nameRow.error:SetText(ns.MESSAGES[reason]) end
 end
 
-local function lookName(key)
-  for _, hat in ipairs(ns.Core.HATS) do
-    if hat.key == key then return hat.label end
-  end
-end
-
 local function createLook()
   local row = createRow("Look")
   local control = CreateFrame("Frame", nil, row)
   local grid = CreateFrame("Frame", nil, control)
-  local rowsOf = math.ceil(#ns.Core.HATS / LOOK_COLUMNS)
-  grid:SetSize(LOOK_COLUMNS * (LOOK_CELL + LOOK_GAP) - LOOK_GAP, rowsOf * (LOOK_CELL + LOOK_GAP) - LOOK_GAP)
+  local gridRows = math.ceil(#ns.Core.HATS / LOOK_COLUMNS)
+  grid:SetSize(LOOK_COLUMNS * (LOOK_CELL + LOOK_GAP) - LOOK_GAP, gridRows * (LOOK_CELL + LOOK_GAP) - LOOK_GAP)
   grid:SetPoint("TOPRIGHT")
   row.name = Skin.label(control, "small", MUTED)
   row.name:SetPoint("TOPLEFT", grid, "BOTTOMLEFT", 0, -4)
@@ -271,12 +267,11 @@ local function createLook()
   for i, hat in ipairs(ns.Core.HATS) do
     local cell = CreateFrame("Button", nil, grid)
     cell:SetSize(LOOK_CELL, LOOK_CELL)
-    local column, line = (i - 1) % LOOK_COLUMNS, math.floor((i - 1) / LOOK_COLUMNS)
-    cell:SetPoint("TOPLEFT", column * (LOOK_CELL + LOOK_GAP), -line * (LOOK_CELL + LOOK_GAP))
-    Skin.fill(cell, Skin.CHIP)
+    local column, gridRow = (i - 1) % LOOK_COLUMNS, math.floor((i - 1) / LOOK_COLUMNS)
+    cell:SetPoint("TOPLEFT", column * (LOOK_CELL + LOOK_GAP), -gridRow * (LOOK_CELL + LOOK_GAP))
+    Skin.border(cell, Skin.BORDER)
+    cell.chosen = Skin.fill(cell, Skin.CHIP)
     Skin.fill(cell, Skin.HOVER, "HIGHLIGHT")
-    cell.chosen = Skin.fill(cell, Skin.GOLD, "BORDER")
-    cell.chosen:SetAlpha(0.25)
     cell.art = ns.CampScene.hat(cell)
     cell.art:SetAllPoints()
     cell.key = hat.key
@@ -285,7 +280,7 @@ local function createLook()
     cell:SetScript("OnLeave", function() row.name:SetText(row.shownName) end)
     row.cells[i] = cell
   end
-  control:SetSize(grid:GetWidth() + LOOK_PREVIEW_GAP + 40, grid:GetHeight() + 18)
+  control:SetSize(grid:GetWidth() + LOOK_PREVIEW_GAP + LOOK_PREVIEW_WIDTH, grid:GetHeight() + LOOK_NAME_HEIGHT)
   placeControl(row, control)
   return row
 end
@@ -297,15 +292,16 @@ local function ownClass()
 end
 
 local function drawLook()
-  local chosen = core:look().hat or "none"
+  local look = core:look()
+  local chosen = look.hat or "none"
   for _, cell in ipairs(lookRow.cells) do
     cell.art:SetHat(cell.key)
     cell.chosen:SetShown(cell.key == chosen)
   end
-  lookRow.shownName = lookName(chosen)
-  lookRow.name:SetText(lookRow.shownName)
+  lookRow.shownName = look.label
+  lookRow.name:SetText(look.label)
   local class = ownClass()
-  if class then lookRow.preview:SetClass(class, core:look().hat) else lookRow.preview:Hide() end
+  if class then lookRow.preview:SetClass(class, look.hat) else lookRow.preview:Hide() end
 end
 
 -- WoW: addons can't copy to the clipboard.

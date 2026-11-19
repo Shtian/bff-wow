@@ -1509,16 +1509,21 @@ function Core:setDisplayName(displayName)
   return true
 end
 
+local function ownHat(self)
+  local own = self.ledger:own()
+  return ns.Look.hat(own and own.look)
+end
+
 function Core:look()
-  local hat = ns.Look.hat(self.ledger:own() and self.ledger:own().look)
-  return { hat = hat }
+  local hat = ownHat(self)
+  return { hat = hat, label = ns.Look.label(hat) }
 end
 
 function Core:setLook(look)
   local key = type(look) == "table" and look.hat or nil
   if not ns.Look.known(key) then return nil, "unknownHat" end
   local hat = key ~= "none" and key or nil
-  if hat ~= self:look().hat then
+  if hat ~= ownHat(self) then
     self.ledger:writeOwn({ look = hat and { hat = hat } or false })
     sendOwnNow(self)
     self.listener("changed")

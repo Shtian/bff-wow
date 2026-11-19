@@ -129,14 +129,16 @@ local function tint(t, classFilename)
   t:SetVertexColor(Skin.classColor(classFilename))
 end
 
-local HAT_FORE = 2
+local FOREHEAD_ROW = 2
+local BROW_TO_FOREHEAD = 2
+local HAT_MARK_LIFT = 1
 
 local function hatPlace(name, row)
   local hat = name and Sheet.hats[name]
   if not hat then return nil end
   local s = Sheet.sprites[hat.sprite]
-  local bottom = row + Sheet.sprites.seated[4] - HAT_FORE + hat.brow + 2 - s[4]
-  return hat.sprite, math.floor((LAYOUT.seated - s[3]) / 2), bottom, bottom + s[4]
+  local top = row + Sheet.sprites.seated[4] - FOREHEAD_ROW + hat.brow + BROW_TO_FOREHEAD
+  return { sprite = hat.sprite, x = math.floor((LAYOUT.seated - s[3]) / 2), bottom = top - s[4], top = top }
 end
 
 function CampScene.figure(parent)
@@ -150,14 +152,14 @@ function CampScene.figure(parent)
   function frame:Layout()
     local unit = CampScene.artUnit(self, self.target)
     local s = Sheet.sprites.seated
-    local sprite, x, row, top = hatPlace(self.hatName, 0)
-    self:SetSize(s[3] * unit, math.max(s[4], top or 0) * unit)
+    local hat = hatPlace(self.hatName, 0)
+    self:SetSize(s[3] * unit, math.max(s[4], hat and hat.top or 0) * unit)
     setSprite(self.cloth, "seatedCloth", unit)
     setSprite(self.skin, "seated", unit)
-    if sprite then
-      setSprite(self.hat, sprite, unit)
+    if hat then
+      setSprite(self.hat, hat.sprite, unit)
       self.hat:ClearAllPoints()
-      self.hat:SetPoint("BOTTOMLEFT", x * unit, row * unit)
+      self.hat:SetPoint("BOTTOMLEFT", hat.x * unit, hat.bottom * unit)
     else
       self.hat:Hide()
     end
@@ -375,14 +377,14 @@ local function hideExtras(parts)
 end
 
 local function drawHat(scene, parts, actor, x, row, mirrored)
-  local sprite, dx, bottom, top = hatPlace(actor.hat, row)
-  if not sprite then
+  local hat = hatPlace(actor.hat, row)
+  if not hat then
     parts.hat:Hide()
     return nil
   end
-  setSprite(parts.hat, sprite, scene.unit, mirrored)
-  put(scene, parts.hat, x + dx, bottom)
-  return top
+  setSprite(parts.hat, hat.sprite, scene.unit, mirrored)
+  put(scene, parts.hat, x + hat.x, hat.bottom)
+  return hat.top
 end
 
 local function drawArrival(scene, parts, actor, f, played)
@@ -411,7 +413,7 @@ local function drawArrival(scene, parts, actor, f, played)
   local top = ROW.standing + Sheet.sprites.seated[4]
   if not walking then
     setSprite(parts.mark, "hi", unit)
-    put(scene, parts.mark, x + HI.x, markRow(scene, "hi", top + HI.row + (hatTop and 1 or 0)))
+    put(scene, parts.mark, x + HI.x, markRow(scene, "hi", top + HI.row + (hatTop and HAT_MARK_LIFT or 0)))
   end
   return x, top, hatTop
 end
@@ -552,7 +554,7 @@ local function drawActor(scene, parts, actor, f)
     if dead then parts.hat:Hide() else hatTop = drawHat(scene, parts, actor, x, row) end
     for _, z in ipairs(parts.sleep) do z:Hide() end
     top = row + Sheet.sprites.seated[4]
-    local markTop = top + (hatTop and 1 or 0)
+    local markTop = top + (hatTop and HAT_MARK_LIFT or 0)
     if pose.tool then posePart(scene, parts.tool, actor, pose.tool, row) else parts.tool:Hide() end
     if pose.back then
       posePart(scene, parts.back, actor, pose.back, row)

@@ -474,9 +474,10 @@ describe("Head pieces", function()
     local a = clients[1]
     a.core:setLook({ hat = "beret" })
     net:run(5)
-    local version = a.core.ledger:own().version
+    local mark = #net.wire
     assert.is_true(a.core:setLook({ hat = "beret" }))
-    assert.equal(version, a.core.ledger:own().version)
+    net:step()
+    assert.equal(mark, #net.wire)
   end)
 
   it("read as none when unknown or malformed, keeping the rest of the record", function()
@@ -492,15 +493,16 @@ describe("Head pieces", function()
     end
   end)
 
-  it("survive a merge relayed by another client", function()
-    local net, clients, ns = crew({ "Ann" })
-    local a = clients[1]
+  it("survive a merge relayed by another client, and are passed on", function()
+    local net, clients, ns = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
     receive(a, ns, net, "relay", { id = "far", displayName = "Far", look = { hat = "straw", pet = "cat" } })
     assert.equal("straw", a:rowFor({ memberId = "far" }).hat)
-    assert.same({ hat = "straw", pet = "cat" }, a.core.ledger.db.records.far.look)
+    net:run(70)
+    assert.equal("straw", b:rowFor({ memberId = "far" }).hat)
   end)
 
-  it("are kept on your record when you leave and join again", function()
+  it("are kept on your record when you leave", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a = clients[1]
     a.core:setLook({ hat = "horns" })

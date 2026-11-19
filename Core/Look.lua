@@ -22,17 +22,19 @@ Look.HATS = {
   { key = "tophat", label = "Top hat" },
 }
 
-local worn = {}
-for _, hat in ipairs(Look.HATS) do
-  if hat.key ~= "none" then worn[hat.key] = true end
-end
+local labels = {}
+for _, hat in ipairs(Look.HATS) do labels[hat.key] = hat.label end
 
 function Look.known(key)
-  return key == "none" or worn[key] == true
+  return labels[key] ~= nil
+end
+
+function Look.label(key)
+  return labels[key or "none"]
 end
 
 function Look.hat(look)
   if type(look) ~= "table" then return nil end
   local key = look.hat
-  return worn[key] and key or nil
+  return key ~= "none" and labels[key] and key or nil
 end
