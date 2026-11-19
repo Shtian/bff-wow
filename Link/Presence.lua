@@ -1,59 +1,27 @@
--- Presence: who is in the Crew channel and can be whispered. Pure: the
--- channel link reads the game (events, names, notices) and tells Presence in
--- plain names; Presence answers who to whisper, whether the first member
--- list is in, and whether a chat notice is about one of ours. It decodes no
--- messages and knows nothing about Members.
--- See docs/design/code-structure.md (the link port).
-
 local _, ns = ...
 
 local Presence = {}
 Presence.__index = Presence
 ns.Presence = Presence
 
--- How long to wait for the first member list before being ready anyway (a
--- channel of one may send none).
+-- WoW: a channel with only the player in it may send no member list.
 local LIST_WAIT = 5
--- Messages whispered by someone not (yet) known to be in the channel wait
--- this long for a member list that shows them, and at most this many.
 local STRANGER_WAIT = 10
 local STRANGER_MAX = 20
--- After "No player named ...", how long more of them for that name (queued
--- whispers, later chunks) stay out of chat.
 local NOT_FOUND_HIDE = 30
--- And how long a member list alone doesn't add them again: the list can go
--- on showing a Character who logged out, and each re-add would whisper
--- them, draw the same notice and drop them again, every minute.
+-- WoW: the member list can go on showing a Character who logged out.
 local READD_WAIT = 300
--- A "Player is offline." within this long after a failed send to one peer
--- is about them.
 local OFFLINE_WINDOW = 3
--- An unreadable notice within this long after a whisper may be about it.
 local UNREADABLE_WINDOW = 5
 
--- A peer who hasn't answered for this long isn't whispered until they are
--- heard again. Every peer sends a DIGEST about every minute, so this is
--- three missed in a row.
 local SILENCE = 180
--- A silent peer still gets one whisper this often. Without it two peers who
--- lost each other's whispers for SILENCE at the same time would both wait
--- for the other to speak first, for good.
+Presence.SILENCE = SILENCE
 local RETRY = 300
 
 local OFFLINE_TEXT = "Player is offline."
 
 local function nothing() end
 
--- deps: now() in seconds, and optionally:
---   key(name): what makes two spellings the same Character ("Name-Realm"
---     and "name"); lower case if left out
---   trace(line): the sync trace
---   deliver(message, name): a held message whose sender turned out to be a
---     peer, or a message from a peer, with the name it was whispered by
---   ready(why): the first member list since start() is in, or the wait ran out
---   arrived(): a member list showed a new peer while ready
---   gone(name): a peer is gone
---   askList(): a fresh member list would help
 function Presence.new(deps)
   return setmetatable({
     now = deps.now,
@@ -66,36 +34,21 @@ function Presence.new(deps)
       gone = deps.gone or nothing,
       askList = deps.askList or nothing,
     },
-    -- The other Characters in the channel: key -> the name to whisper.
     peers = {},
-    -- Senders not yet in peers: key -> { name, since, messages }.
     strangers = {},
-    -- Peers whispered after they logged out: key -> when the first
-    -- "No player named ..." for them came. Forgotten when they are added
-    -- again, or after READD_WAIT.
     missed = {},
-    -- Peers a send failed to: key -> when the last chunk failed. And when a
-    -- "Player is offline." was last put down to one of them, so the chat
-    -- filter hides it whether it runs before or after the event.
+    -- WoW: a chat filter can run before or after the event handler.
     failedAt = {},
     offlineMatched = nil,
-    -- Names with a whisper still in the send queue, and key -> when the
-    -- last chunk left. A peer's leaving cancels neither, so a "No player
-    -- named ..." for them can still come (#160, #178). Never cleared with the
-    -- peers: the queue outlives them.
+    -- WoW: leaving the channel doesn't empty ChatThrottleLib's queue, so a "No
+    -- player named ..." can still come after a peer leaves.
     queued = {},
     lastChunk = {},
     lastWhisper = nil,
-    -- Peers whispered and not heard since: key -> for how many seconds,
-    -- counted only while the link is up (isListening), since no one can be
-    -- heard while it is down. And those it reached SILENCE for: key -> for
-    -- how many seconds since, or since the last whisper tried, counted the
-    -- same way.
     unanswered = {},
     silent = {},
     isListening = false,
     lastTick = deps.now(),
-    -- When start() was called, while the first member list is awaited.
     waitingSince = nil,
     isReady = false,
   }, Presence)
@@ -109,19 +62,15 @@ local function clear(self, why)
   self.waitingSince = nil
 end
 
--- The player joined the channel: everyone known is forgotten, and the wait
--- for the first member list starts.
 function Presence:start()
   clear(self, "joined the channel")
   self.waitingSince = self.now()
 end
 
--- The Crew changed: everyone known is forgotten, and nothing is awaited.
 function Presence:stop()
   clear(self, "Crew changed")
 end
 
--- Whether the first member list since start() is in, or the wait ran out.
 function Presence:ready()
   return self.isReady
 end
@@ -134,7 +83,6 @@ local function deliverHeld(self, key)
   for _, message in ipairs(waiting.messages) do self.on.deliver(message, waiting.name) end
 end
 
--- Returns true if the name is new. why is for the trace.
 local function add(self, name, why)
   if name == "" then return false end
   local key = self.key(name)
@@ -154,7 +102,6 @@ local function remove(self, name, why)
   self.unanswered[key], self.silent[key] = nil, nil
 end
 
--- A peer who logged out before their leave notice came.
 local function drop(self, key, why)
   local name = self.peers[key]
   if not name then return end
@@ -162,17 +109,12 @@ local function drop(self, key, why)
   self.on.gone(name)
 end
 
--- Whether a name was reported not found in the last READD_WAIT.
 local function reportedMissing(self, key)
   local since = self.missed[key]
   return since ~= nil and self.now() - since < READD_WAIT
 end
 
--- A member list's names, without the player's own. Long lists may come in
--- several parts, so a list only ever adds. The first one since start()
--- brings ready; a new name in a later one is reported as arrived. A name
--- reported not found is left out: only a whisper from them or their join
--- notice shows they are back.
+-- WoW: a long member list can come in several parts.
 function Presence:listed(names)
   local found = false
   for _, name in ipairs(names) do
@@ -186,20 +128,16 @@ function Presence:listed(names)
   end
 end
 
--- A join notice for the channel.
 function Presence:joined(name)
   add(self, name, "joined the channel")
 end
 
--- A leave notice for the channel: they logged out.
 function Presence:left(name)
   remove(self, name, "left the channel")
   self.on.gone(name)
 end
 
--- A message whispered by a name. Only a peer's counts; one from anyone
--- else, usually a Character who just joined, waits for a member list that
--- shows them. A peer dropped as not found is back the moment they whisper.
+-- WoW: a Character who just joined can whisper before a member list shows them.
 function Presence:heard(name, message)
   local key = self.key(name)
   if reportedMissing(self, key) then add(self, name, "whispered again") end
@@ -226,23 +164,14 @@ function Presence:heard(name, message)
   end
 end
 
--- Whether whispers from a name are held: they aren't a peer, and
--- whispered in the last 10 s.
 function Presence:holds(name)
   return self.strangers[self.key(name)] ~= nil
 end
 
--- A held stranger the channel link vouches for: one of their whispers is
--- from a Member this client knows. They become a peer, and what was held
--- is delivered. No member list or join notice is needed.
 function Presence:vouched(name)
   add(self, name, "known Member")
 end
 
--- The link went up or came down. Silence is only counted while it is up.
--- When it comes up every silent peer is due a try, so the DIGEST Core sends
--- then reaches them: whatever kept them from hearing us may have ended
--- with what kept the link down.
 function Presence:listening(isUp)
   if isUp and not self.isListening then
     for key in pairs(self.silent) do self.silent[key] = RETRY end
@@ -250,7 +179,6 @@ function Presence:listening(isUp)
   self.isListening = isUp
 end
 
--- Once a second.
 function Presence:tick()
   local now = self.now()
   local elapsed = now - self.lastTick
@@ -282,16 +210,11 @@ function Presence:tick()
   end
 end
 
--- Whether a peer is silent and not due another try.
 local function muted(self, key)
   local since = self.silent[key]
   return since ~= nil and since < RETRY
 end
 
--- Who to whisper, sorted: every peer, or only the one named `to` (none if
--- they aren't a peer). A silent peer is left out, but for one whisper every
--- RETRY. Silence never makes them gone: whether a Member shows as online is
--- the Roster's rule.
 function Presence:targets(to)
   if to then
     local key = self.key(to)
@@ -311,8 +234,6 @@ function Presence:has(name)
   return self.peers[self.key(name)] ~= nil
 end
 
--- The name a peer is whispered by, however this one spells them, or nil
--- if they aren't a peer.
 function Presence:peer(name)
   return self.peers[self.key(name)]
 end
@@ -323,7 +244,6 @@ function Presence:count()
   return count
 end
 
--- A whisper to a name entered the send queue.
 function Presence:whispered(name)
   local key = self.key(name)
   self.queued[key] = true
@@ -335,9 +255,6 @@ function Presence:whispered(name)
   end
 end
 
--- A chunk of a whisper to a name left the queue: whether any whisper to
--- them is still queued, and whether this chunk failed (anything but a
--- throttle).
 function Presence:chunk(name, queued, failed)
   local key = self.key(name)
   self.lastChunk[key] = self.now()
@@ -345,9 +262,6 @@ function Presence:chunk(name, queued, failed)
   if failed then self.failedAt[key] = self.now() end
 end
 
--- Whether a "No player named ..." for a name is about a Character BFF
--- whispered: a peer, one just dropped for it, or one who left with
--- whispers to them still queued or just sent.
 function Presence:hidesNotFound(name)
   local key, now = self.key(name), self.now()
   local since, chunk = self.missed[key], self.lastChunk[key]
@@ -362,8 +276,7 @@ local function peerKeys(self)
   return table.concat(keys, ", ")
 end
 
--- "No player named ...": they logged out, and the leave notice hasn't come
--- (or won't).
+-- WoW: the leave notice can come after "No player named ...", or never.
 function Presence:notFound(name)
   local key = self.key(name)
   if not self:hidesNotFound(name) then
@@ -377,9 +290,7 @@ function Presence:notFound(name)
   end
 end
 
--- The peer a "Player is offline." is about: it names no one, so only the
--- one peer a send failed to just before, or nil if none or several (an
--- account that can't send fails to everyone).
+-- WoW: "Player is offline." names no one.
 local function offlinePeer(self)
   local found
   for key, time in pairs(self.failedAt) do
@@ -391,13 +302,11 @@ local function offlinePeer(self)
   return found
 end
 
--- Whether a "Player is offline." is about a peer.
 function Presence:hidesOffline()
   return offlinePeer(self) ~= nil
     or (self.offlineMatched ~= nil and self.now() - self.offlineMatched < OFFLINE_WINDOW)
 end
 
--- "Player is offline."
 function Presence:offline()
   local key = offlinePeer(self)
   self.trace(("notice: %s (%s)"):format(OFFLINE_TEXT, key and self.peers[key] or "not ours, or not clear whose"))
@@ -407,9 +316,6 @@ function Presence:offline()
   end
 end
 
--- A notice the game wouldn't let the channel link read. Returns how many
--- seconds after the last whisper it came if that is soon enough to be
--- about it, else nil.
 function Presence:unreadable()
   local since = self.lastWhisper and self.now() - self.lastWhisper
   return since and since < UNREADABLE_WINDOW and since or nil

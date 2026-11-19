@@ -2,8 +2,6 @@ local load = require("tests.load")
 
 local Framing = load().Framing
 
--- A Framing with its own clock, recording every sender a message was
--- reported lost from, and how many of its chunks came ("2 of 3").
 local function newFraming(random)
   local world = { time = 100, lost = {}, got = {} }
   world.framing = Framing.new({
@@ -14,7 +12,6 @@ local function newFraming(random)
       world.got[#world.got + 1] = got .. " of " .. total
     end,
   })
-  -- Moves the clock on, ticking once a second as the links do.
   function world.advance(seconds)
     for _ = 1, seconds do
       world.time = world.time + 1
@@ -24,14 +21,12 @@ local function newFraming(random)
   return world, world.framing
 end
 
--- A message of `size` bytes that says where each byte belongs.
 local function text(size)
   local parts = {}
   for i = 1, math.ceil(size / 10) do parts[i] = ("%09d."):format(i) end
   return table.concat(parts):sub(1, size)
 end
 
--- Hands chunks to a Framing in the order given: every message completed.
 local function receive(framing, sender, chunks, order)
   local done = {}
   for _, index in ipairs(order) do
@@ -65,12 +60,10 @@ describe("Framing", function()
         assert.equal("2|", chunk:sub(1, 2))
         assert.is_true(ns.Framing.isChunk(chunk))
       end
-      -- An older BFF's Codec read "<protocol>|" and compared it with its own, 1.
       assert.is_true(tonumber(chunks[1]:match("^(%d+)|")) > 1)
     end)
 
     it("never starts a chunk with a byte AceComm treats as multipart control", function()
-      -- Whatever the message holds, and for every message id.
       local _, framing = newFraming()
       local message = ("\001\002\003\004"):rep(200)
       for _ = 1, 4000 do
@@ -147,8 +140,6 @@ describe("Framing", function()
     end)
 
     it("starts over when a message id comes back with another number of chunks", function()
-      -- A sender who reloaded can reuse an id while its old message is
-      -- still incomplete here.
       local _, before = newFraming()
       local _, after = newFraming()
       local world, receiver = newFraming()

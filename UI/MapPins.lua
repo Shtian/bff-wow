@@ -1,12 +1,3 @@
--- MapPins: a pin on the world map for where each other Member was last
--- seen, from Core's mapPins(), drawn through HereBeDragons-Pins. A pin is
--- the Member's avatar: the Camp's seated figure in the shown Character's
--- class colour, or the class icon while the Camp is off. It has a small
--- green dot while online and is faded while offline, and shows
--- on its own map and on the zone, continent and world maps above it.
--- Hovering one says who, where and when. Your own Member has none; the
--- game already shows you. With the map setting off Core gives no pins.
-
 local _, ns = ...
 
 local MapPins = {}
@@ -15,21 +6,16 @@ ns.MapPins = MapPins
 local Skin = ns.Skin
 local HBDPins = LibStub("HereBeDragons-Pins-2.0")
 
--- Each pin size (Core's mapPinSize): the avatar's art unit on the map, and
--- the class icon's size while the Camp is off. Medium is a bit smaller
--- than on Roster rows.
 local SIZES = {
   small = { figure = 1.1, icon = 13 },
   medium = { figure = 1.4, icon = 16 },
   large = { figure = 1.8, icon = 20 },
 }
--- The online dot, with a dark keyline round it so it reads on a bright map.
 local DOT = 5
 local KEYLINE = 1
 local OFFLINE_ALPHA = 0.5
 
 local core
--- Pin frames, reused across refreshes.
 local frames = {}
 
 local function showTooltip(frame)
@@ -38,7 +24,7 @@ local function showTooltip(frame)
   GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
   GameTooltip:AddLine(pin.displayName or pin.name, 1, 1, 1)
   GameTooltip:AddLine(("%s, level %d"):format(pin.fullName, pin.level), Skin.classColor(pin.classFilename))
-  -- Inside an instance the zone is usually the instance itself.
+  -- WoW: inside an instance the zone is usually the instance itself.
   if pin.zone and pin.zone ~= pin.instance then
     GameTooltip:AddLine(pin.zone, Skin.MUTED[1], Skin.MUTED[2], Skin.MUTED[3])
   end
@@ -67,13 +53,11 @@ end
 local function createFrame()
   local frame = CreateFrame("Frame", nil, UIParent)
   frame:EnableMouse(true)
-  -- The Camp's seated figure while the Camp is on, else the class icon.
   frame.figure = ns.CampScene.figure(frame)
   frame.figure:SetPoint("CENTER")
   frame.icon = frame:CreateTexture(nil, "ARTWORK")
   frame.icon:SetPoint("CENTER")
   Skin.round(frame, frame.icon)
-  -- The online dot, on a frame of its own so it sits over the figure.
   local badge = CreateFrame("Frame", nil, frame)
   badge:SetSize(DOT + 2 * KEYLINE, DOT + 2 * KEYLINE)
   badge:SetPoint("CENTER", frame, "BOTTOMRIGHT", -1, 1)
@@ -105,13 +89,12 @@ local function draw(frame, pin)
     frame.icon:Show()
     frame:SetSize(size.icon, size.icon)
   end
-  -- Kept over the figure after HereBeDragons reparents the pin.
+  -- WoW: HereBeDragons-Pins reparents the pin onto the map's canvas.
   frame.online:SetFrameLevel(frame:GetFrameLevel() + 5)
   frame.online:SetShown(pin.online)
   frame:SetAlpha(pin.online and 1 or OFFLINE_ALPHA)
 end
 
--- Redraws every pin from Core.
 function MapPins.refresh()
   if not core then return end
   HBDPins:RemoveAllWorldMapIcons(MapPins)
@@ -120,8 +103,6 @@ function MapPins.refresh()
     local frame = frames[i] or createFrame()
     frames[i] = frame
     HBDPins:AddWorldMapIconMap(MapPins, frame, pin.mapId, pin.x, pin.y, HBD_PINS_WORLDMAP_SHOW_WORLD)
-    -- Drawn once on the map's canvas, so the figure's art unit is worked
-    -- out at the canvas's scale.
     draw(frame, pin)
   end
   for i = #pins + 1, #frames do
@@ -130,9 +111,6 @@ function MapPins.refresh()
   end
 end
 
--- The map setting: Core gives no pins while it's off.
--- A Member's live spot changed: redrawn now if the map is open, else when
--- it opens.
 function MapPins.moved()
   if WorldMapFrame and WorldMapFrame:IsShown() then MapPins.refresh() end
 end
@@ -143,7 +121,6 @@ end
 
 function MapPins.start(c)
   core = c
-  -- Last seen goes stale, so opening the map redraws it.
   if WorldMapFrame then WorldMapFrame:HookScript("OnShow", MapPins.refresh) end
   MapPins.refresh()
 end

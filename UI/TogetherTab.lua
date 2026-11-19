@@ -1,14 +1,3 @@
--- TogetherTab: the panel's Together tab, laid out from Core's together().
--- A toolbar ("As Gahzuria 24", what's hidden, Clear and Show), then a
--- 1–60 level line that scrolls sideways: friends' dots and labels above the
--- axis, a lane per dungeon bar that needs one below it, and an overview
--- strip under it to jump along. In type a step larger than the rest of the
--- panel, since it's read at a glance. Clicking friends picks them to see the dungeons you share,
--- and the Show menu filters the line. With the Camp on, friends are their
--- Camp heads on the line rather than dots, the online ones hopping now and
--- then. Opening the tab glides the line to you. Core places and words everything;
--- this only draws it and keeps what's picked. See docs/design/together.md.
-
 local _, ns = ...
 
 local TogetherTab = {}
@@ -23,8 +12,6 @@ local DIM = Skin.DIM
 local ONLINE = Skin.ONLINE
 local OFFLINE = Skin.OFFLINE
 
--- The tab's two fonts, Skin's a step up from what the rest of the panel
--- uses: Core measures its "small" and "tiny" texts in these.
 local SMALL = "text"
 local TINY = "small"
 local FONT_FOR = { small = SMALL, tiny = TINY }
@@ -32,37 +19,26 @@ local FONT_FOR = { small = SMALL, tiny = TINY }
 local INSET = 12
 local TOOLBAR = 32
 local OVERVIEW = 22
--- Inside the line, from its top: the band's label, the label rows, the dot
--- rail, the axis and the dungeon lanes.
 local ROW = 21
 local ROWS_TOP = 20
 local LABEL_HEIGHT = 20
 local AXIS = 20
 local LANE = 23
 local BAR = 20
--- The online dot before an online friend's name, as the header's.
 local ONLINE_DOT = 6
 local DOT = 7
 local RING = 2
 local KEYLINE = 1
 local WHEEL_STEP = 48
 local DASH = 3
--- A press that moves the cursor less than this is a click, not a drag.
 local CLICK_SLOP = 4
--- What a selection fades: unpicked friends and dungeons not shared.
 local FADED = 0.3
 local SHARED = { 1, 1, 1, 0.6 }
 local MENU_WIDTH = 240
 local MENU_PAD = 10
--- Every other ten levels' wash, your level's line down through the lanes,
--- and the hover guide.
 local DECADE = Skin.warm(0.022)
 local YOU_LINE = Skin.warm(0.28)
 local GUIDE = Skin.warm(0.16)
--- A bar's plate, in the Camp's dither (Media\Dither50 and Dither25, tiled
--- at its art unit): a solid cream plate with light caps where you fit, a
--- 50% checker with faint caps ahead of you, a sparse 25% dither once
--- you've outlevelled it. Its corners are stepped by a cap's width.
 local PLATE = {
   fits = { color = Skin.warm(0.2), cap = { 1, 1, 1, 0.75 } },
   other = { dither = "half", color = Skin.warm(0.13), cap = Skin.warm(0.22) },
@@ -70,18 +46,12 @@ local PLATE = {
   attunement = { dither = "quarter", color = Skin.warm(0.16) },
 }
 local CAP_WIDTH = 2
--- A bar's name starts this far in, clear of its cap.
 local NAME_INSET = 6
 local PAST_ALPHA = 0.7
--- A hovered bar's range, marked on the axis.
 local RANGE_SHADE = { 1, 1, 1, 0.1 }
 local RANGE_EDGE = { 1, 1, 1, 0.55 }
--- With the Camp on: a head stands on the rail, a 2px ground line under it.
 local HEAD_GAP = 4
 local GROUND = 2
--- The overview: a column per level as tall as how many dungeons fit it
--- (the most, DENSITY_TALL), brighter in your can-play band, on a faint
--- base line, and friends as class-colour feet under it.
 local DENSITY = Skin.warm(0.2)
 local DENSITY_NEAR = Skin.warm(0.55)
 local DENSITY_BASE = Skin.warm(0.12)
@@ -90,23 +60,15 @@ local FEET = 2
 local FOOT_OFFLINE = 0.55
 local STRIP_WINDOW = Skin.warm(0.04)
 local STRIP_WINDOW_EDGE = Skin.warm(0.35)
--- Online friends' heads, and yours, hop an art pixel for HOP_FOR seconds
--- every HOP_EVERY, each on its own beat.
 local HOP_EVERY = 4.2
 local HOP_FOR = 0.25
--- Opening the tab glides the line GLIDE_FROM px to you over GLIDE_TIME
--- seconds, easing out.
 local GLIDE_FROM = 260
 local GLIDE_TIME = 0.7
 
 local view
 local core
--- Whether the Camp is on: friends show as its heads (the Lit Camp Rule).
 local lit = false
--- The Members picked on the line, as memberIds; Core drops any it doesn't
--- know.
 local selected = {}
--- Bars by frame, for the sticky names while scrolling.
 local barFrames = {}
 local labelFrames, dotFrames, stemTextures = {}, {}, {}
 local tickTextures, numberLabels, overviewTicks = {}, {}, {}
@@ -125,7 +87,6 @@ local function hideFrom(list, from)
   for i = from, #list do list[i]:Hide() end
 end
 
--- A text's width in Skin's font, for Core's placement.
 local measurers = {}
 local function measure(text, font)
   local label = measurers[font]
@@ -142,17 +103,14 @@ local function layout()
   return ns.Core.TOGETHER_LAYOUT
 end
 
--- Only the label rows in use take room; the rest goes to the lanes.
 local function rows()
   return view.data and view.data.rows or layout().rows
 end
 
--- Rows count up from the axis; y is from the line's top.
 local function rowY(row)
   return ROWS_TOP + (rows() - row) * ROW
 end
 
--- The rail: dots' centres, or the ground heads stand on.
 local function headHeight()
   return lit and math.ceil(ns.CampScene.HEAD_ROWS * ns.CampScene.artUnit(view, ns.CampScene.FIGURE_TARGET)) or 0
 end
@@ -170,7 +128,6 @@ local function laneY(lane)
   return axisY() + AXIS + 6 + (lane - 1) * LANE
 end
 
--- Tooltips anchor to the right of what's hovered, as small controls' do.
 local function showTooltip(owner)
   if not owner.tooltip then return end
   GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
@@ -187,9 +144,6 @@ local function line(text, color)
   GameTooltip:AddLine(text, color[1], color[2], color[3])
 end
 
--- A Character's line: the Character (full name, level and the extra
--- parts) on the left, whose they are on the right, so the two names never
--- run together.
 local function characterLine(character, extra)
   local parts = {
     classHex(character.classFilename) .. character.fullName .. "|r",
@@ -248,10 +202,6 @@ local function clearSelection()
   redraw()
 end
 
--- Dragging the line moves along the levels; anything on it passes its
--- mouse-down on, so a drag can start on a bar or a label. A press that
--- doesn't move is a click: on a friend it picks them, on the line's empty
--- space it clears what's picked.
 local function scrollTo(x)
   local scroller = view.scroller
   local range = math.max(0, view.track:GetWidth() - scroller:GetWidth())
@@ -268,7 +218,6 @@ local function cursorY()
   return y / view.scroller:GetEffectiveScale()
 end
 
--- Up and down, when the lanes are taller than the window.
 local function scrollDownTo(y)
   local range = math.max(0, view.track:GetHeight() - view.scroller:GetHeight())
   view.scroller:SetVerticalScroll(math.min(range, math.max(0, y)))
@@ -316,7 +265,6 @@ local function hoverable(parent, tooltip)
   return frame
 end
 
--- A dashed 1px edge round a frame, for the attunement.
 local function dashes(frame, width, height)
   frame.dashes = frame.dashes or {}
   local count = 0
@@ -346,7 +294,6 @@ local function dashes(frame, width, height)
   hideFrom(frame.dashes, count + 1)
 end
 
--- Hovering a friend lights up their Members' other labels on the line.
 local function lightOtherLabels(group)
   local ids = {}
   for _, id in ipairs(group and group.memberIds or {}) do ids[id] = true end
@@ -367,9 +314,6 @@ local function indexSet(list)
   return set
 end
 
--- Hovering a bar lights the friends who fit it, and hovering a friend the
--- bars they fit (Core's bar.groups and group.bars): the rest fade back
--- until the mouse leaves. With nothing given, all are as drawn.
 local function linkUp(groupsLit, barsLit)
   local data = view.data
   if not data then return end
@@ -389,8 +333,6 @@ local function linkUp(groupsLit, barsLit)
   end
 end
 
--- A group's dot or label: a tooltip, lights up their other labels and the
--- bars they fit, and picks them on click (shift adds).
 local function memberFrame()
   local frame = hoverable(view.track, groupTooltip)
   frame:SetScript("OnEnter", function(self)
@@ -407,8 +349,6 @@ local function memberFrame()
   return frame
 end
 
--- The Show menu: Core's options as checkboxes, the key and the help line.
--- Built once from the first together().show; draws its values each time.
 local function keySwatch(parent, kind)
   local swatch = CreateFrame("Frame", nil, parent)
   swatch:SetSize(22, 9)
@@ -488,7 +428,6 @@ local function createMenu(show)
   help:SetText(show.help)
   menu:SetHeight(y + 6 + help:GetStringHeight() + 10)
 
-  -- A click anywhere outside it, but on the Show button, closes it.
   menu:SetScript("OnShow", function(self) self:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
   menu:SetScript("OnHide", function(self)
     self:UnregisterEvent("GLOBAL_MOUSE_DOWN")
@@ -514,9 +453,8 @@ local function toggleMenu()
   TogetherTab.escapeKeys()
 end
 
--- Escape closes the menu, else clears what's picked. The tab only takes
--- the keyboard while there's one of those to undo, and never in combat,
--- where it can't let other keys through.
+-- WoW: SetPropagateKeyboardInput is protected in combat, so a frame that
+-- takes the keyboard then would swallow every key.
 local function createEscapeKeys()
   local keys = CreateFrame("Frame", nil, view)
   keys:SetScript("OnKeyDown", function(self, key)
@@ -533,7 +471,7 @@ local function createEscapeKeys()
     end
     TogetherTab.escapeKeys()
   end)
-  -- Let go before combat locks it in; take it back after.
+  -- WoW: let go of the keyboard before combat locks it in.
   keys:RegisterEvent("PLAYER_REGEN_DISABLED")
   keys:RegisterEvent("PLAYER_REGEN_ENABLED")
   keys:SetScript("OnEvent", function(self, event)
@@ -558,7 +496,6 @@ local function createView(parent)
   view = CreateFrame("Frame", nil, parent)
   view:SetAllPoints()
 
-  -- Toolbar: who you play as, and what's hidden.
   view.toolbar = CreateFrame("Frame", nil, view)
   view.toolbar:SetPoint("TOPLEFT")
   view.toolbar:SetPoint("TOPRIGHT")
@@ -574,7 +511,6 @@ local function createView(parent)
   view.showButton.label:SetFontObject(Skin.fonts[SMALL])
   view.showButton.iconRoom = Skin.leadIcon(view.showButton, "filter", TEXT)
   view.showButton:SetPoint("RIGHT", -8, 0)
-  -- Clear, while friends are picked, left of Show.
   view.clear = Skin.button(view.toolbar, "Clear", clearSelection)
   view.clear:SetHeight(22)
   view.clear.label:SetFontObject(Skin.fonts[SMALL])
@@ -582,7 +518,6 @@ local function createView(parent)
   view.hidden = Skin.label(view.toolbar, SMALL, DIM)
   view.hidden:SetJustifyH("RIGHT")
 
-  -- The overview strip.
   view.overview = CreateFrame("Frame", nil, view)
   view.overview:SetPoint("BOTTOMLEFT")
   view.overview:SetPoint("BOTTOMRIGHT")
@@ -593,7 +528,6 @@ local function createView(parent)
   view.strip:SetPoint("RIGHT", -INSET, 0)
   view.strip:SetHeight(OVERVIEW - 4)
   view.strip:EnableMouse(true)
-  -- The base line the level columns stand on.
   view.stripBase = Skin.fill(view.strip, DENSITY_BASE, "BACKGROUND")
   view.stripBase:ClearAllPoints()
   view.stripBase:SetHeight(1)
@@ -622,7 +556,6 @@ local function createView(parent)
     end
   end)
 
-  -- The line itself.
   view.scroller = CreateFrame("ScrollFrame", nil, view)
   view.scroller:SetPoint("TOPLEFT", 0, -TOOLBAR)
   view.scroller:SetPoint("BOTTOMRIGHT", 0, OVERVIEW)
@@ -651,7 +584,6 @@ local function createView(parent)
     scrollDownTo(view.dragScrollY + (cursorY() - view.dragFromY))
   end)
 
-  -- The can-play band: a faint gold fill with 1px edges.
   view.band = view.track:CreateTexture(nil, "BACKGROUND")
   view.band:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.04)
   view.bandLeft = view.track:CreateTexture(nil, "BORDER")
@@ -662,14 +594,10 @@ local function createView(parent)
   view.bandRight:SetWidth(1)
   view.bandLabel = Skin.label(view.track, TINY, GOLD)
 
-  -- Your level, down from the axis through the lanes: a bar it crosses is
-  -- one you fit.
   view.youLine = view.track:CreateTexture(nil, "BORDER", nil, 1)
   view.youLine:SetColorTexture(unpack(YOU_LINE))
   view.youLine:SetWidth(1)
 
-  -- The hover guide: a line at the level under the cursor, and what it
-  -- says on the axis.
   view.guide = view.track:CreateTexture(nil, "BORDER", nil, 2)
   view.guide:SetColorTexture(unpack(GUIDE))
   view.guide:SetWidth(1)
@@ -680,7 +608,6 @@ local function createView(parent)
   view.guideTag:SetFrameLevel(view.track:GetFrameLevel() + 20)
   view.guideTag:Hide()
 
-  -- The axis.
   view.axis = view.track:CreateTexture(nil, "BACKGROUND", nil, 1)
   view.axis:SetColorTexture(unpack(Skin.SIDEBAR))
   view.axisTop = view.track:CreateTexture(nil, "BORDER")
@@ -689,11 +616,9 @@ local function createView(parent)
   view.axisBottom = view.track:CreateTexture(nil, "BORDER")
   view.axisBottom:SetColorTexture(Skin.BORDER[1], Skin.BORDER[2], Skin.BORDER[3], Skin.BORDER[4])
   view.axisBottom:SetHeight(1)
-  -- Your level on the axis: a light flag with the number on it.
   view.youFlag = Skin.badge(view.track, TINY, Skin.WINDOW, Skin.TEXT)
   view.youFlag:SetHeight(15)
   view.youFlag:SetFrameLevel(view.track:GetFrameLevel() + 15)
-  -- A hovered bar's range on the axis.
   view.rangeShade = CreateFrame("Frame", nil, view.track)
   view.rangeShade:SetHeight(AXIS)
   view.rangeShade:SetFrameLevel(view.track:GetFrameLevel() + 14)
@@ -701,7 +626,6 @@ local function createView(parent)
   for _, side in ipairs({ "LEFT", "RIGHT" }) do Skin.edge(view.rangeShade, side, RANGE_EDGE) end
   view.rangeShade:Hide()
 
-  -- Back to you, when you've scrolled away.
   view.backLeft = Skin.button(view, "‹ You", centreOnYou)
   view.backLeft:SetHeight(22)
   view.backLeft.label:SetFontObject(Skin.fonts[SMALL])
@@ -713,8 +637,6 @@ local function createView(parent)
   view.backRight:SetPoint("TOPRIGHT", view.scroller, "TOPRIGHT", -6, -4)
   view.backRight:SetFrameLevel(view.scroller:GetFrameLevel() + 10)
 
-  -- With only near your level on: what's said over a stretch of the line
-  -- with no dungeons, and the link that turns the filter off.
   view.empty = CreateFrame("Frame", nil, view)
   view.empty:SetSize(1, 16)
   view.empty:SetFrameLevel(view.scroller:GetFrameLevel() + 10)
@@ -750,8 +672,6 @@ local function at(region, x, y, width, height)
 end
 
 local function drawAxis(data)
-  -- Tall enough for every lane; taller than the window, it pans up and
-  -- down too.
   local trackHeight = math.max(view.scroller:GetHeight(), laneY(data.lanes) + BAR + 8)
   view.track:SetSize(data.width, trackHeight)
   scrollDownTo(view.scroller:GetVerticalScroll())
@@ -795,7 +715,6 @@ local function drawAxis(data)
     texture:SetColorTexture(1, 1, 1, tick.big and 0.4 or 0.16)
     at(texture, tick.x, y, 1, tick.big and 5 or 3)
     texture:Show()
-    -- Your level's number is on its flag.
     if tick.number and not tick.you then
       numbers = numbers + 1
       local label = numberLabels[numbers]
@@ -843,8 +762,6 @@ local function createDotFrame()
   return frame
 end
 
--- With the Camp on, a friend's Camp head on the rail, a ground line under
--- it: green while someone there is played, light for yours, else grey.
 local function createHeadFrame()
   local frame = memberFrame()
   frame.head = ns.CampScene.head(frame)
@@ -951,7 +868,6 @@ local function drawGroups(data)
         stem:SetColorTexture(1, 1, 1, 0.14)
         stemTextures[stems] = stem
       end
-      -- Down to 1px above the head, or the dot's ring.
       local top = lit and rail - headHeight() + 1 or rail - 3
       at(stem, group.x, y + LABEL_HEIGHT - 2, 1, math.max(1, top - y - LABEL_HEIGHT))
       stem:SetAlpha(group.faded and FADED or 1)
@@ -967,7 +883,6 @@ local function drawGroups(data)
   hideFrom(stemTextures, stems + 1)
 end
 
--- A hovered bar marks its range on the axis.
 local function showRange(frame)
   local bar = frame.bar
   view.rangeShade:ClearAllPoints()
@@ -976,8 +891,6 @@ local function showRange(frame)
   view.rangeShade:Show()
 end
 
--- A bar: its plate is the dungeon's level range, with 2px end caps; its
--- name and dots run on past the plate when they're wider than it.
 local function createBarFrame()
   local frame = hoverable(view.track, dungeonTooltip)
   frame:SetHeight(BAR)
@@ -996,24 +909,17 @@ local function createBarFrame()
   frame.plate = CreateFrame("Frame", nil, frame)
   frame.plate:SetPoint("TOPLEFT")
   frame.plate:SetHeight(BAR)
-  -- The fill between the caps, and the caps a corner short of the top and
-  -- bottom, so the plate's corners step.
   frame.fill = frame.plate:CreateTexture(nil, "BACKGROUND")
   frame.caps = {}
   for i = 1, 2 do frame.caps[i] = frame.plate:CreateTexture(nil, "BORDER", nil, 1) end
-  -- The plate lights on hover; the plate takes no mouse itself, so the bar
-  -- shows it.
   frame.hover = Skin.fill(frame.plate, Skin.HOVER, "BORDER", -1)
   frame.hover:ClearAllPoints()
   frame.hover:SetPoint("TOPLEFT", CAP_WIDTH, 0)
   frame.hover:SetPoint("BOTTOMRIGHT", -CAP_WIDTH, 0)
   frame.hover:Hide()
-  -- The 1px light outline of a dungeon you share with who's picked.
   frame.outline = Skin.border(frame.plate, SHARED)
-  -- What stays readable when the bar is partly scrolled off the left.
   frame.inner = CreateFrame("Frame", nil, frame)
   frame.inner:SetHeight(BAR)
-  -- The raids' diamond.
   frame.diamond = frame.inner:CreateTexture(nil, "ARTWORK")
   frame.diamond:SetSize(7, 7)
   frame.diamond:SetPoint("LEFT", 2, 0)
@@ -1026,9 +932,6 @@ local function createBarFrame()
   return frame
 end
 
--- Paints a piece of a plate, x from left to right and y from top to bottom
--- in the plate: a solid colour, or the dither tiled at the Camp's art unit
--- from the plate's corner, so its pieces line up.
 local function paint(texture, color, dither, left, right, top, bottom)
   texture:ClearAllPoints()
   texture:SetPoint("TOPLEFT", left, -top)
@@ -1056,12 +959,10 @@ local function drawBar(frame, bar)
   local look = PLATE[attunement and "attunement" or (bar.fits and "fits" or (bar.past and "past" or "other"))]
   local range = bar.range
   if attunement then
-    -- Its dashed edge is square, so its fill is too.
     paint(frame.fill, look.color, look.dither, 0, range, 0, BAR)
     for _, cap in ipairs(frame.caps) do cap:Hide() end
   else
     paint(frame.fill, look.color, look.dither, CAP_WIDTH, range - CAP_WIDTH, 0, BAR)
-    -- Caps where the plate has them, else the fill carries on into them.
     local color, dither = look.cap or look.color, not look.cap and look.dither or nil
     paint(frame.caps[1], color, dither, 0, CAP_WIDTH, CAP_WIDTH, BAR - CAP_WIDTH)
     paint(frame.caps[2], color, dither, range - CAP_WIDTH, range, CAP_WIDTH, BAR - CAP_WIDTH)
@@ -1128,7 +1029,6 @@ local function drawDungeons(data)
   hideFrom(barFrames, #data.bars + 1)
 end
 
--- A pooled texture on the overview strip.
 local function stripTexture(list, i, layer)
   local texture = list[i]
   if not texture then
@@ -1141,9 +1041,6 @@ local function stripTexture(list, i, layer)
   return texture
 end
 
--- The overview: the whole line in a strip. A column per level as tall as
--- how many dungeons fit it, brighter in your can-play band, friends as
--- class-colour feet under their level and you in gold.
 local function drawOverview(data)
   local scale = view.strip:GetWidth() / data.width
   local half = layout().level / 2
@@ -1172,7 +1069,6 @@ local function drawOverview(data)
   view.stripBase:SetPoint("BOTTOMLEFT", view.strip, "BOTTOMLEFT", first, FEET + 1)
   view.stripBase:SetWidth(last + lastWidth - first)
 
-  -- Friends only: you are the gold mark.
   local feet = 0
   for _, group in ipairs(data.groups) do
     if not group.own then
@@ -1190,8 +1086,6 @@ local function drawOverview(data)
   view.stripYou:SetPoint("CENTER", view.strip, "LEFT", data.you * scale, 0)
 end
 
--- Opening the tab: the line glides to you, easing out, until a drag, the
--- wheel or the overview takes over.
 function TogetherTab.glided()
   local start = view.glide
   if not start or not view.data then return end
@@ -1201,8 +1095,6 @@ function TogetherTab.glided()
   if t >= 1 then view.glide = nil end
 end
 
--- With the Camp on, the heads of who's online, and yours, hop an art pixel
--- now and then, each on its own beat.
 function TogetherTab.idle()
   if not lit then return end
   local now = GetTime()
@@ -1218,12 +1110,8 @@ function TogetherTab.idle()
   end
 end
 
--- The hover guide: while the cursor is over the line and not dragging it,
--- a line at the level under it and what that level says on the axis. Your
--- own level has its flag already.
 function TogetherTab.hovered()
   local data = view.data
-  -- A press hides it only once it moves, as a drag.
   local dragging = view.pressFrom and math.abs(cursorX() - view.pressFrom) >= CLICK_SLOP
   if not data or dragging or not view.scroller:IsMouseOver() then
     view.guide:Hide()
@@ -1253,8 +1141,6 @@ function TogetherTab.hovered()
   view.guideTag:Show()
 end
 
--- Keeps what depends on where the line is scrolled up to date: the sticky
--- dungeon names, the overview's window and the back-to-you buttons.
 function TogetherTab.scrolled()
   if not view or not view.data then return end
   local data = view.data
@@ -1278,7 +1164,6 @@ function TogetherTab.scrolled()
   for _, button in ipairs({ view.backLeft, view.backRight }) do
     button:SetWidth(button.label:GetStringWidth() + 16)
   end
-  -- The hint shows while the whole window is in one empty stretch.
   local empty = false
   for _, span in ipairs(data.empty and data.empty.spans or {}) do
     if left >= span.left and left + width <= span.right then empty = true end
@@ -1286,9 +1171,6 @@ function TogetherTab.scrolled()
   view.empty:SetShown(empty)
 end
 
--- Draws the tab into parent (the panel's content) from Core, centred on the
--- Character you play when the tab wasn't on screen. campOn: the Camp's band
--- is showing, so friends are its heads.
 function TogetherTab.draw(parent, theCore, campOn)
   core = theCore
   lit = campOn and true or false
@@ -1298,7 +1180,6 @@ function TogetherTab.draw(parent, theCore, campOn)
   local data = core:together(measure, selected)
   view.data = data
   view.guideTag.level = nil
-  -- A redraw may give the hovered bar's frame another dungeon.
   view.rangeShade:Hide()
   if not data then
     view.scroller:Hide()
@@ -1344,8 +1225,7 @@ function TogetherTab.draw(parent, theCore, campOn)
   drawDungeons(data)
   drawOverview(data)
   if opening then
-    -- The glide works out where you are each frame, as the line's width
-    -- may not be laid out until the next one.
+    -- WoW: a frame's width may not be laid out until the next frame.
     scrollTo(data.you - view.scroller:GetWidth() / 2 - GLIDE_FROM)
     view.glide = GetTime()
   else

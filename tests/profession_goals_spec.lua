@@ -1,6 +1,5 @@
 local load = require("tests.load")
 
--- Skill line IDs.
 local ALCHEMY, ENGINEERING, MINING, TAILORING = 171, 202, 186, 197
 local COOKING, FISHING, FIRST_AID = 185, 356, 129
 local ALL = {
@@ -22,9 +21,6 @@ local function cooking(skill) return profession(COOKING, "Cooking", skill, true)
 local function fishing(skill) return profession(FISHING, "Fishing", skill, true) end
 local function firstAid(skill) return profession(FIRST_AID, "First Aid", skill, true) end
 
--- A net with the given clients logged in, in one Crew and settled, then
--- each sharing its professions for the first time (by name; none known for
--- a name left out).
 local function crew(names, professions)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -36,7 +32,6 @@ local function crew(names, professions)
   for i, name in ipairs(names) do
     if professions[name] then
       clients[i]:play({ professions = professions[name] })
-      -- Professions alone wait for the next send.
       clients[i]:play({ level = 11 })
     end
   end
@@ -97,9 +92,7 @@ describe("Profession goal ladders", function()
         b = { level = 5, professions = { { id = COOKING, n = "Cooking", k = 40, m = 75, s = true } } },
       } },
       { characters = { c = { level = 22, professions = {} } } },
-      -- Never shared: none.
       { characters = { d = { level = 40 } } },
-      -- Malformed: unknown.
       { characters = { e = { level = 40, professions = { { id = "x" } } } } },
     }
     local progress = Goals.progress(records)
@@ -127,8 +120,6 @@ describe("Profession Crew goals", function()
     assert.equal(4, coverage.value)
     assert.equal(12, coverage.goal)
     assert.equal(12, #coverage.professions)
-    -- The twelve in order: main professions by name, then cooking, fishing
-    -- and first aid, the covered ones lit, with their own icon.
     for i, p in ipairs(coverage.professions) do
       assert.equal(ALL[i][1], p.skillLine)
       assert.equal(ALL[i][2], p.name)
@@ -141,7 +132,6 @@ describe("Profession Crew goals", function()
     assert.equal(300, rows.crewSkill.value)
     assert.equal(500, rows.crewSkill.goal)
 
-    -- Ann's best is 160, Bob's 90: both Apprentices, one a Journeyman.
     assert.equal("Everyone a Journeyman", rows.everyoneRank.title)
     assert.equal(1, rows.everyoneRank.value)
     assert.equal(2, rows.everyoneRank.goal)
@@ -165,7 +155,6 @@ describe("Profession Crew goals", function()
     b:play({ professions = { tailoring(260), cooking(20) } })
     b:play({ level = 12 })
     net:run(3)
-    -- Tailoring and Cooking, 530 skill and Everyone an Expert, all quiet.
     for _, client in ipairs({ a, b }) do
       assert.same({}, goalTexts(client))
       local rows = goals(client)
@@ -188,7 +177,6 @@ describe("Profession Crew goals", function()
     assert.equal("Engineering", last.label)
     assert.is_number(last.time)
 
-    -- One somebody already has isn't news.
     b:play({ professions = { alchemy(10), engineering(1) } })
     net:run(3)
     assert.same({ "The Crew has an Engineer now!" }, goalTexts(a))
@@ -229,7 +217,6 @@ describe("Profession Crew goals", function()
       },
     })
     local a, b, c = clients[1], clients[2], clients[3]
-    -- Herbalism, Leatherworking and Skinning are missing.
     b:play({ professions = { mining(1), tailoring(1), profession(182, "Herbalism", 1) } })
     net:run(3)
     assert.same({ "The Crew has a Herbalist now!" }, goalTexts(a))
@@ -264,7 +251,6 @@ describe("Profession Crew goals", function()
       professions[name] = { alchemy(150), mining(150) }
     end
     local net, clients = crew({ "Ann", "Bob", "Cid", "Dan", "Eve", "Fay", "Gus", "Hal" }, professions)
-    -- 2,400: 100 more makes 2,500.
     clients[1]:play({ professions = { alchemy(225), mining(175) } })
     net:run(3)
     assert.same({ "The Crew has 2,500 profession skill together!" }, goalTexts(clients[2]))
@@ -273,7 +259,6 @@ describe("Profession Crew goals", function()
   it("say when everyone is a Journeyman at something, from each Member's best on any Character", function()
     local net, clients = crew({ "Ann", "Bob" }, { Ann = { alchemy(160) }, Bob = { tailoring(149), cooking(20) } })
     local a, b = clients[1], clients[2]
-    -- Bob's Alt gets there first.
     b:play({ guid = "Player-0-BobAlt", name = "Bobalt", level = 5, professions = {} })
     net:run(3)
     b:play({ professions = { tailoring(150) } })

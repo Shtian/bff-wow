@@ -1,11 +1,3 @@
--- Ledger: what we know. One record per Member, with the display name, the
--- left flag and all their Characters inside, keyed by GUID: the own record,
--- which only this client writes, and copies of everyone else's. The version
--- is the owner's clock at the last write and always moves forward, so a
--- higher version wins (docs/adr/0001). Also when each Member was last heard,
--- who each copy came from, and the Members removed from your own view,
--- with the last version seen of each.
-
 local _, ns = ...
 
 local Ledger = {}
@@ -15,20 +7,11 @@ ns.Ledger = Ledger
 local ID_LENGTH = 8
 local ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
 
--- The fields Snapshot reports for a Character. name is the first name, the
--- one names are matched on; lastName is Forever's last name (nil where
--- there is none), for showing and for whispering "First Last".
 local CHARACTER_FIELDS = {
   "name", "lastName", "classFilename", "level", "xp", "maxXp", "zone", "deaths", "money", "professions",
 }
--- Where a Character was last seen, from locate(): written only by
--- Ledger:locate, and kept when Snapshot reports the Character.
 local LOCATION_FIELDS = { "mapId", "x", "y", "instance" }
 
--- Reported fields the record keeps in another form: store(reported)
--- gives it (nil keeps what the record has), same(a, b) compares two.
--- Professions keep short field names, and the last list when none could
--- be read. A last name doesn't go away when one read misses it.
 local STORED_AS = {
   professions = { store = ns.Professions.store, same = ns.Professions.same, keep = true },
   lastName = { store = function(value) return value end, same = function(a, b) return a == b end, keep = true },
@@ -57,9 +40,6 @@ local function newMemberId(random)
   return table.concat(chars)
 end
 
--- db is the whole saved table; the Ledger keeps `memberId`, `records`,
--- `heard`, `via` and `removed`. Last-heard times survive a reload but not
--- a logout, since nobody was heard while you were logged out.
 function Ledger.new(db, now, random, initialLogin)
   db.memberId = db.memberId or newMemberId(random)
   db.records = db.records or {}
@@ -73,7 +53,6 @@ function Ledger:memberId()
   return self.db.memberId
 end
 
--- The own record, or nil until the first Character is reported.
 function Ledger:own()
   return self.db.records[self.db.memberId]
 end
@@ -87,9 +66,6 @@ local function ownRecord(self)
   return record
 end
 
--- Every write of the own record also prunes its Reactions, and whatever
--- the pruner handed to pruneWith keeps in it, so pruning alone never sends
--- DATA.
 local function bump(self, record)
   local now = self.now()
   record.version = math.max(now, record.version + 1)
@@ -97,17 +73,10 @@ local function bump(self, record)
   if self.prune then self.prune(record, now) end
 end
 
--- Hands over the pruner: prune(record, now) edits the own record on every
--- write, before it goes out. The Spares module prunes its Spares and
--- Claims this way, since only it knows which have ended.
 function Ledger:pruneWith(prune)
   self.prune = prune
 end
 
--- A write of the own record by a module that owns part of it: change(record)
--- edits it and returns true if it changed, which makes the write. Returns
--- what change did. A change returning false that edits it anyway isn't a
--- write, as when leaving the Crew clears the own Spares.
 function Ledger:changeOwn(change)
   local record = ownRecord(self)
   local changed = change(record)
@@ -115,10 +84,6 @@ function Ledger:changeOwn(change)
   return changed
 end
 
--- Records the current state of the Character being played. Returns true if
--- the record changed, and the Character as it was before (nil if new).
--- Switching to a Character counts as a change even if nothing else did, so
--- it becomes the most recently played one.
 function Ledger:updateOwn(character)
   if type(character) ~= "table" or type(character.guid) ~= "string" then
     error("updateOwn: character.guid must be a string", 2)
@@ -145,8 +110,6 @@ function Ledger:updateOwn(character)
   return true, before
 end
 
--- Marks the Character being played as played now, for the heartbeat.
--- Returns true if there is one.
 function Ledger:touch()
   local record = self:own()
   local saved = record and self.playingGuid and record.characters[self.playingGuid]
@@ -156,18 +119,10 @@ function Ledger:touch()
   return true
 end
 
--- Positions are kept to 0.1% of the map, so standing still isn't a change,
--- and inside 0–1, since peers drop a record with a spot off the map.
 local function round(value)
   return math.min(1, math.max(0, math.floor(value * 1000 + 0.5) / 1000))
 end
 
--- Records where the Character being played is, from locate(): mapId, x
--- and y (0–1 on that map) for the open world, which also clears the
--- instance; or instance (its name), with the last open-world spot if
--- given, else keeping the record's.
--- Nil, or anything else, keeps what was known. Returns true if the record
--- changed.
 function Ledger:locate(location)
   local record = self:own()
   local saved = record and self.playingGuid and record.characters[self.playingGuid]
@@ -199,7 +154,6 @@ function Ledger:locate(location)
   return changed
 end
 
--- The GUID of the Character being played, or nil before the first report.
 function Ledger:playing()
   return self.playingGuid
 end
@@ -209,11 +163,6 @@ function Ledger:displayName()
   return record and record.displayName
 end
 
--- Writes the given displayName, left flag, Main (a Character GUID),
--- joinedAt (when you started or joined the Crew) and bff (the BFF version
--- running, for What's new) into the own record. A
--- field not given is kept; false clears left or Main. Returns true if the
--- record changed.
 function Ledger:writeOwn(fields)
   local record = ownRecord(self)
   local changed = false
@@ -228,8 +177,6 @@ function Ledger:writeOwn(fields)
   return changed
 end
 
--- Writes the own Play times summary (from PlayTimes) into the own record,
--- once it exists. Returns true if the record changed.
 function Ledger:setPlayTimes(summary)
   local record = self:own()
   if not record or ns.PlayTimes.same(record.playTimes, summary) then return false end
@@ -238,7 +185,6 @@ function Ledger:setPlayTimes(summary)
   return true
 end
 
--- Adds a Reaction (a key from Reactions) to the own record, made now.
 function Ledger:addReaction(key)
   local record = ownRecord(self)
   record.reactions = record.reactions or {}
@@ -246,14 +192,11 @@ function Ledger:addReaction(key)
   bump(self, record)
 end
 
--- Leaving the Crew clears the own Reactions. Not a write: the tombstone
--- carries none, and rejoining writes the record anyway.
 function Ledger:clearReactions()
   local record = self:own()
   if record then record.reactions = nil end
 end
 
--- What a Member who left publishes: no Characters.
 function Ledger:tombstone()
   local record = ownRecord(self)
   return { id = record.id, version = record.version, displayName = record.displayName, left = true }
@@ -266,7 +209,6 @@ function Ledger:knowsOthers()
   return false
 end
 
--- Drops every record but the own one, who was heard, and who was removed.
 function Ledger:forgetOthers()
   for id in pairs(self.db.records) do
     if id ~= self.db.memberId then self.db.records[id] = nil end
@@ -276,9 +218,6 @@ function Ledger:forgetOthers()
   self.db.removed = {}
 end
 
--- Removes a Member from your own view: their record is dropped, and later
--- copies are too. The version is kept, so the DIGEST still lists them and
--- nobody owes them to you. Returns false for yourself or a Member not held.
 function Ledger:remove(id)
   local record = self.db.records[id]
   if not record or id == self.db.memberId then return false end
@@ -289,8 +228,6 @@ function Ledger:remove(id)
   return true
 end
 
--- Takes a Member off the Remove list, and forgets their version, so their
--- record is fetched again. Returns false if they weren't on it.
 function Ledger:readd(id)
   if not self.db.removed[id] then return false end
   self.db.removed[id] = nil
@@ -301,41 +238,27 @@ function Ledger:isRemoved(id)
   return self.db.removed[id] ~= nil
 end
 
--- The removed Members: for id, { displayName, version } in ledger:removed().
 function Ledger:removed()
   return pairs(self.db.removed)
 end
 
--- The Member id whose message brought this Member's record, if it wasn't
--- their own.
 function Ledger:via(id)
   return self.db.via[id]
 end
 
--- The record with this Member id, or nil. Not to be changed.
 function Ledger:record(id)
   return self.db.records[id]
 end
 
--- The version held for a Member id: for a removed Member the last one
--- seen (0 if removed before versions were kept), and 0 if none.
 function Ledger:version(id)
   local record = self.db.records[id] or self.db.removed[id]
   return record and record.version or 0
 end
 
--- Every record held, own included: for id, record in ledger:records().
 function Ledger:records()
   return pairs(self.db.records)
 end
 
--- Up to `limit` Member ids and versions: the own one first, then each id in
--- `ask` (a set of ids, listed with the version held, 0 if none, so whoever
--- holds them newer replies), then the other records and the removed
--- Members (with the last version seen) in turn by id, starting
--- after the id `after`. Returns the versions, whether any record was left
--- out, and the last id listed in turn (`after` again if none was), to pass
--- as `after` next time, so every record is listed within a few DIGESTs.
 function Ledger:digest(limit, after, ask)
   local own = self:own()
   local versions, count = {}, 0
@@ -393,8 +316,6 @@ local RECORD_SHAPE = {
   bff = isOptional(isText),
   playTimes = isOptional(ns.PlayTimes.valid),
 }
--- A Character's professions aren't checked here: a malformed list costs
--- only them, so Professions.describe ignores it when rows are built.
 local CHARACTER_SHAPE = {
   guid = isText,
   name = isText,
@@ -421,7 +342,6 @@ local function fits(value, shape)
   return true
 end
 
--- A record from the wire is only kept if it has the expected shape.
 local function wellFormed(record)
   if not fits(record, RECORD_SHAPE) then return false end
   if record.characters == nil then return true end
@@ -432,10 +352,6 @@ local function wellFormed(record)
   return true
 end
 
--- Keeps a copy of someone else's record, sent by the Member id `from`, if
--- it is newer than the one held and the Member isn't removed. A removed
--- Member's copy is refused, but a newer version is noted. Returns true if
--- it was kept, and the copy held before (nil on first sight).
 function Ledger:merge(record, from)
   if not wellFormed(record) or record.id == self.db.memberId then return false end
   local removed = self.db.removed[record.id]
@@ -451,22 +367,17 @@ function Ledger:merge(record, from)
   return true, before
 end
 
--- Notes that a message from this Member was just heard.
 function Ledger:heard(id)
   if self:isRemoved(id) then return end
   self.db.heard[id] = self.now()
 end
 
--- When this Member was last heard, or nil.
 function Ledger:lastHeard(id)
   return self.db.heard[id]
 end
 
--- Forgets having heard the Members owning a Character of this name, and
--- returns whether there were any. On Forever the channel names a Character
--- "First Last" while records match on the first name (UnitName's first
--- value; older clients never share the last), so the first name matches too. Two Characters sharing one may
--- both go offline until the other's next message.
+-- WoW: on Forever the channel names a Character "First Last", while
+-- UnitName's first value is the first name alone.
 function Ledger:wentAway(name)
   local any = false
   local lower = name:lower()

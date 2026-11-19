@@ -1,17 +1,3 @@
--- EmptyState: what a tab shows when it has nothing to show yet (DESIGN.md,
--- Empty states): a small pixel vignette in the Camp's art, a headline, one
--- line on what will fill the tab and, for the alone state, the Crew code
--- ready to copy. Stacked and centred: the vignette on top, the words under
--- it. :Set({ art, title, text, code, still }) fills it, art naming one of
--- CampSheet.vignettes.art; :Layout(width) lays it out across width and
--- returns its height; :Place(parent, width, height, top) also sets it in a
--- view of that size, `top` down parent, its middle at about 40% of the way
--- down. EmptyState.pick chooses between a tab's own state and the alone
--- state, which wins while you're the only Member known. The vignette is a
--- whole number of screen pixels per art pixel near the Camp band's, and
--- steps its frames on the band's 6 a second while shown, unless still (the
--- Camp is off, so nothing in the panel moves). See docs/design/camp.md.
-
 local _, ns = ...
 
 local EmptyState = {}
@@ -21,24 +7,17 @@ local Skin = ns.Skin
 local Sheet = ns.CampSheet.vignettes
 
 local FPS = 6
--- The words' widest, and the gaps: vignette to headline, headline to line,
--- line to the code box, and the code box to its hint.
 local TEXT_MAX = 300
 local GAP_ART = 8
 local GAP_LINE = 4
 local GAP_ACTION = 10
 local GAP_HINT = 4
--- The Crew code's box, as the Settings code row's.
 local CODE_WIDTH = 128
 local CODE_HEIGHT = 24
 local HINT = "Ctrl+C to copy"
--- Where the block's middle sits in a view it's placed in, from the top,
--- and the least room above it.
 local PLACE_AT = 0.4
 local PLACE_INSET = 12
 
--- The alone state: for whoever started the Crew, with its code to hand
--- out; for whoever joined it, only the wait.
 local ALONE = {
   art = "alone",
   title = "Your Crew hasn't arrived yet",
@@ -50,9 +29,6 @@ local JOINED = {
   text = "You're in. The rest of the Crew shows up here once one of them is online.",
 }
 
--- The state to Set for a tab whose own empty state is `own` ({ art,
--- title, text }): the alone state instead while crew() (Core's) is alone.
--- still while the Camp is off.
 function EmptyState.pick(crew, own, still)
   local alone = crew and crew.alone
   local from = alone and (crew.joined and JOINED or ALONE) or own
@@ -113,15 +89,13 @@ local function place(self, parent, width, height, top)
   return own
 end
 
--- A new empty state on parent, hidden until placed.
 function EmptyState.new(parent)
   local self = CreateFrame("Frame", nil, parent)
   self:Hide()
   self.played = 0
   self.art = self:CreateTexture(nil, "ARTWORK")
   self.art:SetTexture(Sheet.file, "CLAMP", "CLAMP", "NEAREST")
-  -- As the Camp's: ElvUI turns default texture snapping off.
-  if self.SetRoundLayoutToNearestPixel then self:SetRoundLayoutToNearestPixel(true) end
+  Skin.snapToPixels(self)
 
   self.title = Skin.label(self, "heading", Skin.TEXT)
   self.title:SetJustifyH("CENTER")
@@ -131,8 +105,6 @@ function EmptyState.new(parent)
   self.text:SetWordWrap(true)
   self.text:SetPoint("TOP", self.title, "BOTTOM", 0, -GAP_LINE)
 
-  -- The code stays selected for copying, as the Roster footer's does; a
-  -- faint selection keeps it from being the brightest thing in the panel.
   self.code = Skin.editBox(self, CODE_WIDTH)
   self.code:SetHeight(CODE_HEIGHT)
   self.code:SetJustifyH("CENTER")

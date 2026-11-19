@@ -1,7 +1,5 @@
 local load = require("tests.load")
 
--- A changelog with a major release in the middle and more releases than What's
--- new shows.
 local TEXT = [[
 # Changelog
 
@@ -53,7 +51,6 @@ local function playing(name)
   }
 end
 
--- A client on the given BFF version, with saved data db.
 local function client(net, name, version, db)
   return net:add(name, { character = playing(name), version = version, changelog = TEXT, db = db })
 end
@@ -241,7 +238,6 @@ describe("What's new", function()
       local bob = client(net, "Bob", "v2.3.0"):login()
       bob:join(ann:join())
       net:run(60)
-      -- A login that takes the Crew's news, so the next one has none.
       ann:logout()
       ann:login()
       net:run(60)

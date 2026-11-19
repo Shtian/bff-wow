@@ -2,7 +2,6 @@ local load = require("tests.load")
 
 local DAY = 24 * 60 * 60
 
--- A character table for FakeNet, at the given level.
 local function playing(name, level, extra)
   local character = {
     guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
@@ -12,8 +11,6 @@ local function playing(name, level, extra)
   return character
 end
 
--- A net with the given clients logged in and in one Crew, settled. levels
--- maps a name to the level it plays.
 local function crew(names, levels, netOptions)
   local ns = load()
   local net = ns.FakeNet.new(netOptions)
@@ -28,7 +25,6 @@ local function crew(names, levels, netOptions)
   return net, clients, ns, code
 end
 
--- Every entry in the client's feed(), newest first.
 local function entries(client)
   local all = {}
   for _, day in ipairs(client.core:feed().days) do
@@ -37,8 +33,6 @@ local function entries(client)
   return all
 end
 
--- The texts of the client's entries, leaving out the "You joined the Crew"
--- every joining client has.
 local function texts(client)
   local result = {}
   for _, entry in ipairs(entries(client)) do
@@ -47,7 +41,6 @@ local function texts(client)
   return result
 end
 
--- The texts of the feedEntry events the client's Core fired.
 local function chatLines(client)
   local lines = {}
   for _, event in ipairs(client.events) do
@@ -79,7 +72,6 @@ describe("The Feed", function()
     assert.equal(22, ding.from)
     assert.equal(24, ding.level)
     assert.equal(2, entries(c)[1].count)
-    -- While you were away showed them instead.
     assert.equal(0, c.core:feed().unseen)
     assert.same({}, chatLines(c))
   end)
@@ -114,7 +106,6 @@ describe("The Feed", function()
     a:play({ level = 12 })
     net:run(3)
     assert.same({ "Ann dinged 12" }, chatLines(b))
-    -- The ding from settling went into While you were away.
     assert.equal(0, b.core:feed().unseen)
   end)
 
@@ -132,7 +123,6 @@ describe("The Feed", function()
   it("makes no ding for a level above your own max level", function()
     local net, clients = crew({ "Ann", "Bob" }, { Ann = 60 }, { maxLevel = 70 })
     local a, b = clients[1], clients[2]
-    -- Bob is behind on a patch: his max level is lower.
     b:logout()
     net.maxLevel = 60
     b:login()
@@ -161,7 +151,6 @@ describe("The Feed", function()
     assert.same({ "Dee joined the Crew" }, texts(b))
     assert.same({ "Dee joined the Crew" }, chatLines(a))
 
-    -- Cid was in the Crew before Dee, so Dee's first sight of Cid is silent.
     c:login()
     net:run(40)
     assert.same({}, texts(d))
@@ -277,8 +266,6 @@ describe("The Feed", function()
   end)
 
   describe("visit", function()
-    -- A net where Bob has chat lines and toasts off, so Ann's entries
-    -- stay unseen for him.
     local function quiet()
       local net, clients = crew({ "Ann", "Bob" })
       local b = clients[2]
@@ -287,7 +274,6 @@ describe("The Feed", function()
       return net, clients[1], b
     end
 
-    -- The texts of the client's New entries.
     local function new(client)
       local result = {}
       for _, entry in ipairs(entries(client)) do
@@ -386,7 +372,6 @@ describe("The Feed", function()
   end)
 
   it("groups entries by day, newest first, each titled", function()
-    -- The clock starts on Thursday 1 January 1970.
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     a:play({ level = 11 })

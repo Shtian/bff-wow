@@ -1,17 +1,3 @@
--- GoalsTab: the panel's Goals tab as a trophy cabinet, drawn from Core's
--- trophies() and goals(). On top the latest win in a gold plate, then the
--- trophy shelf (the newest medals and a See all tile), then Working on: a
--- tile per track with its progress. Trophies are Crew goal rungs, dungeon
--- and raid clears and Rare kills. See all opens the full cabinet in the
--- same tab: a slot per dungeon and per raid, lit once cleared, a slot per
--- Rare, lit once slain, then every track's medals oldest first; Back
--- returns. Before the
--- baseline has settled, or with nothing reached, a composed empty state
--- takes the latest win's and the shelf's place. Track hues and medal tiers
--- are Skin's trophy colours; Core decides which tier and what is fresh.
--- Panel owns the scroll view; this fills its content. See
--- docs/design/goals.md.
-
 local _, ns = ...
 
 local GoalsTab = {}
@@ -26,11 +12,9 @@ local DIM = Skin.DIM
 
 local INSET = 12
 local HEADING = 28
--- The latest win's plate, which catches the fire's light (Skin.LIT_PLATE_*).
 local PLATE_ICON = 40
 local PLATE_PAD = 10
 local PLATE_MIN = 60
--- Medals: a 40px icon with a 3px foot, the value and the date under it.
 local MEDAL_ICON = 40
 local MEDAL_FOOT = 3
 local MEDAL_HEIGHT = 72
@@ -39,12 +23,7 @@ local SHELF_GAP = 6
 local CABINET_MEDAL = 60
 local CABINET_GAP = 4
 local MEDAL_ROW_GAP = 10
--- The shelf's newest medals; the rest are behind See all.
 local SHELF = 7
--- Unveiling unseen Trophies, once a visit (docs/design/goals.md): the
--- latest win's medal stamps in, a soft gold band sweeps the plate, then
--- each other unseen medal's edge flares gold, one after another. Chosen
--- from prototypes in #237.
 local STAMP_SCALE = 1.25
 local STAMP_TIME = 0.3
 local SWEEP_WIDTH = 110
@@ -52,20 +31,16 @@ local SWEEP_COLOR = { 1, 0.914, 0.627, 0.32 }
 local SWEEP_TIME = 0.6
 local SHINE_TIME = 0.45
 local SHINE_GAP = 0.15
--- Working on: tiles in two columns, one when the panel is narrow.
 local TILE_HEIGHT = 74
 local TILE_PAD = 10
 local TILE_ICON = 28
 local TILE_BAR = 4
 local TWO_COLUMNS = 400
--- The cabinet: its header row and each track's line.
 local CABINET_HEAD = 38
 local TRACK_LINE = 24
 local TRACK_ICON = 16
 local TRACK_GAP = 12
 local SMALL_BUTTON = 20
--- The empty state (UI/EmptyState.lua), in the latest win's and the
--- shelf's place, with room above and below it.
 local EMPTY_PAD = 10
 
 local EMPTY_UNSETTLED = { art = "goals", title = "Counting up the Crew",
@@ -77,13 +52,10 @@ local view
 local core
 local cabinetOpen = false
 local redraw
--- Whether this visit has had its first draw, which unveils: redraws don't.
 local unveiled = false
 local pools = {}
 local plate, empty, seeAll, tiles, cabinetHead
 
--- Reused frames of one kind: take() hands out the next, done() hides the
--- ones not taken since start().
 local function pool(name, make)
   pools[name] = pools[name] or { items = {}, used = 0, make = make }
   return pools[name]
@@ -98,10 +70,7 @@ local function take(p)
   return item
 end
 
--- Each draw's number: the plate, empty state, See all, tiles and cabinet
--- header drawn in it carry it, and the others are hidden after. Hiding
--- one only to show it again would stop its animations, and with the sim
--- running the panel redraws every second.
+-- WoW: hiding a frame stops its animations, even when it's shown again at once.
 local drawCount = 0
 
 local function shown(frame)
@@ -123,12 +92,10 @@ local function hideTooltip()
   GameTooltip:Hide()
 end
 
--- Every frame a pool has made, taken or not.
 local function made(name)
   return pools[name] and pools[name].items or {}
 end
 
--- Ends the unveil at once, leaving everything in its final state.
 local function stopUnveil()
   if plate then
     plate.stamp:Stop()
@@ -140,7 +107,6 @@ local function stopUnveil()
   end
 end
 
--- Which trophy a medal shows, across redraws (each draw reads new tables).
 local function trophyKey(trophy)
   return ("%s:%s:%s"):format(trophy.track, trophy.label, trophy.time)
 end
@@ -152,7 +118,6 @@ local function open(on)
   redraw()
 end
 
--- "TROPHY SHELF ————— 12".
 local function createHeading()
   local heading = CreateFrame("Frame", nil, view.content)
   heading:SetHeight(HEADING)
@@ -165,7 +130,6 @@ local function createHeading()
   return heading
 end
 
--- Places a heading at y. Returns the y under it.
 local function drawHeading(text, count, y)
   local heading = take(pool("headings", createHeading))
   heading:SetPoint("TOPLEFT", view.content, "TOPLEFT", 0, y)
@@ -175,22 +139,15 @@ local function drawHeading(text, count, y)
   return y - HEADING
 end
 
--- A trophy's icon: a profession's own, a goal track's, a clear's or a
--- Rare kill's.
 local function iconOf(trophy)
   if trophy.track == "rareKills" then return Skin.RARE_ICON end
   return trophy.icon or Skin.GOAL_ICONS[trophy.track] or Skin.CLEAR_ICONS[trophy.kind]
 end
 
--- A Rare's level and kind, and where: "Level 37 Rare Elite · Badlands".
 local function rareLine(rare)
   return ("Level %d %s · %s"):format(rare.level, rare.elite and "Rare Elite" or "Rare", rare.zone)
 end
 
--- A goal rung: the track, the value and the date. A clear: the instance,
--- the date and who was there. A Rare kill: the Rare, its level and zone,
--- the date and whose kill it was. An empty slot: the instance and its
--- levels, or the Rare, its level and zone.
 local function showMedalTooltip(medal)
   local trophy, slot = medal.trophy, medal.slot
   if not (trophy or slot) then return end
@@ -229,8 +186,6 @@ local function showMedalTooltip(medal)
   GameTooltip:Show()
 end
 
--- A medal: the track's icon (or the profession's) edged in its tier's
--- colour with a 3px foot, its value (gold while fresh) and date under it.
 local function createMedal()
   local medal = CreateFrame("Frame", nil, view.content)
   medal:SetHeight(MEDAL_HEIGHT)
@@ -267,7 +222,6 @@ end
 
 local function drawMedal(trophy, width)
   local medal = newMedal(width)
-  -- A redraw that moved another trophy here ends its shine.
   if medal.shining and medal.shining ~= trophyKey(trophy) then
     medal.shine:Stop()
     medal.shining = nil
@@ -283,8 +237,6 @@ local function drawMedal(trophy, width)
   return medal
 end
 
--- A dungeon, raid or Rare slot in the cabinet: its trophy's medal, or
--- greyed with its name and level (range) until cleared or slain.
 local function drawSlot(slot, width)
   if slot.trophy then return drawMedal(slot.trophy, width) end
   local medal = newMedal(width)
@@ -299,7 +251,6 @@ local function drawSlot(slot, width)
   return medal
 end
 
--- See all: a plain slot with how many more, opening the cabinet.
 local function createSeeAll()
   local tile = CreateFrame("Button", nil, view.content)
   tile:SetHeight(MEDAL_HEIGHT)
@@ -323,8 +274,6 @@ local function createSeeAll()
   return tile
 end
 
--- Lays frames out left to right, wrapping, `cell` wide with `gap` between,
--- from y in a width. Returns the y under them.
 local function flow(frames, cell, gap, y, width)
   local columns = math.max(1, math.floor((width + gap) / (cell + gap)))
   for i, item in ipairs(frames) do
@@ -336,7 +285,6 @@ local function flow(frames, cell, gap, y, width)
   return y - rows * MEDAL_HEIGHT - (rows - 1) * MEDAL_ROW_GAP
 end
 
--- The newest win, worded like its Feed entry, in a gold plate.
 local function createPlate()
   local frame = CreateFrame("Frame", nil, view.content)
   Skin.litWash(frame, Skin.LIT_PLATE_FROM, Skin.LIT_PLATE_TO)
@@ -348,7 +296,6 @@ local function createPlate()
   frame.title:SetWordWrap(true)
   frame.sub = Skin.label(frame, "small", MUTED)
   frame.stamp = Skin.stamp(frame.picture, STAMP_SCALE, STAMP_TIME)
-  -- As the stamp lands, on the Master channel like toasts.
   frame.stamp.group:SetScript("OnFinished", function()
     local sound = core:unveilSound()
     if sound then ns.Toasts.play(sound) end
@@ -384,8 +331,6 @@ local function drawPlate(trophies, y, width)
   return y - height
 end
 
--- Nothing on the shelf: the empty state, or the alone state while you're
--- the only Member known.
 local function drawEmpty(settled, y, width)
   empty = empty or ns.EmptyState.new(view.content)
   empty:Set(ns.EmptyState.pick(core:crew(), settled and EMPTY_NONE or EMPTY_UNSETTLED, not core:setting("camp")))
@@ -396,7 +341,6 @@ local function drawEmpty(settled, y, width)
   return y - EMPTY_PAD - height - EMPTY_PAD
 end
 
--- The tile of Every profession in the Crew names the ones nobody has yet.
 local function showTileTooltip(tile)
   local row = tile.row
   if not (row and row.professions) then return end
@@ -414,16 +358,12 @@ local function showTileTooltip(tile)
   GameTooltip:Show()
 end
 
--- A Working on tile: the track's icon in its hue, its name, big numbers,
--- a bar in its hue and how many rungs it has reached.
 local function createTile()
   local tile = CreateFrame("Frame", nil, tiles)
   tile:SetHeight(TILE_HEIGHT)
   tile:EnableMouse(true)
   tile:SetScript("OnEnter", showTileTooltip)
   tile:SetScript("OnLeave", hideTooltip)
-  -- No fill, so the fire's light shows through: the hairlines are the
-  -- 1px gaps to its right and under it, drawn when another tile is there.
   tile.right = tile:CreateTexture(nil, "BACKGROUND")
   tile.right:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
   tile.right:SetPoint("TOPLEFT", tile, "TOPRIGHT")
@@ -482,8 +422,6 @@ local function drawTile(tile, row)
   end
 end
 
--- Working on: a tile per track, two columns (one when narrow), split by
--- hairlines.
 local function drawTiles(rows, y, width)
   if not tiles then
     tiles = CreateFrame("Frame", nil, view.content)
@@ -498,10 +436,8 @@ local function drawTiles(rows, y, width)
     local column, line = (i - 1) % columns, math.floor((i - 1) / columns)
     tile:SetPoint("TOPLEFT", tiles, "TOPLEFT", 1 + column * (tileWidth + 1), -(1 + line * (TILE_HEIGHT + 1)))
     tile:SetWidth(tileWidth)
-    -- The border draws the outer edges; tiles draw the lines between.
     tile.right:SetShown(column < columns - 1 and i < #rows)
     tile.below:SetShown(line < lines - 1)
-    -- A later column's line also covers the corner where the lines cross.
     tile.below:SetPoint("TOPLEFT", tile, "BOTTOMLEFT", column > 0 and -1 or 0, 0)
     drawTile(tile, row)
   end
@@ -513,10 +449,6 @@ local function drawTiles(rows, y, width)
   return y - height
 end
 
--- Unveils the unseen Trophies on the shelf: the latest win's plate stamps
--- and sweeps if it's unseen, then the other unseen medals shine, newest
--- first, from when the stamp lands (at once without one). Those behind See
--- all don't.
 local function unveil(trophies, medals)
   local start = 0
   if trophies.latest.unseen then
@@ -544,8 +476,6 @@ local function drawGoalsView(trophies, width)
     y = drawHeading("TROPHY SHELF", trophies.count, y)
     local shelf = {}
     for i = 1, math.min(SHELF, #trophies.shelf) do shelf[i] = drawMedal(trophies.shelf[i], SHELF_MEDAL) end
-    -- Always there: the cabinet also holds the dungeons and raids not
-    -- cleared yet.
     seeAll = seeAll or createSeeAll()
     seeAll:ClearAllPoints()
     seeAll:SetWidth(SHELF_MEDAL)
@@ -575,7 +505,6 @@ local function createCabinetHead()
   return head
 end
 
--- A track's line in the cabinet: its icon, small, and its name.
 local function createTrackLine()
   local line = CreateFrame("Frame", nil, view.content)
   line:SetHeight(TRACK_LINE)
@@ -620,12 +549,9 @@ local function drawCabinet(trophies, width)
   return y
 end
 
--- Draws the tab into Panel's scroll view, `width` wide. onChange redraws
--- the panel (See all and Back).
 function GoalsTab.draw(scrollView, theCore, width, onChange)
   view, core, redraw = scrollView, theCore, onChange
   local trophies = core:trophies()
-  -- Nothing to show in the cabinet: back to the Goals view.
   if trophies.count == 0 then cabinetOpen = false end
   startPools()
   drawCount = drawCount + 1
@@ -637,23 +563,19 @@ function GoalsTab.draw(scrollView, theCore, width, onChange)
     y = drawGoalsView(trophies, inner)
   end
   hideUnused()
-  -- pairs: the ones not made yet are nil.
+  -- WoW: Lua 5.1's ipairs stops at the first nil; frames not made yet are nil.
   for _, frame in pairs({ plate, empty, seeAll, tiles, cabinetHead }) do
     if frame.drawn ~= drawCount then frame:Hide() end
   end
   view.content:SetHeight(-y + INSET)
-  -- Opening on the cabinet (the panel hidden there) unveils nothing.
   unveiled = true
 end
 
--- The panel was hidden: the unveil stops, and the next visit unveils
--- again if there's anything new.
 function GoalsTab.hidden()
   stopUnveil()
   unveiled = false
 end
 
--- The tab was left: as hidden, and it opens on the Goals view next time.
 function GoalsTab.leave()
   GoalsTab.hidden()
   cabinetOpen = false

@@ -1,10 +1,3 @@
--- Minimap: the minimap button from the panel decision (#7), through
--- LibDataBroker and LibDBIcon. Click toggles the panel, the badge counts
--- Members online, the tooltip says who is online and can play (and, with
--- the While you were away popup off, what's new in the Feed), and
--- right-click gives Settings, Appear offline and Hide minimap button. Its
--- position and hidden flag live in Core's account-wide minimap table.
-
 local _, ns = ...
 
 local Minimap = {}
@@ -16,11 +9,8 @@ local ICON = "Interface\\AddOns\\BFF\\Media\\BFF"
 local core
 local icons
 local badge
--- Whether the button is shown, so refresh only calls LibDBIcon on a change.
 local shown
 
--- "N of M online · K can play with you now" and, with the popup off, "N new
--- in Feed", or how to get started.
 local function showTooltip(tooltip)
   tooltip:AddDoubleLine("BFF", ns.VERSION, nil, nil, nil, 0.6, 0.6, 0.6)
   if not core:crew() then
@@ -29,7 +19,6 @@ local function showTooltip(tooltip)
     local summary = core:summary()
     tooltip:AddLine(("%d of %d online · %d can play with you now"):format(summary.online,
       summary.members, summary.canPlay), 1, 1, 1)
-    -- With the popup off, this is where what you missed shows.
     local unseen = core:unseen()
     if not core:isAwayPopupOn() and unseen > 0 then
       tooltip:AddLine(("%d new in Feed"):format(unseen), 1, 0.82, 0)
@@ -64,8 +53,6 @@ local function onClick(owner, mouse)
   end
 end
 
--- The count of Members online on a small dark plate over the icon's lower
--- right, like the panel's badges, so it doesn't sit on the icon's rings.
 local function createBadge()
   local button = icons:GetMinimapButton(NAME)
   if not button then return end
@@ -81,12 +68,10 @@ local function showButton(on)
   if shown then icons:Show(NAME) else icons:Hide(NAME) end
 end
 
--- Shows or hides the button as the minimap setting changes.
 function Minimap.settingChanged(key, on)
   if key == "minimap" and icons then showButton(on) end
 end
 
--- Shows or hides the button and redraws the badge, from Core.
 function Minimap.refresh()
   if not icons then return end
   showButton(core:isMinimapShown())

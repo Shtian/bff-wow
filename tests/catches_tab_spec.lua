@@ -1,6 +1,5 @@
 local load = require("tests.load")
 
--- Item IDs from the list (docs/research/fishing-catches.md).
 local SMALLFISH = 6291
 local LOCH_FRENZY = 6317
 local CATFISH_19 = 6363
@@ -12,7 +11,6 @@ local SHOE = 271647
 
 local DAY = 86400
 
--- A net with the given clients logged in and in one Crew, settled.
 local function crew(names)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -30,7 +28,6 @@ local function catch(...)
   return { items = items, zone = "Feralas", subzone = "The Twin Colossals", mapId = 1444 }
 end
 
--- Shares every client's catches: a level change sends the record now.
 local function share(net, clients)
   for _, client in ipairs(clients) do client:play({ level = client.character.level + 1 }) end
   net:run(5)
@@ -62,7 +59,6 @@ local function tileCount(tab)
   return n
 end
 
--- Every counted type's first item, so a test can catch them all.
 local function countedItems(ns)
   local items = {}
   for _, t in ipairs(ns.Catches.TYPES) do
@@ -140,9 +136,7 @@ describe("the Catches tab", function()
       assert.equal(#ns.Catches.TYPES, tileCount(tab))
       assert.equal(48, counted)
       assert.equal(2, caught)
-      -- 4 fish, 2 bloated fish and the Mud Snapper family.
       assert.equal("1 / 7", first.count)
-      -- The Catfish family's first water is Level 10–25.
       assert.equal("1 / 9", section(tab, "Level 10–25").count)
     end)
 

@@ -9,8 +9,6 @@ local function playing(name, extra)
   return character
 end
 
--- A net with the given clients logged in and in one Crew, settled. start
--- maps a name to what its Character starts with ({ level, deaths }).
 local function crew(names, start, netOptions)
   local ns = load()
   local net = ns.FakeNet.new(netOptions)
@@ -24,14 +22,12 @@ local function crew(names, start, netOptions)
   return net, clients, ns, code
 end
 
--- The client's Goals tab rows, by track.
 local function goals(client)
   local byTrack = {}
   for _, row in ipairs(client.core:goals()) do byTrack[row.track] = row end
   return byTrack
 end
 
--- Every goal entry in the client's feed(), newest first.
 local function goalEntries(client)
   local list = {}
   for _, day in ipairs(client.core:feed().days) do
@@ -83,7 +79,6 @@ describe("Goal ladders", function()
         b = { level = 5, deaths = 2 },
       } },
       { characters = { c = { level = 22, deaths = 1 } } },
-      -- A Member with no Characters yet doesn't count.
       { characters = {} },
     }
     local progress = Goals.progress(records)
@@ -99,7 +94,6 @@ describe("Crew goals", function()
     local net, clients = crew({ "Ann", "Bob" }, { Ann = { level = 30, deaths = 4 }, Bob = { level = 12, deaths = 2 } })
     local a = clients[1]
 
-    -- A low Alt doesn't add to Crew levels, but its deaths count.
     a:play({ guid = "Player-0-AnnAlt", name = "Annalt", level = 3, deaths = 5 })
     net:run(3)
     local rows = goals(clients[2])
@@ -108,7 +102,6 @@ describe("Crew goals", function()
     assert.equal(50, rows.crewLevels.goal)
     assert.equal(11, rows.deaths.value)
     assert.equal(25, rows.deaths.rung)
-    -- Everyone at 20: one of two Members has a Character there.
     assert.equal(20, rows.everyone.rung)
     assert.equal(1, rows.everyone.value)
     assert.equal(2, rows.everyone.goal)
@@ -134,7 +127,6 @@ describe("Crew goals", function()
     local net, clients = crew({ "Ann", "Bob" }, { Ann = { level = 30 }, Bob = { level = 21 } })
     local a, b = clients[1], clients[2]
     b:logout()
-    -- Saved data from before Crew goals existed.
     b.db.goals = nil
     a:play({ level = 31, deaths = 26 })
     net:run(5)
@@ -190,9 +182,7 @@ describe("Crew goals", function()
     assert.same({ "The Crew has died 50 times together!", "The Crew reached 50 Crew levels!" }, goalTexts(b))
     local rows = goals(b)
     assert.equal(50, rows.deaths.last.rung)
-    -- Each rung crossed is reached.
     assert.equal(100, rows.deaths.rung)
-    -- No chat line while settling: While you were away has them.
     assert.same({}, chatLines(b))
     local summary
     for _, event in ipairs(b.events) do
@@ -208,7 +198,6 @@ describe("Crew goals", function()
     local net, clients = crew({ "Ann", "Bob", "Cid" }, { Ann = { level = 30 }, Bob = { level = 21 }, Cid = { level = 2 } })
     local a, c = clients[1], clients[3]
 
-    -- 53 Crew levels: 50 reached in the baseline.
     assert.equal(50, goals(a).crewLevels.last.rung)
     assert.is_true(a.core:removeMember(c.memberId))
     local rows = goals(a)
@@ -238,7 +227,6 @@ describe("Crew goals", function()
     assert.equal(45, rows.crewLevels.value)
     assert.equal(3, rows.deaths.value)
     assert.equal(2, rows.everyone.goal)
-    -- Removing the lowest Member reaches Everyone at 10, quietly.
     assert.equal(10, rows.everyone.last.rung)
 
     b.core:leaveCrew()
@@ -265,7 +253,6 @@ describe("Crew goals", function()
     assert.same({}, goalTexts(a))
     assert.same({}, chatLines(a))
 
-    -- Progress after that is news again.
     d:play({ level = 45 })
     net:run(3)
     assert.same({}, goalTexts(a))
@@ -287,7 +274,6 @@ describe("Crew goals", function()
     assert.equal(60, rows.everyone.last.rung)
     assert.equal("Everyone at max level", rows.everyone.title)
     assert.same({ "Everyone in the Crew has a Character at max level!" }, goalTexts(a))
-    -- Crew levels goes on.
     assert.equal(150, rows.crewLevels.rung)
   end)
 
@@ -299,7 +285,6 @@ describe("Crew goals", function()
     a.core:leaveCrew()
     net:run(3)
     assert.is_nil(goals(a).crewLevels.last)
-    -- Bob stays in the old Crew; on FakeNet's one channel he'd be heard.
     clients[2]:logout()
 
     local d = net:add("Dan", { character = playing("Dan", { level = 40 }) }):login()

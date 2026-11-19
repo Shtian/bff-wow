@@ -1,23 +1,3 @@
--- Away: the While you were away popup from the Feed decision (#14), in the
--- Skin's flat look. Your Crew noticed comes first: a line per entry of
--- yours others reacted to, then Crew goals reached, in gold, then
--- Spares: Claims on yours, what was sent to you and Gives, then
--- Professions: a line per profession picked up, milestone or maxed, with
--- the profession's icon and a Cheer, then Catches: the new types others
--- caught, and a line per rare find with its item's icon and a Cheer, then
--- BFF updated: the newest change, a line asking you to make sure your
--- friends update when a major release came with it, and how many more
--- changes, with a What's new button (docs/design/whats-new.md). Then
--- Core's summary as a scoreboard, Members by
--- most recent activity: a row per Character with its level now, a bar for
--- the jump (gold when it reached max level), levels gained, deaths, and
--- Cheer and Respects buttons. The Member's name sits on their first row,
--- with joined or left beside it, and a Welcome by joined. Dismiss and Open
--- Feed. With a camp in the summary it opens on the Camp, each friend's
--- levels gained over their head, and widens for it. App shows it once out
--- of combat. See docs/design/feed.md, docs/design/reactions.md and
--- docs/design/camp.md.
-
 local _, ns = ...
 
 local Away = {}
@@ -26,34 +6,26 @@ ns.Away = Away
 local Skin = ns.Skin
 
 local WIDTH = 400
--- Wider with the Camp.
 local CAMP_WIDTH = 440
 local INSET = 14
--- The intro line's slot above the column headings.
 local INTRO = 34
 local HEADINGS = 18
 local BUTTONS = 46
 local ICON = 14
 local ROW = 26
--- Above each section title (and the intro line), the title's slot, each
--- line's slot, and what's left under a section's last line.
 local SECTION_TOP = 12
 local NOTICED_TITLE = 16
 local NOTICED_LINE = 20
 local NOTICED_GAP = 4
--- The Reaction buttons, in a column at the right of each row.
 local REACT = 18
 local REACT_GAP = 4
 local REACT_COLUMN = 2 * REACT + REACT_GAP + 8
 local SMALL_BUTTON = 20
--- A row with the Character's name under the Member's.
 local TALL_ROW = 38
--- Columns, as x from the left of the scoreboard and from its right.
 local LEVEL_X = 136
 local BAR = 90
 local DEATHS_RIGHT = REACT_COLUMN
 local GAINED_RIGHT = DEATHS_RIGHT + 30
--- The names stop short of the level column.
 local NAME_WIDTH = LEVEL_X - 8
 local GAINED = Skin.ONLINE
 local STAR = "|T" .. Skin.FEED_ICONS.maxLevel .. ":12|t"
@@ -77,8 +49,6 @@ local function classHex(classFilename)
   return hex(Skin.TEXT)
 end
 
--- A column heading, placed by show(): x is from the left, or from the
--- right when negative.
 local function heading(text, x)
   local label = Skin.label(frame, "label", Skin.DIM)
   label:SetText(text)
@@ -129,8 +99,6 @@ local function create()
   dismiss:SetPoint("RIGHT", open, "LEFT", -8, 0)
 end
 
--- A Reaction button's click: reacts with the key it was drawn with, and
--- shows it done once it is.
 local function react(button)
   if not button.key or button.done then return end
   local ok, reason = ns.core:react(button.key)
@@ -141,8 +109,6 @@ local function react(button)
   end
 end
 
--- Draws a Reaction button from a summary button ({ key, reacted }), or
--- hides it.
 local function drawButton(button, reaction, data)
   button:SetShown(data ~= nil)
   if not data then return end
@@ -150,8 +116,6 @@ local function drawButton(button, reaction, data)
   button:SetReaction(reaction, data.reacted)
 end
 
--- A scoreboard row: the Member (on their first row) and the Character on
--- the left, then level and bar, levels gained, deaths and Reactions.
 local function row(index)
   local item = rows[index]
   if item then return item end
@@ -189,9 +153,6 @@ local function row(index)
   return item
 end
 
--- The level column: the level now (with a star at max level) over a bar
--- from 0 to max level, the part before in grey and the jump in green. A
--- dash for a Character that only died.
 local function drawLevel(item, character, maxLevel)
   local shown = character.level ~= nil
   item.track:SetShown(shown)
@@ -221,15 +182,12 @@ local function drawLevel(item, character, maxLevel)
   item.gain:Show()
 end
 
--- Draws one row and returns its height. character is nil for a Member
--- with no Character rows (joined or left only).
 local function drawRow(item, member, character, first, maxLevel)
   item.edge:SetShown(first)
   item.icon:SetShown(first and member.classFilename ~= nil)
   item.member:SetShown(first)
   if first then
     item.icon:SetAtlas("classicon-" .. (member.classFilename or ""):lower())
-    -- Highlighted tags (joined) in gold, the rest (left) plainly.
     local tags = {}
     for i, tag in ipairs(member.tags) do
       tags[i] = hex(tag.highlight and Skin.GOLD or Skin.MUTED) .. tag.text .. "|r"
@@ -238,7 +196,6 @@ local function drawRow(item, member, character, first, maxLevel)
     if #tags > 0 then text = text .. "  " .. table.concat(tags, ", ") end
     item.member:SetText(text)
   end
-  -- The Welcome sits just after the gold joined tag.
   drawButton(item.welcome, "welcome", first and member.welcome or nil)
   if first and member.welcome then
     item.welcome:ClearAllPoints()
@@ -272,7 +229,6 @@ local function drawRow(item, member, character, first, maxLevel)
   return height
 end
 
--- A line in Your Crew noticed or Crew goals: an icon and the text.
 local function line(pool, index)
   local item = pool[index]
   if item then return item end
@@ -282,9 +238,6 @@ local function line(pool, index)
   return item
 end
 
--- A section of one-line items under a title (Your Crew noticed, Crew
--- goals), from y down, with a line per text from the pool. Returns the y
--- below it.
 local function drawSection(title, texts, pool, y)
   title:SetShown(#texts > 0)
   for i = #texts + 1, #pool do pool[i]:Hide() end
@@ -304,7 +257,6 @@ local function drawSection(title, texts, pool, y)
   return y - NOTICED_GAP
 end
 
--- Your Crew noticed: each with its Reaction's icon.
 local function drawNoticed(noticed, y)
   local texts = {}
   for i, notice in ipairs(noticed) do
@@ -313,7 +265,6 @@ local function drawNoticed(noticed, y)
   return drawSection(frame.noticed, texts, lines, y)
 end
 
--- Crew goals reached, in gold.
 local function drawGoals(goals, y)
   local texts = {}
   for i, goal in ipairs(goals) do
@@ -322,7 +273,6 @@ local function drawGoals(goals, y)
   return drawSection(frame.goals, texts, goalLines, y)
 end
 
--- Spare notices and Gives, each with its kind's icon.
 local function drawSpares(notices, y)
   local texts = {}
   for i, notice in ipairs(notices) do
@@ -331,8 +281,6 @@ local function drawSpares(notices, y)
   return drawSection(frame.spares, texts, spareLines, y)
 end
 
--- A Professions or Catches line: its icon and the text, gold when
--- highlighted, and a Cheer at the right.
 local function cheerLine(pool, index)
   local item = pool[index]
   if item then return item end
@@ -348,7 +296,6 @@ local function cheerLine(pool, index)
   return item
 end
 
--- A section of cheerLines under a title, from y down. Returns the y below it.
 local function drawCheerLines(title, news, pool, y)
   title:SetShown(#news > 0)
   for i = #news + 1, #pool do pool[i]:Hide() end
@@ -371,8 +318,6 @@ local function drawCheerLines(title, news, pool, y)
   return y - NOTICED_GAP
 end
 
--- BFF updated ({ title, lines, more }), with What's new at the right of
--- its title. Returns the y below it.
 local function drawUpdate(update, y)
   frame.whatsNew:SetShown(update ~= nil)
   if not update then
@@ -390,15 +335,10 @@ local function drawUpdate(update, y)
   return below
 end
 
--- Core's campReaction: a Reaction just attached plays in the popup's
--- Camp, while it shows.
 function Away.campReaction(reaction)
   if frame and frame:IsShown() then frame.camp:React(reaction) end
 end
 
--- Shows the summary from Core's awaySummary: { members, goals,
--- spares, professions, catches, count, intro, maxLevel, noticed, update }. With no Member news, only Your
--- Crew noticed, Crew goals, Spares, Professions and Catches show.
 function Away.show(summary)
   if not frame then create() end
   local top = -Skin.HEADER_HEIGHT

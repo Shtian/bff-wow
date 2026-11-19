@@ -1,15 +1,3 @@
--- Toasts: live Feed entries, Reactions to yours and Spare notices
--- as small notices on screen, from the toasts decision. ToastQueue decides
--- what shows; this draws it in the Skin's look, plays the chosen sound,
--- and has the move mode Settings opens. Toasts stack away from where
--- they're placed: down from the top half of the screen, up from the
--- bottom half. A left click opens the Feed (the Spares tab for a
--- notice), a right click dismisses, and an entry you can react to has a
--- Reaction button at its right edge. An entry about a Member that Core
--- gives a figure shows that Member's Camp figure in place of the picture.
--- See docs/design/toasts.md, docs/design/reactions.md and
--- docs/design/camp.md.
-
 local _, ns = ...
 
 local Toasts = {}
@@ -23,19 +11,12 @@ local GAP = 6
 local ICON = 18
 local PICTURE = 24
 local REACT = 20
--- Seconds a toast takes to fade out at the end of its time.
 local FADE = 0.6
--- The timer line along a toast's bottom edge, faint white on every toast:
--- gold text already marks the news.
 local TIMER = 2
 local TIMER_COLOR = { 1, 1, 1, 0.18 }
--- Where toasts start, down from the top centre, until moved.
 local DEFAULT_FROM_TOP = 160
--- The overflow toast's icon: a small grey chat bubble.
 local MORE_ICON = "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon"
 
--- The sounds to pick from: game sounds by their SOUNDKIT name. One the
--- client doesn't have is left out of the list.
 local SOUNDS = {
   { "UI_BNET_TOAST", "Friend online" },
   { "TELL_MESSAGE", "Whisper" },
@@ -53,7 +34,6 @@ local driver
 local toastFrames = {}
 local mover
 
--- The sounds this client has, as { key, label }, with None first.
 function Toasts.sounds()
   local list = { { key = "none", label = "None" } }
   for _, sound in ipairs(SOUNDS) do
@@ -64,7 +44,6 @@ function Toasts.sounds()
   return list
 end
 
--- The label for a sound key, for the Settings button.
 function Toasts.soundLabel(key)
   for _, sound in ipairs(Toasts.sounds()) do
     if sound.key == key then return sound.label end
@@ -72,13 +51,12 @@ function Toasts.soundLabel(key)
   return "None"
 end
 
--- Plays a sound on the Master channel, so it's heard with game sounds off.
+-- WoW: PlaySound on the "Master" channel is heard with game sounds off.
 function Toasts.play(key)
   local id = SOUNDKIT and SOUNDKIT[key]
   if id then PlaySound(id, "Master") end
 end
 
--- The centre of the first toast, and whether the stack grows down.
 local function position()
   local x, y = core:toastPosition()
   local height = UIParent:GetHeight()
@@ -88,8 +66,6 @@ local function position()
   return x, y, y > height / 2
 end
 
--- Opens the tab the toast is about: the Feed, or the Spares tab
--- for a Spare notice.
 local function openFeed(toast)
   queue:dismiss(toast)
   ns.Panel.show(toast.entry and toast.entry.opens or "feed")
@@ -100,7 +76,6 @@ local function onClick(self, button)
   Toasts.draw()
 end
 
--- Reacts to the toast's entry and shows it done; the toast stays up.
 local function onReact(self)
   local entry = self:GetParent().toast.entry
   if not (entry and entry.key) or entry.reacted then return end
@@ -127,8 +102,6 @@ local function createToast()
   toast.picture:SetPoint("LEFT", 10, 0)
   toast.figure = ns.CampScene.figure(toast)
   toast.figure:SetPoint("CENTER", toast.picture)
-  -- The overflow toast's small grey icon, centred where the picture goes
-  -- (the picture is hidden then).
   toast.icon = toast:CreateTexture(nil, "ARTWORK")
   toast.icon:SetSize(ICON, ICON)
   toast.icon:SetPoint("LEFT", 10 + (PICTURE - ICON) / 2, 0)
@@ -147,8 +120,6 @@ local function createToast()
   return toast
 end
 
--- A Reaction toast (news from Core's reaction event, which has an
--- entryKey) shows the Reaction's icon, edged in gold, and has no button.
 local function drawPicture(frame, entry)
   if entry.entryKey then
     frame.picture:SetPicture(Skin.REACTION_ICONS[entry.reaction], Skin.GOLD)
@@ -179,7 +150,6 @@ local function drawToast(frame, toast)
   end
 end
 
--- Redraws the toasts on screen, newest nearest where they're placed.
 function Toasts.draw()
   local visible = queue:visible()
   local x, y, down = position()
@@ -198,16 +168,12 @@ function Toasts.draw()
   for i = count + 1, #toastFrames do toastFrames[i]:Hide() end
 end
 
--- Hover follows the mouse rather than OnEnter and OnLeave, since a redraw
--- can move a toast to another frame while the mouse is over it.
 local function hover(now)
   for _, frame in ipairs(toastFrames) do
     if frame:IsShown() then queue:hover(frame.toast, frame:IsMouseOver(), now) end
   end
 end
 
--- Fades each toast over its last FADE seconds; a hovered one stays solid.
--- Its timer line shrinks with the time it has left.
 local function fade(now)
   for _, frame in ipairs(toastFrames) do
     if frame:IsShown() then
@@ -218,7 +184,6 @@ local function fade(now)
   end
 end
 
--- Runs while anything is shown or waiting.
 local function onUpdate()
   local now = GetTime()
   hover(now)
@@ -229,22 +194,17 @@ local function onUpdate()
   if queue:isIdle() then driver:Hide() end
 end
 
--- Turning toasts off clears what's shown and waiting.
 function Toasts.settingChanged(key, on)
   if key ~= "toasts" or on or not queue then return end
   queue:clear()
   Toasts.draw()
 end
 
--- Shows a live Feed entry (from Core's feedEntry), Reaction (from its
--- reaction event) or Spare notice (spare) as a toast.
 function Toasts.show(entry)
   queue:push(entry)
   driver:Show()
 end
 
--- Re-places the mover from the saved position. The hint and buttons go on
--- the side toasts stack towards, where there's always half a screen of room.
 local function placeMover()
   local x, y, down = position()
   mover:ClearAllPoints()
@@ -264,7 +224,6 @@ local function placeMover()
   end
 end
 
--- Saves where the mover was dropped.
 local function moverDropped(self)
   self:StopMovingOrSizing()
   local x, y = self:GetCenter()
@@ -272,8 +231,6 @@ local function moverDropped(self)
   placeMover()
 end
 
--- A sample toast to drag, with Done and Reset by it. Escape closes it
--- too; the position is saved as it's dropped.
 local function createMover()
   mover = CreateFrame("Frame", "BFFToastMover", UIParent)
   mover:SetSize(WIDTH, HEIGHT)
@@ -305,8 +262,6 @@ local function createMover()
   end)
 end
 
--- Move mode, from Settings: shows the mover. onDone, if given, runs once
--- it's closed (Done or Escape), to bring Settings back.
 function Toasts.move(onDone)
   if not mover then createMover() end
   mover.onDone = onDone

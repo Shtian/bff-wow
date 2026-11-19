@@ -1,10 +1,5 @@
--- App: wiring only. Creates Core, routes WoW events to it and ticks it once a
--- second. See docs/design/code-structure.md.
-
 local addonName, ns = ...
 
--- The .toc's Version, which the packager fills in from the release tag
--- ("v0.2.1"). A checkout that wasn't packaged still has the token.
 local version = C_AddOns.GetAddOnMetadata(addonName, "Version")
 if not version or version:find("@", 1, true) then version = "dev" end
 ns.VERSION = version
@@ -14,7 +9,6 @@ local function say(text)
 end
 ns.say = say
 
--- What Core's and the channel link's refusals and notices say.
 local MESSAGES = {
   invalidCode = "That code doesn't look right.",
   inCrew = "Leave your Crew first (/bff leave).",
@@ -43,14 +37,12 @@ local MESSAGES = {
 }
 ns.MESSAGES = MESSAGES
 
--- A live Feed entry or Reaction as a chat line: "BFF: Ana dinged 24."
 local function chatLine(entry)
   local text = entry.text
   if not text:find("[.!?]$") then text = text .. "." end
   say(text)
 end
 
--- While you were away and a Tip's window wait for combat to end.
 local pendingAway
 local pendingTip
 local eventFrame = CreateFrame("Frame")
@@ -73,16 +65,12 @@ local function showAway(summary)
   end
 end
 
--- Spares whose item left the bags and that have a Claim, asked
--- about one at a time: Give to the winner, withdraw, or not now (the
--- question comes back next login). Escape is "not now".
 local goneAsks = {}
 
 local function askNextGone()
   local ask = goneAsks[1]
   if not ask then return end
-  -- No free popup: drop the rest rather than wait for an OnHide that
-  -- won't come. They're asked again next login.
+  -- WoW: StaticPopup_Show returns nil when no popup frame is free, and no OnHide follows.
   if not StaticPopup_Show("BFF_SPARE_GONE", ask.link or "Your Spare",
     ask.winner and ask.winner.character or "?", ask) then
     goneAsks = {}
@@ -111,7 +99,6 @@ StaticPopupDialogs.BFF_SPARE_GONE = {
   hideOnEscape = true,
 }
 
--- Core found a Spare's item gone at login: it withdrew it, or asks.
 local function spareGone(gone)
   if gone.action == "withdrawn" then
     say(("%s has left your bags, so your Spare is withdrawn."):format(gone.link or "An item"))
@@ -129,8 +116,6 @@ local function onCoreEvent(event, arg, more)
     ns.Minimap.refresh()
     ns.MapPins.refresh()
   elseif event == "settingChanged" then
-    -- arg is the key, more the new value; each module ignores keys it
-    -- doesn't use.
     ns.Panel.settingChanged(arg, more)
     ns.PocketCamp.settingChanged(arg, more)
     ns.TipDialog.refresh()
@@ -138,7 +123,6 @@ local function onCoreEvent(event, arg, more)
     ns.Toasts.settingChanged(arg, more)
     ns.MapPins.settingChanged(arg, more)
   elseif event == "moved" then
-    -- A Member's live spot (a WHERE): only the map shows it.
     ns.MapPins.moved()
   elseif event == "crewChanged" then
     ns.ChannelLink.setCrew(ns.core:crew())
@@ -149,7 +133,6 @@ local function onCoreEvent(event, arg, more)
   elseif event == "notice" then
     say(MESSAGES[arg])
   elseif event == "feedEntry" or event == "reaction" or event == "spare" then
-    -- Core says where each Live event goes: more is its outlets.
     if more.chat then chatLine(arg) end
     if more.toast then ns.Toasts.show(arg) end
   elseif event == "tip" then
@@ -167,14 +150,11 @@ local function onCoreEvent(event, arg, more)
   end
 end
 
--- How far local time is ahead of server time, so the Feed's days start at
--- local midnight.
 local function utcOffset()
   local now = time()
   return time(date("*t", now)) - time(date("!*t", now))
 end
 
--- Redraws the panel once a burst of item info has arrived.
 local itemRefreshDue = false
 local function itemInfoReceived()
   if itemRefreshDue then return end
@@ -185,13 +165,6 @@ local function itemInfoReceived()
   end)
 end
 
--- The sync trace: one trace(line) function, given to Core and the channel
--- link at start. Each line gets the time of day and GetTime() and always
--- goes in the sync log (ns.syncLog, saved per Character, for /bff report).
--- While /bff debug sync is on (off at every login and reload) it is also
--- printed: in a dev checkout the /bffdev console sets ns.traceSink(stamp,
--- text), which shows the line in its log and returns true, else it goes
--- to chat.
 local syncLog = ns.SyncLog.new()
 ns.syncLog = syncLog
 local syncTrace = false
@@ -203,7 +176,6 @@ local function traceLine(text)
   print(("|cff33ff99BFF|r |cff888888%s|r %s"):format(stamp, text))
 end
 
--- Whether trace lines are printed as well as logged.
 function ns.setSyncTrace(on)
   syncTrace = on and true or false
 end
@@ -254,22 +226,16 @@ local function start(isInitialLogin)
 end
 
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
--- Logging out or reloading: the sync log is saved for the next session.
 eventFrame:RegisterEvent("PLAYER_LOGOUT")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
--- After a real login the bags read as empty until the first of these, so
--- Core checks Spare items only on it.
+-- WoW: after a real login the bags read as empty until the first BAG_UPDATE_DELAYED.
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
--- A boss died: Core decides whether it's a clear.
 eventFrame:RegisterEvent("ENCOUNTER_END")
--- The loot window filled: Core keeps it if it was fished. With auto-loot
--- the slots are still filled when LOOT_READY fires. It can fire more than
--- once for one window, so a window's catch is kept once, until LOOT_CLOSED.
+-- WoW: with auto-loot the slots are still filled when LOOT_READY fires, and it can
+-- fire more than once for one loot window, before LOOT_CLOSED.
 eventFrame:RegisterEvent("LOOT_READY")
 eventFrame:RegisterEvent("LOOT_CLOSED")
 local lootRead = false
--- The Camp's art pixel is a whole number of screen pixels: worked out
--- again when the UI scale or the window changes.
 eventFrame:RegisterEvent("UI_SCALE_CHANGED")
 eventFrame:RegisterEvent("DISPLAY_SIZE_CHANGED")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
@@ -284,8 +250,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
   elseif event == "ENCOUNTER_END" then
     if ns.core then ns.core:encounterEnded(ns.Snapshot.encounter(...)) end
   elseif event == "LOOT_READY" then
-    -- Marked read only once something fished is found, in case
-    -- IsFishingLoot() isn't true yet at the first LOOT_READY.
+    -- WoW: IsFishingLoot() may not be true yet at the first LOOT_READY.
     if ns.core and not lootRead then
       local loot = ns.Snapshot.catch()
       if loot then
@@ -305,7 +270,6 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     local summary, tip = pendingAway, pendingTip
     pendingAway, pendingTip = nil, nil
     if summary then ns.Away.show(summary) end
-    -- Answered meanwhile (in Settings, say): nothing left to offer.
     if tip and ns.core:tip() then ns.TipDialog.show(tip) end
   end
 end)
@@ -320,14 +284,11 @@ StaticPopupDialogs.BFF_LEAVE_CREW = {
   hideOnEscape = true,
 }
 
--- Asks to confirm, then leaves.
 function ns.confirmLeave()
   StaticPopup_Show("BFF_LEAVE_CREW")
 end
 
--- The display name the setup view and slash commands start from: the one
--- already set, or the current Character's first name (Forever Characters
--- may also have a last name, which could push it past 16 characters).
+-- WoW: a Forever Character's name can be "First Last".
 function ns.defaultDisplayName()
   return ns.core:displayName() or (UnitName("player") or ""):match("^%S*")
 end
@@ -367,8 +328,6 @@ function commands.goals()
   ns.Panel.show("goals")
 end
 
--- Says how posting a bag item went, from Bags' returns: the
--- Spare's id and the item's link, or nil and a reason.
 function ns.sayPosted(id, result)
   if id then
     say(result .. " is up for your Crew. See /bff spares.")
@@ -377,8 +336,6 @@ function ns.sayPosted(id, result)
   end
 end
 
--- /bff spares opens the Spares tab; /bff spares add <item link> offers
--- the first matching item in your bags to the Crew, if it can be traded.
 function commands.spares(rest)
   local sub, link = rest:match("^(%S*)%s*(.-)$")
   if sub:lower() ~= "add" then return ns.Panel.show("spares") end
@@ -414,8 +371,6 @@ function commands.leave()
   if ns.core:crew() then ns.confirmLeave() else say(MESSAGES.noCrew) end
 end
 
--- /bff sim, /bff sim ding, /bff sim fish and /bff sim stop, only in a dev checkout
--- (Dev/ is left out of releases).
 function commands.sim(rest)
   if not ns.Sim then return say("/bff sim is only in a dev checkout.") end
   if rest == "stop" then
@@ -439,7 +394,6 @@ function commands.sim(rest)
   end
 end
 
--- A diagnostics report to copy into a bug report.
 function commands.report()
   ns.Report.show()
 end
@@ -472,7 +426,7 @@ SlashCmdList.BFF = function(input)
   end
 end
 
--- The key binding in Bindings.xml, under a "BFF" header in Key Bindings.
+-- WoW: Key Bindings labels Bindings.xml entries from BINDING_HEADER_ and BINDING_NAME_ globals.
 BINDING_HEADER_BFF = "BFF"
 BINDING_NAME_BFF_TOGGLE = "Open or close the BFF panel"
 

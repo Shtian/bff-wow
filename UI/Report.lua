@@ -1,9 +1,3 @@
--- Report: /bff report's window, for bug reports. A diagnostics report (the
--- versions, the Crew and the link, where the player is, and the sync log) in
--- a scrollable text box, all selected so Ctrl+C copies it. The player
--- pastes it themselves: nothing is sent anywhere. See
--- docs/design/code-structure.md.
-
 local _, ns = ...
 
 local Report = {}
@@ -20,7 +14,6 @@ local function yesNo(value)
   return value and "yes" or "no"
 end
 
--- The report, as plain text.
 function Report.text()
   local gameVersion, build, _, interface = GetBuildInfo()
   local forever = WOW_PROJECT_CAMELOT ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CAMELOT
@@ -86,7 +79,6 @@ local function create()
   box:SetWidth(WIDTH - 2 * INSET - 16)
   scroller:SetScrollChild(box)
   scroller:SetScript("OnSizeChanged", function(_, width) box:SetWidth(width) end)
-  -- Keeps the cursor in view as it moves.
   box:SetScript("OnCursorChanged", function(_, _, y, _, height)
     local top = -y
     local offset = scroller:GetVerticalScroll()
@@ -97,7 +89,6 @@ local function create()
       scroller:SetVerticalScroll(top + height - visible)
     end
   end)
-  -- Read-only: typing puts the report back, selected.
   box:SetScript("OnTextChanged", function(self, userInput)
     if userInput then
       self:SetText(frame.text)
@@ -110,7 +101,6 @@ local function create()
   frame.scroller = scroller
 end
 
--- Opens the window with a fresh report, all of it selected.
 function Report.show()
   if not frame then create() end
   frame.text = Report.text()

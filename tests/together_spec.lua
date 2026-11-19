@@ -1,8 +1,5 @@
 local load = require("tests.load")
 
--- The Together tab, read through Core's together(): friends and dungeons
--- on one level line.
-
 local function character(name, level, extra)
   local c = {
     guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
@@ -12,8 +9,6 @@ local function character(name, level, extra)
   return c
 end
 
--- A Crew of Members, all logged in and settled. members is a list of
--- { name, level }, the first being you.
 local function crew(members)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -27,7 +22,6 @@ local function crew(members)
   return net, clients, ns
 end
 
--- Gives a client an Alt and plays it, keeping the first Character as Main.
 local function playAlt(net, client, name, level)
   assert(client.core:setMain(client.character.guid))
   client.character = character(name, level)
@@ -49,7 +43,6 @@ local function barFor(view, name)
   return nil
 end
 
--- Every dungeon entry shown, by name.
 local function entries(view)
   local shown = {}
   for _, bar in ipairs(view.bars) do shown[bar.name] = bar end
@@ -69,6 +62,22 @@ end
 
 describe("Together", function()
   describe("the dungeon table", function()
+    it("keeps every name a release has shipped, since Members' clears are kept by name", function()
+      local shipped = {
+        "Ragefire Chasm", "Hall of Thanes", "Ruins of Lordaeron", "Wailing Caverns",
+        "The Deadmines", "Shadowfang Keep", "Blackfathom Deeps", "The Stockade", "Excavation Site",
+        "SM Graveyard", "City of Dalaran", "Gnomeregan", "SM Library", "Razorfen Kraul",
+        "SM Armory", "SM Cathedral", "The Drowned City", "Razorfen Downs", "Krol'dok Stronghold",
+        "Uldaman", "Zul'Farrak", "Maraudon", "Alcaz Prison", "Sunken Temple", "Blackrock Depths",
+        "Lower Blackrock Spire", "Blackmaw Hold", "Onyxia attunement", "Dire Maul", "Scholomance",
+        "Stratholme", "Upper Blackrock Spire", "Shaper's Terrace", "Molten Core", "Onyxia's Lair",
+        "Zul'Gurub", "The Barrow Deeps", "Hyjal Summit",
+      }
+      local names = {}
+      for _, dungeon in ipairs(load().Core.DUNGEONS) do names[dungeon.name] = true end
+      for _, name in ipairs(shipped) do assert.is_true(names[name], name) end
+    end)
+
     it("has the nine new Forever dungeons as Blizzard gives them", function()
       local ns = load()
       local forever = {}
@@ -237,13 +246,11 @@ describe("Together", function()
       net:run(5)
       local view = clients[1].core:together()
 
-      -- Simbad plays an Alt: both it and the Main show.
       assert.equal("Simbad", groupAt(view, 22).label)
       assert.is_true(groupAt(view, 22).alt)
       assert.is_true(groupAt(view, 22).online)
       assert.equal("Simbad", groupAt(view, 27).label)
       assert.is_false(groupAt(view, 27).alt)
-      -- Simone is offline: her Main shows, her Alt doesn't.
       assert.is_not_nil(groupAt(view, 41))
       assert.is_false(groupAt(view, 41).online)
       assert.is_nil(groupAt(view, 19))
@@ -286,7 +293,6 @@ describe("Together", function()
       local net, clients = crew({ { "Gahz", 24 }, { "Simba", 25 }, { "Simbad", 29 }, { "Simone", 41 } })
       playAlt(net, clients[3], "Simbalt", 23)
       clients[2]:play({ lastName = "Stormgaard" })
-      -- A last name alone goes out with the next unhurried DATA.
       net:run(70)
       local bar = barFor(clients[1].core:together(), "Shadowfang Keep")
       assert.equal(2, #bar.dots)
@@ -314,7 +320,6 @@ describe("Together", function()
       assert.equal((30 - 22 + 1) * layout.level, keep.range)
       local chasm = barFor(view, "Ragefire Chasm")
       assert.equal((18 - 13 + 1) * layout.level, chasm.range)
-      -- From its first level's left edge, as the can-play band's.
       assert.equal(view.ticks[13].x - layout.level / 2, chasm.x)
       for _, bar in ipairs(view.bars) do
         assert.truthy(bar.range <= bar.width, bar.name)
@@ -381,7 +386,6 @@ describe("Together", function()
         most = math.max(most, bar.lane)
       end
       assert.equal(view.lanes, most)
-      -- Nothing in a lane overlaps.
       for i, a in ipairs(view.bars) do
         for j = i + 1, #view.bars do
           local b = view.bars[j]
@@ -390,8 +394,6 @@ describe("Together", function()
           end
         end
       end
-      -- The ones you fit are placed first: where one you fit and one you
-      -- don't would overlap, yours is nearer the axis.
       for _, a in ipairs(view.bars) do
         for _, b in ipairs(view.bars) do
           if a.fits and not b.fits and a.x < b.x + b.width and b.x < a.x + a.width then
@@ -433,7 +435,6 @@ describe("Together", function()
         end
       end
       for _, bar in ipairs(view.bars) do assert.truthy(bar.lane >= 1 and bar.lane <= view.lanes) end
-      -- Your own label is placed, nearest the axis.
       assert.equal(1, groupAt(view, 24).row)
     end)
 
@@ -519,7 +520,6 @@ describe("Together", function()
       assert.same({}, select({ "a" }, { "a" }))
       assert.same({}, select({ "a", "b" }, { "b", "a" }))
       assert.same({ "a", "b" }, select({ "a", "b" }, { "a" }, true))
-      -- Your own dot selects nobody.
       assert.same({ "a" }, select({ "a" }, {}))
       assert.same({ "a" }, select({ "a" }, {}, true))
     end)
@@ -601,7 +601,6 @@ describe("Together", function()
       local hidden = clients[1].core:together()
       assert.is_nil(groupAt(hidden, 22))
       assert.is_nil(groupAt(hidden, 24))
-      -- Simbad plays Simbonus: only Simbalt is hidden. Your own aren't counted.
       assert.equal("1 alt hidden", hidden.hidden)
 
       clients[1].core:setSetting("togetherAlts", true)
@@ -626,8 +625,6 @@ describe("Together", function()
         core:setSetting("togetherAlts", alts)
         return core:together().hidden
       end
-      -- Simbad plays Simbonus: Simbalt is hidden. Simone is offline with
-      -- an Alt.
       assert.equal("2 alts hidden", note(true, false))
       assert.equal("1 alt, 1 offline hidden", note(false, false))
       assert.equal("1 offline hidden", note(false, true))
@@ -701,7 +698,6 @@ describe("Together", function()
       assert.is_true(inSpan(xOf(5)))
       assert.is_true(inSpan(xOf(15)))
       assert.is_false(inSpan(xOf(40)))
-      -- No span overlaps anything in a lane.
       for _, span in ipairs(view.empty.spans) do
         for _, item in ipairs(view.bars) do
           assert.truthy(span.right <= item.x or span.left >= item.x + item.width)

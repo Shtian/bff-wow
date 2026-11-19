@@ -1,6 +1,5 @@
 local load = require("tests.load")
 
--- A net with Ann and Bob logged in and in one Crew, settled.
 local function crew()
   local ns = load()
   local net = ns.FakeNet.new()
@@ -11,14 +10,12 @@ local function crew()
   return net, a, b, ns
 end
 
--- Starts a sync trace on a client's Core: the lines it reports.
 local function trace(client)
   local lines = {}
   client.core:setTrace(function(line) lines[#lines + 1] = line end)
   return lines
 end
 
--- The lines starting with `prefix`.
 local function starting(lines, prefix)
   local found = {}
   for _, line in ipairs(lines) do
@@ -93,7 +90,6 @@ describe("The sync trace", function()
     net:run(1)
     a:lockdown(false)
     net:run(5)
-    -- The same record again, as another Member relaying it would.
     a:lockdown(true)
     net:run(1)
     a:lockdown(false)

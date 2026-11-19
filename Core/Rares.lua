@@ -1,21 +1,8 @@
--- Rares: the pure parts of the Crew's Rare kills. The list of Rares (data,
--- keyed by NPC ID: a new Rare is one row), the watch that tells a kill
--- from the game's unit and loot reads (handed the API, so offline tests
--- can fake it), how a Member's Rare kills are kept in their own record,
--- and how the records add up to the Crew's: the earliest kill per Rare.
--- Goals keeps the Crew's as trophies. Stateless but for the watch's
--- memory of units seen; tested through Core. See docs/design/rares.md
--- and docs/research/rare-mobs.md.
-
 local _, ns = ...
 
 local Rares = {}
 ns.Rares = Rares
 
--- The Rares: NPC ID, name (English), zone, level, and elite for a rare
--- elite. Only mobs the game classifies as rare ("rare" or "rareelite"):
--- famous elites (Mor'Ladim, Gazz'uz, and Mother Fang, Elite on Forever)
--- aren't. Levels and classifications are Wowhead Forever's, 2026-11-13.
 local function rare(id, name, zone, level, elite)
   return { id = id, name = name, zone = zone, level = level, elite = elite or nil }
 end
@@ -54,8 +41,6 @@ Rares.LIST = {
   rare(266901, "Pexmit", "Mount Hyjal", 60),
 }
 
--- Level order, the list's own order breaking ties; each Rare's place in
--- it, and each by NPC ID.
 do
   for i, r in ipairs(Rares.LIST) do r.index = i end
   table.sort(Rares.LIST, function(a, b)
@@ -70,19 +55,13 @@ for i, r in ipairs(Rares.LIST) do
 end
 Rares.TOTAL = #Rares.LIST
 
--- The Rares slain track's steps: the last is every Rare.
 Rares.STEPS = { 5, 10, 20, Rares.TOTAL }
 
--- How many unlisted rares a record keeps: past it, a new one is dropped.
 Rares.UNLISTED_CAP = 50
--- A rares field with more entries than this is ignored as a whole.
 local MAX_ENTRIES = 200
--- How many units the watch remembers before it starts over.
 local MEMORY = 100
--- What the dev logger shows for a value that read secret.
 local SECRET = "<secret>"
 
--- The Rare with an NPC ID, or nil when it isn't on the list.
 function Rares.byId(npcId)
   return BY_ID[npcId]
 end
@@ -96,9 +75,8 @@ local function text(value)
   return nil
 end
 
--- The NPC ID in a creature's GUID ("Creature-0-[server]-[instance]-[zone]-
--- [npc]-[spawn]"; Forever obfuscates the server and spawn parts), or nil
--- for anything else.
+-- WoW: a creature's GUID is "Creature-0-[server]-[instance]-[zone]-[npc]-[spawn]";
+-- Forever obfuscates the server and spawn parts.
 function Rares.npcId(guid)
   if type(guid) ~= "string" then return nil end
   local kind, id = guid:match("^(%a+)%-[^-]*%-[^-]*%-[^-]*%-[^-]*%-(%d+)%-")
@@ -109,19 +87,6 @@ end
 
 local RARE_CLASSES = { rare = true, rareelite = true }
 
--- The watch: tells a Rare kill from what the game lets an addon read
--- (docs/research/rare-mobs.md, section 4), through api: unitGUID,
--- unitName, unitClassification, unitIsDead, unitIsTapDenied (the globals
--- of those names), getNumLootItems, getLootSourceInfo, zone
--- (GetRealZoneText), subzone (GetSubZoneText), mapId
--- (C_Map.GetBestMapForUnit("player")) and isSecret (issecretvalue,
--- optional). Each call returns what it found and an info for the dev
--- logger: { signal, read (each value read, "<secret>" when secret),
--- secret (the names of those that were), result (what it made of them) }.
--- A value that reads secret, or a read that errors, finds nothing: it
--- costs that kill, never an error. A kill is { npcId, signal ("loot",
--- "target" or "partyKill"), unlisted (a rare not on the list), name (an
--- unlisted one's, when read), zone, subzone, mapId }.
 local Watch = {}
 Watch.__index = Watch
 
@@ -129,10 +94,8 @@ function Rares.watch(api)
   return setmetatable({
     api = api,
     isSecret = api.isSecret or function() return false end,
-    -- Units seen while readable, by GUID: { npcId, name, rare }.
     seen = {},
     count = 0,
-    -- The target as last seen while readable, nil when it couldn't be.
     target = nil,
   }, Watch)
 end
@@ -141,7 +104,6 @@ local function newInfo(signal)
   return { signal = signal, read = {}, secret = {} }
 end
 
--- Reads a value for info under name: nil, true when it's secret.
 local function read(self, info, name, value)
   if self.isSecret(value) then
     if info.read[name] ~= SECRET then info.secret[#info.secret + 1] = name end
@@ -153,7 +115,6 @@ local function read(self, info, name, value)
   return value, false
 end
 
--- Runs fn(info) guarded: an error is the info's result, and finds nothing.
 local function guarded(self, signal, fn, empty)
   local info = newInfo(signal)
   local ok, found = pcall(fn, self, info)
@@ -165,7 +126,6 @@ local function guarded(self, signal, fn, empty)
   return found, info
 end
 
--- Where the kill happened, each nil when unknown or secret.
 local function where(self, info, kill)
   kill.zone = text((read(self, info, "zone", self.api.zone())))
   kill.subzone = text((read(self, info, "subzone", self.api.subzone())))
@@ -184,8 +144,6 @@ local function remember(self, guid, unit)
   self.seen[guid] = unit
 end
 
--- A kill of the creature with this GUID, if it's on the list or was seen
--- classified rare; else nil and why not.
 local function killOf(self, guid, signal, unit)
   local npcId = Rares.npcId(guid)
   if not npcId then return nil, "notCreature" end
@@ -195,8 +153,6 @@ local function killOf(self, guid, signal, unit)
   return nil, "notRare"
 end
 
--- A unit read: its GUID, NPC ID, name and whether the game calls it
--- rare. Nil when its GUID can't be read.
 local function readUnit(self, info, token)
   local guid = read(self, info, "guid", self.api.unitGUID(token))
   if type(guid) ~= "string" then return nil end
@@ -207,11 +163,6 @@ local function readUnit(self, info, token)
   return guid, { npcId = npcId, name = text(name), rare = RARE_CLASSES[class] == true }
 end
 
--- A unit was seen (PLAYER_TARGET_CHANGED for "target",
--- UPDATE_MOUSEOVER_UNIT, NAME_PLATE_UNIT_ADDED): a listed rare, or one
--- the game calls rare, is remembered by its GUID while it can be read.
--- The target is remembered apart, until the next target change, so its
--- death can be told once its GUID reads secret in combat. Returns the info.
 function Watch:see(token)
   local _, info = guarded(self, "seen", function(_, i)
     i.unit = token
@@ -232,9 +183,7 @@ function Watch:see(token)
   return info
 end
 
--- The loot window filled (LOOT_READY): every rare among its corpses, each
--- once. Looting a corpse means your group had the tag. Returns the kills
--- (a list) and the info.
+-- WoW: looting a corpse means your group had the tag.
 function Watch:loot()
   return guarded(self, "loot", function(_, info)
     local kills, found = {}, {}
@@ -268,11 +217,8 @@ function Watch:loot()
   end, {})
 end
 
--- The target died (PLAYER_TARGET_DIED), or combat ended
--- (PLAYER_REGEN_ENABLED): a rare target that's dead and that nobody
--- outside the group tagged is a kill. Its GUID is read now, or, while it
--- reads secret, taken from when it was targeted. Returns the kill (or
--- nil) and the info.
+-- WoW: a target's GUID can read secret in combat, so it's taken from
+-- when it was targeted.
 function Watch:targetDied()
   return guarded(self, "target", function(_, info)
     local guid, unit = readUnit(self, info, "target")
@@ -304,8 +250,6 @@ function Watch:targetDied()
   end)
 end
 
--- PARTY_KILL: someone in the group killed something. Counts when the
--- target's GUID can be read. Returns the kill (or nil) and the info.
 function Watch:partyKill(attackerGUID, targetGUID)
   return guarded(self, "partyKill", function(_, info)
     read(self, info, "attackerGUID", attackerGUID)
@@ -328,13 +272,6 @@ local function unlistedCount(rares)
   return n
 end
 
--- Adds a kill (as the watch gives it) to the own record, made at time by
--- the Character with GUID character. Its rares are { [npcId] = { t, z, s,
--- m, c, n } }: t the first kill's time, z, s and m its zone, subzone and
--- map ID, c the Character's GUID, and n an unlisted rare's name. Only the
--- first kill of each is kept; unlisted rares past UNLISTED_CAP are
--- dropped. Returns true if the record changed, else false and why not:
--- "unreadable", "had" or "full".
 function Rares.add(record, kill, time, character)
   if type(kill) ~= "table" or not isId(kill.npcId) then return false, "unreadable" end
   record.rares = record.rares or {}
@@ -359,10 +296,6 @@ local function validEntry(entry)
     and isText(entry.z) and isText(entry.s) and isMap(entry.m) and isText(entry.c) and isText(entry.n)
 end
 
--- A record's Rare kills, skipping anything malformed (a record from the
--- wire isn't shape-checked for them): for npcId, entry in valid(record).
--- A field with more than MAX_ENTRIES is ignored; unlisted rares past
--- UNLISTED_CAP (the earliest kept) are skipped.
 local function valid(record)
   local list = {}
   local rares = record.rares
@@ -385,9 +318,6 @@ local function valid(record)
   return pairs(list)
 end
 
--- The Crew's Rare kills over the given records: { [npcId] = { time (the
--- earliest), memberId (whose it was; ties go to the lower Member id),
--- character (that kill's Character GUID, or nil) } }, listed Rares only.
 function Rares.collect(records)
   local crew = {}
   for _, record in ipairs(records) do
@@ -403,15 +333,12 @@ function Rares.collect(records)
   return crew
 end
 
--- How many listed Rares anyone in the given records has slain.
 function Rares.slain(records)
   local n = 0
   for _ in pairs(Rares.collect(records)) do n = n + 1 end
   return n
 end
 
--- The Feed entry's text for the Crew's first kill of a Rare: "Ana slew
--- Rak'shiri!", "You slew Rak'shiri!".
 function Rares.text(name, who)
   return ("%s slew %s!"):format(who, name)
 end

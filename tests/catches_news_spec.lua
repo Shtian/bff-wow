@@ -1,13 +1,11 @@
 local load = require("tests.load")
 
--- Item IDs from the list (docs/research/fishing-catches.md).
 local SMALLFISH = 6291
 local AHI = 16967
 local TASTYFISH = 19807
 local SUMMER_BASS = 13756
 local SHOE = 271647
 
--- A net with the given clients logged in and in one Crew, settled.
 local function crew(names, options)
   local ns = load()
   local net = ns.FakeNet.new(options)
@@ -19,14 +17,12 @@ local function crew(names, options)
   return net, clients, ns
 end
 
--- A catch as Catches.read gives it: each item ID once, in Westfall.
 local function catch(...)
   local items = {}
   for i = 1, select("#", ...) do items[i] = { itemId = select(i, ...), quantity = 1 } end
   return { items = items, zone = "Westfall", subzone = "The Jansen Stead", mapId = 1436 }
 end
 
--- The first n counted types' item IDs that are everyday fish.
 local function fish(ns, n)
   local ids = {}
   for _, t in ipairs(ns.Catches.TYPES) do
@@ -35,8 +31,6 @@ local function fish(ns, n)
   return ids
 end
 
--- Catches n everyday types, and lets the record reach the Crew (a catch
--- alone waits for the next send; a level goes out now).
 local function catchTypes(net, client, ns, n)
   client.core:caught(catch(unpack(fish(ns, n))))
   client:play({ level = client.character.level + 1 })
@@ -175,7 +169,6 @@ describe("The types caught track", function()
       assert.is_false(trophies[1].fresh)
     end)
 
-    -- A client whose baseline was taken before the track shipped.
     local function beforeTheTrack(client)
       client.db.goals.reached.catches = nil
       client.db.goals.quiet.catches = nil
@@ -227,7 +220,6 @@ describe("The types caught track", function()
   end)
 end)
 
--- Catches something and sends it now, as a level does.
 local function send(net, client, ...)
   client.core:caught(catch(...))
   client:play({ level = client.character.level + 1 })
@@ -368,7 +360,6 @@ describe("Rare finds", function()
 end)
 
 describe("While you were away, for Catches", function()
-  -- Bob away while Ana and Cid fish; Bob's next login's summary.
   local function away(fishing)
     local net, clients, ns = crew({ "Bob", "Ana", "Cid" })
     local bob = clients[1]
@@ -436,7 +427,6 @@ describe("While you were away, for Catches", function()
     assert.equal("1 new type caught (Ana 1)", summaryOf(bob).catches[1].text)
   end)
 
-  -- Logs the client in afresh and lets sync settle.
   local function relog(net, client)
     client:logout()
     net:run(5)
@@ -446,8 +436,6 @@ describe("While you were away, for Catches", function()
     return summaryOf(client)
   end
 
-  -- Ana fishes while Bob is offline and logs out before Bob is back, so
-  -- her record can't reach him.
   local function fishedUnheard(net, bob, ana, ...)
     bob:logout()
     net:run(5)

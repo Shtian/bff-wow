@@ -1,6 +1,5 @@
 local load = require("tests.load")
 
--- A character table for FakeNet, at the given level.
 local function playing(name, level)
   return {
     guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
@@ -8,7 +7,6 @@ local function playing(name, level)
   }
 end
 
--- A net with the given clients logged in and in one Crew, settled.
 local function crew(names)
   local ns = load()
   local net = ns.FakeNet.new()

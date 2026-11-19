@@ -12,8 +12,6 @@ local function character(name, extra)
   return c
 end
 
--- A net with the given clients logged in and in one Crew, settled. options
--- maps a name to FakeNet:add options.
 local function crew(names, options)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -29,7 +27,6 @@ local function crew(names, options)
   return net, clients, ns, code
 end
 
--- Jumps the clock ahead, then lets the Crew settle.
 local function skip(net, seconds)
   net:step(net:now() + seconds)
   net:run(5)
@@ -50,7 +47,6 @@ local function gravesOf(view, client)
   return list
 end
 
--- Every entry in the client's feed(), newest first.
 local function entries(client)
   local all = {}
   for _, day in ipairs(client.core:feed().days) do
@@ -68,7 +64,6 @@ end
 
 local layout = load().Core.CAMP_LAYOUT
 
--- Every figure and grave in the view as { left, right } in art pixels.
 local function spans(view)
   local list = {}
   for _, actor in ipairs(view.actors) do list[#list + 1] = { actor.x, actor.x + actor.width } end
@@ -91,7 +86,6 @@ describe("The Camp", function()
     view = a.core:camp(COLUMNS)
     assert.equal("asleep", actorFor(view, b).pose)
 
-    -- Cid goes quiet without leaving the channel: asleep after 12 minutes.
     c.ticks = false
     c:lockdown(true)
     skip(net, 13 * 60)
@@ -149,7 +143,6 @@ describe("The Camp", function()
     local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal", "Ivy", "Jon" }
     local net, clients = crew(names)
     local a = clients[1]
-    -- Everyone but Bob and Cid logs out, one a minute, Jon last.
     for i = 4, 10 do
       clients[i]:logout()
       net:run(60)
@@ -161,7 +154,6 @@ describe("The Camp", function()
     assert.is_true(shown < 10)
     assert.equal(10 - shown, view.more)
     assert.equal(("+%d more"):format(10 - shown), view.moreText)
-    -- The sleepers shown are the most recently seen.
     for i = 10, 4, -1 do
       local expected = (10 - i) < shown - 3
       assert.equal(expected, actorFor(view, clients[i]) ~= nil, clients[i].name)
@@ -194,14 +186,12 @@ describe("The Camp", function()
       local left, right = -math.floor(columns / 2), columns - math.floor(columns / 2)
       for i, span in ipairs(list) do
         assert.is_true(span[1] >= left and span[2] <= right, ("out of the band at %d"):format(columns))
-        -- The fire stays clear.
         assert.is_true(span[2] <= -layout.fire or span[1] >= layout.fire, ("on the fire at %d"):format(columns))
         for j = i + 1, #list do
           local other = list[j]
           assert.is_true(span[2] <= other[1] or other[2] <= span[1], ("overlap at %d"):format(columns))
         end
       end
-      -- Names never run into each other.
       local labels = {}
       for _, actor in ipairs(view.actors) do
         local centre = actor.x + actor.width / 2
@@ -251,7 +241,6 @@ describe("The Camp", function()
       net:run(15)
       local view = a.core:camp(COLUMNS)
       assert.equal(4, #view.graves)
-      -- Newest first: Dee's and Cid's graves, then one of Bob's.
       assert.equal(1, #gravesOf(view, d))
       assert.equal(2, #gravesOf(view, c))
       assert.equal(1, #gravesOf(view, b))
@@ -356,7 +345,6 @@ describe("The Camp", function()
       assert.equal("ASLEEP IN CAMP", a:rowFor(c).section)
       assert.equal("CREW", a.core:rows("level")[2].section)
       assert.is_nil(a.core:rows()[1].status)
-      -- Alt lines keep plain Last seen.
       assert.equal("online", a:rowFor(b).lastSeenText)
 
       a.events = {}

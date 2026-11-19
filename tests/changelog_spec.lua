@@ -1,11 +1,7 @@
 local load = require("tests.load")
 
--- A CHANGELOG.md as bumpy writes it: a title, blank lines, then a section per
--- release with its date and an item per bump file.
 local TEXT = [[
 # Changelog
-
-
 
 ## 2.3.0
 <sub>2026-11-15</sub>

@@ -1,13 +1,3 @@
--- ToastQueue: which toasts are on screen, from the toasts decision. Pure
--- Lua, so it's tested offline: Toasts feeds it live Feed entries and the
--- time, and draws visible() after each update. At most MAX toasts show,
--- each for DURATION seconds (the clock stops while hovered); a burst that
--- doesn't fit ends in one "+N more" toast; nothing new shows in combat;
--- and the sound plays at most once per SOUND_GAP. A Reaction to an entry
--- whose Reaction toast is showing or waiting merges into it, and a shown
--- one gets its full time again. See docs/design/toasts.md and
--- docs/design/reactions.md.
-
 local _, ns = ...
 
 local ToastQueue = {}
@@ -18,14 +8,10 @@ ToastQueue.MAX = 3
 ToastQueue.DURATION = 10
 ToastQueue.SOUND_GAP = 2
 
--- reactionText(names, phrase) words a merged Reaction toast
--- (Core.reactionText).
 function ToastQueue.new(reactionText)
   return setmetatable({ pending = {}, shown = {}, reactionText = reactionText }, ToastQueue)
 end
 
--- The Reaction toast showing or waiting for this entry, and whether it's
--- showing.
 local function reactionFor(self, entryKey)
   for _, toast in ipairs(self.shown) do
     if toast.entry and toast.entry.entryKey == entryKey then return toast.entry, toast end
@@ -35,8 +21,6 @@ local function reactionFor(self, entryKey)
   end
 end
 
--- Adds a Member's name to a Reaction toast: "Bob and Cleo cheered your
--- ding to 30".
 local function merge(self, target, news)
   for _, name in ipairs(target.names) do
     if name == news.name then return false end
@@ -46,7 +30,6 @@ local function merge(self, target, news)
   return true
 end
 
--- A live Feed entry, or a Reaction from Core's reaction event, to show.
 function ToastQueue:push(entry)
   if entry.entryKey then
     local target, toast = reactionFor(self, entry.entryKey)
@@ -62,21 +45,15 @@ function ToastQueue:push(entry)
   self.pending[#self.pending + 1] = entry
 end
 
--- The toasts on screen, oldest first. A toast is { entry, expiresAt,
--- hovered, left }, or the overflow toast { more = n, ... }; left is the
--- time it had when hovered.
 function ToastQueue:visible()
   return self.shown
 end
 
--- Takes every toast off screen and drops those waiting, as turning toasts
--- off does.
 function ToastQueue:clear()
   self.pending = {}
   self.shown = {}
 end
 
--- Whether there's nothing to show or wait for.
 function ToastQueue:isIdle()
   return #self.shown == 0 and #self.pending == 0
 end
@@ -91,13 +68,10 @@ local function remove(list, item)
   return false
 end
 
--- Takes a toast off screen, as a click does.
 function ToastQueue:dismiss(toast)
   remove(self.shown, toast)
 end
 
--- Hovering stops a toast's clock; leaving starts it again from where it
--- stopped.
 function ToastQueue:hover(toast, hovered, now)
   if (toast.hovered == true) == hovered then return end
   toast.hovered = hovered
@@ -108,25 +82,21 @@ function ToastQueue:hover(toast, hovered, now)
   end
 end
 
--- Seconds until the toast goes, not counting down while hovered.
 function ToastQueue:remaining(toast, now)
   if toast.hovered then return toast.left end
   return toast.expiresAt - now
 end
 
--- The share of its full time the toast has left, from 1 down to 0.
 function ToastQueue:share(toast, now)
   return math.max(0, math.min(1, self:remaining(toast, now) / ToastQueue.DURATION))
 end
 
--- Gives a toast its full time.
 local function restart(toast, now)
   toast.expiresAt = now + ToastQueue.DURATION
   toast.left = ToastQueue.DURATION
   toast.renew = nil
 end
 
--- Restarts the toasts a merged Reaction renewed. Returns whether any.
 local function renew(self, now)
   local any = false
   for _, toast in ipairs(self.shown) do
@@ -155,9 +125,6 @@ local function overflow(self)
   end
 end
 
--- Puts waiting entries on screen. What doesn't fit goes into the overflow
--- toast, which takes the last free slot; with no slot free and no overflow
--- toast showing, entries wait. Returns whether anything showed.
 local function fill(self, now)
   local pending = self.pending
   if #pending == 0 then return false end
@@ -191,9 +158,6 @@ local function fill(self, now)
   return true
 end
 
--- Called every frame with the time in seconds and whether you're in
--- combat. Returns whether the toasts on screen changed, and whether to
--- play the sound.
 function ToastQueue:update(now, inCombat)
   local renewed = renew(self, now)
   local changed = expire(self, now) or renewed

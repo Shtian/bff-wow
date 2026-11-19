@@ -1,9 +1,3 @@
--- Loads the pure code the way the game does: the pure libraries Core uses,
--- then every Core/ and Link/ file listed in BFF.toc, in order, called with
--- the addon name and a shared private namespace. FakeNet comes along for the
--- scenario tests.
-
--- LibStub keeps one copy of each library per process, as in game.
 local libraries = {
   "Libs/LibStub/LibStub.lua",
   "Libs/LibSerialize/LibSerialize.lua",

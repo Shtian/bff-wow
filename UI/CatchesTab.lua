@@ -1,13 +1,3 @@
--- CatchesTab: the panel's Catches tab, a field guide drawn from Core's
--- catchesTab(). On top "25 of 46 types caught", the Group and Show
--- pickers (the game's menus) and a bar with a tick at each trophy step;
--- then a section per water (or per type) of 28px tiles that scrolls; and
--- at the bottom Recent first catches. Core groups, filters and words
--- everything; this asks the game for each item's name, icon and quality,
--- and draws them. What's picked in Group and Show is the UI's, as the
--- Roster's sort is; the names checkbox is Core's setting. See
--- docs/design/catches.md.
-
 local _, ns = ...
 
 local CatchesTab = {}
@@ -23,38 +13,28 @@ local DIM = Skin.DIM
 local INSET = 12
 local SMALL_BUTTON = 20
 local PICKER_GAP = 6
--- The summary: the count line, the bar and the next trophy.
 local BAR = 4
 local TICK = 8
 local SUMMARY_PAD = 9
--- The grid's tiles, and the gaps between them across and down (room
--- for the 2px gold line under a fresh one).
 local TILE = 28
 local GAP_X = 4
 local GAP_Y = 7
 local FRESH_LINE = 2
--- A section's heading and its zones line.
 local SECTION_PAD = 9
 local HEADING = 16
--- Recent first catches: a label, then a row each.
 local RECENT_ROW = 22
 local RECENT_ICON = 16
 local RECENT_LABEL = 14
--- Under this content height Recent first catches shows two, and under
--- this width it leaves out the zone.
 local RECENT_SHORT = 300
 local RECENT_NARROW = 400
 local THUMB = 6
 local SCROLL_STEP = 40
 local EMPTY_PAD = 18
--- A tile not caught: its icon faint and grey, or a "?".
 local UNCAUGHT_ALPHA = 0.45
 local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local view
 local core
--- Group and Show, as the UI remembers them; Core falls back to its
--- defaults for anything it doesn't know.
 local group = "where"
 local show = "all"
 local sectionFrames, tileFrames, recentRows = {}, {}, {}
@@ -63,10 +43,6 @@ local function hideFrom(list, from)
   for i = from, #list do list[i]:Hide() end
 end
 
--- An item as the game has it: name (or Core's fallback until it's
--- cached), icon and quality colour (nil for
--- common, or while not cached). Asking starts loading it, and the panel
--- redraws when it arrives.
 local function item(itemId, fallback)
   local name, icon, quality = Skin.item(itemId)
   return name or fallback, icon or QUESTION_MARK, quality
@@ -76,8 +52,6 @@ local function colored(text, color)
   return Skin.hex(color) .. text .. "|r"
 end
 
--- A Member as a catch names them: "You" in Ash Text, anyone else in their
--- Character's class colour.
 local function who(first)
   if first.own or not first.classFilename then return colored(first.who, TEXT) end
   local r, g, b = Skin.classColor(first.classFilename)
@@ -122,10 +96,6 @@ local function hideTooltip()
   GameTooltip:Hide()
 end
 
--- A square item picture: an opaque back, the quality edge (1px, faded)
--- and the icon inset 1px with its bevel cropped. :Draw(tile) shows a
--- caught tile in full colour, a tile not caught faint, its icon grey when
--- named and a "?" when not.
 local function picture(parent, size)
   local frame = Skin.feedPicture(parent, size)
   frame.border = {}
@@ -214,8 +184,6 @@ local function redraw()
   if view and view:IsShown() then CatchesTab.draw(view:GetParent(), core) end
 end
 
--- Group and Show: the app's small picker buttons, opening the game's
--- menu. The names checkbox keeps Show's menu open.
 local function showMenu(owner, menu, onPick)
   MenuUtil.CreateContextMenu(owner, function(_, root)
     root:CreateTitle(menu.title)
@@ -229,8 +197,7 @@ local function showMenu(owner, menu, onPick)
     end
     if menu.names then
       root:CreateDivider()
-      -- view.data is redrawn after each click, so this reads the setting
-      -- as it is now.
+      -- WoW: a menu callback returning MenuResponse.Refresh keeps the menu open.
       root:CreateCheckbox(menu.names.label, function() return view.data.show.names.value end, function()
         core:setSetting("catchesNames", not view.data.show.names.value)
         redraw()
@@ -283,7 +250,6 @@ local function createView(parent)
   view.recent:SetPoint("BOTTOMLEFT")
   view.recent:SetPoint("BOTTOMRIGHT")
   Skin.edge(view.recent, "TOP", Skin.LINE)
-  -- Its spark sits level with the label's middle, which tops out 7 down.
   view.recent.label = Skin.sectionLabel(view.recent, INSET, -10, "TOPLEFT")
 
   view.scroller = CreateFrame("ScrollFrame", nil, view)
@@ -300,8 +266,6 @@ local function createView(parent)
   view.thumb:SetColorTexture(1, 1, 1, 0.18)
   view.thumb:SetWidth(3)
 
-  -- No catches yet, or nothing for this Show: a heading and a line,
-  -- centred at the top of the list.
   view.message = CreateFrame("Frame", nil, view.content)
   view.message.title = Skin.label(view.message, "heading", TEXT)
   view.message.title:SetPoint("TOP", 0, -EMPTY_PAD)
@@ -310,20 +274,15 @@ local function createView(parent)
   view.message.text:SetPoint("TOP", view.message.title, "BOTTOM", 0, -4)
   view.message.text:SetJustifyH("CENTER")
   view.message.text:SetWordWrap(true)
-  -- No catches yet: the empty state (UI/EmptyState.lua), or the alone
-  -- state while you're the only Member known (your own catches count: with
-  -- any, it isn't empty).
   view.empty = ns.EmptyState.new(view.content)
 
-  -- Hiding the tab closes a tile's tooltip, not anyone else's.
+  -- WoW: GameTooltip is shared with the rest of the UI and other addons.
   view:SetScript("OnHide", function()
     local owner = GameTooltip:GetOwner()
     if owner and owner.tile then GameTooltip:Hide() end
   end)
 end
 
--- The count, the pickers and, when they don't fit beside it, the pickers
--- on a line of their own under it. Returns the summary's height.
 local function picked(menu)
   for _, option in ipairs(menu.options) do
     if option.picked then return option.label end
@@ -334,7 +293,6 @@ end
 local function drawSummary(data, width)
   setPicker(view.group, data.group.label)
   setPicker(view.show, data.show.label)
-  -- "25" then "of 46 types caught" smaller, or "All 46 types caught".
   view.count:SetText(data.countOf and tostring(data.caught) or data.count)
   view.countOf:SetText(data.countOf or "")
   Skin.color(view.count, data.done and GOLD or TEXT)
@@ -343,8 +301,6 @@ local function drawSummary(data, width)
   local inner = width - 2 * INSET
   local oneLine = countWidth + 8 + pickers <= inner
   if not oneLine then
-    -- Narrow: the pickers' icons say which is which, so they show only
-    -- what's picked, and move under the count only if still too wide.
     setPicker(view.group, picked(data.group))
     setPicker(view.show, picked(data.show))
     pickers = view.group:GetWidth() + PICKER_GAP + view.show:GetWidth()
@@ -388,9 +344,6 @@ local function drawSummary(data, width)
   return height
 end
 
--- Up to 3 recent first catches ("Tor caught Feralas Ahi", the item in its
--- quality colour), 2 in a short panel, leaving the zone out when narrow.
--- Returns the strip's height, 0 when there's none.
 local function drawRecent(data, width, height)
   local max = height < RECENT_SHORT and 2 or 3
   local shown = math.min(max, #data.recent)
@@ -527,7 +480,6 @@ function CatchesTab.draw(parent, theCore)
   view.content:SetHeight(drawSections(data, width - THUMB))
   CatchesTab.updateThumb()
 
-  -- A tooltip open over a tile follows what it shows now.
   local owner = GameTooltip:GetOwner()
   if owner and owner.tile and owner:GetParent() == view.content and owner:IsShown() and owner:IsMouseOver() then
     tileTooltip(owner)

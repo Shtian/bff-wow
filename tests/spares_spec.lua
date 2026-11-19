@@ -1,5 +1,3 @@
--- Spares, Claims and Gives played out across a Crew, through Core's
--- interface: the Spares tab, the Feed, listener events and what goes out.
 local load = require("tests.load")
 
 local Codec = load().Codec
@@ -38,7 +36,6 @@ local function view(client)
   return client.core:spares()
 end
 
--- The row another client shows for the owner's Spare.
 local function crewRow(client, owner, id)
   for _, row in ipairs(view(client).crew) do
     if row.ownerId == owner.memberId and row.id == id then return row end
@@ -77,7 +74,6 @@ local function feedTexts(client, kind)
   return texts
 end
 
--- The client's own record as its last DATA sent it.
 local function sent(net, client)
   for i = #net.wire, 1, -1 do
     local message = Codec.decode(net.wire[i].message)
@@ -96,8 +92,6 @@ local function post(net, client, link, level)
   return id
 end
 
--- Claims while the claimer's messages are lost, so the Claim reaches the
--- others only once it resends (relink()).
 local function claimUnheard(net, client, owner, id)
   net.drop = function(_, from, to) return from == client.name and to ~= client.name end
   assert(client.core:claimSpare(owner.memberId, id))
@@ -179,7 +173,6 @@ describe("Spares", function()
     assert.same({}, view(a).yours)
     assert.is_nil(crewRow(b, a, id))
     assert.same({ nil, "unknown" }, { a.core:withdrawSpare(id) })
-    -- Bob's Claim goes at his next write.
     assert.equal(1, #sent(net, b).claims)
     b:play({ zone = "Westfall" })
     net:run(15)
@@ -312,8 +305,6 @@ describe("Spares", function()
       assert.equal(b.memberId, yourRow(a, id).winner.memberId)
       assert.equal(b.memberId, crewRow(d, a, id).winner.memberId)
       assert.same({ nil, "notClaimed" }, { c.core:withdrawClaim(a.memberId, id) })
-      -- Bob's and Cleo's Claims came in one DATA each: Bob first, then Cleo
-      -- moved ahead of him, then she withdrew.
       assert.same({
         "Bob claimed [Cruel Barb] for Bob",
         "Cleo claimed [Cruel Barb] for Cleo",
@@ -392,7 +383,6 @@ describe("Spares", function()
       local net, clients = crew({ "Ann", "Bob", "Cleo", "Dee" })
       local a, b, c, d = clients[1], clients[2], clients[3], clients[4]
       local id = post(net, a)
-      -- Nobody hears Cleo's Claim until after the Give.
       claimUnheard(net, c, a, id)
       assert.is_true(b.core:claimSpare(a.memberId, id))
       net:run(5)
@@ -408,7 +398,6 @@ describe("Spares", function()
       assert.equal(b.memberId, given.r)
       assert.equal(b.character.guid, given.c)
 
-      -- Cleo's Claim arrives later and is earlier, but the Give is final.
       resend(net, c)
       assert.equal(2, yourRow(a, id).claims)
       assert.equal(b.memberId, yourRow(a, id).given.memberId)
@@ -432,11 +421,9 @@ describe("Spares", function()
           end
         end
       end
-      -- Live: Dee's gave entry is news; Bob's is covered by his notice.
       assert.equal(1, #events(d, "feedEntry"))
       assert.equal(0, #events(b, "feedEntry"))
 
-      -- The Give stays in the record until the 30 days are up.
       a:play({ zone = "Westfall" })
       b:play({ zone = "Westfall" })
       net:run(15)
@@ -593,7 +580,6 @@ describe("Spares", function()
     assert.same({}, view(a).yours)
     assert.equal(0, view(a).claims)
     assert.is_nil(crewRow(b, a, id))
-    -- Rejoining sends a record without them.
     a:join(code)
     net:run(40)
     assert.is_nil(sent(net, a).spares)
@@ -603,7 +589,6 @@ describe("Spares", function()
 end)
 
 describe("The Spares tab's words", function()
-  -- A row's buttons, info, highlight and dimmed, as the panel draws them.
   local function drawn(row)
     return {
       primary = row.primary, secondary = row.secondary, info = row.info,
@@ -626,7 +611,6 @@ describe("The Spares tab's words", function()
       info = "30d left · No claims yet", highlight = false, dimmed = false,
     }, drawn(yourRow(a, id)))
 
-    -- Bob's Claim wins: gold for Bob and for Ann, not for Cleo.
     assert.is_true(b.core:claimSpare(a.memberId, id))
     net:run(5)
     assert.same({
@@ -638,7 +622,6 @@ describe("The Spares tab's words", function()
       info = "30d left · Bob claimed it for Bob", highlight = true, dimmed = false,
     }, drawn(yourRow(a, id)))
 
-    -- Given: no buttons, and dimmed.
     assert.is_true(a.core:giveSpare(id, b.memberId))
     net:run(5)
     assert.same({ info = "Given to Bob (Bob)", highlight = false, dimmed = true }, drawn(yourRow(a, id)))
@@ -676,7 +659,6 @@ end)
 describe("Spare items in the bags", function()
   local GUID = "Item-0-0000000000A1B2C3"
 
-  -- Whether a value holds the text anywhere, keys included.
   local function holds(value, text)
     if type(value) == "string" then return value:find(text, 1, true) ~= nil end
     if type(value) ~= "table" then return false end
@@ -773,7 +755,6 @@ describe("Spares whose item has left the bags", function()
     return events(client, "spareGone")
   end
 
-  -- Ann posts the Barb from her bags; Bob sees it.
   local function posted()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
@@ -840,8 +821,6 @@ describe("Spares whose item has left the bags", function()
     net:run(5)
     a.events = {}
     a:bagsUpdated()
-    -- The withdrawal's changed event comes first, then the one telling the
-    -- owner, as for any withdrawal.
     assert.same({ "changed", "spareGone" }, { a.events[1][1], a.events[2][1] })
     a:bagsUpdated()
     net:run(5)

@@ -1,11 +1,3 @@
--- Codec: turns a message into a string an addon channel can carry, and back.
--- A plain-text protocol version comes first (`2|<payload>`), so a message
--- from a newer BFF is recognised before anything is decoded. The payload is
--- LibSerialize, then LibDeflate, then LibDeflate's addon channel encoding.
--- Protocol 2 is protocol 1's payload sent in BFF's own chunks
--- (Link/Framing.lua), which an older BFF can't read; protocol 1 is still
--- read, so friends who haven't updated are seen.
-
 local _, ns = ...
 
 local LibSerialize = LibStub("LibSerialize")
@@ -15,7 +7,6 @@ local Codec = {}
 ns.Codec = Codec
 
 Codec.PROTOCOL = 2
--- The oldest protocol still read.
 Codec.OLDEST = 1
 
 function Codec.encode(value)
@@ -23,7 +14,6 @@ function Codec.encode(value)
   return Codec.PROTOCOL .. "|" .. LibDeflate:EncodeForWoWAddonChannel(compressed)
 end
 
--- Returns the value, or nil and "newer" (sent by a newer BFF) or "invalid".
 function Codec.decode(message)
   local protocol, payload = message:match("^(%d+)|(.*)$")
   protocol = tonumber(protocol)

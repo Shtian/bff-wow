@@ -1,20 +1,3 @@
--- SettingsTab: the panel's Settings view, opened from the sidebar's
--- Settings, the minimap button's menu and /bff settings. You (display
--- name, and the Crew code read-only while in one) on top, then a section
--- per section of Core's settings(), each a section label over rows split
--- by Hairlines: the setting's label on the left, wrapping in a narrow
--- window, and its control at the right. An on/off setting is a switch
--- (Skin.switch), and its whole row is clickable; Map pin size and the
--- Pocket Camp's In combat are segmented controls, the toast sound a
--- picker with Play, the Pocket Camp's backdrop opacity and Fade to
--- sliders, and Move toasts and Reset BFF window small buttons. Leave Crew
--- sits under Appear offline. A control greys out while what it needs is
--- off, and a row Core marks hidden (Fade to, while the Pocket Camp doesn't
--- fade in combat) is left off. Out of a Crew there's a Back button on top,
--- to the setup view. Panel owns the scroll view; this fills its content.
--- Everything is read and written through Core. See
--- docs/design/settings-and-release.md.
-
 local _, ns = ...
 
 local SettingsTab = {}
@@ -29,15 +12,10 @@ local ERROR = { 1, 0.42, 0.42 }
 
 local INSET = 12
 local TOP_GAP = 6
--- A section's label, as What's new's, with room above every one but the
--- first.
 local SECTION = 26
 local SECTION_GAP = 12
--- A row is at least this tall; a wrapped label gets ROW_PAD above and
--- below.
 local ROW = 34
 local ROW_PAD = 8
--- Between a row's label and its control.
 local CONTROL_GAP = 16
 local SMALL_BUTTON = 20
 local NAME_BOX = 160
@@ -48,15 +26,10 @@ local SLIDER_VALUE = 36
 local view, core
 local onBack
 local back
--- Sections in order, each { heading, rows }, every row a frame with
--- .control, and :draw(value) and :setEnabled(on) where it has a value.
 local sections
--- The rows by setting key.
 local rows = {}
 local nameRow, codeRow, leaveRow
 
--- A small button: the secondary plate, 20px high with Small text, as wide
--- as its text.
 local function smallButton(parent, text, onClick)
   local button = Skin.button(parent, text, onClick)
   button:SetHeight(SMALL_BUTTON)
@@ -80,7 +53,6 @@ local function sectionHeading(title)
   return heading
 end
 
--- A row with its label; clickable rows get the hover wash.
 local function createRow(text, clickable)
   local row = CreateFrame(clickable and "Button" or "Frame", nil, view.content)
   if clickable then Skin.fill(row, Skin.HOVER, "HIGHLIGHT") end
@@ -96,7 +68,6 @@ local function createRow(text, clickable)
   return row
 end
 
--- Puts a row's control at its right.
 local function placeControl(row, control)
   control:SetPoint("RIGHT", row, "RIGHT", -INSET, 0)
   row.control = control
@@ -106,10 +77,8 @@ local function dimLabel(row, on)
   Skin.color(row.label, on and TEXT or DIM)
 end
 
--- The controls, by kind: each makes the setting's row.
 local makers = {}
 
--- On/off: a switch, and a click anywhere on the row flips it.
 function makers.toggle(setting)
   local row = createRow(setting.label, true)
   local switch = Skin.switch(row)
@@ -128,8 +97,6 @@ function makers.toggle(setting)
   return row
 end
 
--- One of a few choices (Map pin size): a cell per choice, side by side,
--- the chosen one on a chip.
 function makers.choice(setting)
   local row = createRow(setting.label)
   local control = CreateFrame("Frame", nil, row)
@@ -168,8 +135,6 @@ function makers.choice(setting)
   return row
 end
 
--- The toast sound: a picker showing the chosen sound, opening a menu of
--- every sound the client has (choosing one plays it), and Play.
 function makers.sound(setting)
   local row = createRow(setting.label)
   local control = CreateFrame("Frame", nil, row)
@@ -201,8 +166,6 @@ function makers.sound(setting)
   return row
 end
 
--- Move toasts: the panel steps aside while the sample toast is dragged,
--- and comes back on Settings once it's done.
 function makers.position(setting)
   local row = createRow(setting.label)
   local move = smallButton(row, setting.button, function()
@@ -217,8 +180,6 @@ function makers.position(setting)
   return row
 end
 
--- Reset BFF window: back to the default size, centred. Greyed out while
--- the panel already opens there.
 function makers.panelPlace(setting)
   local row = createRow(setting.label)
   local reset = smallButton(row, setting.button, function() core:resetPanelPlace() end)
@@ -227,8 +188,6 @@ function makers.panelPlace(setting)
   return row
 end
 
--- A percentage, 0 to 100, in steps of 5: a flat slider with its value
--- beside it, saved as it's dragged.
 function makers.percent(setting)
   local row = createRow(setting.label)
   local control = CreateFrame("Frame", nil, row)
@@ -271,15 +230,12 @@ function makers.percent(setting)
   return row
 end
 
--- Puts the current name back, without saving.
 local function showName()
   nameRow.box.shown = ns.defaultDisplayName()
   nameRow.box:SetText(nameRow.box.shown)
   nameRow.error:SetText("")
 end
 
--- Saves the typed display name when the box loses focus, or says why it
--- can't. Escape cancels, and an untouched box saves nothing.
 local function nameFocusLost(box)
   if box.cancelled then
     box.cancelled = nil
@@ -290,8 +246,7 @@ local function nameFocusLost(box)
   if ok then showName() else nameRow.error:SetText(ns.MESSAGES[reason]) end
 end
 
--- You: Display name, saved as it loses focus, and the Crew code, read-only
--- with the text selected, since addons can't copy to the clipboard.
+-- WoW: addons can't copy to the clipboard.
 local function createYou()
   nameRow = createRow("Display name")
   local box = Skin.editBox(nameRow, NAME_BOX)
@@ -325,7 +280,6 @@ local function createYou()
   return { heading = sectionHeading("You"), rows = { nameRow, codeRow } }
 end
 
--- What goes under a setting's row, by key: Leave Crew under Appear offline.
 local function createLeave()
   leaveRow = createRow("Leave your Crew")
   placeControl(leaveRow, smallButton(leaveRow, "Leave Crew", ns.confirmLeave))
@@ -349,10 +303,6 @@ local function create()
   end
 end
 
--- Whether a setting's control is usable: not while a setting it needs is
--- off (Map pin size, ALT over a friend), nor the Toasts section's controls
--- that aren't on/off while toasts are off, nor Appear offline out of a
--- Crew, with no one to appear offline to.
 local function enabled(row, values, crew)
   if row.needs and not values[row.needs] then return false end
   if row.kind ~= "toggle" and row.section == rows.toasts.section and not values.toasts then return false end
@@ -360,7 +310,6 @@ local function enabled(row, values, crew)
   return true
 end
 
--- Lays a row out at y, as wide as width, and returns the y under it.
 local function placeRow(row, y, first, width)
   row:ClearAllPoints()
   row:SetPoint("TOPLEFT", view.content, "TOPLEFT", 0, y)
@@ -369,7 +318,6 @@ local function placeRow(row, y, first, width)
   local labelWidth = width - 2 * INSET - row.control:GetWidth() - CONTROL_GAP
   row.label:SetWidth(math.max(60, labelWidth))
   local height = math.max(ROW, row.label:GetStringHeight() + 2 * ROW_PAD)
-  -- A refused display name says why under the box.
   if row.error and row.error:GetText() ~= "" then
     row.error:SetWidth(width - 2 * INSET)
     height = height + row.error:GetStringHeight() + 4
@@ -379,14 +327,11 @@ local function placeRow(row, y, first, width)
   return y - height
 end
 
--- Draws the settings into the scroll view, width wide. backToSetup, when
--- given (out of a Crew), is what Back does.
 function SettingsTab.draw(scrollView, theCore, width, backToSetup)
   view, core, onBack = scrollView, theCore, backToSetup
   if not sections then create() end
   local crew = core:crew()
 
-  -- The values, and which controls they leave usable.
   local values, hidden = {}, {}
   for _, section in ipairs(core:settings()) do
     for _, setting in ipairs(section.settings) do
@@ -402,7 +347,6 @@ function SettingsTab.draw(scrollView, theCore, width, backToSetup)
 
   local box = nameRow.box
   if not box:HasFocus() and nameRow.error:GetText() == "" then showName() end
-  -- Left alone while focused, so the selection holds.
   if crew and not codeRow.box:HasFocus() then
     codeRow.box.crewCode = crew.code
     codeRow.box:SetText(crew.code)
@@ -435,8 +379,6 @@ function SettingsTab.draw(scrollView, theCore, width, backToSetup)
   view.content:SetHeight(-y + INSET)
 end
 
--- The view was left: a typed name is saved as its box loses focus, and a
--- refused one is forgotten.
 function SettingsTab.leave()
   if not nameRow then return end
   nameRow.box:ClearFocus()

@@ -15,3 +15,7 @@ Read during review. Each rule here needs judgement; anything luacheck enforces (
 
 - **Core decides; UI renders.** A rule about what happens (whether something is announced, where it goes, what counts as a change) belongs in Core. UI and App act on what Core says, and don't read settings to decide behaviour themselves. Module boundaries: `docs/design/code-structure.md`, "Modules".
 - **Docs move with the code.** A change to Core's interface, its events or a setting updates the matching file in `docs/design/` in the same change.
+
+## Comments
+
+- **No comments.** Names, small functions and tests say what code does; `docs/` and ADRs say why the design is what it is. The one exception is a fact about something we cannot change (the WoW client and its API, Lua 5.1, `Libs/`), written as `-- WoW: …`. `scripts/check-comments.lua` (run by `scripts/check.sh` and CI) rejects every other comment. If code needs a comment to be understood, rename or reshape it instead. Run `/no-comments` on a diff to sweep it.

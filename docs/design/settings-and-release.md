@@ -113,11 +113,11 @@ Releases and the changelog are managed by [`@varlock/bumpy`](https://github.com/
 ### Flow
 
 ```text
-PR with a bump file        -> test.yml (luacheck, busted) + bumpy-check.yml (comments the release plan)
+PR with a bump file        -> test.yml (luacheck, comment check, busted) + bumpy-check.yml (comments the release plan)
 merge to main              -> bumpy ci release opens/updates the "Versioned release" PR
                               (bumps package.json, writes CHANGELOG.md)
 merge the Versioned release PR
-  -> release.yml: test.yml (luacheck, busted), then bumpy ci release publishes:
+  -> release.yml: test.yml (luacheck, comment check, busted), then bumpy ci release publishes:
        draft GitHub release for tag bff@X.Y.Z (notes from the bump files)
        publishCommand: scripts/package.sh X.Y.Z (zip to CurseForge and the draft release)
        tag pushed, release finalised

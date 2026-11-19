@@ -2,7 +2,6 @@ local load = require("tests.load")
 
 local DAY = 24 * 60 * 60
 
--- A character table for FakeNet, at the given level.
 local function playing(name, level, extra)
   local character = {
     guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
@@ -12,8 +11,6 @@ local function playing(name, level, extra)
   return character
 end
 
--- A net with the given clients logged in and in one Crew, settled. levels
--- maps a name to the level it plays.
 local function crew(names, levels)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -28,7 +25,6 @@ local function crew(names, levels)
   return net, clients, ns, code
 end
 
--- Every entry in the client's feed(), newest first.
 local function entries(client)
   local all = {}
   for _, day in ipairs(client.core:feed().days) do
@@ -37,7 +33,6 @@ local function entries(client)
   return all
 end
 
--- The newest entry with this text.
 local function entry(client, text)
   for _, candidate in ipairs(entries(client)) do
     if candidate.text == text then return candidate end
@@ -45,8 +40,6 @@ local function entry(client, text)
   error(("%s has no entry %q"):format(client.name, text))
 end
 
--- Who reacted to an entry, by name ("You" for yourself, marked you), in
--- order.
 local function reactors(client, text)
   local names = {}
   for i, reactor in ipairs(entry(client, text).reactors) do
@@ -80,7 +73,6 @@ local function noticed(summary)
   return texts
 end
 
--- Logs the client back in with a clean event list.
 local function relog(net, client)
   client.events = {}
   client:login()
@@ -288,7 +280,6 @@ describe("Reactions", function()
   it("are kept 50 at a time in the record, while the owner keeps them all", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
-    -- The death entries, newest first, without the Crew goals they reach.
     local function deaths(client)
       local list = {}
       for _, item in ipairs(entries(client)) do
@@ -435,17 +426,34 @@ describe("Reactions", function()
     for _, id in ipairs({ "olderone", "garbled1", "garbled2" }) do
       assert.is_table(a.core.ledger:record(id))
     end
-    -- First sight is a silent baseline, but the Reaction still shows.
     assert.same({ "garbled1" }, reactors(a, "You dinged 11"))
     assert.equal(0, a.core:unseen())
   end)
 end)
 
--- The Camp plays the Reactions this client attaches live (campReaction):
--- docs/design/camp.md.
+describe("Reactions on the wire", function()
+  it("keep the item shape every release has sent, for each kind", function()
+    local Reactions = load().Reactions
+    local sent = {
+      { m = "ann00001", g = "Player-0-Ann", k = "d", n = 11, t = 5 },
+      { m = "ann00001", g = "Player-0-Ann", k = "m", t = 5 },
+      { m = "ann00001", g = "Player-0-Ann", k = "c", t = 5 },
+      { m = "ann00001", g = "Player-0-Ann", k = "x", n = 3, t = 5 },
+      { m = "ann00001", k = "j", n = 1700000000, t = 5 },
+      { m = "ann00001", g = "Player-0-Ann", k = "p", p = 171, t = 5 },
+      { m = "ann00001", g = "Player-0-Ann", k = "s", n = 150, p = 171, t = 5 },
+      { m = "ann00001", g = "Player-0-Ann", k = "a", p = 171, t = 5 },
+      { m = "ann00001", g = "Player-0-Ann", k = "r", n = 1130, t = 5 },
+    }
+    local read = Reactions.inRecord({ reactions = sent })
+    assert.equal(#sent, #read)
+    for i, item in ipairs(sent) do
+      assert.same(item, Reactions.item(read[i].key, read[i].time))
+    end
+  end)
+end)
+
 describe("Reactions in the Camp", function()
-  -- The campReaction events the client's Core fired, as "kind:Name", with
-  -- the grave key for Respects.
   local function played(client, clients)
     local names = {}
     for _, other in ipairs(clients) do names[other.memberId] = other.name end
@@ -471,7 +479,6 @@ describe("Reactions in the Camp", function()
     net:run(5)
     assert.same({ "cheer:Ann" }, played(c, clients))
     assert.same({ "cheer:Ann" }, played(a, clients))
-    -- Your own Cheer hops through the UI's own path, so Core plays none.
     assert.same({}, played(b, clients))
   end)
 
@@ -488,11 +495,9 @@ describe("Reactions in the Camp", function()
     assert.same({ "respects:Ann" }, played(c, clients))
     assert.equal(grave, events(c, "campReaction")[1].grave)
     assert.same({ "respects:Ann" }, played(a, clients))
-    -- Your own Respects bloom it too, once.
     assert.same({ "respects:Ann" }, played(b, clients))
     assert.equal(grave, events(b, "campReaction")[1].grave)
 
-    -- A later Respects on a Grave that already has its flower plays nothing.
     assert.is_true(react(c, "Ann died"))
     net:run(5)
     assert.same({ "respects:Ann" }, played(a, clients))

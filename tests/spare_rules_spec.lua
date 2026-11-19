@@ -1,5 +1,3 @@
--- SpareRules, the stateless parts of Spares: item strings, what a record
--- carries, tradeability, pruning, the item-gone check and who wins.
 local load = require("tests.load")
 
 local DAY = 24 * 60 * 60
@@ -125,7 +123,7 @@ describe("SpareRules", function()
 
     it("refuses a bound item, whatever its binding says", function()
       assert.same({ nil, "bound" }, { H.tradeable(true, 2) })
-      -- An heirloom reports bindType 1 and IsBound true.
+      -- WoW: an heirloom reports bindType 1 and IsBound true.
       assert.same({ nil, "bound" }, { H.tradeable(true, 1) })
     end)
 
@@ -141,7 +139,6 @@ describe("SpareRules", function()
   end)
 
   describe("when the item has left the bags", function()
-    -- isOpen, hasClaim, inInventory, isEquipped, isNextLogin
     it("keeps an item still in the bags or bank", function()
       assert.equal("keep", H.itemCheck(true, false, true, false, false))
       assert.equal("keep", H.itemCheck(true, true, true, false, true))

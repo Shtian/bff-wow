@@ -1,12 +1,3 @@
--- WhatsNew: what changed in BFF since you last looked (docs/design/whats-new.md).
--- Holds the releases the build carries (Changelog), the version running and
--- the one last seen (db.changesSeen, account-wide), and the visit: opening
--- What's new marks every change seen, but the releases new when it opened
--- stay marked until it's left, as the Feed's New entries do. Also the line
--- While you were away gets, once per update (db.changesTold). A fresh
--- install has nothing new; saved data from before What's new has only the
--- release installed. Pure; Core's internal seam.
-
 local _, ns = ...
 
 local WhatsNew = {}
@@ -15,10 +6,7 @@ ns.WhatsNew = WhatsNew
 
 local Changelog = ns.Changelog
 
--- How many releases the view lists, newest first.
 WhatsNew.SHOWN = 5
--- What each kind of change is called where the view names it (a change's
--- tooltip). A patch can be a fix or a small improvement.
 local KIND_NAMES = { major = "Big change", minor = "New feature", patch = "Small change or fix" }
 local OLDER = "Older updates are on BFF's CurseForge page."
 
@@ -26,21 +14,16 @@ local function plural(count, word)
   return ("%d %s%s"):format(count, word, count == 1 and "" or "s")
 end
 
--- db is the account-wide saved data, version the .toc's ("v2.3.0", or
--- "dev" in a checkout), text the changelog the build carries, and fresh
--- whether db was empty (a fresh install).
 function WhatsNew.new(db, version, text, fresh)
   local self = setmetatable({ db = db, version = Changelog.version(version), releases = {} }, WhatsNew)
   if not self.version then return self end
   for _, release in ipairs(Changelog.parse(text)) do
-    -- A changelog newer than the build (it can't be) lists nothing early.
     if not Changelog.newer(release.version, self.version) then self.releases[#self.releases + 1] = release end
   end
   if #self.releases == 0 then return self end
   if fresh then
     db.changesSeen = self.version
   elseif not Changelog.version(db.changesSeen) then
-    -- Saved data from before What's new: only the release installed is new.
     local previous = self.releases[2]
     db.changesSeen = previous and previous.version or self.version
   end
@@ -51,7 +34,6 @@ function WhatsNew:available()
   return #self.releases > 0
 end
 
--- The releases newer than the one seen, newest first.
 local function unseen(self)
   local list = {}
   local seen = Changelog.version(self.db.changesSeen)
@@ -79,16 +61,12 @@ function WhatsNew:hasNew()
   return #unseen(self) > 0
 end
 
--- What a visit opened now would show as new: { list (the unseen releases),
--- new (by version), since (the version seen before) }.
 local function newVisit(self)
   local list, new = unseen(self), {}
   for _, release in ipairs(list) do new[release.version] = true end
   return { list = list, new = new, since = self.db.changesSeen }
 end
 
--- Starts a visit if none is open, marking every change seen. Returns true
--- if that changed what's seen.
 function WhatsNew:open()
   if self.visit or not self:available() then return false end
   self.visit = newVisit(self)
@@ -100,12 +78,6 @@ function WhatsNew:leave()
   self.visit = nil
 end
 
--- Make sure your friends update: for a major release new on this visit,
--- the Members (from Roster rows, not you) known to run an older BFF.
--- everyone says there are friends, each one's version is known and none is
--- behind. text says why it matters, and who says everyone is up to date
--- (nil otherwise: the view names those behind). versionOf(memberId) is the
--- BFF version a Member's record carries.
 local function friends(release, rows, versionOf)
   local behind, known, others = {}, 0, 0
   for _, row in ipairs(rows) do
@@ -129,10 +101,6 @@ local function friends(release, rows, versionOf)
   }
 end
 
--- The What's new view: { title, line, friends (nil, or { version, behind,
--- everyone, text, who }), releases (the last SHOWN: { version, date, new, entries
--- ({ kind ("major", "minor" or "patch"), kindName, title, detail }) }), older (a line about older updates, or nil) }.
--- rows and versionOf as for friends(). Nil without a changelog.
 function WhatsNew:view(rows, versionOf)
   if not self:available() then return nil end
   local visit = self.visit or newVisit(self)
@@ -168,10 +136,6 @@ function WhatsNew:view(rows, versionOf)
   return view
 end
 
--- While you were away's section, once per update: { title (its label),
--- lines (the newest change, then "Make sure your friends update too" when
--- a major release came with it), more ("and 2 more changes", or nil) }, or
--- nil. Taken whether or not the popup shows, so it's never kept for later.
 function WhatsNew:takeAwayLine()
   local new = unseen(self)
   if #new == 0 or self.db.changesTold == self.version then return nil end

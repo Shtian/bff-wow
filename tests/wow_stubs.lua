@@ -1,34 +1,23 @@
--- WoW stand-ins for the game-facing files that are tested offline (the
--- channel link). wow() returns a fresh game: env, the globals a file is
--- loaded with (Lua's own come from _G), plus helpers to drive it. Only what
--- those files call is here.
-
 return function()
   local game = {
     time = 100,
     timers = {},
-    -- Every chunk handed to ChatThrottleLib: { prefix, text, distribution,
-    -- target, priority, queue, callback, arg }. It stays "in the send queue"
-    -- until a test calls game.sent or game.failed for it.
     whispers = {},
     frames = {},
     lockdown = false,
     channels = {},
-    -- Every channel a member list was asked for (ListChannelByName).
     listed = {},
-    -- What UnitName("player") returns. On Forever a Character's last name
-    -- comes second, where retail puts the realm.
+    -- WoW: on Forever, UnitName("player") returns the last name second,
+    -- where retail puts the realm.
     player = { "Me" },
-    -- Whether ChatThrottleLib sends a chunk at once, calling back inside
-    -- SendAddonMessage, as it does while it has bandwidth to spare.
+    -- WoW: ChatThrottleLib sends at once while it has bandwidth to spare,
+    -- calling back inside SendAddonMessage.
     instant = false,
-    -- What IsInInstance() returns.
     instance = { false, "none" },
   }
 
-  -- A secret value, as Midnight hands addons for chat text it may not read:
-  -- reading it in any way (indexing, concatenating, tostring, #) errors, so
-  -- a test fails if the code under test touches it.
+  -- WoW: Midnight hands addons secret values for chat text they may not
+  -- read; indexing, concatenating, tostring or # on one errors.
   local secrets = setmetatable({}, { __mode = "k" })
   function game.secret()
     local function refuse() error("read a secret value", 2) end
@@ -47,7 +36,6 @@ return function()
     return timer
   end
 
-  -- Moves the clock on, running every timer that comes due on the way.
   function game.advance(seconds)
     local stop = game.time + (seconds or 0)
     while true do
@@ -68,12 +56,11 @@ return function()
     game.time = stop
   end
 
-  -- ChatThrottleLib's callback for a chunk: it went out, or the game
-  -- refused it with this result code (Enum.SendAddonMessageResult).
+  -- WoW: ChatThrottleLib calls back with whether the chunk went out and an
+  -- Enum.SendAddonMessageResult code.
   function game.sent(whisper) whisper.callback(whisper.arg, true, 0) end
   function game.failed(whisper, result) whisper.callback(whisper.arg, false, result or 9) end
 
-  -- Fires a game event at every frame registered for it.
   function game.fire(event, ...)
     for _, frame in ipairs(game.frames) do
       if frame.events[event] and frame.onEvent then frame.onEvent(frame, event, ...) end
@@ -132,9 +119,6 @@ return function()
   env._G = env
   game.env = env
 
-  -- Loads a game-facing file into this game, with the addon's namespace.
-  -- The pure Link/ files BFF.toc lists come first, as in game: the channel
-  -- link builds on them.
   function game.load(path, ns)
     for line in io.lines("BFF.toc") do
       local pure = line:match("^%s*(Link/[^%s]+%.lua)%s*$")

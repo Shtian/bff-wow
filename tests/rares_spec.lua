@@ -2,25 +2,19 @@ local load = require("tests.load")
 
 local DAY = 24 * 60 * 60
 
--- NPC IDs from the list (docs/research/rare-mobs.md).
 local TIMBER = 1132
 local RAKSHIRI = 10200
 local BROKEN_TOOTH = 2850
 local VOLCHAN = 10119
--- Classified rare by the game, but not on the list.
-local BJARN = 1130
+local UNLISTED_RARE = 1130
 
 local function guid(npcId, spawn)
   return ("Creature-0-5250-0-27-%d-%s"):format(npcId, spawn or "00001A2B3C")
 end
 
--- What a secret value is in these tests: any table marked so.
 local SECRET = setmetatable({}, { __tostring = function() return "<secret>" end })
 local function isSecret(value) return value == SECRET end
 
--- A fake of the game's unit and loot API, as Snapshot hands it to the
--- watch. units maps a unit token to { guid, classification, dead,
--- tapDenied, name }; loot is a list of slots, each a list of source GUIDs.
 local function fakeApi(state)
   state = state or {}
   state.units = state.units or {}
@@ -76,7 +70,6 @@ describe("The Rares list", function()
 
   it("has only mobs the game classifies as rare: no famous elites", function()
     local ns = load()
-    -- Mor'Ladim, Gazz'uz, Mother Fang (Elite on Forever), Old Murk-Eye.
     for _, id in ipairs({ 522, 3204, 471, 391 }) do assert.is_nil(ns.Rares.byId(id)) end
   end)
 
@@ -127,14 +120,14 @@ describe("The rare kill watch", function()
     it("keeps an unlisted rare seen while readable as unlisted, with its name", function()
       local ns = load()
       local api, state = fakeApi({
-        units = { mouseover = { guid = guid(BJARN), classification = "rare", name = "Bjarn" } },
+        units = { mouseover = { guid = guid(UNLISTED_RARE), classification = "rare", name = "Bjarn" } },
       })
       local watch = ns.Rares.watch(api)
       watch:see("mouseover")
-      state.loot = { { guid(BJARN) } }
+      state.loot = { { guid(UNLISTED_RARE) } }
       local kills = watch:loot()
       assert.equal(1, #kills)
-      assert.equal(BJARN, kills[1].npcId)
+      assert.equal(UNLISTED_RARE, kills[1].npcId)
       assert.equal("Bjarn", kills[1].name)
       assert.is_true(kills[1].unlisted)
     end)
@@ -228,9 +221,9 @@ describe("The rare kill watch", function()
 
     it("keeps an unlisted rare the game classifies as rare, with its name", function()
       local ns = load()
-      local unit = { guid = guid(BJARN), classification = "rareelite", name = "Bjarn", dead = true, tapDenied = false }
+      local unit = { guid = guid(UNLISTED_RARE), classification = "rareelite", name = "Bjarn", dead = true, tapDenied = false }
       local kill = ns.Rares.watch(fakeApi({ units = { target = unit } })):targetDied()
-      assert.equal(BJARN, kill.npcId)
+      assert.equal(UNLISTED_RARE, kill.npcId)
       assert.equal("Bjarn", kill.name)
       assert.is_true(kill.unlisted)
     end)
@@ -270,11 +263,11 @@ describe("The rare kill watch", function()
 
     it("keeps an unlisted rare only once it was seen classified rare", function()
       local ns = load()
-      local api = fakeApi({ units = { nameplate1 = { guid = guid(BJARN), classification = "rare", name = "Bjarn" } } })
+      local api = fakeApi({ units = { nameplate1 = { guid = guid(UNLISTED_RARE), classification = "rare", name = "Bjarn" } } })
       local watch = ns.Rares.watch(api)
-      assert.is_nil((watch:partyKill(nil, guid(BJARN))))
+      assert.is_nil((watch:partyKill(nil, guid(UNLISTED_RARE))))
       watch:see("nameplate1")
-      assert.equal(BJARN, watch:partyKill(nil, guid(BJARN)).npcId)
+      assert.equal(UNLISTED_RARE, watch:partyKill(nil, guid(UNLISTED_RARE)).npcId)
     end)
   end)
 
@@ -287,7 +280,6 @@ describe("The rare kill watch", function()
   end)
 end)
 
--- A net with the given clients logged in and in one Crew, settled.
 local function crew(names)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -335,7 +327,6 @@ local function live(client)
   return list
 end
 
--- How many Rares the Crew has slain now, from the records held.
 local function slainNow(client)
   for _, r in ipairs(client.core:goals()) do
     if r.track == "rares" then return r.value or 0 end
@@ -362,7 +353,6 @@ describe("Rare kills", function()
     assert.equal("Everlook", entry.s)
     assert.equal(1452, entry.m)
     assert.equal(a.character.guid, entry.c)
-    -- No party list.
     assert.is_nil(entry.p)
   end)
 
@@ -466,12 +456,11 @@ describe("Rare kills", function()
     for i = 1, ns.Rares.UNLISTED_CAP do
       assert.is_true(a.core:rareKilled(kill(900000 + i, { name = "Unlisted " .. i, unlisted = true })))
     end
-    assert.is_false(a.core:rareKilled(kill(BJARN, { name = "Bjarn", unlisted = true })))
-    -- A listed one still goes in.
+    assert.is_false(a.core:rareKilled(kill(UNLISTED_RARE, { name = "Bjarn", unlisted = true })))
     assert.is_true(a.core:rareKilled(kill(TIMBER)))
     local own = a.core.ledger:own().rares
     assert.equal("Unlisted 1", own[900001].n)
-    assert.is_nil(own[BJARN])
+    assert.is_nil(own[UNLISTED_RARE])
     net:run(5)
     assert.equal(1, #rareTrophies(clients[2]))
     assert.equal(1, clients[2].core:trophies().rares.slain)
@@ -581,7 +570,6 @@ local function row(client)
   end
 end
 
--- Kills the first n Rares on the list, in one go.
 local function killRares(net, client, ns, n)
   for i = 1, n do client.core:rareKilled(kill(ns.Rares.LIST[i].id)) end
   net:run(5)
@@ -634,7 +622,7 @@ describe("The Rares slain track", function()
 
   it("never counts unlisted rares", function()
     local net, clients = crew({ "Ann", "Bob" })
-    clients[1].core:rareKilled(kill(BJARN, { name = "Bjarn", unlisted = true }))
+    clients[1].core:rareKilled(kill(UNLISTED_RARE, { name = "Bjarn", unlisted = true }))
     net:run(5)
     assert.equal(0, row(clients[2]).value)
   end)

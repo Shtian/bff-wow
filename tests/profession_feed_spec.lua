@@ -1,6 +1,5 @@
 local load = require("tests.load")
 
--- Skill line IDs.
 local ALCHEMY, TAILORING, COOKING = 171, 197, 185
 
 local function profession(skillLine, name, skill, max, secondary)
@@ -12,8 +11,6 @@ local function alchemy(skill, max) return profession(ALCHEMY, "Alchemy", skill, 
 local function tailoring(skill, max) return profession(TAILORING, "Tailoring", skill, max or 75) end
 local function cooking(skill, max) return profession(COOKING, "Cooking", skill, max or 300, true) end
 
--- A net with the given clients logged in and in one Crew, settled, each
--- already sharing professions (the first share is a silent baseline).
 local function crew(names, professions)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -23,14 +20,11 @@ local function crew(names, professions)
   for i = 2, #clients do clients[i]:join(code) end
   net:run(40)
   for _, client in ipairs(clients) do client:play({ professions = professions or {} }) end
-  -- Professions alone wait for the next send.
   for _, client in ipairs(clients) do client:play({ level = 11 }) end
   net:run(5)
   return net, clients, ns
 end
 
--- The client's Feed entries, newest first, but Crew goals, which
--- profession_goals_spec covers.
 local function entries(client)
   local all = {}
   for _, day in ipairs(client.core:feed().days) do
@@ -41,7 +35,6 @@ local function entries(client)
   return all
 end
 
--- The texts of the client's profession entries, newest first.
 local function texts(client)
   local result = {}
   for _, entry in ipairs(entries(client)) do
@@ -81,7 +74,6 @@ describe("Profession Feed entries", function()
     assert.equal(1000 + TAILORING, entry.icon)
     assert.equal("cheer", entry.reaction)
     assert.is_true(entry.canReact)
-    -- Your own is in your Feed, seen.
     assert.same({ "You picked up Tailoring" }, texts(a))
     assert.is_true(entries(a)[1].seen)
   end)
@@ -184,7 +176,6 @@ describe("Profession Feed entries", function()
     net:run(2)
     a:play({ professions = { alchemy(225) } })
     net:run(2)
-    -- Bob cheers the 150, which Cid only sees inside "reached 225".
     local cheered = entries(b)[2]
     assert.equal("Ann reached 150 Alchemy", cheered.text)
     assert.is_true(b.core:react(cheered.key))
@@ -201,7 +192,6 @@ describe("Profession Feed entries", function()
 
     local reaction = events(a, "reaction")
     assert.equal("Bob cheered your 150 Alchemy", reaction[#reaction].text)
-    -- Cheering the maxed and picked-up kinds too.
     a:play({ professions = { alchemy(300), tailoring(1) } })
     net:run(2)
     for _, entry in ipairs(entries(b)) do
@@ -228,7 +218,6 @@ describe("Profession Feed entries", function()
     b:login()
     net:run(40)
     local summary = events(b, "awaySummary")[1]
-    -- Tailoring is new to the Crew too: a Crew goal entry.
     assert.equal(3, summary.count)
     assert.same({ "The Crew has a Tailor now!" }, { summary.goals[1].text })
     assert.same({}, summary.members)

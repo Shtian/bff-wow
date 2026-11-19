@@ -1,27 +1,16 @@
--- Professions: the pure parts of a Character's Professions. Reading them
--- from the game (handed the API, so offline tests can fake it), how a list
--- is stored in a record (short field names) and checked off the wire, the
--- rank from the max skill, and the Professions tab: who has each profession.
--- See docs/design/professions.md.
-
 local _, ns = ...
 
 local Professions = {}
 ns.Professions = Professions
 
--- GetProfessions() has five slots: two main professions, then first aid,
--- fishing and cooking.
+-- WoW: GetProfessions() has five slots: two main professions, then first
+-- aid, fishing and cooking.
 local SLOTS = 5
 local SECONDARY_FROM = 3
--- Forever caps professions at 300 (#97).
+-- WoW: Forever caps professions at 300.
 Professions.CAP = 300
--- The Feed entry kinds that are profession news (each names a skill line).
 Professions.KINDS = { newProfession = true, professionSkill = true, professionMaxed = true }
 local RANKS = { { 300, "Artisan" }, { 225, "Expert" }, { 150, "Journeyman" }, { 75, "Apprentice" } }
--- The twelve professions, by skill line, in the tabs' order: main ones by
--- name, then cooking, fishing and first aid. The name and icon are for a
--- profession nobody has; one somebody has shows as their client words it.
--- noun names whoever has it, for Every profession in the Crew's Feed entry.
 Professions.ALL = {
   { skillLine = 171, name = "Alchemy", noun = "an Alchemist", icon = "Interface\\Icons\\Trade_Alchemy" },
   { skillLine = 164, name = "Blacksmithing", noun = "a Blacksmith", icon = "Interface\\Icons\\Trade_BlackSmithing" },
@@ -39,13 +28,10 @@ Professions.ALL = {
     secondary = true },
 }
 
--- The secondary columns' order, by skill line ID: cooking, fishing, first
--- aid. Any other secondary goes after them, by name.
+-- WoW: skill lines 185 cooking, 356 fishing, 129 first aid.
 local SECONDARY_ORDER = { [185] = 1, [356] = 2, [129] = 3 }
 local OTHER_SECONDARY = 4
 
--- The rank a max skill stands for: 75 Apprentice up to 300 Artisan. Nil
--- below 75.
 function Professions.rank(max)
   for _, rank in ipairs(RANKS) do
     if max >= rank[1] then return rank[2] end
@@ -66,12 +52,11 @@ local function readAll(api)
     if index ~= nil then
       if isSecret(index) then return nil end
       local name, icon, skill, max, _, _, skillLine = api.getProfessionInfo(index)
-      -- A plain loop: ipairs would stop at a nil icon before the rest.
+      -- WoW: Lua 5.1's ipairs stops at the first nil, and the icon can be nil.
       local values = { name, icon, skill, max, skillLine }
       for i = 1, 5 do
         if isSecret(values[i]) then return nil end
       end
-      -- Anything a record couldn't store keeps the last list instead.
       if type(name) ~= "string" or name == "" or not isCount(skill) or not isCount(max) or max == 0
         or not isCount(skillLine) or skillLine == 0 then
         return nil
@@ -89,12 +74,6 @@ local function readAll(api)
   return list
 end
 
--- The Character's professions as the game has them, through api:
--- getProfessions (GetProfessions), getProfessionInfo (GetProfessionInfo)
--- and isSecret (issecretvalue, optional). A list of up to 5 { skillLine,
--- name, icon, skill (the base skill, without gear and racial bonuses), max,
--- secondary }, in the game's order; empty for none. A value that reads
--- secret, or a read that errors, keeps `last`.
 function Professions.read(api, last)
   local ok, list = pcall(readAll, api)
   if ok and list then return list end
@@ -111,9 +90,6 @@ local function validEntry(entry)
     and (entry.s == nil or entry.s == true)
 end
 
--- Whether a list from a record has the expected shape: up to 5 entries of
--- { id (skill line), n (name), i (icon file ID, optional), k (skill), m
--- (max skill), s (true if secondary) }.
 local function valid(stored)
   if type(stored) ~= "table" then return false end
   local count = 0
@@ -125,7 +101,6 @@ local function valid(stored)
   return true
 end
 
--- A list from read() as the record stores it, or nil for none known.
 function Professions.store(list)
   if type(list) ~= "table" then return nil end
   local stored = {}
@@ -136,7 +111,6 @@ function Professions.store(list)
   return stored
 end
 
--- Whether two stored lists are the same.
 function Professions.same(a, b)
   if a == nil or b == nil then return a == b end
   if #a ~= #b then return false end
@@ -149,14 +123,10 @@ function Professions.same(a, b)
   return true
 end
 
--- The professions that gather, by skill line: herbalism, mining, skinning.
+-- WoW: skill lines 182 herbalism, 186 mining, 393 skinning.
 local GATHERING = { [182] = true, [186] = true, [393] = true }
 local FISHING = 356
 
--- What a Character was at between its stored list as it was and as it is:
--- "gathering" or "crafting" if a profession's skill grew (gathering first),
--- else nil. Fishing doesn't count: catches tell of that. Nil when either
--- list is unknown or malformed.
 function Professions.practised(before, after)
   if not valid(before) or not valid(after) then return nil end
   local had = {}
@@ -171,19 +141,10 @@ function Professions.practised(before, after)
   return found
 end
 
--- The skills that are Feed news, lowest first: each rank's cap, the last
--- (Professions.CAP) being maxed.
 Professions.MILESTONES = {}
 for i = #RANKS, 1, -1 do Professions.MILESTONES[#Professions.MILESTONES + 1] = RANKS[i][1] end
 local MILESTONES = Professions.MILESTONES
 
--- What's news between a Character's stored list as it was and as it is:
--- a list of { kind, skillLine, name, icon, from, milestone }, in after's
--- order. kind is "newProfession" for one it didn't have, "professionMaxed"
--- for reaching 300, or "professionSkill" for reaching 75, 150 or 225 (the
--- highest crossed, with from the skill before). Base skill only. Empty
--- when either list is unknown or malformed (a first share is a silent
--- baseline), and for drops and unlearning.
 function Professions.news(before, after)
   local list = {}
   if not valid(before) or not valid(after) then return list end
@@ -214,8 +175,6 @@ local function secondaryOrder(p)
   return SECONDARY_ORDER[p.skillLine] or OTHER_SECONDARY
 end
 
--- Main professions first, then cooking, fishing and first aid; the game's
--- order, or by name, otherwise.
 local function listedBefore(a, b)
   if a.secondary ~= b.secondary then return b.secondary end
   if a.secondary and secondaryOrder(a) ~= secondaryOrder(b) then
@@ -226,9 +185,6 @@ local function listedBefore(a, b)
   return a.skillLine < b.skillLine
 end
 
--- A stored list as rows show it, or nil when unknown or malformed: a fresh
--- list of { skillLine, name, icon, skill, max, secondary, rank, full (skill
--- at the max skill), capped (skill at 300) }, main professions first.
 function Professions.describe(stored)
   if not valid(stored) then return nil end
   local list = {}
@@ -251,9 +207,6 @@ function Professions.describe(stored)
   return list
 end
 
--- The Professions tab from the Roster's rows (own first, then in the
--- Roster's order), sorted by the profession with skill line sortBy if
--- given. See Core:professions().
 function Professions.tab(rows, sortBy)
   local professions, bySkillLine = {}, {}
   for i, p in ipairs(Professions.ALL) do
@@ -261,8 +214,6 @@ function Professions.tab(rows, sortBy)
       had = false }
     bySkillLine[p.skillLine] = professions[i]
   end
-  -- Each Member's Characters, the Main first, and any profession outside
-  -- the twelve as a column too.
   local members = {}
   for index, row in ipairs(rows) do
     local characters = {}
@@ -280,14 +231,12 @@ function Professions.tab(rows, sortBy)
           bySkillLine[p.skillLine] = profession
           professions[#professions + 1] = profession
         end
-        -- Someone has it: as their client words it.
         profession.name, profession.icon, profession.had = p.name, p.icon or profession.icon, true
       end
     end
     members[#members + 1] = member
   end
 
-  -- The twelve keep their order; any other goes after its kind, by name.
   for i, profession in ipairs(professions) do profession.position = i <= #Professions.ALL and i or nil end
   table.sort(professions, function(a, b)
     if a.position and b.position then return a.position < b.position end
@@ -297,8 +246,6 @@ function Professions.tab(rows, sortBy)
   end)
   for _, profession in ipairs(professions) do profession.position = nil end
 
-  -- A cell per profession: the Member's Characters who have it, best first,
-  -- the best's skill on the cell itself; false for none.
   for _, member in ipairs(members) do
     member.cells = {}
     for i, profession in ipairs(professions) do
@@ -325,8 +272,6 @@ function Professions.tab(rows, sortBy)
     member.characters = nil
   end
 
-  -- Sorted by a profession: yours stays first, then the best skill in it,
-  -- then the Roster's order.
   local column
   for i, profession in ipairs(professions) do
     if profession.skillLine == sortBy then column = i end

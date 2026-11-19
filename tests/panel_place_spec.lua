@@ -1,6 +1,5 @@
 local load = require("tests.load")
 
--- A Core over a fresh db, outside any Crew, recording its events.
 local function newCore(db)
   local deps = {
     events = {},
@@ -53,7 +52,6 @@ describe("Panel place", function()
   it("keeps the panel on a screen smaller than where it was left", function()
     local core = newCore()
     core:setPanelPlace(800, 700, 1500, 1050)
-    -- 1500 + 800 runs off a 1280 wide screen; 1050 is above a 720 high one.
     assert.same({ width = 800, height = 700, left = 480, top = 720 }, core:panelPlace(1280, 720))
     core:setPanelPlace(800, 700, -40, 200)
     assert.same({ width = 800, height = 700, left = 0, top = 700 }, core:panelPlace(1280, 720))

@@ -12,8 +12,6 @@ local function character(name, extra)
   return c
 end
 
--- A net with the given clients logged in and in one Crew, settled, the
--- first with the Pocket Camp on.
 local function crew(names)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -49,7 +47,6 @@ local function catch(itemId)
   return { items = { { itemId = itemId, quantity = 1 } }, zone = "Westfall", mapId = 1436 }
 end
 
--- The animations the client's Core fired, as "kind" or "kind:Name".
 local function animations(client, clients)
   local names = {}
   for _, other in ipairs(clients) do names[other.memberId] = other.name end
@@ -63,7 +60,6 @@ local function animations(client, clients)
   return list
 end
 
--- Steps until the viewer shows the client fishing; fails after `within` s.
 local function untilFishing(net, viewer, client, within)
   for _ = 1, within do
     if poseOf(viewer, client) == "fishing" then return end
@@ -97,7 +93,6 @@ describe("The Pocket Camp", function()
     net:run(15)
     c:logout()
     net:run(2)
-    -- Past Cid's bedroll.
     skip(net, 10 * 60)
     local view = a.core:pocketCamp()
     assert.equal(ns.Core.CAMP_LAYOUT.pocketColumns, view.columns)
@@ -110,7 +105,6 @@ describe("The Pocket Camp", function()
     assert.is_nil(view.graves)
     assert.is_nil(view.tent)
     assert.is_nil(view.more)
-    -- The Camp itself is unchanged.
     assert.equal("asleep", actorFor(a.core:camp(300), c).pose)
   end)
 
@@ -235,11 +229,9 @@ describe("The Pocket Camp", function()
     local _, clients, ns = crew(names)
     local core = clients[1].core
     local layout = ns.Core.CAMP_LAYOUT
-    -- At its usual max it doesn't grow.
     local view = core:pocketCamp()
     assert.same({ layout.pocketColumns, layout.pocketColumns, 6, 3 },
       { view.columns, view.maxColumns, #view.actors, view.more })
-    -- Room to spare: just wide enough for everyone (five a side).
     core:setPocketCampColumns(layout.pocketMaxColumns)
     view = core:pocketCamp()
     assert.same({ layout.pocketColumns + 2 * layout.pocketStep, layout.pocketMaxColumns, 9 },
@@ -249,7 +241,6 @@ describe("The Pocket Camp", function()
     for _, actor in ipairs(view.actors) do
       assert.is_true(actor.x >= -half and actor.x + actor.width <= half)
     end
-    -- A max one step up: eight fit, the ninth is +1.
     core:setPocketCampColumns(layout.pocketColumns + layout.pocketStep)
     view = core:pocketCamp()
     assert.same({ layout.pocketColumns + layout.pocketStep, 8, 1, "+1" },
@@ -305,13 +296,11 @@ describe("The Pocket Camp", function()
     assert.is_nil(actorFor(view, c).onAlt)
     assert.same({ "You: by the fire", "Bob (on alt): by the fire", "Cy: by the fire" }, view.tooltip.lines)
 
-    -- Your own Alt too.
     b.core:setSetting("pocketCamp", true)
     view = b.core:pocketCamp()
     assert.is_true(actorFor(view, b).onAlt)
     assert.equal("You (on alt): by the fire", view.tooltip.lines[1])
 
-    -- Back on the Main, the mark goes.
     b.character = character("Bob")
     b:play()
     net:run(70)
@@ -439,7 +428,6 @@ describe("The Pocket Camp", function()
       local before = a:count("changed")
       net:run(1)
       assert.equal("seated", poseOf(a, b))
-      -- The Pocket Camp is told to redraw when the spell ends.
       assert.equal(before + 1, a:count("changed"))
     end)
 
@@ -452,7 +440,6 @@ describe("The Pocket Camp", function()
       b.core:caught(catch(SMALLFISH))
       untilFishing(net, a, b, 70)
       net:run(30)
-      -- Two catches in one update: one spell, restarted.
       b.core:caught(catch(SMALLFISH))
       b.core:caught(catch(SMALLFISH))
       b:play({ level = 11 })
@@ -477,14 +464,12 @@ describe("The Pocket Camp", function()
     it("is silent on the first sight of a Member, at login and after a reload", function()
       local net, clients = crew({ "Ann", "Bob" })
       local a, b = clients[1], clients[2]
-      -- First sight: Cid joins already holding catches.
       local c = net:add("Cid", { character = character("Cid") }):login()
       c.core:caught(catch(SMALLFISH))
       c:join(a.core:crew().code)
       net:run(40)
       assert.equal("seated", poseOf(a, c))
 
-      -- Login: Bob fished while Ann was away.
       a:logout()
       net:run(5)
       b.core:caught(catch(SMALLFISH))
@@ -493,7 +478,6 @@ describe("The Pocket Camp", function()
       net:run(40)
       assert.equal("seated", poseOf(a, b))
 
-      -- Reload: a spell under way isn't kept.
       b.core:caught(catch(SMALLFISH))
       untilFishing(net, a, b, 70)
       a:reload()
@@ -530,10 +514,8 @@ describe("The Pocket Camp", function()
       net:run(5)
       c:play({ level = 60 })
       net:run(5)
-      -- Cid's max level also takes the Crew to 50 Crew levels.
       assert.same({ "ding:Bob", "death:Cid", "rareFind:Bob", "maxLevel:Cid", "goal" }, animations(a, clients))
       assert.equal(0, a:count("feedEntry"))
-      -- The entries stay unseen, for While you were away.
       assert.equal(5, a.core:unseen())
     end)
 
@@ -573,7 +555,6 @@ describe("The Pocket Camp", function()
       local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal", "Ivy" }
       local net, clients = crew(names)
       local a = clients[1]
-      -- Ivy can't play with Ann, so the Roster lists her last: she's in +N.
       local hidden = clients[9]
       hidden:play({ level = 30 })
       net:run(5)
@@ -584,7 +565,6 @@ describe("The Pocket Camp", function()
       assert.equal(1, a:count("feedEntry"))
       assert.same({}, animations(a, clients))
 
-      -- Bob dings and logs out while Ann can't hear; the news comes later.
       local b = clients[2]
       a:lockdown(true)
       b:play({ level = 11 })
@@ -622,8 +602,6 @@ describe("Arrivals and bedrolls", function()
     return list
   end
 
-  -- A Crew as crew() makes it, with Ann's link up long enough that whoever
-  -- she hears next came online.
   local function settledCrew(names)
     local net, clients, ns = crew(names)
     skip(net, 2 * 60)
@@ -640,14 +618,12 @@ describe("Arrivals and bedrolls", function()
     net:run(40)
     assert.same({ "arrive:Bob" }, arrivals(a, clients))
     assert.equal("seated", poseOf(a, b))
-    -- Nobody else walks in: not Bob again, and not you.
     assert.same({}, arrivals(b, clients))
   end)
 
   it("walks in nobody on first sight, at login catch-up or after a reload", function()
     local net, clients = settledCrew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
-    -- First sight: Cid joins.
     a.events = {}
     local c = net:add("Cid", { character = character("Cid") }):login()
     c:join(a.core:crew().code)
@@ -656,7 +632,6 @@ describe("Arrivals and bedrolls", function()
     assert.is_table(actorFor(a.core:pocketCamp(), c))
     assert.same({}, arrivals(a, clients))
 
-    -- Login: Ann logs in with Bob and Cid already online.
     a:logout()
     net:run(5)
     a:login()
@@ -664,12 +639,10 @@ describe("Arrivals and bedrolls", function()
     net:run(3 * 60)
     assert.same({}, arrivals(a, clients))
 
-    -- Reload: everyone is still online.
     a:reload()
     net:run(3 * 60)
     assert.same({}, arrivals(a, clients))
 
-    -- Bob comes online while Ann's sync hasn't settled.
     b:logout()
     net:run(5)
     a:logout()
@@ -686,7 +659,6 @@ describe("Arrivals and bedrolls", function()
     a.events = {}
     a:lockdown(true)
     net:run(13 * 60)
-    -- Bob was online all along; Ann just couldn't hear him.
     assert.is_nil(actorFor(a.core:pocketCamp(), b))
     a:lockdown(false)
     net:run(3 * 60)
@@ -749,7 +721,6 @@ describe("Arrivals and bedrolls", function()
     net:run(40)
     assert.equal("seated", poseOf(a, b))
     assert.same({ "arrive:Bob" }, arrivals(a, clients))
-    -- The old bedroll doesn't come back when they go again later.
     skip(net, 11 * 60)
     assert.equal("seated", poseOf(a, b))
   end)
@@ -783,7 +754,6 @@ describe("Arrivals and bedrolls", function()
     local net, clients, ns = crew(names)
     local a = clients[1]
     a.core:setPocketCampColumns(ns.Core.CAMP_LAYOUT.pocketMaxColumns)
-    -- Five online: the usual width fits them.
     for i = 6, #names do clients[i]:logout() end
     net:run(2)
     local view = a.core:pocketCamp()
@@ -795,14 +765,12 @@ describe("Arrivals and bedrolls", function()
         asleep = asleep + 1
       else
         online = online + 1
-        -- Online figures come before any bedroll.
         assert.equal(i, online)
       end
     end
     assert.equal(5, online)
     assert.is_true(asleep < 4)
 
-    -- Nine online at the usual max width: no bedrolls get a seat.
     a.core:setPocketCampColumns(nil)
     for i = 6, #names do clients[i]:login() end
     net:run(40)
@@ -857,7 +825,6 @@ describe("Tips", function()
     local net = load().FakeNet.new()
     local a = net:add("Ann"):login()
     net:run(5)
-    -- Outside a Crew there's no Tip to offer yet.
     assert.equal(0, a:count("tip"))
     a:join()
     net:run(5)
@@ -867,7 +834,6 @@ describe("Tips", function()
       if event[1] == "tip" then offered = event[2] end
     end
     assert.same(a.core:tip(), offered)
-    -- Left unanswered, it stays in the panel but isn't offered again.
     a:reload()
     net:run(5)
     a:logout()
@@ -900,7 +866,6 @@ describe("Tips", function()
     assert.same({ "settingChanged", "pocketCamp", true }, a.events[1])
     assert.equal(1, a:count("changed"))
     assert.is_nil(a.core:tip())
-    -- Off again later, on another Character, after a reload: still answered.
     a.core:setSetting("pocketCamp", false)
     a:reload()
     assert.is_nil(a.core:tip())
@@ -949,14 +914,12 @@ describe("Tips", function()
 end)
 
 describe("Playing together", function()
-  -- Each actor's label, in the read's order.
   local function order(view)
     local labels = {}
     for i, actor in ipairs(view.actors) do labels[i] = actor.label end
     return labels
   end
 
-  -- A unit of your group as Snapshot.party reads it.
   local function unit(client)
     return { guid = client.character.guid, name = client.character.name }
   end
@@ -969,7 +932,6 @@ describe("Playing together", function()
     net:run(15)
   end
 
-  -- The actors standing in a doorway, by label, sorted.
   local function under(view, doorway)
     local labels = {}
     for _, actor in ipairs(view.actors) do
@@ -996,15 +958,12 @@ describe("Playing together", function()
     local a, b, c = clients[1], clients[2], clients[3]
     c:play({ lastName = "Stormgaard" })
     b:play({ lastName = "Ashby" })
-    -- A last name alone goes out with the next unhurried DATA.
     net:run(70)
     a.core:group({ { name = "Cid", lastName = "Stormgaard" }, { name = "Bob", lastName = "Other" } })
     local view = a.core:pocketCamp()
     assert.same({ "You", "Cid", "Bob" }, order(view))
     assert.is_true(actorFor(view, c).group)
     assert.is_nil(actorFor(view, b).group)
-    -- Matched however they're cased, but on the whole name: a first name
-    -- alone doesn't match a Character with a last name, nor the reverse.
     a.core:group({ { name = "cid", lastName = "STORMGAARD" }, { name = "Bob" } })
     view = a.core:pocketCamp()
     assert.is_true(actorFor(view, c).group)
@@ -1037,8 +996,6 @@ describe("Playing together", function()
     local view = ns.Camp.pocket(rows, {}, 0, doing, {}, 304, { b = true, c = true })
     local ids = {}
     for i, actor in ipairs(view.actors) do ids[i] = actor.memberId end
-    -- Your group (Cid sharing your doorway first), then Hal sharing it,
-    -- then the pair in Ragefire Chasm, then the rest.
     assert.same({ "you", "c", "b", "h", "e", "g", "d", "f" }, ids)
   end)
 
@@ -1048,7 +1005,6 @@ describe("Playing together", function()
     inside(net, { b, e }, "The Deadmines")
     inside(net, { d }, "Ragefire Chasm")
     local view = a.core:pocketCamp()
-    -- Bob and Eve one after the other.
     local labels = order(view)
     local at = {}
     for i, label in ipairs(labels) do at[label] = i end
@@ -1058,7 +1014,6 @@ describe("Playing together", function()
     assert.equal(bob.doorway, eve.doorway)
     assert.are_not.equal(bob.doorway, dee.doorway)
     assert.is_nil(actorFor(view, c).doorway)
-    -- Next to each other on one side, the doorway round both.
     local layout = ns.Core.CAMP_LAYOUT
     local shared = view.doorways[bob.doorway]
     local first, last = bob, eve
@@ -1100,7 +1055,6 @@ describe("Playing together", function()
     local a = clients[1]
     local layout = ns.Core.CAMP_LAYOUT
     inside(net, clients, "The Deadmines")
-    -- Five don't fit on one side at the usual width, the max by default.
     local view = a.core:pocketCamp()
     assert.equal(layout.pocketColumns, view.maxColumns)
     assert.equal(layout.pocketColumns + 2 * layout.pocketStep, view.columns)
@@ -1123,7 +1077,6 @@ describe("Playing together", function()
     end
     local doing = { said = {}, fishing = {}, working = {} }
     assert.equal(layout.pocketColumns, ns.Camp.pocket(rows, {}, 0, doing, {}, nil, {}).columns)
-    -- Nine fit on one side of the widest: that's worth growing for.
     for i = 11, 12 do rows[i].instance = nil end
     assert.equal(layout.pocketMaxColumns, ns.Camp.pocket(rows, {}, 0, doing, {}, nil, {}).columns)
   end)
@@ -1135,7 +1088,6 @@ describe("Playing together", function()
     a.core:group({ unit(a), unit(b), unit(c) })
     local view = a.core:pocketCamp()
     assert.same({ "You", "Bob", "Cid", "Dee" }, order(view))
-    -- Bob across the fire from you, Cid beside you: as without a group.
     assert.are_not.equal(view.actors[1].x < 0, actorFor(view, b).x < 0)
     assert.equal(view.actors[1].x < 0, actorFor(view, c).x < 0)
   end)
@@ -1153,11 +1105,9 @@ describe("Playing together", function()
     for _, client in ipairs({ b, d }) do
       assert.are_not.equal(you.x < 0, actorFor(view, client).x < 0)
     end
-    -- Four in your group don't fit on one side: three there, one across.
     a.core:setPocketCampColumns(ns.Core.CAMP_LAYOUT.pocketMaxColumns)
     a.core:group({ unit(a), unit(b), unit(c), unit(d), unit(e) })
     view = a.core:pocketCamp()
-    -- And it doesn't grow for that.
     assert.equal(ns.Core.CAMP_LAYOUT.pocketColumns, view.columns)
     local yours = 0
     for _, actor in ipairs(view.actors) do
@@ -1220,8 +1170,6 @@ end)
 describe("The Spares crate", function()
   local BARB = "|cff1eff00|Hitem:5191::::::::18:::::::|h[Cruel Barb]|h|r"
 
-  -- Ann and Bob in a Crew, Ann with the Pocket Camp on and chat lines and
-  -- toasts off, so Spare notices wait for the Spares tab.
   local function quietCrew()
     local ns = load()
     local net = ns.FakeNet.new({ items = { ["item:5191"] = "[Cruel Barb]" } })
@@ -1325,13 +1273,11 @@ end)
 
 describe("The trophy cup", function()
   local HOUR = 60 * 60
-  local FINALS = { [101] = "The Deadmines" }
+  local FAKE_FINAL_BOSSES = { [101] = "The Deadmines" }
 
-  -- Ann and Bob in a Crew, settled, Ann with the Pocket Camp on. start
-  -- maps a name to what its Character starts with.
   local function pair(start)
     local ns = load()
-    local net = ns.FakeNet.new({ finalBosses = FINALS })
+    local net = ns.FakeNet.new({ finalBosses = FAKE_FINAL_BOSSES })
     local a = net:add("Ann", { character = character("Ann", start and start.Ann) }):login()
     local b = net:add("Bob", { character = character("Bob", start and start.Bob) }):login()
     b:join(a:join())
@@ -1369,7 +1315,6 @@ describe("The trophy cup", function()
     skip(net, 2 * 60)
     assert.is_nil(a.core:pocketCamp().trophies)
     assert.is_nil(a.core:pocketCamp().trophiesTooltip)
-    -- Still on the Trophies tab.
     assert.equal("deaths", a.core:trophies().shelf[1].track)
   end)
 
@@ -1387,7 +1332,6 @@ describe("The trophy cup", function()
       lines = { "Crew deaths: 50 · just now", "Crew deaths: 25 · 10m ago" },
       hint = "Click to see them in Trophies.",
     }, view.trophiesTooltip)
-    -- The older goes at its hour, the newer stays.
     skip(net, 50 * 60)
     assert.same({ "Crew deaths: 50 · 50m ago" }, names(a.core:pocketCamp()))
   end)
@@ -1436,7 +1380,6 @@ describe("The trophy cup", function()
       if trophy.track == "deaths" then deaths = trophy end
     end
     assert.is_true(deaths.quiet)
-    -- The baseline's, reached this session and within the hour.
     assert.is_true(net:now() - deaths.time < HOUR)
     assert.is_nil(a.core:pocketCamp().trophies)
   end)
@@ -1492,7 +1435,6 @@ describe("How long a Member has been at it", function()
     local mark = #net.wire
     b.core:doing({ combat = true })
     net:run(2 * 60 + 10)
-    -- Said again at 2 minutes.
     assert.equal(2, #net:sent(mark, "Bob", "DOING"))
     assert.equal("fighting · 2m", status(a, b))
   end)
@@ -1564,7 +1506,6 @@ describe("How long a Member has been at it", function()
     net:run(5 * 60)
     a:reload()
     a.core:setSetting("pocketCamp", true)
-    -- What Bob is doing is heard again when he says it again.
     for _ = 1, 3 * 60 do
       if poseOf(a, b) == "resting" then break end
       net:step()
