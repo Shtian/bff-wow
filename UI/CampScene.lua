@@ -28,8 +28,10 @@ local WALK_STEP = 2
 local BOUNCE_TICKS = 3
 local ROW = {
   seat = 3, seated = 4, hop = 6, standing = 3, asleep = 3, grave = 3, flower = 2,
-  logs = 3, fire = 5, tent = 5, ember = 16, crate = 1, cup = 19,
+  logs = 3, fire = 5, tent = 5, ember = 16, crate = 1, cup = 19, pet = 3,
 }
+local PET_IDLE = { every = 24, spread = 25, ticks = 3, seed = 7 }
+local PET_HOP_LATE = 1
 local CRATE_X = -1
 local CUP_X = -6
 local CUP_BOB = 4
@@ -149,26 +151,39 @@ function CampScene.figure(parent)
   frame.skin = texture(frame, "ARTWORK", 1)
   frame.skin:SetPoint("BOTTOMLEFT")
   frame.hat = texture(frame, "ARTWORK", 2)
+  frame.pet = texture(frame, "ARTWORK", 0)
   function frame:Layout()
     local unit = CampScene.artUnit(self, self.target)
     local s = Sheet.sprites.seated
     local hat = hatPlace(self.hatName, 0)
-    self:SetSize(s[3] * unit, math.max(s[4], hat and hat.top or 0) * unit)
+    local pet = self.petName and Sheet.pets[self.petName]
+    local left = pet and LAYOUT.pet + LAYOUT.petGap or 0
+    self:SetSize((left + s[3]) * unit, math.max(s[4], hat and hat.top or 0) * unit)
     setSprite(self.cloth, "seatedCloth", unit)
     setSprite(self.skin, "seated", unit)
+    self.cloth:SetPoint("BOTTOMLEFT", left * unit, 0)
+    self.skin:SetPoint("BOTTOMLEFT", left * unit, 0)
     if hat then
       setSprite(self.hat, hat.sprite, unit)
       self.hat:ClearAllPoints()
-      self.hat:SetPoint("BOTTOMLEFT", hat.x * unit, hat.bottom * unit)
+      self.hat:SetPoint("BOTTOMLEFT", (left + hat.x) * unit, hat.bottom * unit)
     else
       self.hat:Hide()
+    end
+    if pet then
+      setSprite(self.pet, pet.awake, unit)
+      self.pet:ClearAllPoints()
+      self.pet:SetPoint("BOTTOMLEFT", (LAYOUT.pet - Sheet.sprites[pet.awake][3]) * unit, 0)
+    else
+      self.pet:Hide()
     end
   end
   function frame:SetTarget(target)
     self.target = target
   end
-  function frame:SetClass(classFilename, hat)
+  function frame:SetClass(classFilename, hat, pet)
     self.hatName = hat
+    self.petName = pet
     self:Layout()
     tint(self.cloth, classFilename)
     self:Show()
@@ -203,6 +218,18 @@ function CampScene.hat(parent)
     local hat = Sheet.hats[name]
     if not hat then return self.art:Hide() end
     setSprite(self.art, hat.sprite, CampScene.artUnit(self, CampScene.FIGURE_TARGET))
+  end
+  return frame
+end
+
+function CampScene.pet(parent)
+  local frame = CreateFrame("Frame", nil, parent)
+  frame.art = texture(frame, "ARTWORK", 0)
+  frame.art:SetPoint("CENTER")
+  function frame:SetPet(name)
+    local pet = Sheet.pets[name]
+    if not pet then return self.art:Hide() end
+    setSprite(self.art, pet.awake, CampScene.artUnit(self, CampScene.FIGURE_TARGET))
   end
   return frame
 end
@@ -262,17 +289,17 @@ local function put(scene, t, x, row)
   t:SetPoint("BOTTOMLEFT", scene.art, "BOTTOMLEFT", (scene.fire + x) * scene.unit, row * scene.unit)
 end
 
-local function hopping(scene, actor)
+local function hopping(scene, actor, late)
   local start = actor.pose ~= "asleep" and scene.hops[actor.memberId]
-  local played = start and GetTime() - start
-  return played and played < HOP_FOR and played or nil
+  local played = start and GetTime() - start - (late or 0) / FPS
+  return played and played >= 0 and played < HOP_FOR and played or nil
 end
 
-local function playing(scene, kind, memberId)
-  local now = GetTime()
+local function playing(scene, kind, memberId, late)
+  local now = GetTime() - (late or 0) / FPS
   for i = #scene.animations, 1, -1 do
     local animation = scene.animations[i]
-    if animation.kind == kind and animation.memberId == memberId and now < animation.ends then
+    if animation.kind == kind and animation.memberId == memberId and animation.start <= now and now < animation.ends then
       return now - animation.start, animation
     end
   end
@@ -283,11 +310,12 @@ local function bounced(f)
   return math.floor(f / BOUNCE_TICKS) % 2 == 0
 end
 
-local function celebrating(scene, actor, f)
-  if hopping(scene, actor) then return true end
-  local ding = playing(scene, "ding", actor.memberId)
+local function celebrating(scene, actor, f, late)
+  late = late or 0
+  if hopping(scene, actor, late) then return true end
+  local ding = playing(scene, "ding", actor.memberId, late)
   if ding and ding < STAR_RISES_FOR then return true end
-  return (ding or playing(scene, "maxLevel", actor.memberId)) ~= nil and bounced(f)
+  return (ding or playing(scene, "maxLevel", actor.memberId, late)) ~= nil and bounced(f - late)
 end
 
 local function markRow(scene, name, row)
@@ -508,11 +536,31 @@ local function drawCheer(scene, parts, actor, top, played)
   end
 end
 
+local function drawPet(scene, parts, actor, f, hidden)
+  local pet = actor.pet and Sheet.pets[actor.pet.key]
+  if not pet or hidden then
+    parts.pet:Hide()
+    return
+  end
+  local asleep = actor.pose == "asleep"
+  local seed = actor.pet.x * PET_IDLE.seed
+  local every = PET_IDLE.every + seed % PET_IDLE.spread
+  local name = asleep and pet.asleep or (f + seed) % every < PET_IDLE.ticks and pet.idle or pet.awake
+  local mirrored = actor.pet.x > actor.x
+  local width = Sheet.sprites[name][3]
+  local x = mirrored and actor.pet.x or actor.pet.x + LAYOUT.pet - width
+  local lift = not asleep and celebrating(scene, actor, f, PET_HOP_LATE) and ROW.hop - ROW.seated or 0
+  setSprite(parts.pet, name, scene.unit, mirrored)
+  put(scene, parts.pet, x, ROW.pet + lift)
+end
+
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
   local top, hatTop
   local walkedIn = actor.pose ~= "asleep" and playing(scene, "arrive", actor.memberId)
   local welcomed = not walkedIn and actor.pose ~= "asleep" and playing(scene, "welcome", actor.memberId) ~= nil
+  local dead = actor.pose ~= "asleep" and playing(scene, "death", actor.memberId) ~= nil
+  drawPet(scene, parts, actor, f, dead or actor.form ~= nil or (walkedIn and walkedIn < WALK_FOR))
   if walkedIn or welcomed then
     x, top, hatTop = drawArrival(scene, parts, actor, f, walkedIn)
   elseif actor.form and not playing(scene, "death", actor.memberId) then
@@ -529,7 +577,6 @@ local function drawActor(scene, parts, actor, f)
     end
     parts.skin:SetAlpha(alpha)
   elseif actor.pose ~= "asleep" then
-    local dead = playing(scene, "death", actor.memberId) ~= nil
     local pose = not dead and POSE[actor.pose] or {}
     local standing = pose.standing == true
     local hop = not dead and celebrating(scene, actor, f)
@@ -747,7 +794,7 @@ local function onUpdate(band)
   if f == scene.frame then return end
   scene.frame = f
   for i = #scene.animations, 1, -1 do
-    if scene.animations[i].ends <= now then table.remove(scene.animations, i) end
+    if scene.animations[i].ends + PET_HOP_LATE / FPS <= now then table.remove(scene.animations, i) end
   end
   for key, start in pairs(scene.blooms) do
     if now - start >= BLOOM.lasts then scene.blooms[key] = nil end
@@ -802,6 +849,7 @@ function CampScene.new(parent, options)
     actorParts = pool(function()
       return {
         back = texture(band.art, "ARTWORK", -1),
+        pet = texture(band.art, "ARTWORK", 0),
         seat = texture(band.art, "ARTWORK", 0),
         cloth = texture(band.art, "ARTWORK", 1),
         skin = texture(band.art, "ARTWORK", 2),

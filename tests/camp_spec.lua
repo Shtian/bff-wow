@@ -66,7 +66,10 @@ local layout = load().Core.CAMP_LAYOUT
 
 local function spans(view)
   local list = {}
-  for _, actor in ipairs(view.actors) do list[#list + 1] = { actor.x, actor.x + actor.width } end
+  for _, actor in ipairs(view.actors) do
+    list[#list + 1] = { actor.x, actor.x + actor.width }
+    if actor.pet then list[#list + 1] = { actor.pet.x, actor.pet.x + layout.pet } end
+  end
   for _, grave in ipairs(view.graves) do
     list[#list + 1] = { grave.x, grave.x + layout.grave }
   end
@@ -164,6 +167,9 @@ describe("The Camp", function()
   it("never overlaps anything, keeps it inside the band, and drops the tent when there's no room", function()
     local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal" }
     local net, clients = crew(names)
+    local pets = { "cat", "dog", "owl", "frog", "rabbit", "fox", "cat", "dog" }
+    for i, client in ipairs(clients) do client.core:setLook({ pet = pets[i] }) end
+    net:run(5)
     clients[5]:logout()
     clients[6]:logout()
     clients[2]:play({ deaths = 2 })
@@ -173,10 +179,11 @@ describe("The Camp", function()
     clients[6]:logout()
     net:run(5)
     local a = clients[1]
-    local sawTent, sawNoTent = false, false
+    local sawTent, sawNoTent, sawPets = false, false, false
     for columns = 128, 375 do
       local view = a.core:camp(columns)
       local list = spans(view)
+      for _, actor in ipairs(view.actors) do sawPets = sawPets or actor.pet ~= nil end
       if view.tent then
         list[#list + 1] = { view.tent.x, view.tent.x + layout.tent }
         sawTent = true
@@ -205,6 +212,7 @@ describe("The Camp", function()
     end
     assert.is_true(sawTent)
     assert.is_true(sawNoTent)
+    assert.is_true(sawPets)
   end)
 
   describe("graves", function()
@@ -510,5 +518,149 @@ describe("Head pieces", function()
     a.core:leaveCrew()
     net:run(5)
     assert.equal("horns", a.core:look().hat)
+  end)
+end)
+
+describe("Pets", function()
+  local function receive(client, ns, net, from, record)
+    record.version = record.version or net:now()
+    record.characters = record.characters or {
+      ["Player-0-" .. record.id] = { guid = "Player-0-" .. record.id, name = record.id, level = 20, lastPlayed = net:now() },
+    }
+    client.core:received(ns.Codec.encode({ type = "DATA", from = from, records = { record } }))
+  end
+
+  local function seats(view)
+    local list = {}
+    for _, actor in ipairs(view.actors) do list[#list + 1] = actor.memberId end
+    for _, grave in ipairs(view.graves) do list[#list + 1] = "grave:" .. grave.memberId end
+    list[#list + 1] = view.tent and "tent" or "no tent"
+    list[#list + 1] = "more:" .. tostring(view.more)
+    return table.concat(list, " ")
+  end
+
+  it("lists the pets with their names, none first", function()
+    local keys = {}
+    for _, pet in ipairs(load().Core.PETS) do keys[#keys + 1] = pet.key end
+    assert.same({ "none", "cat", "dog", "owl", "frog", "rabbit", "fox" }, keys)
+    assert.same({ key = "none", label = "None" }, load().Core.PETS[1])
+  end)
+
+  it("sit beside their Member on the side away from the fire, in every Camp", function()
+    local net, clients = crew({ "Ann", "Bob", "Cid" })
+    local a, b, c = clients[1], clients[2], clients[3]
+    b.core:setLook({ pet = "fox" })
+    c.core:setLook({ pet = "owl" })
+    net:run(5)
+    c:logout()
+    net:run(5)
+    local view = a.core:camp(COLUMNS)
+    for _, client in ipairs({ b, c }) do
+      local actor = actorFor(view, client)
+      if actor.x > 0 then
+        assert.equal(actor.x + actor.width + layout.petGap, actor.pet.x)
+      else
+        assert.equal(actor.x - layout.petGap - layout.pet, actor.pet.x)
+      end
+    end
+    assert.equal("fox", actorFor(view, b).pet.key)
+    assert.same({ "asleep", "owl" }, { actorFor(view, c).pose, actorFor(view, c).pet.key })
+    assert.is_nil(actorFor(view, a).pet)
+  end)
+
+  it("keep the Graves after them, on the far side", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b.core:setLook({ pet = "dog" })
+    b:play({ deaths = 1 })
+    net:run(15)
+    local view = a.core:camp(COLUMNS)
+    local bob, grave = actorFor(view, b), gravesOf(view, b)[1]
+    if bob.x > 0 then
+      assert.is_true(grave.x >= bob.pet.x + layout.pet)
+    else
+      assert.is_true(grave.x + layout.grave <= bob.pet.x)
+    end
+  end)
+
+  it("are left out first in a narrow band, before any Member, Grave or the tent, and come back as it widens", function()
+    local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal" }
+    local net, clients = crew(names)
+    local a = clients[1]
+    clients[2]:play({ deaths = 2 })
+    net:run(15)
+    local function settle()
+      clients[7]:logout()
+      clients[8]:logout()
+      net:run(15)
+    end
+    settle()
+    local without = {}
+    for columns = 128, 375 do without[columns] = seats(a.core:camp(columns)) end
+    clients[7]:login()
+    clients[8]:login()
+    for _, client in ipairs(clients) do client.core:setLook({ pet = "cat" }) end
+    net:run(15)
+    settle()
+    local fewest, most = #names, 0
+    for columns = 128, 375 do
+      local view = a.core:camp(columns)
+      assert.equal(without[columns], seats(view), ("seats changed at %d"):format(columns))
+      local count = 0
+      for _, actor in ipairs(view.actors) do count = count + (actor.pet and 1 or 0) end
+      fewest, most = math.min(fewest, count), math.max(most, count)
+    end
+    assert.equal(0, fewest)
+    assert.equal(#names, most)
+    for _, actor in ipairs(a.core:camp(375).actors) do assert.equal("cat", actor.pet.key) end
+  end)
+
+  it("are written with your head piece, refuse a pet that isn't on the list, and go back to none", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    a.core:setLook({ hat = "fez" })
+    assert.is_true(a.core:setLook({ pet = "rabbit" }))
+    assert.same({ "fez", "rabbit" }, { a.core:look().hat, a.core:look().pet })
+    assert.same({ nil, "unknownPet" }, { a.core:setLook({ pet = "dragon" }) })
+    assert.equal("rabbit", a.core:look().pet)
+    net:run(5)
+    assert.same({ "fez", "rabbit" }, { actorFor(b.core:camp(COLUMNS), a).hat, actorFor(b.core:camp(COLUMNS), a).pet.key })
+    assert.is_true(a.core:setLook({ pet = "none" }))
+    net:run(5)
+    assert.is_nil(a.core:look().pet)
+    assert.equal("fez", actorFor(b.core:camp(COLUMNS), a).hat)
+    assert.is_nil(actorFor(b.core:camp(COLUMNS), a).pet)
+  end)
+
+  it("send no more than a head piece does", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    local mark = #net.wire
+    a.core:setLook({ hat = "beret" })
+    net:step()
+    local forHat = #net.wire - mark
+    net:run(5)
+    mark = #net.wire
+    a.core:setLook({ pet = "frog" })
+    net:step()
+    assert.equal(forHat, #net.wire - mark)
+    net:run(5)
+    mark = #net.wire
+    assert.is_true(a.core:setLook({ pet = "frog" }))
+    for columns = 128, 375, 13 do a.core:camp(columns) end
+    net:step()
+    assert.equal(mark, #net.wire)
+  end)
+
+  it("read as none when unknown or malformed, keeping the head piece and the record", function()
+    local net, clients, ns = crew({ "Ann" })
+    local a = clients[1]
+    receive(a, ns, net, "newer", { id = "newer", displayName = "Newer", look = { hat = "fez", pet = "dragon" } })
+    receive(a, ns, net, "badpet", { id = "badpet", displayName = "Badpet", look = { pet = 7 } })
+    local newer = a:rowFor({ memberId = "newer" })
+    assert.same({ 20, "fez" }, { newer.level, newer.hat })
+    assert.is_nil(newer.pet)
+    assert.is_nil(a:rowFor({ memberId = "badpet" }).pet)
+    assert.is_nil(actorFor(a.core:camp(COLUMNS), { memberId = "newer" }).pet)
   end)
 end)

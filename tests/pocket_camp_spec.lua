@@ -1545,3 +1545,68 @@ describe("Head pieces in the Pocket Camp", function()
     assert.equal("templar", actorFor(view, a).hat)
   end)
 end)
+
+describe("Pets in the Pocket Camp", function()
+  local function seats(view)
+    local list = {}
+    for _, actor in ipairs(view.actors) do list[#list + 1] = actor.memberId end
+    return table.concat(list, " ") .. " +" .. tostring(view.more)
+  end
+
+  it("sit on the far side of their Member, and asleep beside a bedroll", function()
+    local net, clients, ns = crew({ "Ann", "Bob", "Cid" })
+    local layout = ns.Core.CAMP_LAYOUT
+    local a, b, c = clients[1], clients[2], clients[3]
+    a.core:setPocketCampColumns(layout.pocketMaxColumns)
+    b.core:setLook({ pet = "dog" })
+    c.core:setLook({ pet = "owl" })
+    net:run(5)
+    skip(net, 2 * 60)
+    c:logout()
+    net:run(2)
+    local view = a.core:pocketCamp()
+    local bob, cid = actorFor(view, b), actorFor(view, c)
+    assert.equal("dog", bob.pet.key)
+    assert.same({ "asleep", "owl" }, { cid.pose, cid.pet.key })
+    for _, actor in ipairs({ bob, cid }) do
+      local far = actor.x > 0 and actor.pet.x >= actor.x + actor.width or actor.pet.x + layout.pet <= actor.x
+      assert.is_true(far)
+    end
+  end)
+
+  it("shows no pet in a doorway", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    b.core:setLook({ pet = "frog" })
+    b:move({ instance = "The Deadmines" })
+    b:play({ zone = "The Deadmines" })
+    net:run(15)
+    local bob = actorFor(a.core:pocketCamp(), b)
+    assert.equal("adventuring", bob.pose)
+    assert.is_nil(bob.pet)
+  end)
+
+  it("drops pets before a Member goes to +N, and widens for them only when there's room", function()
+    local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal", "Ivy" }
+    local net, clients, ns = crew(names)
+    local layout = ns.Core.CAMP_LAYOUT
+    local core = clients[1].core
+    local without = seats(core:pocketCamp())
+    for _, client in ipairs(clients) do client.core:setLook({ pet = "fox" }) end
+    net:run(5)
+    local view = core:pocketCamp()
+    assert.equal(without, seats(view))
+    assert.equal(layout.pocketColumns, view.columns)
+
+    core:setPocketCampColumns(layout.pocketMaxColumns)
+    local wide = core:pocketCamp()
+    assert.is_true(wide.columns > layout.pocketColumns)
+    local petted = 0
+    for _, actor in ipairs(wide.actors) do petted = petted + (actor.pet and 1 or 0) end
+    assert.is_true(petted > 0)
+    local half = wide.columns / 2
+    for _, actor in ipairs(wide.actors) do
+      if actor.pet then assert.is_true(actor.pet.x >= -half and actor.pet.x + layout.pet <= half) end
+    end
+  end)
+end)

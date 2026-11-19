@@ -28,6 +28,8 @@ local LAYOUT = {
   formTrot = 4,
   doorway = 2,
   doorwayGap = 3,
+  pet = 13,
+  petGap = 1,
 }
 Camp.LAYOUT = LAYOUT
 
@@ -76,23 +78,31 @@ local function news(entries, now)
   return graves, sparks
 end
 
-local function placeOn(side, figure, graveCount, fore, aft, gap)
-  local width = figure + (aft or 0) + graveCount * (LAYOUT.graveGap + LAYOUT.grave)
+local function placeOn(side, figure, graveCount, fore, aft, pet, gap)
+  aft = aft or 0
+  local petRoom = pet and LAYOUT.petGap + LAYOUT.pet or 0
+  local width = figure + aft + petRoom + graveCount * (LAYOUT.graveGap + LAYOUT.grave)
   local start = (side.used == 0 and LAYOUT.fire or side.used + (gap or LAYOUT.gap)) + (fore or 0)
   if start + width > side.limit then return nil end
   side.used = start + width
   local x
   if side.sign > 0 then x = start else x = -start - figure end
+  local petX
+  if pet and side.sign > 0 then
+    petX = x + figure + aft + LAYOUT.petGap
+  elseif pet then
+    petX = x - aft - LAYOUT.petGap - LAYOUT.pet
+  end
   local graveXs = {}
   for i = 1, graveCount do
-    local offset = figure + (i - 1) * (LAYOUT.graveGap + LAYOUT.grave) + LAYOUT.graveGap
+    local offset = figure + petRoom + (i - 1) * (LAYOUT.graveGap + LAYOUT.grave) + LAYOUT.graveGap
     if side.sign > 0 then
       graveXs[i] = x + offset
     else
       graveXs[i] = x - offset + figure - LAYOUT.grave
     end
   end
-  return x, graveXs
+  return x, graveXs, petX
 end
 
 local function roomier(left, right)
@@ -116,8 +126,7 @@ local function labelRoom(actors, left, right)
   end
 end
 
-function Camp.view(rows, entries, now, columns, options)
-  options = options or {}
+local function arrange(rows, entries, now, columns, options, petted)
   columns = math.max(1, math.floor(columns))
   local leftEdge = math.floor(columns / 2)
   local rightEdge = columns - leftEdge
@@ -134,6 +143,10 @@ function Camp.view(rows, entries, now, columns, options)
   local function roomOf(row)
     if options.room then return options.room(row) end
   end
+  local withPets = {}
+  local function petOf(row)
+    if row.pet and not (options.noPet and options.noPet(row)) then return row.pet end
+  end
   local placed = {}
   local function placeTogether(first)
     local key, gap = keyOf(list[first])
@@ -142,23 +155,24 @@ function Camp.view(rows, entries, now, columns, options)
     if last == first then return end
     for _, tried in ipairs({ roomier(left, right) }) do
       local copy = { sign = tried.sign, used = tried.used, limit = tried.limit }
-      local xs = {}
+      local spots = {}
       for j = first, last do
         local fore, aft = roomOf(list[j])
-        xs[#xs + 1] = placeOn(copy, LAYOUT.seated, 0, fore, aft, j > first and gap or nil)
+        local x, _, petX = placeOn(copy, LAYOUT.seated, 0, fore, aft, petted[list[j].memberId], j > first and gap or nil)
+        spots[#spots + 1] = x and { x = x, petX = petX, side = tried } or nil
       end
-      if #xs == last - first + 1 then
+      if #spots == last - first + 1 then
         tried.used = copy.used
-        for j = first, last do placed[list[j]] = { x = xs[j - first + 1], side = tried } end
+        for j = first, last do placed[list[j]] = spots[j - first + 1] end
         return
       end
     end
     local side = roomier(left, right)
     for j = first, last do
       local fore, aft = roomOf(list[j])
-      local x = placeOn(side, LAYOUT.seated, 0, fore, aft, j > first and gap or nil)
+      local x, _, petX = placeOn(side, LAYOUT.seated, 0, fore, aft, petted[list[j].memberId], j > first and gap or nil)
       if not x then break end
-      placed[list[j]] = { x = x, side = side }
+      placed[list[j]] = { x = x, petX = petX, side = side }
     end
     view.splits = view.splits or {}
     view.splits[key] = last - first + 1
@@ -170,15 +184,16 @@ function Camp.view(rows, entries, now, columns, options)
     local figure = seated and LAYOUT.seated or LAYOUT.asleep
     local own = not options.onlineOnly and graves[row.memberId] or {}
     local fore, aft = roomOf(row)
-    local x, graveXs, side
+    local pet = petOf(row)
+    local x, graveXs, side, petX
     if placed[row] then
-      x, graveXs, side = placed[row].x, {}, placed[row].side
+      x, graveXs, side, petX = placed[row].x, {}, placed[row].side, placed[row].petX
     else
       local first, second = roomier(left, right)
       for _, count in ipairs({ #own, 0 }) do
         for _, tried in ipairs({ first, second }) do
           if not x then
-            x, graveXs = placeOn(tried, figure, count, fore, aft)
+            x, graveXs, petX = placeOn(tried, figure, count, fore, aft, petted[row.memberId])
             side = x and tried
           end
         end
@@ -186,12 +201,14 @@ function Camp.view(rows, entries, now, columns, options)
       end
     end
     if x then
+      if pet then withPets[#withPets + 1] = row.memberId end
       view.actors[#view.actors + 1] = {
         memberId = row.memberId,
         pose = seated and "seated" or "asleep",
         label = row.own and "You" or row.displayName or row.name,
         classFilename = row.classFilename,
         hat = row.hat,
+        pet = petX and { key = pet, x = petX } or nil,
         x = x,
         width = figure,
         side = side.sign,
@@ -215,7 +232,31 @@ function Camp.view(rows, entries, now, columns, options)
   end
   labelRoom(view.actors, leftEdge, rightEdge)
   for _, actor in ipairs(view.actors) do actor.side = nil end
-  return view
+  return view, withPets
+end
+
+local function seats(view)
+  local parts = { view.more or 0, view.tent and "tent" or "" }
+  for _, actor in ipairs(view.actors) do parts[#parts + 1] = actor.memberId end
+  for _, grave in ipairs(view.graves) do parts[#parts + 1] = grave.memberId end
+  return table.concat(parts, " ")
+end
+
+function Camp.view(rows, entries, now, columns, options)
+  options = options or {}
+  local base, withPets = arrange(rows, entries, now, columns, options, {})
+  local wanted = seats(base)
+  for count = #withPets, 1, -1 do
+    local petted = {}
+    for i = 1, count do petted[withPets[i]] = true end
+    local view = arrange(rows, entries, now, columns, options, petted)
+    if seats(view) == wanted then
+      view.petsLeftOut = count < #withPets and #withPets - count or nil
+      return view
+    end
+  end
+  base.petsLeftOut = #withPets > 0 and #withPets or nil
+  return base
 end
 
 local STATUS = {
@@ -398,6 +439,7 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
       local key = seatKey(row)
       return key, key ~= GROUP and LAYOUT.doorwayGap or nil
     end,
+    noPet = function(row) return poses[row.memberId] == "adventuring" end,
   }
   local function wanted(view, columns)
     for key, count in pairs(view.splits or {}) do
@@ -410,6 +452,13 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
   while wanted(view, columns) and columns + LAYOUT.pocketStep <= LAYOUT.pocketMaxColumns do
     columns = columns + LAYOUT.pocketStep
     view = Camp.view(rows, entries, now, columns, options)
+  end
+  local room = math.min(maxColumns or LAYOUT.pocketColumns, LAYOUT.pocketMaxColumns)
+  local wider = columns
+  while view.petsLeftOut and wider + LAYOUT.pocketStep <= room do
+    wider = wider + LAYOUT.pocketStep
+    local tried = Camp.view(rows, entries, now, wider, options)
+    if (tried.petsLeftOut or 0) < view.petsLeftOut then view = tried end
   end
   view.rows = LAYOUT.pocketRows
   view.graves = nil

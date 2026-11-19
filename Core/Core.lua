@@ -20,6 +20,7 @@ Core.DUNGEONS = ns.Together.DUNGEONS
 Core.TOGETHER_LAYOUT = ns.Together.LAYOUT
 Core.CAMP_LAYOUT = ns.Camp.LAYOUT
 Core.HATS = ns.Look.HATS
+Core.PETS = ns.Look.PETS
 Core.FINAL_BOSSES = ns.Clears.FINAL_BOSSES
 
 Core.grouped = ns.Text.grouped
@@ -1509,22 +1510,31 @@ function Core:setDisplayName(displayName)
   return true
 end
 
-local function ownHat(self)
+local function ownLook(self)
   local own = self.ledger:own()
-  return ns.Look.hat(own and own.look)
+  local look = own and own.look
+  return ns.Look.hat(look), ns.Look.pet(look)
 end
 
 function Core:look()
-  local hat = ownHat(self)
-  return { hat = hat, label = ns.Look.label(hat) }
+  local hat, pet = ownLook(self)
+  return { hat = hat, hatLabel = ns.Look.hatLabel(hat), pet = pet, petLabel = ns.Look.petLabel(pet) }
+end
+
+local function chosenKey(key)
+  return key ~= "none" and key or nil
 end
 
 function Core:setLook(look)
-  local key = type(look) == "table" and look.hat or nil
-  if not ns.Look.known(key) then return nil, "unknownHat" end
-  local hat = key ~= "none" and key or nil
-  if hat ~= ownHat(self) then
-    self.ledger:writeOwn({ look = hat and { hat = hat } or false })
+  if type(look) ~= "table" then return nil, "unknownHat" end
+  if look.hat ~= nil and not ns.Look.knownHat(look.hat) then return nil, "unknownHat" end
+  if look.pet ~= nil and not ns.Look.knownPet(look.pet) then return nil, "unknownPet" end
+  local oldHat, oldPet = ownLook(self)
+  local hat, pet = oldHat, oldPet
+  if look.hat ~= nil then hat = chosenKey(look.hat) end
+  if look.pet ~= nil then pet = chosenKey(look.pet) end
+  if hat ~= oldHat or pet ~= oldPet then
+    self.ledger:writeOwn({ look = (hat or pet) and { hat = hat, pet = pet } or false })
     sendOwnNow(self)
     self.listener("changed")
   end

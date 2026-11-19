@@ -17,7 +17,7 @@ A **Settings** view inside the BFF panel, drawn by `UI/SettingsTab.lua` in the p
 | Section | Setting | Default | From |
 |---|---|---|---|
 | **You** | Display name (2–16 characters) | Character name at setup | #10 |
-| | Look: a grid of head pieces, with your seated figure as a preview | none | #241 |
+| | Look: a grid of head pieces and a grid of pets, with your seated figure and pet as a preview | none | #241, #242 |
 | | Crew code, read-only, text selected for copying | | #10 |
 | **Sharing** | Appear offline (Pause sharing) | off | #8 |
 | | Leave Crew button (asks to confirm) | | #10 |
