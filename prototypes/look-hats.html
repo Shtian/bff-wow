@@ -214,6 +214,48 @@ const HATS = [
     ".ZZTKKTTt.",
     ".ZT.KK.Tt.",
   ] },
+  { key: "greathelm", label: "Great helm", brow: 1, main: "Z", light: "G", rows: [
+    ".tTTGOTTt.",
+    "TZZTGOTTTt",
+    "TZTTGOTTTt",
+    "TZTTGOTTTt",
+    "TKKKGOKKKt",
+    "TGGGGOOOOt",
+    "TTKTGOTKTt",
+    ".tTTGOTTt.",
+  ] },
+  { key: "kabuto", label: "Samurai kabuto", brow: 5, main: "X", light: "G", rows: [
+    "G........G",
+    ".GG.GG.GG.",
+    "...GOOG...",
+    "..XqXXXx..",
+    ".XqXXXXXx.",
+    "GGGGGGGGGO",
+    "rRr....rRr",
+    "rr......rr",
+    "r........r",
+  ] },
+  { key: "dwarf", label: "Dwarven helm", brow: 2, main: "T", light: "A", rows: [
+    "...TZZT...",
+    "..TZNZTt..",
+    ".TZZZTTTt.",
+    "GGGGGGGGGO",
+    "T...GO...t",
+    "T...GO...t",
+    "aAaaaaaaAa",
+    ".aaAaaAaa.",
+    "...aaaa...",
+  ] },
+  { key: "dragon", label: "Dragon helm", brow: 5, main: "R", light: "Y", rows: [
+    "N........N",
+    ".NRRrRRRN.",
+    ".RRRRRRRR.",
+    "RRYRRRRYRR",
+    ".RrRRRRrR.",
+    "RrRNRRNRrR",
+    "Rr......rR",
+    "r........r",
+  ] },
   { key: "wolfskin", label: "Wolfskin helmet", brow: 4, main: "T", light: "Y", rows: [
     ".Tt....tT.",
     "..TTTTTT..",
@@ -497,13 +539,13 @@ const pocketCast = [
 ];
 const panelCast = [
   { x: -21, pose: "seated", cls: "MAGE", hat: "wizard", mark: "afk" },
-  { x: -37, pose: "seated", cls: "HUNTER", hat: "coonskin" },
+  { x: -37, pose: "seated", cls: "HUNTER", hat: "kabuto" },
   { x: -55, pose: "standing", cls: "WARRIOR", hat: "centurion", mark: "quest" },
   { x: -73, pose: "hop", cls: "PALADIN", hat: "circlet", mark: "star" },
   { x: 9, pose: "seated", cls: "WARLOCK", hat: "fez", mark: "alt" },
-  { x: 25, pose: "seated", cls: "SHAMAN", hat: "wolfskin" },
+  { x: 25, pose: "seated", cls: "SHAMAN", hat: "dragon" },
   { x: 41, pose: "seated", cls: "DRUID", hat: "straw" },
-  { x: 57, pose: "seated", cls: "ROGUE", hat: "beret" },
+  { x: 57, pose: "seated", cls: "ROGUE", hat: "dwarf" },
   { x: 80, pose: "flying", cls: "PRIEST", hat: "cowboy" },
 ];
 
@@ -595,7 +637,7 @@ function drawHeads() {
       HATS.forEach((h, i) => {
         const row = document.createElement("div"); row.className = "rosterrow";
         const c = document.createElement("canvas"); c.dataset.hat = h.key; c.dataset.cls = GALLERY_CLASSES[i % 4];
-        const n = document.createElement("span"); n.textContent = ["Lunara", "Thistle", "Ilsa", "Fenn", "Kesh", "Mira", "Brann", "Odo", "Pell", "Rook", "Sable", "Tam", "Wren", "Yara"][i];
+        const n = document.createElement("span"); n.textContent = ["Lunara", "Thistle", "Ilsa", "Fenn", "Kesh", "Mira", "Brann", "Odo", "Pell", "Rook", "Sable", "Tam", "Wren", "Yara", "Bram", "Cora", "Dain", "Esk"][i];
         const lv = document.createElement("span"); lv.className = "lv"; lv.textContent = 20 + i * 3;
         row.append(c, n, lv); el.append(row);
       });
