@@ -68,7 +68,7 @@
 <div id="toggles"></div>
 
 <h2>The Pocket Camp</h2>
-<p class="sub">Seated and AFK (wizard hat), standing with a torch (horned helm), hopping for a ding (knight's helmet), asleep (wolfskin), flying on an Alt (top hat) and waving hi (cowboy hat). Click a figure for its next hat.</p>
+<p class="sub">Seated and AFK (wizard hat), standing with a torch (horned helm), hopping for a ding (templar helm), asleep (wolfskin), flying on an Alt (top hat) and waving hi (cowboy hat). Click a figure for its next hat.</p>
 <div class="stage"><canvas id="pocket"></canvas></div>
 
 <h2>The panel's Camp band</h2>
@@ -80,7 +80,7 @@
 <div class="scroll"><div id="gallery"></div></div>
 
 <h2>Head marks over a hat</h2>
-<p class="sub">AFK, ALT, a ding's star and a quest, over no hat, a knight's helmet, a wolfskin helmet and a cowboy hat, in a 34-row Pocket Camp.</p>
+<p class="sub">AFK, ALT, a ding's star and a quest, over no hat, a templar helm, a centurion helmet and a straw hat, in a 34-row Pocket Camp.</p>
 <div id="marks"></div>
 
 <h2>Roster rows: the head-only figure</h2>
@@ -191,14 +191,23 @@ const HAT_PAL = {
 // except the light chars, which become the one highlight.
 const HATS = [
   { key: "none", label: "None" },
-  { key: "knight", label: "Knight's helmet", brow: 3, main: "T", light: "R", rows: [
-    "....RO....",
-    "..tZZZZt..",
-    ".tZZNZZTt.",
-    ".TTTTTTTT.",
-    "TT......TT",
-    "TT......TT",
-    ".T......T.",
+  { key: "templar", label: "Templar helm", brow: 2, main: "T", light: "G", rows: [
+    ".tTTTTt.",
+    "TZZTTTTt",
+    "TZTTTTTt",
+    "KKKGGKKK",
+    "TTGGGGTt",
+    "TZTGGTTt",
+    "tTTGGTtt",
+  ] },
+  { key: "centurion", label: "Centurion helmet", brow: 4, main: "T", light: "R", rows: [
+    ".RRRRRRRR.",
+    "RrRrRrRrRr",
+    "..tZZTTt..",
+    ".tZTTTTTt.",
+    ".GGGGGGGG.",
+    ".T......t.",
+    ".t......t.",
   ] },
   { key: "wolfskin", label: "Wolfskin helmet", brow: 4, main: "T", light: "Y", rows: [
     ".Tt....tT.",
@@ -225,11 +234,12 @@ const HATS = [
     "a..AAAAAA..a",
     "aAAAAAAAAAAa",
   ] },
-  { key: "straw", label: "Straw hat", brow: 3, main: "Y", light: "R", rows: [
-    "...YWYYYO...",
+  { key: "straw", label: "Straw hat", brow: 4, main: "Y", light: "R", rows: [
+    "....GYYG....",
+    "...GYWYYGO..",
     "...RRRRRR...",
-    "GYYYYYYYYYYG",
-    ".OGGGGGGGGO.",
+    ".OGYYYYYYGO.",
+    "aOGGGGGGGGOa",
   ] },
   { key: "fez", label: "Fez", brow: 3, main: "R", light: "G", rows: [
     "...RRRRr..",
@@ -475,7 +485,7 @@ const opts = (extra) => ({ style: style(), marks, asleep: asleepMode, ...extra }
 const pocketCast = [
   { x: -21, pose: "seated", cls: "MAGE", hat: "wizard", name: "You", mark: "afk" },
   { x: -39, pose: "standing", cls: "WARRIOR", hat: "horns", name: "Brann" },
-  { x: -55, pose: "hop", cls: "PALADIN", hat: "knight", name: "Ilsa", mark: "star" },
+  { x: -55, pose: "hop", cls: "PALADIN", hat: "templar", name: "Ilsa", mark: "star" },
   { x: 9, pose: "asleep", cls: "DRUID", hat: "wolfskin", name: "Fenn" },
   { x: 36, pose: "flying", cls: "PRIEST", hat: "tophat", name: "Mira", mark: "alt" },
   { x: 62, pose: "wave", cls: "ROGUE", hat: "cowboy", name: "Kesh" },
@@ -483,7 +493,7 @@ const pocketCast = [
 const panelCast = [
   { x: -21, pose: "seated", cls: "MAGE", hat: "wizard", mark: "afk" },
   { x: -37, pose: "seated", cls: "HUNTER", hat: "coonskin" },
-  { x: -55, pose: "standing", cls: "WARRIOR", hat: "knight", mark: "quest" },
+  { x: -55, pose: "standing", cls: "WARRIOR", hat: "centurion", mark: "quest" },
   { x: -73, pose: "hop", cls: "PALADIN", hat: "circlet", mark: "star" },
   { x: 9, pose: "seated", cls: "WARLOCK", hat: "fez", mark: "alt" },
   { x: 25, pose: "seated", cls: "SHAMAN", hat: "wolfskin" },
@@ -550,7 +560,7 @@ function drawGallery() {
 function drawMarks() {
   const el = document.getElementById("marks");
   const sets = [["afk", "AFK"], ["alt", "ALT"], ["star", "Ding star"], ["quest", "Quest"]];
-  const hats = ["none", "knight", "wolfskin", "cowboy"];
+  const hats = ["none", "templar", "centurion", "straw"];
   if (!el.dataset.built) {
     el.innerHTML = "";
     for (const mode of ["spec", "clear"]) {
