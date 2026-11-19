@@ -45,7 +45,7 @@ The baseline is taken once, **when the first sync has settled** (the Feed's rule
 
 ## Trophies tab
 
-A third tab in the panel's sidebar, under Roster and Feed, drawn by `UI/GoalsTab.lua`. It scrolls within the panel's fixed height. `/bff goals` opens it. A **trophy cabinet** ([#119](https://github.com/Shtian/bff-wow/issues/119)): every rung reached stays visible, as a medal. Top to bottom:
+A third tab in the panel's sidebar, under Roster and Feed, drawn by `UI/GoalsTab.lua`. It scrolls within the panel's fixed height. `/bff trophies` opens it (`/bff goals` too, as a hidden alias). A **trophy cabinet** ([#119](https://github.com/Shtian/bff-wow/issues/119)): every rung reached stays visible, as a medal. Top to bottom:
 
 - **Latest win:** the newest trophy in an Ember Gold framed plate, worded like its Feed entry ("The Crew reached 150 Crew levels!"), its date, and how many other trophies are **unseen** (below): "3 Nov · 2 more since you last looked". Nothing is counted the first time.
 - **Trophy shelf:** every reached rung as a medal, newest first: the track's icon (the profession's own for Every profession in the Crew), its value ("150", "Journeyman", "Engineering") and date. The newest 7 show, then a **See all** tile with how many more. Medals wrap to a second line in a narrow panel rather than scroll sideways. Hover shows the track, the value and the date.

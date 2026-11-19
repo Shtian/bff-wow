@@ -92,11 +92,11 @@ A field guide of the crew's fishing catches. Every type of fish is filled in by 
 | `/bff start`, `/bff join <code>`, `/bff leave` | Start, join or leave a crew |
 | `/bff code` | Show your crew code, to invite another friend |
 | `/bff name <name>` | Set the name your friends see |
-| `/bff feed`, `/bff goals`, `/bff when`, `/bff spares`, `/bff professions`, `/bff catches`, `/bff together` | Open the panel on that tab |
+| `/bff roster`, `/bff feed`, `/bff trophies`, `/bff playtimes`, `/bff spares`, `/bff professions`, `/bff dungeons`, `/bff catches`, `/bff whatsnew` | Open the panel on that tab |
 | `/bff spares add <item>` | Offer an item: type `add`, then shift-click the item in your bags |
 | `/bff settings` | Open Settings |
 | `/bff minimap` | Bring back a hidden minimap button |
-| `/bff help` | List every command |
+| `/bff help`, `/bff help <command>` | List the commands, or say more about one |
 
 ## FAQ
 

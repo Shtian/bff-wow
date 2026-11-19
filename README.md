@@ -43,7 +43,7 @@ A World of Warcraft: Forever addon for friends who don't always play at the same
 | Command | What it does |
 |---|---|
 | `/bff` | Open or close the panel (also a key binding and the minimap button) |
-| `/bff feed`, `/bff goals`, `/bff when`, `/bff spares`, `/bff professions`, `/bff together` | Open the panel on that tab |
+| `/bff roster`, `/bff feed`, `/bff trophies`, `/bff playtimes`, `/bff spares`, `/bff professions`, `/bff dungeons`, `/bff catches`, `/bff whatsnew` | Open the panel on that tab |
 | `/bff spares add <item>` | Offer an item from your bags: shift-click it in after `add` |
 | `/bff start`, `/bff join <code>`, `/bff leave` | Start, join or leave a crew |
 | `/bff code` | Show your crew code |
@@ -52,7 +52,7 @@ A World of Warcraft: Forever addon for friends who don't always play at the same
 | `/bff minimap` | Bring back a hidden minimap button |
 | `/bff report` | Open a diagnostics report (versions, link state and the recent sync log) to copy into a bug report |
 | `/bff debug sync` | Print the sync trace in chat as well: a line for each message sent and received, and for the link going up or down. Off again after a reload. The trace is always kept for `/bff report` |
-| `/bff help` | List the commands |
+| `/bff help`, `/bff help <command>` | List the commands, or say more about one |
 
 ## Install
 
