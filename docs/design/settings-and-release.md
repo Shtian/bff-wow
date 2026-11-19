@@ -17,6 +17,7 @@ A **Settings** view inside the BFF panel, drawn by `UI/SettingsTab.lua` in the p
 | Section | Setting | Default | From |
 |---|---|---|---|
 | **You** | Display name (2–16 characters) | Character name at setup | #10 |
+| | Look: a grid of head pieces, with your seated figure as a preview | none | #241 |
 | | Crew code, read-only, text selected for copying | | #10 |
 | **Sharing** | Appear offline (Pause sharing) | off | #8 |
 | | Leave Crew button (asks to confirm) | | #10 |
@@ -88,7 +89,7 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
 - **Events:** a real change fires `settingChanged(key, value)`, not `changed`; setting a value it already has fires nothing. Core's own reactions run first (Pause sharing pauses Gossip).
 - **The page:** the panel's Settings view, in a scroll view of the panel's. A section label per section (You first, drawn by hand, then one per section of `settings()`), and under it a row per setting split by Hairlines: the label on the left, wrapping in a narrow window, and the control at the right. Every on/off setting is a **switch** (DESIGN.md, Inputs), and its whole row is clickable; the rows are built in a loop from `settings()`, so a new on/off setting needs only a list entry. Settings with no section, the Dungeons tab's Show menu choices (`docs/design/together.md`) and the Catches tab's names checkbox (`docs/design/catches.md`), aren't on the page; those menus show them; nor are `pocketCampPosition`, `pocketCampScale` and `pocketCampColumns`, which dragging the Pocket Camp and its corner grip set. Map pin size is a segmented control (the chosen one on a chip), the sound a picker opening a menu with Play beside it, Move toasts and Reset BFF window small buttons, and the backdrop opacity a flat slider with its value; all read and write through `setting()` and `setSetting()`. A control greys out while what it needs is off. Leave Crew sits under Appear offline. Any `settingChanged` redraws the view while it's open.
 
-Display name isn't in the list: it's part of your Member record and spreads to the Crew.
+Display name and Look aren't in the list: they're part of your Member record and spread to the Crew.
 
 The panel's size and position (`panelPlace`, #109) is saved through Core, not the game's window-layout cache, which is applied before the panel is created. `setPanelPlace(width, height, left, top)` saves where a move or resize left it, `resetPanelPlace()` goes back to the default, and `panelPlace(screenWidth, screenHeight)` says where it opens on this screen: shrunk to fit and moved onto it, with nil `left` and `top` for centred. The grip in the panel's bottom right corner resizes it (double-click resets), and the Settings page has its Reset under Notifications and display, greyed out while the panel is at its default.
 

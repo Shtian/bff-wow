@@ -19,6 +19,12 @@ local ROW_PAD = 8
 local CONTROL_GAP = 16
 local SMALL_BUTTON = 20
 local NAME_BOX = 160
+local LOOK_CELL = 30
+local LOOK_GAP = 2
+local LOOK_COLUMNS = 8
+local LOOK_PREVIEW_GAP = 12
+local LOOK_PREVIEW_WIDTH = 32
+local LOOK_NAME_HEIGHT = 18
 local CODE_BOX = 110
 local SLIDER = 120
 local SLIDER_VALUE = 36
@@ -28,7 +34,7 @@ local onBack
 local back
 local sections
 local rows = {}
-local nameRow, codeRow, leaveRow
+local nameRow, lookRow, codeRow, leaveRow
 
 local function smallButton(parent, text, onClick)
   local button = Skin.button(parent, text, onClick)
@@ -246,6 +252,58 @@ local function nameFocusLost(box)
   if ok then showName() else nameRow.error:SetText(ns.MESSAGES[reason]) end
 end
 
+local function createLook()
+  local row = createRow("Look")
+  local control = CreateFrame("Frame", nil, row)
+  local grid = CreateFrame("Frame", nil, control)
+  local gridRows = math.ceil(#ns.Core.HATS / LOOK_COLUMNS)
+  grid:SetSize(LOOK_COLUMNS * (LOOK_CELL + LOOK_GAP) - LOOK_GAP, gridRows * (LOOK_CELL + LOOK_GAP) - LOOK_GAP)
+  grid:SetPoint("TOPRIGHT")
+  row.name = Skin.label(control, "small", MUTED)
+  row.name:SetPoint("TOPLEFT", grid, "BOTTOMLEFT", 0, -4)
+  row.preview = ns.CampScene.figure(control)
+  row.preview:SetPoint("BOTTOMRIGHT", grid, "BOTTOMLEFT", -LOOK_PREVIEW_GAP, 0)
+  row.cells = {}
+  for i, hat in ipairs(ns.Core.HATS) do
+    local cell = CreateFrame("Button", nil, grid)
+    cell:SetSize(LOOK_CELL, LOOK_CELL)
+    local column, gridRow = (i - 1) % LOOK_COLUMNS, math.floor((i - 1) / LOOK_COLUMNS)
+    cell:SetPoint("TOPLEFT", column * (LOOK_CELL + LOOK_GAP), -gridRow * (LOOK_CELL + LOOK_GAP))
+    Skin.border(cell, Skin.BORDER)
+    cell.chosen = Skin.fill(cell, Skin.CHIP)
+    Skin.fill(cell, Skin.HOVER, "HIGHLIGHT")
+    cell.art = ns.CampScene.hat(cell)
+    cell.art:SetAllPoints()
+    cell.key = hat.key
+    cell:SetScript("OnClick", function() core:setLook({ hat = hat.key }) end)
+    cell:SetScript("OnEnter", function() row.name:SetText(hat.label) end)
+    cell:SetScript("OnLeave", function() row.name:SetText(row.shownName) end)
+    row.cells[i] = cell
+  end
+  control:SetSize(grid:GetWidth() + LOOK_PREVIEW_GAP + LOOK_PREVIEW_WIDTH, grid:GetHeight() + LOOK_NAME_HEIGHT)
+  placeControl(row, control)
+  return row
+end
+
+local function ownClass()
+  for _, row in ipairs(core:rows()) do
+    if row.own then return row.classFilename end
+  end
+end
+
+local function drawLook()
+  local look = core:look()
+  local chosen = look.hat or "none"
+  for _, cell in ipairs(lookRow.cells) do
+    cell.art:SetHat(cell.key)
+    cell.chosen:SetShown(cell.key == chosen)
+  end
+  lookRow.shownName = look.label
+  lookRow.name:SetText(look.label)
+  local class = ownClass()
+  if class then lookRow.preview:SetClass(class, look.hat) else lookRow.preview:Hide() end
+end
+
 -- WoW: addons can't copy to the clipboard.
 local function createYou()
   nameRow = createRow("Display name")
@@ -263,6 +321,8 @@ local function createYou()
   nameRow.error:SetPoint("TOPRIGHT", box, "BOTTOMRIGHT", 0, -4)
   nameRow.error:SetJustifyH("RIGHT")
 
+  lookRow = createLook()
+
   codeRow = createRow("Crew code")
   local code = Skin.editBox(codeRow, CODE_BOX)
   code:SetJustifyH("CENTER")
@@ -277,7 +337,7 @@ local function createYou()
   codeRow.box = code
   placeControl(codeRow, code)
 
-  return { heading = sectionHeading("You"), rows = { nameRow, codeRow } }
+  return { heading = sectionHeading("You"), rows = { nameRow, lookRow, codeRow } }
 end
 
 local function createLeave()
@@ -317,7 +377,7 @@ local function placeRow(row, y, first, width)
   row.line:SetShown(not first)
   local labelWidth = width - 2 * INSET - row.control:GetWidth() - CONTROL_GAP
   row.label:SetWidth(math.max(60, labelWidth))
-  local height = math.max(ROW, row.label:GetStringHeight() + 2 * ROW_PAD)
+  local height = math.max(ROW, row.label:GetStringHeight() + 2 * ROW_PAD, row.control:GetHeight() + 2 * ROW_PAD)
   if row.error and row.error:GetText() ~= "" then
     row.error:SetWidth(width - 2 * INSET)
     height = height + row.error:GetStringHeight() + 4
@@ -347,6 +407,7 @@ function SettingsTab.draw(scrollView, theCore, width, backToSetup)
 
   local box = nameRow.box
   if not box:HasFocus() and nameRow.error:GetText() == "" then showName() end
+  drawLook()
   if crew and not codeRow.box:HasFocus() then
     codeRow.box.crewCode = crew.code
     codeRow.box:SetText(crew.code)

@@ -361,3 +361,17 @@ describe("Settings list", function()
     end
   end
 end)
+
+describe("Settings: your look", function()
+  it("reads your piece, and redraws your own views when it changes", function()
+    local _, clients = crew({ "Ann" })
+    local a = clients[1]
+    assert.same({ label = "None" }, a.core:look())
+    local before = a:count("changed")
+    assert.is_true(a.core:setLook({ hat = "straw" }))
+    assert.equal(before + 1, a:count("changed"))
+    assert.same({ hat = "straw", label = "Straw hat" }, a.core:look())
+    assert.is_true(a.core:setLook({ hat = "straw" }))
+    assert.equal(before + 1, a:count("changed"))
+  end)
+end)

@@ -129,6 +129,18 @@ local function tint(t, classFilename)
   t:SetVertexColor(Skin.classColor(classFilename))
 end
 
+local FOREHEAD_ROW = 2
+local BROW_TO_FOREHEAD = 2
+local HAT_MARK_LIFT = 1
+
+local function hatPlace(name, row)
+  local hat = name and Sheet.hats[name]
+  if not hat then return nil end
+  local s = Sheet.sprites[hat.sprite]
+  local top = row + Sheet.sprites.seated[4] - FOREHEAD_ROW + hat.brow + BROW_TO_FOREHEAD
+  return { sprite = hat.sprite, x = math.floor((LAYOUT.seated - s[3]) / 2), bottom = top - s[4], top = top }
+end
+
 function CampScene.figure(parent)
   local frame = CreateFrame("Frame", nil, parent)
   frame.target = CampScene.FIGURE_TARGET
@@ -136,17 +148,27 @@ function CampScene.figure(parent)
   frame.cloth:SetPoint("BOTTOMLEFT")
   frame.skin = texture(frame, "ARTWORK", 1)
   frame.skin:SetPoint("BOTTOMLEFT")
+  frame.hat = texture(frame, "ARTWORK", 2)
   function frame:Layout()
     local unit = CampScene.artUnit(self, self.target)
     local s = Sheet.sprites.seated
-    self:SetSize(s[3] * unit, s[4] * unit)
+    local hat = hatPlace(self.hatName, 0)
+    self:SetSize(s[3] * unit, math.max(s[4], hat and hat.top or 0) * unit)
     setSprite(self.cloth, "seatedCloth", unit)
     setSprite(self.skin, "seated", unit)
+    if hat then
+      setSprite(self.hat, hat.sprite, unit)
+      self.hat:ClearAllPoints()
+      self.hat:SetPoint("BOTTOMLEFT", hat.x * unit, hat.bottom * unit)
+    else
+      self.hat:Hide()
+    end
   end
   function frame:SetTarget(target)
     self.target = target
   end
-  function frame:SetClass(classFilename)
+  function frame:SetClass(classFilename, hat)
+    self.hatName = hat
     self:Layout()
     tint(self.cloth, classFilename)
     self:Show()
@@ -171,6 +193,18 @@ local function setSpriteBottom(t, name, unit, rows)
   t.sprite = name .. " bottom"
   t:SetSize(s[3] * unit, rows * unit)
   t:Show()
+end
+
+function CampScene.hat(parent)
+  local frame = CreateFrame("Frame", nil, parent)
+  frame.art = texture(frame, "ARTWORK", 0)
+  frame.art:SetPoint("CENTER")
+  function frame:SetHat(name)
+    local hat = Sheet.hats[name]
+    if not hat then return self.art:Hide() end
+    setSprite(self.art, hat.sprite, CampScene.artUnit(self, CampScene.FIGURE_TARGET))
+  end
+  return frame
 end
 
 function CampScene.head(parent)
@@ -342,6 +376,17 @@ local function hideExtras(parts)
   parts.back:SetAlpha(1)
 end
 
+local function drawHat(scene, parts, actor, x, row, mirrored)
+  local hat = hatPlace(actor.hat, row)
+  if not hat then
+    parts.hat:Hide()
+    return nil
+  end
+  setSprite(parts.hat, hat.sprite, scene.unit, mirrored)
+  put(scene, parts.hat, x + hat.x, hat.bottom)
+  return hat.top
+end
+
 local function drawArrival(scene, parts, actor, f, played)
   local unit, x = scene.unit, actor.x
   local pose = POSE[actor.pose] or {}
@@ -364,12 +409,13 @@ local function drawArrival(scene, parts, actor, f, played)
   setSprite(parts.skin, sprite .. frame, unit, fromRight)
   put(scene, parts.cloth, x, ROW.standing)
   put(scene, parts.skin, x, ROW.standing)
+  local hatTop = drawHat(scene, parts, actor, x, ROW.standing, fromRight)
   local top = ROW.standing + Sheet.sprites.seated[4]
   if not walking then
     setSprite(parts.mark, "hi", unit)
-    put(scene, parts.mark, x + HI.x, markRow(scene, "hi", top + HI.row))
+    put(scene, parts.mark, x + HI.x, markRow(scene, "hi", top + HI.row + (hatTop and HAT_MARK_LIFT or 0)))
   end
-  return x, top
+  return x, top, hatTop
 end
 
 local function drawForm(scene, parts, actor, f)
@@ -464,14 +510,15 @@ end
 
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
-  local top
+  local top, hatTop
   local walkedIn = actor.pose ~= "asleep" and playing(scene, "arrive", actor.memberId)
   local welcomed = not walkedIn and actor.pose ~= "asleep" and playing(scene, "welcome", actor.memberId) ~= nil
   if walkedIn or welcomed then
-    x, top = drawArrival(scene, parts, actor, f, walkedIn)
+    x, top, hatTop = drawArrival(scene, parts, actor, f, walkedIn)
   elseif actor.form and not playing(scene, "death", actor.memberId) then
     parts.seat:Hide()
     parts.cloth:Hide()
+    parts.hat:Hide()
     hideExtras(parts)
     top = drawForm(scene, parts, actor, f)
     local alpha = parts.skin:GetAlpha()
@@ -504,8 +551,10 @@ local function drawActor(scene, parts, actor, f)
     end
     put(scene, parts.cloth, x, row)
     put(scene, parts.skin, x, row)
+    if dead then parts.hat:Hide() else hatTop = drawHat(scene, parts, actor, x, row) end
     for _, z in ipairs(parts.sleep) do z:Hide() end
     top = row + Sheet.sprites.seated[4]
+    local markTop = top + (hatTop and HAT_MARK_LIFT or 0)
     if pose.tool then posePart(scene, parts.tool, actor, pose.tool, row) else parts.tool:Hide() end
     if pose.back then
       posePart(scene, parts.back, actor, pose.back, row)
@@ -519,14 +568,15 @@ local function drawActor(scene, parts, actor, f)
       parts.front:Hide()
     end
     drawCheer(scene, parts, actor, top, not dead and hopping(scene, actor))
-    local marked = drawAnimations(scene, parts, actor, f, row, top, pose.away)
+    local marked = drawAnimations(scene, parts, actor, f, row, markTop, pose.away)
     if actor.onAlt and not dead and not marked then
-      drawAlt(scene, parts, actor, math.max(top, partTop(pose.tool, row) - ALT.row, partTop(pose.back, row) - ALT.row))
+      drawAlt(scene, parts, actor, math.max(markTop, partTop(pose.tool, row) - ALT.row, partTop(pose.back, row) - ALT.row))
     else
       parts.alt:Hide()
     end
   else
     parts.seat:Hide()
+    parts.hat:Hide()
     hideExtras(parts)
     setSprite(parts.cloth, "asleepCloth", scene.unit)
     setSprite(parts.skin, "asleep", scene.unit)
@@ -552,7 +602,8 @@ local function drawActor(scene, parts, actor, f)
   local centre = x + actor.width / 2
   local label = parts.label
   label:ClearAllPoints()
-  label:SetPoint("BOTTOM", scene.art, "BOTTOMLEFT", (scene.fire + centre) * scene.unit, (top + LABEL_GAP) * scene.unit)
+  local labelRow = math.max(top, hatTop or top) + LABEL_GAP
+  label:SetPoint("BOTTOM", scene.art, "BOTTOMLEFT", (scene.fire + centre) * scene.unit, labelRow * scene.unit)
   label:SetWidth(actor.labelWidth * scene.unit)
   local text
   if scene.gains then text = actor.gained elseif scene.names then text = actor.label end
@@ -754,6 +805,7 @@ function CampScene.new(parent, options)
         seat = texture(band.art, "ARTWORK", 0),
         cloth = texture(band.art, "ARTWORK", 1),
         skin = texture(band.art, "ARTWORK", 2),
+        hat = texture(band.art, "ARTWORK", 3),
         sleep = {
           texture(band.art, "ARTWORK", 2),
           texture(band.art, "ARTWORK", 2),

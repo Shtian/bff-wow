@@ -82,6 +82,7 @@ local function rowFor(record, characters, online, yourLevel, now)
   row.playing = online
   row.memberId = record.id
   row.displayName = record.displayName
+  row.hat = ns.Look.hat(record.look)
   row.online = online
   row.onAlt = shown ~= main
   row.mainSet = record.main ~= nil and record.main == main.guid
