@@ -19,6 +19,7 @@ Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
 Core.DUNGEONS = ns.Together.DUNGEONS
 Core.TOGETHER_LAYOUT = ns.Together.LAYOUT
 Core.CAMP_LAYOUT = ns.Camp.LAYOUT
+Core.HATS = ns.Look.HATS
 Core.FINAL_BOSSES = ns.Clears.FINAL_BOSSES
 
 Core.grouped = ns.Text.grouped
@@ -195,7 +196,7 @@ local function liveEntry(self, entry)
   local described = self.log:describe(entry)
   if described.memberId and described.kind ~= "rareFind" and self:setting("camp") then
     for _, row in ipairs(ns.Roster.rows(self.ledger, self.now())) do
-      if row.memberId == described.memberId then described.figure = row.classFilename end
+      if row.memberId == described.memberId then described.figure, described.hat = row.classFilename, row.hat end
     end
   end
   return described
@@ -1502,6 +1503,23 @@ function Core:setDisplayName(displayName)
   if not name then return nil, "invalidName" end
   if name ~= self.ledger:displayName() then
     self.ledger:writeOwn({ displayName = name })
+    sendOwnNow(self)
+    self.listener("changed")
+  end
+  return true
+end
+
+function Core:look()
+  local hat = ns.Look.hat(self.ledger:own() and self.ledger:own().look)
+  return { hat = hat }
+end
+
+function Core:setLook(look)
+  local key = type(look) == "table" and look.hat or nil
+  if not ns.Look.known(key) then return nil, "unknownHat" end
+  local hat = key ~= "none" and key or nil
+  if hat ~= self:look().hat then
+    self.ledger:writeOwn({ look = hat and { hat = hat } or false })
     sendOwnNow(self)
     self.listener("changed")
   end

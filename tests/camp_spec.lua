@@ -389,10 +389,17 @@ describe("The Camp", function()
       b:play({ level = 11 })
       net:run(15)
       assert.equal("MAGE", lastEntry().figure)
-      a.core:setSetting("camp", false)
+      assert.is_nil(lastEntry().hat)
+      b.core:setLook({ hat = "fez" })
+      net:run(5)
       b:play({ level = 12 })
       net:run(15)
+      assert.equal("fez", lastEntry().hat)
+      a.core:setSetting("camp", false)
+      b:play({ level = 13 })
+      net:run(15)
       assert.is_nil(lastEntry().figure)
+      assert.is_nil(lastEntry().hat)
     end)
   end)
 
@@ -409,5 +416,97 @@ describe("The Camp", function()
     net:step()
     assert.equal(mark, #net.wire)
     assert.same({}, a.events)
+  end)
+end)
+
+describe("Head pieces", function()
+  local function hatOf(viewer, client)
+    return actorFor(viewer.core:camp(COLUMNS), client).hat
+  end
+
+  local function receive(client, ns, net, from, record)
+    record.version = record.version or net:now()
+    record.characters = record.characters or {
+      ["Player-0-" .. record.id] = { guid = "Player-0-" .. record.id, name = record.id, level = 20, lastPlayed = net:now() },
+    }
+    client.core:received(ns.Codec.encode({ type = "DATA", from = from, records = { record } }))
+  end
+
+  it("lists the pieces with their names, none first", function()
+    local hats = load().Core.HATS
+    assert.same({ key = "none", label = "None" }, hats[1])
+    local keys = {}
+    for _, hat in ipairs(hats) do keys[#keys + 1] = hat.key end
+    assert.same({ "none", "templar", "centurion", "dwarf", "wolfskin", "coonskin", "cowboy", "straw", "fez", "beret",
+      "circlet", "bandana", "cap", "wizard", "horns", "tophat" }, keys)
+  end)
+
+  it("are written to your record and sent, and reach the others' Camps", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    assert.is_nil(a.core:look().hat)
+    local mark = #net.wire
+    assert.is_true(a.core:setLook({ hat = "wizard" }))
+    assert.equal("wizard", a.core:look().hat)
+    net:step()
+    assert.is_true(#net.wire > mark)
+    net:run(5)
+    assert.equal("wizard", hatOf(b, a))
+    assert.equal("wizard", hatOf(a, a))
+    assert.is_nil(hatOf(a, b))
+  end)
+
+  it("go back to none, and refuse a piece that isn't on the list", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+    a.core:setLook({ hat = "fez" })
+    net:run(5)
+    assert.same({ nil, "unknownHat" }, { a.core:setLook({ hat = "crown" }) })
+    assert.equal("fez", a.core:look().hat)
+    assert.is_true(a.core:setLook({ hat = "none" }))
+    net:run(5)
+    assert.is_nil(a.core:look().hat)
+    assert.is_nil(hatOf(b, a))
+  end)
+
+  it("send nothing when the piece doesn't change", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    a.core:setLook({ hat = "beret" })
+    net:run(5)
+    local version = a.core.ledger:own().version
+    assert.is_true(a.core:setLook({ hat = "beret" }))
+    assert.equal(version, a.core.ledger:own().version)
+  end)
+
+  it("read as none when unknown or malformed, keeping the rest of the record", function()
+    local net, clients, ns = crew({ "Ann" })
+    local a = clients[1]
+    receive(a, ns, net, "newer", { id = "newer", displayName = "Newer", look = { hat = "monocle", pet = "cat" } })
+    receive(a, ns, net, "junk", { id = "junk", displayName = "Junk", look = "tophat" })
+    receive(a, ns, net, "badhat", { id = "badhat", displayName = "Badhat", look = { hat = 7 } })
+    for _, id in ipairs({ "newer", "junk", "badhat" }) do
+      local row = a:rowFor({ memberId = id })
+      assert.equal(20, row.level)
+      assert.is_nil(row.hat)
+    end
+  end)
+
+  it("survive a merge relayed by another client", function()
+    local net, clients, ns = crew({ "Ann" })
+    local a = clients[1]
+    receive(a, ns, net, "relay", { id = "far", displayName = "Far", look = { hat = "straw", pet = "cat" } })
+    assert.equal("straw", a:rowFor({ memberId = "far" }).hat)
+    assert.same({ hat = "straw", pet = "cat" }, a.core.ledger.db.records.far.look)
+  end)
+
+  it("are kept on your record when you leave and join again", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a = clients[1]
+    a.core:setLook({ hat = "horns" })
+    net:run(5)
+    a.core:leaveCrew()
+    net:run(5)
+    assert.equal("horns", a.core:look().hat)
   end)
 end)

@@ -191,6 +191,7 @@ function Camp.view(rows, entries, now, columns, options)
         pose = seated and "seated" or "asleep",
         label = row.own and "You" or row.displayName or row.name,
         classFilename = row.classFilename,
+        hat = row.hat,
         x = x,
         width = figure,
         side = side.sign,

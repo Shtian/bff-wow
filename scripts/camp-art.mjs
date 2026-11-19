@@ -82,6 +82,137 @@ function outlined(rows) {
   return out;
 }
 
+// Head pieces (docs/design/camp.md, Head pieces), from the prototype
+// (prototypes/look-hats.html on the prototype/241-head-pieces branch):
+// fill-only grids, outlined like the tools, in PAL plus HAT_PAL. Untinted,
+// drawn over a figure's head. brow is the fill row whose underside sits on
+// the seated figure's forehead (its row 2), so CampScene can place each one
+// on any pose; CampSheet.hats carries it.
+const HAT_PAL = {
+  x: "#1d1b26", X: "#34303f", q: "#55506a",
+  g: "#2c5a33", h: "#468a46", i: "#6db35e",
+  v: "#2c1d4f", V: "#45307e", u: "#6f55b5",
+  d: "#1c2440", e: "#2c3a66", E: "#4a5d94",
+};
+const HATS = [
+  { key: "templar", brow: 3, rows: [
+    "....GO....",
+    "...ZGOT...",
+    "..ZNGOTt..",
+    ".ZNZGOTTt.",
+    ".ZZZGOTTt.",
+    "GGGGGGGGGO",
+    "ZKKKGOKKKt",
+    "GGGGGGGGOO",
+    ".TKTGOKTt.",
+  ] },
+  { key: "centurion", brow: 3, rows: [
+    "...RRRR...",
+    "....rR....",
+    "...ZZZT...",
+    "..ZNZZTt..",
+    ".ZNZZZTTt.",
+    ".ZZZZZTTt.",
+    "ZKKKKKKKKt",
+    "ZZZTKKZTTt",
+    ".ZZTKKTTt.",
+    ".ZT.KK.Tt.",
+  ] },
+  { key: "dwarf", brow: 2, rows: [
+    "...TZZT...",
+    "..TZNZTt..",
+    ".TZZZTTTt.",
+    "GGGGGGGGGO",
+    "T...GO...t",
+    "T...GO...t",
+    "aAaaaaaaAa",
+    ".aaAaaAaa.",
+    "...aaaa...",
+  ] },
+  { key: "wolfskin", brow: 4, rows: [
+    ".Tt....tT.",
+    "..TTTTTT..",
+    ".TYTTTTYT.",
+    ".tTTZZTTt.",
+    "TtTNZZNTtT",
+    "Tt......tT",
+    "t........t",
+  ] },
+  { key: "coonskin", brow: 3, rows: [
+    ".aAAAAAAa.",
+    ".AAaAAaAA.",
+    ".AaAAaAAAB",
+    ".BBBBBBBBA",
+    ".........b",
+    ".........A",
+    ".........b",
+  ] },
+  { key: "cowboy", brow: 4, rows: [
+    "....AAAA....",
+    "...AaAAAA...",
+    "...bbbbbb...",
+    "a..AAAAAA..a",
+    "aAAAAAAAAAAa",
+  ] },
+  { key: "straw", brow: 4, rows: [
+    "....GYYG....",
+    "...GYWYYGO..",
+    "...RRRRRR...",
+    ".OGYYYYYYGO.",
+    "aOGGGGGGGGOa",
+  ] },
+  { key: "fez", brow: 3, rows: [
+    "...RRRRr..",
+    "...RORRrG.",
+    "...RORRrG.",
+    "..RRRRRRr.",
+  ] },
+  { key: "beret", brow: 3, rows: [
+    ".....d....",
+    "..dEeeed..",
+    ".dEeeeeeed",
+    "..dddddddd",
+  ] },
+  { key: "circlet", brow: 1, rows: [
+    "....YG....",
+    ".GOGFfGOG.",
+  ] },
+  { key: "bandana", brow: 2, rows: [
+    "...RRRR...",
+    "..ROORRR..",
+    ".rRRRRRRrR",
+    "........rR",
+    ".........r",
+  ] },
+  { key: "cap", brow: 4, rows: [
+    ".........R",
+    "...hhh..RO",
+    "..hiihhRO.",
+    ".ghhhhhRhg",
+    "gggggggggg",
+  ] },
+  { key: "wizard", brow: 4, rows: [
+    "......vv..",
+    ".....uV...",
+    "...vuVVv..",
+    "..vuVGVVv.",
+    "vvuuVVVVvv",
+  ] },
+  { key: "horns", brow: 3, rows: [
+    "N........N",
+    "N..TZZT..N",
+    "NNTZZTTTNN",
+    ".tTTTTTTt.",
+  ] },
+  { key: "tophat", brow: 4, rows: [
+    "..XXXXXX..",
+    "..XqXXXx..",
+    "..XqXXXx..",
+    "..rrrrrr..",
+    "xXXXXXXXXx",
+  ] },
+];
+
 // What a Member is doing, for the Pocket Camp (docs/design/pocket-camp.md).
 // Held in a standing figure's raised hand: a blade (fighting), a torch (in
 // a dungeon or raid), a hammer (crafting) and a pick (gathering).
@@ -351,6 +482,8 @@ function paint(rows, palette) {
 const skin = (rows) => paint(rows, PAL);
 const cloth = (rows, tones) => rows.map((row) => [...row].map((ch) => tones[ch] || null));
 
+const hatSprite = (key) => "hat" + key[0].toUpperCase() + key.slice(1);
+
 const SPRITES = [
   ["seatedCloth", cloth(SIT, CLOTH)], ["seated", skin(SIT)],
   ["hopCloth", cloth(HOP, CLOTH)], ["hop", skin(HOP)],
@@ -387,6 +520,7 @@ const SPRITES = [
   ["moonkin1", form(MOONKIN[0], "moonkin")], ["moonkin2", form(MOONKIN[1], "moonkin")],
   ["leaves1", paint(LEAVES[0], FORM_PAL.leaves)], ["leaves2", paint(LEAVES[1], FORM_PAL.leaves)],
   ["spirit1", paint(SPIRIT[0], FORM_PAL.spirit)], ["spirit2", paint(SPIRIT[1], FORM_PAL.spirit)],
+  ...HATS.map((hat) => [hatSprite(hat.key), paint(outlined(hat.rows), { ...PAL, ...HAT_PAL })]),
 ];
 
 function hex(color) {
@@ -831,6 +965,9 @@ ${lines.join("\n")}
     art = {
 ${vignetteLines.join("\n")}
     },
+  },
+  hats = {
+${HATS.map((hat) => `    ${hat.key} = { sprite = "${hatSprite(hat.key)}", brow = ${hat.brow} },`).join("\n")}
   },
   sky = { ${skyR}, ${skyG}, ${skyB} },
 }

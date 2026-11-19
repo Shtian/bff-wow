@@ -25,6 +25,7 @@ Core/CrewCode.lua
 Core/PlayTimes.lua
 Core/Professions.lua
 Core/Catches.lua
+Core/Look.lua
 Core/Ledger.lua
 Core/Gossip.lua
 Core/Settle.lua

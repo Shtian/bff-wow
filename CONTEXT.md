@@ -26,6 +26,10 @@ _Avoid_: Quit, unsubscribe
 The name a Member chooses to be shown as, independent of their Characters' names.
 _Avoid_: Nickname, username
 
+**Look**:
+What a Member chooses for their Camp figure to wear, so far a **head piece** (a hat or helmet, or none). Part of their record, so the whole Crew sees it.
+_Avoid_: Skin, cosmetic, outfit, avatar
+
 **Character**:
 One in-game character owned by a Member.
 _Avoid_: Toon, player, alt (when meaning any character)

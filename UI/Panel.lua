@@ -326,7 +326,7 @@ local function drawRow(row, data)
   setDot(row.dot, data.online)
   row.icon:SetAtlas("classicon-" .. (data.classFilename or ""):lower())
   row.icon:SetShown(not camp:IsShown())
-  if camp:IsShown() then row.figure:SetClass(data.classFilename) else row.figure:Hide() end
+  if camp:IsShown() then row.figure:SetClass(data.classFilename, data.hat) else row.figure:Hide() end
   row.name:SetText(data.name)
   row.name:SetTextColor(classColor(data.classFilename))
   row.level:SetText(data.level)

@@ -166,7 +166,7 @@ end
 function Ledger:writeOwn(fields)
   local record = ownRecord(self)
   local changed = false
-  for _, field in ipairs({ "displayName", "left", "main", "joinedAt", "bff" }) do
+  for _, field in ipairs({ "displayName", "left", "main", "joinedAt", "bff", "look" }) do
     local value = fields[field]
     if value ~= nil and (value or nil) ~= record[field] then
       record[field] = value or nil

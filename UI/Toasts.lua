@@ -139,7 +139,7 @@ local function drawToast(frame, toast)
   frame.picture:SetShown(entry ~= nil)
   frame.picture:SetAlpha(figure and 0 or 1)
   frame.icon:SetShown(entry == nil)
-  if figure then frame.figure:SetClass(figure) else frame.figure:Hide() end
+  if figure then frame.figure:SetClass(figure, entry.hat) else frame.figure:Hide() end
   if entry then
     drawPicture(frame, entry)
     frame.text:SetText(entry.text)
