@@ -407,7 +407,7 @@ local function drawEmpty(empty, width, y)
     view.empty:Hide()
     return y
   end
-  view.empty:Set(ns.EmptyState.pick(core:crew(), { art = "catches", title = empty.title, text = empty.text },
+  view.empty:Set(ns.EmptyState.view({ art = "catches", title = empty.title, text = empty.text },
     not core:setting("camp")))
   view.empty:ClearAllPoints()
   view.empty:SetPoint("TOPLEFT", 0, y - EMPTY_PAD)

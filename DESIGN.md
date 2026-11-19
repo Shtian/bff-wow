@@ -388,10 +388,10 @@ The vignettes are 40×22 art pixels each, drawn at the Camp band's art unit (a w
 | Spare Items | no Crew Spares | the crate, emptied, its lid off | The crate is empty | Got something your Crew could use? Drop it on the slot below. | the drop slot already there |
 | Professions | nobody in the Crew has one | an anvil on a stump | No trades yet | When anyone learns a profession, it shows up here with their skill. | none |
 | Catches | Core's `empty` | a rod over a pond | Core's words (No catches yet, with the waters for your level) | | none |
-| any of these, and the Roster | alone, you started the Crew | a log by the fire, nobody on it | Your Crew hasn't arrived yet | Give your friends the Crew code. They join with /bff join, and show up here once one of them is online. | the Crew code in a read-only box that selects on focus, "Ctrl+C to copy" under it |
+| the Roster | alone, you started the Crew | a log by the fire, nobody on it | Your Crew hasn't arrived yet | Give your friends the Crew code. They join with /bff join, and show up here once one of them is online. | the Crew code in a read-only box that selects on focus, "Ctrl+C to copy" under it |
 | the same | alone, you joined with a code | the same | Waiting for the Crew | You're in. The rest of the Crew shows up here once one of them is online. | none |
 
-The alone state wins over a view's own while you're the only Member known (`crew().alone`); Catches and Professions count your own data, so they're only empty while you have none either. On the Roster it's a card under your own row, and the footer's "Waiting for your Crew" line goes while it shows. Dungeons, Catches' Nothing to show, a single Member's Play Times notes, What's new and Settings keep their own words.
+The alone state shows only on the Roster, while you're the only Member known (`crew().alone`): a card under your own row and its alts, and the footer's "Waiting for your Crew" line goes while it shows. The other tabs keep their own vignette while you're alone, so each still says what will fill it; the same campfire on every tab hid them. Catches and Professions count your own data, so they're only empty while you have none either. Dungeons, Catches' Nothing to show, a single Member's Play Times notes, What's new and Settings keep their own words.
 
 The panel before joining a Crew is a 320px block centred in the window: Display name across, then Start a Crew and Join a Crew in two 150px columns split by a vertical Hairline.
 

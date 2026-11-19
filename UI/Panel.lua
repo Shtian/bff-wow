@@ -107,7 +107,7 @@ local expanded = {}
 local classColor = Skin.classColor
 
 local function emptyState(own)
-  return ns.EmptyState.pick(core:crew(), own, not core:setting("camp"))
+  return ns.EmptyState.view(own, not core:setting("camp"))
 end
 
 local function contentWidth()
@@ -1896,13 +1896,6 @@ local function drawRoster(crew, summary)
     place(row, y)
     drawRow(row, data)
     y = y - ROW_HEIGHT
-    if data.own and crew.alone then
-      rosterView.alone:Set(emptyState(nil))
-      rosterView.alone:ClearAllPoints()
-      rosterView.alone:SetPoint("TOPLEFT", rosterView.content, "TOPLEFT", 0, y - ALONE_CARD_PAD)
-      rosterView.alone:Show()
-      y = y - ALONE_CARD_PAD - rosterView.alone:Layout(listWidth()) - ALONE_CARD_PAD
-    end
     if expanded[data.memberId] then
       for _, altData in ipairs(data.alts) do
         altCount = altCount + 1
@@ -1911,6 +1904,13 @@ local function drawRoster(crew, summary)
         drawAlt(alt, data, altData)
         y = y - ALT_HEIGHT
       end
+    end
+    if data.own and crew.alone then
+      rosterView.alone:Set(ns.EmptyState.alone(crew, not core:setting("camp")))
+      rosterView.alone:ClearAllPoints()
+      rosterView.alone:SetPoint("TOPLEFT", rosterView.content, "TOPLEFT", 0, y - ALONE_CARD_PAD)
+      rosterView.alone:Show()
+      y = y - ALONE_CARD_PAD - rosterView.alone:Layout(listWidth()) - ALONE_CARD_PAD
     end
   end
   hideAll(rowFrames, rowCount + 1)
