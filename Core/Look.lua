@@ -22,19 +22,50 @@ Look.HATS = {
   { key = "tophat", label = "Top hat" },
 }
 
-local labels = {}
-for _, hat in ipairs(Look.HATS) do labels[hat.key] = hat.label end
+Look.PETS = {
+  { key = "none", label = "None" },
+  { key = "cat", label = "Cat" },
+  { key = "dog", label = "Dog" },
+  { key = "owl", label = "Owl" },
+  { key = "frog", label = "Frog" },
+  { key = "rabbit", label = "Rabbit" },
+  { key = "fox", label = "Fox" },
+}
+
+local function labelsOf(list)
+  local labels = {}
+  for _, item in ipairs(list) do labels[item.key] = item.label end
+  return labels
+end
+
+local hatLabels, petLabels = labelsOf(Look.HATS), labelsOf(Look.PETS)
+
+local function chosen(labels, look, field)
+  if type(look) ~= "table" then return nil end
+  local key = look[field]
+  return key ~= "none" and labels[key] and key or nil
+end
 
 function Look.known(key)
-  return labels[key] ~= nil
+  return hatLabels[key] ~= nil
 end
 
 function Look.label(key)
-  return labels[key or "none"]
+  return hatLabels[key or "none"]
 end
 
 function Look.hat(look)
-  if type(look) ~= "table" then return nil end
-  local key = look.hat
-  return key ~= "none" and labels[key] and key or nil
+  return chosen(hatLabels, look, "hat")
+end
+
+function Look.knownPet(key)
+  return petLabels[key] ~= nil
+end
+
+function Look.petLabel(key)
+  return petLabels[key or "none"]
+end
+
+function Look.pet(look)
+  return chosen(petLabels, look, "pet")
 end

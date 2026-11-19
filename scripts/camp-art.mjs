@@ -213,6 +213,54 @@ const HATS = [
   ] },
 ];
 
+// Pets (docs/design/camp.md, Pets), from the prototype
+// (prototypes/camp-pets.html on the prototype/242-pets branch), its large
+// size: fill-only grids facing right, outlined like the tools, in PAL plus
+// PET_PAL. Each has an awake sprite, its idle's second frame (a blink, a
+// wag, an ear twitch or a tail flick) and a curled-up asleep one, no wider
+// than Core's LAYOUT.pet outlined. CampScene mirrors them on the fire's
+// right, so they face their Member.
+const PET_PAL = { g: "#2c5a33", h: "#468a46", i: "#9bd47a", c: "#b8501c" };
+const PETS = {
+  cat: {
+    sit: [".....T..T", ".....TTTT", "t....YTYT", "t....TPTT", ".t..TTTTT", ".tTTTTTNT", "..TTTTTNT", "..TtTtTTT"],
+    idle: [".....T..T", ".....TTTT", "t....tTtT", "t....TPTT", ".t..TTTTT", ".tTTTTTNT", "..TTTTTNT", "..TtTtTTT"],
+    asleep: [".......T.T", "...TTTTTTT", "..TtTTTtTt", ".TTTtTTTTP", "tTTTTtTTTT", ".ttttttttt"],
+  },
+  dog: {
+    sit: ["....AAAA..", "...aAAKAAA", "...aAAAANK", "a..aAAAN..", "a..AAANN..", ".AAAAANN..", ".AAAAAAN..", ".AaAAAaA.."],
+    idle: ["....AAAA..", "a..aAAKAAA", "a..aAAAANK", ".a.aAAAN..", "..AAAANN..", ".AAAAANN..", ".AAAAAAN..", ".AaAAAaA.."],
+    asleep: [".....AAA...", "....aAAaAA.", "..AAaAAaANK", ".aAAAAAAANN", "aAAAAAAANNN"],
+  },
+  owl: {
+    sit: ["bb.....bb", ".bBBBBBb.", "BNNBBBNNB", "NYKNBNKYN", "BNNBOBNNB", "BBBBOBBBB", ".BAbAbAB.", ".BbAbAbB.", "..O...O.."],
+    idle: ["bb.....bb", ".bBBBBBb.", "BNNBBBNNB", "NbbNBNbbN", "BNNBOBNNB", "BBBBOBBBB", ".BAbAbAB.", ".BbAbAbB.", "..O...O.."],
+    asleep: [".bBBBBBb.", "BNNBBBNNB", "NbbNBNbbN", "BNNBOBNNB", "BBBBBBBBB", ".BAbAbAB.", "..BBBBB.."],
+  },
+  frog: {
+    sit: [".WW...WW.", "WKWhhhWKW", "hhhhhhhhh", "hgggggggh", "hhhiiihhh", "ghhiiihhg", "hhg...ghh"],
+    idle: [".hh...hh.", "hgghhhggh", "hhhhhhhhh", "hgggggggh", "hhiiiiihh", "ghiiiiihg", "hhg...ghh"],
+    asleep: [".gg...gg.", "hhhhhhhhh", "hgggggggh", "hhhiiihhh", "hhg...ghh"],
+  },
+  rabbit: {
+    sit: [".....NP..", ".....NP..", ".....NP..", "....NNNN.", "....NKNNP", "N..NNNNN.", "NNNNNNNZ.", "NNNNNNN..", ".ZNNZNN.."],
+    idle: ["....NP...", "....NP...", ".....NP..", "....NNNN.", "....NKNNP", "N..NNNNN.", "NNNNNNNZ.", "NNNNNNN..", ".ZNNZNN.."],
+    asleep: ["....NPPPN..", "..NNNNNNNN.", ".NNNNNNNZNP", "NNNNNNNNNN.", ".ZNNNNNNZ.."],
+  },
+  fox: {
+    sit: ["......R.R..", "......OOO..", "N.....OKOOK", "NO....OONN.", "OO...OOON..", "OO..OOOON..", ".OOOOOOON..", "..ObOObON.."],
+    idle: ["......R.R..", "......OOO..", "......cOcOK", "NN....OONN.", "OOO..OOON..", ".OO.OOOON..", ".OOOOOOON..", "..ObOObON.."],
+    asleep: [".......R.R.", "....OOOOOO.", "..OOOOOOcOK", ".OOOOOOOONN", "OOOOOOOONNN", "NNNOOOOOOb."],
+  },
+};
+const PET_WIDTH = 13;
+const petSprite = (key, frame) => "pet" + key[0].toUpperCase() + key.slice(1) + (frame || "");
+for (const [key, pet] of Object.entries(PETS)) {
+  for (const rows of Object.values(pet)) {
+    if (outlined(rows)[0].length > PET_WIDTH) throw new Error(`${key} is wider than LAYOUT.pet`);
+  }
+}
+
 // What a Member is doing, for the Pocket Camp (docs/design/pocket-camp.md).
 // Held in a standing figure's raised hand: a blade (fighting), a torch (in
 // a dungeon or raid), a hammer (crafting) and a pick (gathering).
@@ -521,6 +569,11 @@ const SPRITES = [
   ["leaves1", paint(LEAVES[0], FORM_PAL.leaves)], ["leaves2", paint(LEAVES[1], FORM_PAL.leaves)],
   ["spirit1", paint(SPIRIT[0], FORM_PAL.spirit)], ["spirit2", paint(SPIRIT[1], FORM_PAL.spirit)],
   ...HATS.map((hat) => [hatSprite(hat.key), paint(outlined(hat.rows), { ...PAL, ...HAT_PAL })]),
+  ...Object.entries(PETS).flatMap(([key, pet]) => [
+    [petSprite(key), paint(outlined(pet.sit), { ...PAL, ...PET_PAL })],
+    [petSprite(key, "Idle"), paint(outlined(pet.idle), { ...PAL, ...PET_PAL })],
+    [petSprite(key, "Asleep"), paint(outlined(pet.asleep), { ...PAL, ...PET_PAL })],
+  ]),
 ];
 
 function hex(color) {
@@ -968,6 +1021,9 @@ ${vignetteLines.join("\n")}
   },
   hats = {
 ${HATS.map((hat) => `    ${hat.key} = { sprite = "${hatSprite(hat.key)}", brow = ${hat.brow} },`).join("\n")}
+  },
+  pets = {
+${Object.keys(PETS).map((key) => `    ${key} = { awake = "${petSprite(key)}", idle = "${petSprite(key, "Idle")}", asleep = "${petSprite(key, "Asleep")}" },`).join("\n")}
   },
   sky = { ${skyR}, ${skyG}, ${skyB} },
 }

@@ -23,7 +23,7 @@ local LOOK_CELL = 30
 local LOOK_GAP = 2
 local LOOK_COLUMNS = 8
 local LOOK_PREVIEW_GAP = 12
-local LOOK_PREVIEW_WIDTH = 32
+local LOOK_PREVIEW_WIDTH = 56
 local LOOK_NAME_HEIGHT = 18
 local CODE_BOX = 110
 local SLIDER = 120
@@ -252,19 +252,14 @@ local function nameFocusLost(box)
   if ok then showName() else nameRow.error:SetText(ns.MESSAGES[reason]) end
 end
 
-local function createLook()
-  local row = createRow("Look")
-  local control = CreateFrame("Frame", nil, row)
+local function lookGrid(control, items, makeArt, choose)
   local grid = CreateFrame("Frame", nil, control)
-  local gridRows = math.ceil(#ns.Core.HATS / LOOK_COLUMNS)
+  local gridRows = math.ceil(#items / LOOK_COLUMNS)
   grid:SetSize(LOOK_COLUMNS * (LOOK_CELL + LOOK_GAP) - LOOK_GAP, gridRows * (LOOK_CELL + LOOK_GAP) - LOOK_GAP)
-  grid:SetPoint("TOPRIGHT")
-  row.name = Skin.label(control, "small", MUTED)
-  row.name:SetPoint("TOPLEFT", grid, "BOTTOMLEFT", 0, -4)
-  row.preview = ns.CampScene.figure(control)
-  row.preview:SetPoint("BOTTOMRIGHT", grid, "BOTTOMLEFT", -LOOK_PREVIEW_GAP, 0)
-  row.cells = {}
-  for i, hat in ipairs(ns.Core.HATS) do
+  grid.name = Skin.label(control, "small", MUTED)
+  grid.name:SetPoint("TOPLEFT", grid, "BOTTOMLEFT", 0, -4)
+  grid.cells = {}
+  for i, item in ipairs(items) do
     local cell = CreateFrame("Button", nil, grid)
     cell:SetSize(LOOK_CELL, LOOK_CELL)
     local column, gridRow = (i - 1) % LOOK_COLUMNS, math.floor((i - 1) / LOOK_COLUMNS)
@@ -272,15 +267,28 @@ local function createLook()
     Skin.border(cell, Skin.BORDER)
     cell.chosen = Skin.fill(cell, Skin.CHIP)
     Skin.fill(cell, Skin.HOVER, "HIGHLIGHT")
-    cell.art = ns.CampScene.hat(cell)
+    cell.art = makeArt(cell)
     cell.art:SetAllPoints()
-    cell.key = hat.key
-    cell:SetScript("OnClick", function() core:setLook({ hat = hat.key }) end)
-    cell:SetScript("OnEnter", function() row.name:SetText(hat.label) end)
-    cell:SetScript("OnLeave", function() row.name:SetText(row.shownName) end)
-    row.cells[i] = cell
+    cell.key = item.key
+    cell:SetScript("OnClick", function() choose(item.key) end)
+    cell:SetScript("OnEnter", function() grid.name:SetText(item.label) end)
+    cell:SetScript("OnLeave", function() grid.name:SetText(grid.shownName) end)
+    grid.cells[i] = cell
   end
-  control:SetSize(grid:GetWidth() + LOOK_PREVIEW_GAP + LOOK_PREVIEW_WIDTH, grid:GetHeight() + LOOK_NAME_HEIGHT)
+  return grid
+end
+
+local function createLook()
+  local row = createRow("Look")
+  local control = CreateFrame("Frame", nil, row)
+  row.hats = lookGrid(control, ns.Core.HATS, ns.CampScene.hat, function(key) core:setLook({ hat = key }) end)
+  row.hats:SetPoint("TOPRIGHT")
+  row.pets = lookGrid(control, ns.Core.PETS, ns.CampScene.pet, function(key) core:setLook({ pet = key }) end)
+  row.pets:SetPoint("TOPRIGHT", row.hats, "BOTTOMRIGHT", 0, -LOOK_NAME_HEIGHT)
+  row.preview = ns.CampScene.figure(control)
+  row.preview:SetPoint("BOTTOMRIGHT", row.pets, "BOTTOMLEFT", -LOOK_PREVIEW_GAP, 0)
+  control:SetSize(row.hats:GetWidth() + LOOK_PREVIEW_GAP + LOOK_PREVIEW_WIDTH,
+    row.hats:GetHeight() + row.pets:GetHeight() + 2 * LOOK_NAME_HEIGHT)
   placeControl(row, control)
   return row
 end
@@ -291,17 +299,21 @@ local function ownClass()
   end
 end
 
+local function drawGrid(grid, chosen, label, setArt)
+  for _, cell in ipairs(grid.cells) do
+    setArt(cell.art, cell.key)
+    cell.chosen:SetShown(cell.key == (chosen or "none"))
+  end
+  grid.shownName = label
+  grid.name:SetText(label)
+end
+
 local function drawLook()
   local look = core:look()
-  local chosen = look.hat or "none"
-  for _, cell in ipairs(lookRow.cells) do
-    cell.art:SetHat(cell.key)
-    cell.chosen:SetShown(cell.key == chosen)
-  end
-  lookRow.shownName = look.label
-  lookRow.name:SetText(look.label)
+  drawGrid(lookRow.hats, look.hat, look.label, function(art, key) art:SetHat(key) end)
+  drawGrid(lookRow.pets, look.pet, look.petLabel, function(art, key) art:SetPet(key) end)
   local class = ownClass()
-  if class then lookRow.preview:SetClass(class, look.hat) else lookRow.preview:Hide() end
+  if class then lookRow.preview:SetClass(class, look.hat, look.pet) else lookRow.preview:Hide() end
 end
 
 -- WoW: addons can't copy to the clipboard.
