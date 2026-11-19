@@ -333,7 +333,7 @@ end
 
 local function drawEmpty(settled, y, width)
   empty = empty or ns.EmptyState.new(view.content)
-  empty:Set(ns.EmptyState.pick(core:crew(), settled and EMPTY_NONE or EMPTY_UNSETTLED, not core:setting("camp")))
+  empty:Set(ns.EmptyState.view(settled and EMPTY_NONE or EMPTY_UNSETTLED, not core:setting("camp")))
   empty:ClearAllPoints()
   empty:SetPoint("TOPLEFT", view.content, "TOPLEFT", INSET, y - EMPTY_PAD)
   local height = empty:Layout(width)

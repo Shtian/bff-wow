@@ -29,9 +29,12 @@ local JOINED = {
   text = "You're in. The rest of the Crew shows up here once one of them is online.",
 }
 
-function EmptyState.pick(crew, own, still)
-  local alone = crew and crew.alone
-  local from = alone and (crew.joined and JOINED or ALONE) or own
+function EmptyState.view(own, still)
+  return { art = own.art, title = own.title, text = own.text, still = still }
+end
+
+function EmptyState.alone(crew, still)
+  local from = crew.joined and JOINED or ALONE
   return { art = from.art, title = from.title, text = from.text, code = from == ALONE and crew.code or nil,
     still = still }
 end
