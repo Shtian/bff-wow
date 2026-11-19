@@ -1,9 +1,3 @@
--- TipDialog: Core's Tip as a small window, shown once per Tip the first
--- time Core offers it (the tip event): its title, its text, and Turn on and
--- No thanks, which answer it. Closing it (the X or Escape) answers nothing,
--- so the Tip stays as the card at the top of the panel. Silent. See
--- docs/design/pocket-camp.md.
-
 local _, ns = ...
 
 local TipDialog = {}
@@ -39,8 +33,6 @@ local function create()
   frame.dismiss:SetPoint("RIGHT", frame.accept, "LEFT", -8, 0)
 end
 
--- Shows a Tip as Core's tip event gives it: { key, title, text, accept,
--- dismiss }.
 function TipDialog.show(tip)
   if not frame then create() end
   frame.key = tip.key
@@ -52,8 +44,6 @@ function TipDialog.show(tip)
   frame:Show()
 end
 
--- Closes the window once its Tip is no longer the one Core has: it was
--- answered from the panel's card, or its feature was turned on in Settings.
 function TipDialog.refresh()
   if not frame or not frame:IsShown() then return end
   local tip = core:tip()

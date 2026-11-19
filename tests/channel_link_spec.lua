@@ -2,7 +2,6 @@ local wow = require("tests.wow_stubs")
 
 local CHANNEL = "BFFABCDEFG"
 
--- A Core that records what the link tells it.
 local function fakeCore()
   local core = { calls = {} }
   for _, method in ipairs({ "up", "down", "gone", "sendFailed", "received" }) do
@@ -10,8 +9,6 @@ local function fakeCore()
       core.calls[#core.calls + 1] = { method, ... }
     end
   end
-  -- Messages from a Member this client knows: those set in core.known, and
-  -- what was asked.
   core.known, core.asked = {}, {}
   function core.fromKnownMember(_, message)
     core.asked[#core.asked + 1] = message
@@ -27,8 +24,6 @@ local function fakeCore()
   return core
 end
 
--- A channel link in the Crew's channel with Bob and Cat (on another realm),
--- link up.
 local function linked()
   local game = wow()
   local ns = game.load("Game/ChannelLink.lua", {})
@@ -42,7 +37,6 @@ local function linked()
   return game, link, core, ns
 end
 
--- Who each whisper since `mark` went to.
 local function targets(game, mark)
   local names = {}
   for i = (mark or 0) + 1, #game.whispers do names[#names + 1] = game.whispers[i].target end
@@ -50,7 +44,6 @@ local function targets(game, mark)
   return names
 end
 
--- The chunks another BFF would whisper for a message.
 local function chunksOf(ns, message)
   return ns.Framing.new({ now = function() return 0 end }):split(message)
 end
@@ -135,7 +128,6 @@ describe("The channel link", function()
         if whisper.target == "Bob" then whole[#whole + 1] = receiver:receive("Me", whisper.text) end
       end
       assert.same({ long, "1|digest", long }, whole)
-      -- Nothing is left queued for anyone.
       game.fire("CHAT_MSG_CHANNEL_LEAVE", "", "Bob", nil, "5. " .. CHANNEL, nil, nil, nil, 5, CHANNEL)
       game.advance(31)
       assert.is_false(game.filters.CHAT_MSG_SYSTEM(nil, "CHAT_MSG_SYSTEM", "No player named 'Bob' is currently playing."))
@@ -170,7 +162,6 @@ describe("The channel link", function()
       assert.same({}, targets(game, 2))
       assert.truthy(table.concat(lines, "\n"):find("\n  dropped 2 unsent chunks to Bob (gone)\n", 1, true))
 
-      -- Cat's go on.
       game.sent(game.whispers[2])
       assert.same({ "Cat-Realm" }, targets(game, 2))
     end)
@@ -197,7 +188,6 @@ describe("The channel link", function()
       assert.equal("  chunk 1/3 to Bob · 255 B · failed (result 7)", lines[3])
       assert.equal("  dropped 2 unsent chunks to Bob (a chunk failed)", lines[4])
 
-      -- The next message starts from its first chunk.
       assert.equal(2, #game.whispers)
       game.sent(game.whispers[2])
       assert.equal("  chunk 1/3 to Bob · 255 B · sent", lines[#lines])
@@ -344,7 +334,6 @@ describe("The channel link", function()
     assert.equal(0, core.count("sendFailed"))
   end)
 
-  -- The game's AceComm delivery: a BFF whisper from a Character.
   local function whisperFrom(game, sender, message)
     game.onComm("BFF", message or "1|digest", "WHISPER", sender)
   end
@@ -360,7 +349,6 @@ describe("The channel link", function()
     link.send("1|digest")
     link.send("1|digest", "Bob")
     assert.same({ "Cat-Realm" }, targets(game, mark))
-    -- Silence is no one's logout: the Roster keeps its own rule.
     assert.equal(0, core.count("gone"))
     assert.equal(0, core.count("down"))
     assert.equal(2, link.state().peers)
@@ -372,13 +360,12 @@ describe("The channel link", function()
   end)
 
   it("asks for the member list when a restriction lifts, not while one starts", function()
-    -- A boss pull, as a trace showed it: lockdown is reported only once
-    -- the restrictions are active, after their events.
+    -- WoW: on a boss pull, InChatMessagingLockdown turns true only after the
+    -- ADDON_RESTRICTION_STATE_CHANGED events (seen in a trace).
     local game = linked()
     local mark = #game.listed
     game.fire("ADDON_RESTRICTION_STATE_CHANGED", 1, 1)
     game.fire("ADDON_RESTRICTION_STATE_CHANGED", 5, 1)
-    -- A stranger's whisper wants a list too, and waits as well.
     whisperFrom(game, "Dan")
     assert.equal(mark, #game.listed)
     game.lockdown = true
@@ -393,7 +380,6 @@ describe("The channel link", function()
   end)
 
   it("asks for the member list again a frame after a restriction that doesn't lock chat starts", function()
-    -- Ordinary combat: no lockdown.
     local game = linked()
     game.fire("ADDON_RESTRICTION_STATE_CHANGED", 0, 1)
     game.advance(0)
@@ -422,7 +408,6 @@ describe("The channel link", function()
     game.advance(60)
     game.fire("CHAT_MSG_CHANNEL_LIST", "*Bob, Cat-Realm", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
     assert.equal(1, link.state().peers)
-    -- No down and up, so no DIGEST to everyone each minute.
     assert.equal(0, core.count("down"))
     assert.equal(1, core.count("up"))
 
@@ -437,13 +422,11 @@ describe("The channel link", function()
     assert.equal(0, core.count("received"))
     game.fire("CHAT_MSG_CHANNEL_LIST", "Dan", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
     assert.equal(1, core.count("received"))
-    -- Someone new while up: Core hears down and up, for a fresh DIGEST.
     assert.equal(1, core.count("down"))
     assert.equal(2, core.count("up"))
   end)
 
   describe("a whisper from a stranger", function()
-    -- A link up without a member list, as on a client that gets none.
     local function listless()
       local game = wow()
       local ns = game.load("Game/ChannelLink.lua", {})
@@ -480,7 +463,6 @@ describe("The channel link", function()
       assert.equal(1, core.count("received"))
       assert.same({ "received", long, "Dan" }, core.calls[#core.calls])
       assert.equal(1, link.state().peers)
-      -- The next message from them comes through the peer's own framing.
       local again = "2|" .. ("z"):rep(700)
       for _, chunk in ipairs(chunksOf(ns, again)) do whisperFrom(game, "Dan", chunk) end
       assert.equal(2, core.count("received"))
@@ -517,7 +499,6 @@ describe("The channel link", function()
     assert.equal(1, core.count("up"))
   end)
 
-  -- #160: a peer's leaving doesn't cancel the whispers queued for them.
   describe("after a peer left the channel", function()
     local NOT_FOUND = "No player named 'Bob' is currently playing."
 
@@ -555,7 +536,6 @@ describe("The channel link", function()
       left(game)
       game.advance(120)
       assert.is_true(hidden(game))
-      -- The one chunk ChatThrottleLib already had; the rest never go.
       game.sent(game.whispers[1])
       assert.equal(1, #game.whispers)
       game.advance(31)
@@ -592,7 +572,6 @@ describe("The channel link", function()
   end)
 
   describe("trace", function()
-    -- Starts the trace: the lines it reports.
     local function traced(link)
       local lines = {}
       link.setTrace(function(line) lines[#lines + 1] = line end)
@@ -645,7 +624,6 @@ describe("The channel link", function()
       assert.truthy(found[1]:find("1.0 s after a whisper", 1, true), found[1])
       assert.truthy(found[1]:find("in instance: party", 1, true), found[1])
       assert.truthy(found[1]:find("lockdown: yes", 1, true), found[1])
-      -- The chat filter doesn't read it either.
       assert.is_false(game.filters.CHAT_MSG_SYSTEM(nil, "CHAT_MSG_SYSTEM", game.secret()))
     end)
 
@@ -696,8 +674,8 @@ describe("The channel link", function()
     assert.same({ up = false, reason = "lockdown", peers = 2, instance = "party", lockdown = true }, link.state())
   end)
 
-  -- Channel notice arguments: text, sender, language, arg 4 (channel name),
-  -- ..., arg 8 (channel index), arg 9 (base name).
+  -- WoW: channel join and leave notices carry text, sender, language, then
+  -- arg 4 channel name, arg 8 channel index, arg 9 base name.
   local function notice(sender, arg4, index, base)
     return "", sender, "", arg4, sender, "", 0, index, base
   end
@@ -726,13 +704,12 @@ describe("The channel link", function()
   end)
 
   describe("member list trace", function()
-    -- Member list arguments: text, ..., arg 4 (channel name), ..., arg 8
-    -- (channel index), arg 9 (base name).
+    -- WoW: a channel member list carries text, then arg 4 channel name,
+    -- arg 8 channel index, arg 9 base name.
     local function list(text, arg4, index, base)
       return text, "", "", arg4, "", "", 0, index, base
     end
 
-    -- A traced link with the Crew set, not yet in its channel.
     local function joining()
       local game = wow()
       local link = game.load("Game/ChannelLink.lua", {}).ChannelLink
@@ -766,7 +743,6 @@ describe("The channel link", function()
       game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob", "5. " .. CHANNEL, 5, CHANNEL))
       game.advance(11)
       game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob, Dan", "7. Friends", 7, "Friends"))
-      -- BFF asks every minute: the same list again, even with other names, isn't.
       game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob", "7. Friends", 7, "Friends"))
       game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob", "8. Trade", 8, "Trade"))
       game.fire("CHAT_MSG_CHANNEL_LIST", list(game.secret(), "5. " .. CHANNEL, 5, CHANNEL))

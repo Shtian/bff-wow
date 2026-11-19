@@ -1,11 +1,3 @@
--- Changelog: reads CHANGELOG.md as bumpy writes it, for What's new
--- (docs/design/whats-new.md). The release build writes the newest releases'
--- text into ChangelogText.lua (scripts/changelog-text.sh); this turns it
--- into releases, newest first: { version, date ("13 Nov"), entries }, each
--- entry { kind ("major", "minor" or "patch"), title, detail (nil if none) }.
--- A bump file's first paragraph is its title and the rest its detail; an
--- older one-paragraph entry splits after its first sentence. Pure.
-
 local _, ns = ...
 
 local Changelog = {}
@@ -13,8 +5,6 @@ ns.Changelog = Changelog
 
 local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
 
--- A release version from a tag or the .toc ("v2.2.0" or "2.2.0"), or nil
--- for anything else (a dev checkout's "dev").
 function Changelog.version(text)
   if type(text) ~= "string" then return nil end
   local major, minor, patch = text:match("^v?(%d+)%.(%d+)%.(%d+)$")
@@ -22,7 +12,6 @@ function Changelog.version(text)
   return ("%d.%d.%d"):format(tonumber(major), tonumber(minor), tonumber(patch))
 end
 
--- Whether release version a is newer than b, by number.
 function Changelog.newer(a, b)
   local x, y = { a:match("^(%d+)%.(%d+)%.(%d+)$") }, { b:match("^(%d+)%.(%d+)%.(%d+)$") }
   for i = 1, 3 do
@@ -38,12 +27,10 @@ local function shortDate(iso)
   return ("%d %s"):format(tonumber(day), MONTHS[tonumber(month)])
 end
 
--- Markdown marks the game can't show: code spans and bold.
 local function plain(text)
   return (text:gsub("`", ""):gsub("%*%*", ""):gsub("%s+", " "):gsub("^ ", ""):gsub(" $", ""))
 end
 
--- An entry from its paragraphs.
 local function entry(kind, paragraphs)
   local texts = {}
   for _, lines in ipairs(paragraphs) do
@@ -55,7 +42,6 @@ local function entry(kind, paragraphs)
   if #texts > 1 then
     detail = table.concat(texts, " ", 2)
   else
-    -- The first sentence: up to a full stop followed by a capital.
     local first, rest = title:match("^(.-[%.!?])%s+(%u.*)$")
     if first then title, detail = first, rest end
   end

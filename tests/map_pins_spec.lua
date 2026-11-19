@@ -5,9 +5,6 @@ local HEARTBEAT = 5 * 60
 
 local ELWYNN = { mapId = 1429, x = 0.412, y = 0.655 }
 
--- A net with the given clients logged in and in one Crew, settled. options
--- maps a name to FakeNet:add options; every client starts in Elwynn Forest
--- unless its options say otherwise.
 local function crew(names, options)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -32,13 +29,11 @@ local function character(name, level, extra)
   return c
 end
 
--- Jumps the clock ahead, then lets the Crew settle.
 local function skip(net, seconds)
   net:step(net:now() + seconds)
   net:run(5)
 end
 
--- The pin the client's Core shows for another client, or nil.
 local function pinFor(client, other)
   for _, pin in ipairs(client.core:mapPins()) do
     if pin.memberId == other.memberId then return pin end
@@ -77,7 +72,6 @@ describe("Map pins", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     b:play({ lastName = "Stormgaard" })
-    -- A last name alone goes out with the next unhurried DATA.
     net:run(70)
 
     local pin = pinFor(a, b)
@@ -153,7 +147,6 @@ describe("Map pins", function()
     end
     local few = wheres({ "Ann", "Bob" })
     assert.is_true(few >= 5 and few <= 6, few)
-    -- Five others online: one every 15 s.
     local many = wheres({ "Ann", "Bob", "Cid", "Dot", "Eve", "Fay" })
     assert.is_true(many >= 3 and many <= 4, many)
   end)
@@ -180,7 +173,6 @@ describe("Map pins", function()
     net:run(12)
     assert.same({ 1436, 0.3, 0.4 }, { pinFor(a, b).mapId, pinFor(a, b).x, pinFor(a, b).y })
 
-    -- A Member who joins later gets the spot from the record alone.
     local c = net:add("Cid", { location = ELWYNN }):login()
     c:join(a.core:crew().code)
     net:run(20)
@@ -271,7 +263,6 @@ describe("Map pins", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
 
-    -- Bob relogs onto an Alt in Westfall, then back onto his Main.
     b.character = character("Bobalt", 12, { zone = "Westfall" })
     b:move({ mapId = 1436, x = 0.3, y = 0.4 })
     b:play()

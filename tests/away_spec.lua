@@ -1,6 +1,5 @@
 local load = require("tests.load")
 
--- A character table for FakeNet, at the given level.
 local function playing(name, level, extra)
   local character = {
     guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
@@ -10,8 +9,6 @@ local function playing(name, level, extra)
   return character
 end
 
--- A net with the given clients logged in and in one Crew, settled. levels
--- maps a name to the level it plays.
 local function crew(names, levels)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -26,7 +23,6 @@ local function crew(names, levels)
   return net, clients, code
 end
 
--- The awaySummary events the client's Core fired.
 local function summaries(client)
   local list = {}
   for _, event in ipairs(client.events) do
@@ -51,13 +47,11 @@ local function events(client, name)
   return list
 end
 
--- The first Character's level range in a summary's first Member.
 local function levels(summary)
   local character = summary.members[1].characters[1]
   return { from = character.from, level = character.level }
 end
 
--- A Member's Character rows without their Reaction buttons and wording.
 local WORDING = { cheer = true, respects = true, label = true, gained = true }
 local function rows(member)
   local list = {}
@@ -71,7 +65,6 @@ local function rows(member)
   return list
 end
 
--- Logs the client back in with a clean event list.
 local function relog(net, client)
   client.events = {}
   client:login()
@@ -359,7 +352,6 @@ describe("While you were away", function()
       labels[i] = character.label or false
       gained[i] = character.gained or false
     end
-    -- No label on a Main named like the Member.
     assert.same({ false, "Alt Jaina", "Alt Rexxar" }, labels)
     assert.same({ "+2", "+2", "new" }, gained)
   end)

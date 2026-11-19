@@ -1,4 +1,5 @@
 local load = require("tests.load")
+local ROOM = load().Framing.ROOM
 
 local function character(name, extra)
   local c = {
@@ -9,8 +10,6 @@ local function character(name, extra)
   return c
 end
 
--- A net with the given clients logged in and in one Crew, settled, each
--- with the Pocket Camp on.
 local function crew(names)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -32,7 +31,6 @@ local function actorFor(view, client)
   return nil
 end
 
--- How the viewer's Pocket Camp shows the client: its pose and status.
 local function shown(viewer, client)
   local actor = actorFor(viewer.core:pocketCamp(), client)
   return actor and { actor.pose, actor.status }
@@ -43,14 +41,12 @@ local function poseOf(viewer, client)
   return actor and actor.pose
 end
 
--- Skill line IDs.
 local ALCHEMY, MINING, FISHING = 171, 186, 356
 
 local function profession(skillLine, name, skill)
   return { skillLine = skillLine, name = name, icon = 1000 + skillLine, skill = skill, max = 300 }
 end
 
--- The animations the client's Core fired, as "kind:Name".
 local function animations(client, clients)
   local names = {}
   for _, other in ipairs(clients) do names[other.memberId] = other.name end
@@ -97,9 +93,7 @@ describe("What a Member is doing", function()
     local sent = doings(net, mark, "Bob")
     assert.equal(1, #sent)
     assert.equal("vendor", sent[1].doing)
-    -- One chunk (Framing.ROOM).
-    assert.is_true(sent[1].size <= 247)
-    -- The record didn't change: over the next DIGESTs no one asks for it.
+    assert.is_true(sent[1].size <= ROOM)
     net:run(70)
     assert.equal(0, #net:sent(mark, nil, "DATA"))
     assert.same({ "vendor", "at a vendor · 1m" }, shown(a, b))
@@ -121,7 +115,6 @@ describe("What a Member is doing", function()
     a.core:doing({ combat = true, resting = true })
     assert.equal("fighting", poseOf(a, a))
     a.core:doing({ afk = true, resting = true })
-    -- Fighting lasts a little past the end of combat.
     assert.equal("fighting", poseOf(a, a))
   end)
 
@@ -132,7 +125,6 @@ describe("What a Member is doing", function()
     assert.equal("vendor", poseOf(b, b))
     b.core:doing({ afk = true, combat = true })
     assert.equal("fighting", poseOf(b, b))
-    -- Fighting's hold outlasts combat, then away shows.
     b.core:doing({ afk = true, resting = true })
     assert.equal("fighting", poseOf(b, b))
     net:run(25)
@@ -163,7 +155,6 @@ describe("What a Member is doing", function()
     local before = b:count("changed")
     net:run(1)
     assert.equal("seated", poseOf(b, b))
-    -- Bob's own Pocket Camp is told to redraw.
     assert.equal(before + 1, b:count("changed"))
     net:run(3)
     assert.equal("seated", poseOf(a, b))
@@ -210,7 +201,6 @@ describe("What a Member is doing", function()
     assert.equal(3, #doings(net, mark, "Bob"))
     assert.equal("resting", poseOf(a, b))
 
-    -- The DOING that ends it is lost: it runs out by itself.
     net.drop = function(message)
       local decoded = load().Codec.decode(message)
       return type(decoded) == "table" and decoded.type == "DOING"
@@ -248,7 +238,6 @@ describe("What a Member is doing", function()
     b.core:doing({ vendor = true })
     net:run(3)
     assert.equal("vendor", poseOf(a, b))
-    -- The window is gone after a reload, and the new session knows of no vendor.
     b:reload()
     b.core:setSetting("pocketCamp", true)
     net:run(20)
@@ -293,7 +282,6 @@ describe("What a Member is doing", function()
     net:broadcast(b, ns.Codec.encode({ type = "DOING", from = b.memberId, doing = "dancing", at = net:now() + 1 }))
     net:run(2)
     assert.same({ "seated", "by the fire" }, shown(a, b))
-    -- An older one, arriving late, changes nothing; nor does one that isn't a DOING at all.
     net:broadcast(b, ns.Codec.encode({ type = "DOING", from = b.memberId, doing = "vendor", at = net:now() - 60 }))
     net:broadcast(b, ns.Codec.encode({ type = "DOING", from = b.memberId, doing = "vendor" }))
     net:run(2)
@@ -328,13 +316,11 @@ describe("What a Member is doing", function()
       local mark = #net.wire
       b.core:questHandedIn()
       assert.same({ "quest:Bob" }, animations(b, clients))
-      -- A hub's worth of quests is one DOING.
       b.core:questHandedIn()
       b.core:questHandedIn()
       net:run(20)
       assert.same({ "quest:Bob" }, animations(a, clients))
       assert.equal(1, #doings(net, mark, "Bob"))
-      -- It left what Bob is doing alone.
       assert.equal("seated", poseOf(a, b))
     end)
 
@@ -360,7 +346,6 @@ describe("What a Member is doing", function()
   end)
 
   describe("a profession", function()
-    -- Both share their professions first: the first share is a baseline.
     local function withProfessions()
       local net, clients = crew({ "Ann", "Bob" })
       for _, client in ipairs(clients) do
@@ -376,7 +361,6 @@ describe("What a Member is doing", function()
       local net, clients = withProfessions()
       local a, b = clients[1], clients[2]
       assert.equal("seated", poseOf(a, b))
-      -- The ding takes the new skill out with it at once.
       b:play({ professions = { profession(ALCHEMY, "Alchemy", 11), profession(MINING, "Mining", 10),
         profession(FISHING, "Fishing", 10) }, level = 12 })
       assert.same({ "crafting", "crafting" }, shown(b, b))
@@ -426,7 +410,6 @@ describe("What a Member is doing", function()
       assert.equal("bear", formOf(a, a))
       a.core:doing({ form = "wolf" })
       assert.same({ "seated", "a ghost wolf" }, shown(a, a))
-      -- A travel form is shown at once on your own figure.
       a.core:doing({ form = "seal" })
       assert.same({ "seated", "in aquatic form" }, shown(a, a))
       a.core:doing({})
@@ -444,8 +427,7 @@ describe("What a Member is doing", function()
       local sent = doings(net, mark, "Bob")
       assert.equal(1, #sent)
       assert.same({ "cat", nil }, { sent[1].form, sent[1].doing })
-      assert.is_true(sent[1].size <= 247)
-      -- A change of form waits out the usual 15 s.
+      assert.is_true(sent[1].size <= ROOM)
       b.core:doing({ form = "wolf" })
       net:run(5)
       assert.equal("cat", formOf(a, b))
@@ -458,7 +440,6 @@ describe("What a Member is doing", function()
       local net, clients = crew({ "Ann", "Bob" })
       local a, b = clients[1], clients[2]
       local mark = #net.wire
-      -- Mounting up and getting off again sends nothing.
       b.core:doing({ form = "travel" })
       net:run(20)
       b.core:doing({})
@@ -491,7 +472,6 @@ describe("What a Member is doing", function()
       assert.is_true(a:count("changed") > before)
       assert.equal(1, #doings(net, mark, "Bob"))
 
-      -- Shifting into it again is told again.
       b.core:doing({ form = "bear" })
       net:run(3)
       assert.equal("bear", formOf(a, b))
@@ -517,7 +497,6 @@ describe("What a Member is doing", function()
       net:run(2)
       assert.same({ "vendor", "at a vendor" }, shown(a, b))
       assert.is_nil(formOf(a, b))
-      -- A form this BFF doesn't know is none.
       net:broadcast(b, ns.Codec.encode({ type = "DOING", from = b.memberId, form = "tree", at = net:now() + 2 }))
       net:run(2)
       assert.same({ "seated", "by the fire" }, shown(a, b))
@@ -534,7 +513,6 @@ describe("What a Member is doing", function()
       b.core:doing({ form = "travel", vendor = true })
       assert.same({ "vendor", "at a vendor" }, shown(b, b))
       assert.is_nil(formOf(b, b))
-      -- The vendor goes out with no form: the bear has ended, the travel form isn't due yet.
       net:run(20)
       assert.same({ "vendor", "at a vendor" }, shown(a, b))
       assert.is_nil(formOf(a, b))
@@ -550,7 +528,6 @@ describe("What a Member is doing", function()
       clients[3].core:doing({ form = "cat" })
       net:run(3)
       local view = a.core:pocketCamp()
-      -- From the sprite's one end to its other, the trot included.
       local function span(actor)
         if not actor.form then return actor.x, actor.x + actor.width end
         local fore, aft = layout.formFore, layout.formAft + (actor.trots and layout.formTrot or 0)
@@ -579,7 +556,6 @@ describe("What a Member is doing", function()
       b.core:doing({ vendor = true })
       net:run(3)
       assert.equal("vendor", poseOf(a, b))
-      -- The DOING that ends the visit is lost; the record says where Bob is.
       b:move({ instance = "The Deadmines" })
       b:play({ zone = "The Deadmines" })
       b.core:doing({ combat = true })
@@ -608,12 +584,10 @@ describe("What a Member is doing", function()
       clients[2].core:doing({ flying = true })
       net:run(3)
       local view = a.core:pocketCamp()
-      -- The griffin takes a second seat on its side.
       assert.equal(5, #view.actors)
       assert.same({ 1, "+1" }, { view.more, view.moreText })
       local bob = actorFor(view, clients[2])
       assert.equal(layout.seated, bob.width)
-      -- From its beak to its tail, on the side of the fire it's on.
       local function span(actor)
         if actor.pose ~= "flying" then return actor.x, actor.x + actor.width end
         if actor.x > 0 then return actor.x - layout.griffinFore, actor.x + actor.width + layout.griffinAft end

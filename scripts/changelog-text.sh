@@ -24,9 +24,6 @@ if [[ "$text" == *"]==]"* ]]; then
 fi
 
 cat >ChangelogText.lua <<LUA
--- The newest releases of CHANGELOG.md, for What's new. Written by
--- scripts/changelog-text.sh for the release build; don't commit it.
-
 local _, ns = ...
 
 ns.CHANGELOG_TEXT = [==[

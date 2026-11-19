@@ -1,6 +1,5 @@
 local load = require("tests.load")
 
--- A character table for FakeNet, at the given level.
 local function playing(name, level)
   return {
     guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
@@ -8,7 +7,6 @@ local function playing(name, level)
   }
 end
 
--- A net with the given clients logged in and in one Crew, settled.
 local function crew(names)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -63,7 +61,6 @@ describe("Settings", function()
   end)
 end)
 
--- A Core over a fresh db, outside any Crew, recording its events.
 local function newCore(db)
   local deps = {
     events = {},
@@ -86,7 +83,6 @@ local function fired(deps, name)
   return found
 end
 
--- Every setting in Core's list: its default and another value to set.
 local SETTINGS = {
   { key = "chatLines", default = true, other = false },
   { key = "awayPopup", default = true, other = false },
@@ -165,7 +161,6 @@ describe("Settings list", function()
     assert.equal("medium", core:setting("mapPinSize"))
   end)
 
-  -- A setting as the Settings page gives it, by key.
   local function onPage(core, key)
     for _, section in ipairs(core:settings()) do
       for _, setting in ipairs(section.settings) do
@@ -311,7 +306,6 @@ describe("Settings list", function()
     assert.equal(12, b:rowFor(a).level)
   end)
 
-  -- Bob's events of this kind since mark, as { text, outlets }.
   local function liveEvents(client, name, mark)
     local found = {}
     for i = mark + 1, #client.events do
@@ -343,7 +337,6 @@ describe("Settings list", function()
           assert.equal(1, b.core:unseen())
         end
 
-        -- A Reaction to Bob's own entry.
         b:play({ level = 11 })
         net:run(3)
         b.core:openFeed()

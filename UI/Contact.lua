@@ -1,9 +1,3 @@
--- Contact: the Get in touch window, opened from the panel's header. Where
--- to send a question, an idea or a bug: the addon's GitHub issues and its
--- CurseForge page, each in a box that selects itself for Ctrl+C, since the
--- game can't open links. Its Report a bug button opens the Report window.
--- See docs/design/code-structure.md.
-
 local _, ns = ...
 
 local Contact = {}
@@ -22,9 +16,8 @@ local LINKS = {
 
 local frame
 
--- A read-only box holding a link: clicking or typing selects all of it
--- (the click that focuses it places the cursor after OnEditFocusGained, so
--- OnMouseUp selects it again).
+-- WoW: the click that focuses an EditBox places its cursor after OnEditFocusGained,
+-- undoing a selection made there.
 local function linkBox(parent, url)
   local box = ns.Skin.editBox(parent, WIDTH - 2 * INSET)
   box:SetFontObject(ns.Skin.fonts.small)
@@ -36,8 +29,7 @@ local function linkBox(parent, url)
       self:HighlightText()
     end
   end)
-  -- Wrapped: the scripts' own arguments would reach HighlightText as its
-  -- start and stop.
+  -- WoW: script handlers pass their own arguments, which HighlightText reads as start and stop.
   local function selectAll(self) self:HighlightText() end
   box:SetScript("OnEditFocusGained", selectAll)
   box:SetScript("OnMouseUp", selectAll)
@@ -82,7 +74,6 @@ local function create()
   report:SetPoint("RIGHT", close, "LEFT", -8, 0)
 end
 
--- Opens the window, as tall as its links plus the buttons under them.
 function Contact.show()
   if not frame then create() end
   frame:SetHeight(1)

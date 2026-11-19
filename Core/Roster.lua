@@ -1,20 +1,12 @@
--- Roster: builds the panel's rows from the Ledger. A row is a fresh table
--- the UI may keep or change; it never shares anything with a record.
--- See the panel decision (#7) and docs/design/code-structure.md.
-
 local _, ns = ...
 
 local Roster = {}
 ns.Roster = Roster
 
--- A Member is online if heard within this long and not seen leaving the
--- channel since.
 local ONLINE_FOR = 12 * 60
 Roster.ONLINE_FOR = ONLINE_FOR
--- Characters unseen this long are hidden; display only.
 local HIDE_AFTER = 30 * 24 * 60 * 60
 Roster.HIDE_AFTER = HIDE_AFTER
--- Within this many levels of the Character you play, you can play together.
 local CAN_PLAY = 3
 Roster.CAN_PLAY = CAN_PLAY
 
@@ -23,8 +15,6 @@ local function mostRecentFirst(a, b)
   return a.guid < b.guid
 end
 
--- The record's Characters seen within 30 days, most recently played first,
--- and how many were hidden.
 local function visibleCharacters(record, now)
   local characters, hidden = {}, 0
   for _, character in pairs(record.characters) do
@@ -38,8 +28,6 @@ local function visibleCharacters(record, now)
   return characters, hidden
 end
 
--- The Main: the Character set as Main, or the most recently played one,
--- among the given Characters (most recently played first).
 local function mainOf(record, characters)
   for _, character in ipairs(characters) do
     if character.guid == record.main then return character end
@@ -47,14 +35,10 @@ local function mainOf(record, characters)
   return characters[1]
 end
 
--- The Main of a record as the panel shows it, or nil if every Character
--- is hidden.
 function Roster.main(record, now)
   return mainOf(record, (visibleCharacters(record, now)))
 end
 
--- What a Member is called in texts: their display name, else their
--- Main's name, else "Someone".
 function Roster.memberName(record, now)
   if record and record.displayName then return record.displayName end
   local main = record and Roster.main(record, now)
@@ -77,7 +61,6 @@ local function describeCharacter(character, main, yourLevel, now)
     zone = character.zone,
     deaths = character.deaths,
     money = character.money,
-    -- A malformed list costs only the professions, not the record.
     professions = ns.Professions.describe(character.professions),
     mapId = character.mapId,
     x = character.x,
@@ -92,8 +75,6 @@ local function describeCharacter(character, main, yourLevel, now)
   }
 end
 
--- A Member's row: the Character they're playing while online, else their
--- Main, with the rest as alts. yourLevel is nil for your own row.
 local function rowFor(record, characters, online, yourLevel, now)
   local main = mainOf(record, characters)
   local shown = online and characters[1] or main
@@ -119,7 +100,6 @@ local function rowFor(record, characters, online, yourLevel, now)
   return row
 end
 
--- The ids of other Members online now, as a set.
 function Roster.online(ledger, now)
   local online = {}
   for id, record in ledger:records() do
@@ -141,7 +121,6 @@ local function anyCanPlay(row)
   return row.canPlay or row.altsCanPlay
 end
 
--- Each order compares two rows and returns true, false, or nil for a tie.
 local ORDERS = {
   online = function(a, b)
     if a.online ~= b.online then return a.online end
@@ -164,7 +143,6 @@ local function sorter(order)
   end
 end
 
--- Builds every row and the hidden count. Rows of others are unsorted.
 local function buildRows(ledger, now)
   local own = ledger:own()
   local online = Roster.online(ledger, now)
@@ -176,7 +154,6 @@ local function buildRows(ledger, now)
     if #characters > 0 then
       ownRow = rowFor(own, characters, true, nil, now)
       ownRow.own = true
-      -- Your own row shows no Last seen.
       ownRow.lastSeenText = nil
     end
   end
@@ -199,9 +176,6 @@ local function buildRows(ledger, now)
   return ownRow, others, hiddenTotal
 end
 
--- Your own row first, then every other Member who hasn't left, in the
--- order "online" (the default: online, can play, Last seen), "level" or
--- "name".
 function Roster.rows(ledger, now, order)
   local ownRow, others = buildRows(ledger, now)
   table.sort(others, sorter(order))
@@ -210,9 +184,6 @@ function Roster.rows(ledger, now, order)
   return rows
 end
 
--- Counts for the title and minimap button: Members online, Members shown,
--- Members online whose Character being played can play with you, and
--- Characters hidden for being unseen 30 days.
 function Roster.summary(ledger, now)
   local _, others, hidden = buildRows(ledger, now)
   local summary = { online = 0, members = #others, canPlay = 0, hidden = hidden }

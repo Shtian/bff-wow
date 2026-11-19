@@ -1,6 +1,3 @@
--- Record versions and what a DIGEST lists aren't visible through Core's
--- interface, so these check the Ledger directly. What peers send because
--- of them is checked through Core (roster_spec, sync_spec).
 local load = require("tests.load")
 
 local function character(level)

@@ -27,7 +27,6 @@ describe("The sync log", function()
     fill(log, 1, 4)
     local saved = log:save()
     assert.same({ "line 2", "line 3", "line 4" }, saved)
-    -- A copy: lines added later don't change what was saved.
     log:add("line 5")
     assert.same({ "line 2", "line 3", "line 4" }, saved)
   end)

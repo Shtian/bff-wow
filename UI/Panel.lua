@@ -1,34 +1,3 @@
--- Panel: the BFF window, in the Skin's flat look. Without a Crew it shows
--- the setup view (display name, Start or Join); in one, a sidebar with
--- Roster, Feed, Goals, When, Spares, Professions, Together, Catches and Settings, and the version under them, which
--- opens What's new (drawn by WhatsNewTab) and carries the Unread dot while
--- there are changes you haven't seen. The Roster has your own row pinned on top,
--- then a row per Member with expandable Alts, a sort menu, a tooltip and
--- right-click menu per Character, and a footer with the hidden count,
--- removed Members and the Crew code. The Feed is a timeline
--- of Core's entries by day, an icon per kind, who reacted to each and a
--- button to react, and marks them seen while open. Goals is a trophy
--- cabinet of the Crew goals reached, drawn by GoalsTab. When is a heatmap of the week in local time: how many
--- Members usually play each hour, or one Member's weeks played, picked
--- from a menu. Spares lists other Members' open ones with Claim
--- and Withdraw-claim buttons, dimmed when none of your Characters is high
--- enough level, then your own with their winning Claim and Give and
--- Withdraw. Professions is a grid of all twelve professions, a row per
--- Member and a tile each with their best Character's skill, sortable by a
--- profession. Together is a level line of friends and dungeons, drawn by
--- TogetherTab. Catches is a field guide of the Crew's fishing catches,
--- drawn by CatchesTab. Settings is every setting, drawn by SettingsTab;
--- out of a Crew it opens in place of the setup view, with a way back. A grip in the bottom right corner resizes the window, and
--- Core keeps its size and position; views lay out to the current width
--- and redraw when a resize ends. While Core has a Camp (camp()), its band
--- runs across the window under the header, above the sidebar and every
--- tab, drawn by CampScene; Roster rows show a small seated figure in place
--- of the class icon, and a Cheer makes a seated friend hop. The fire lights
--- the window under the band (Firelight). Under the band
--- sits Core's Tip (tip()), when there is one: a card offering a feature
--- that's off by default, with a button to turn it on and one to dismiss
--- it. It never sees a Member record.
-
 local _, ns = ...
 
 local Panel = {}
@@ -36,50 +5,34 @@ ns.Panel = Panel
 
 local Skin = ns.Skin
 
--- The window's size is the player's (Core's panelPlace()), between
--- Core's limits; views read it as they draw.
 local SIDEBAR = 124
--- Small enough to stay clear of the Roster footer's Removed and the
--- Together tab's overview strip.
 local GRIP = 12
 local HEADER = Skin.HEADER_HEIGHT
 local NAV_HEIGHT = 30
--- The sidebar's first tab sits this far down, Settings this far up, and
--- there are this many rows: every tab and Settings.
 local NAV_TOP = 8
 local NAV_BOTTOM = 22
 local NAV_ROWS = 9
 local NAV_CHIP_X = 6
 local NAV_CHIP_Y = 2
 local NAV_CHIP_RADIUS = 2
--- The version label under Settings, which opens What's new.
 local VERSION_HEIGHT = 18
--- The Roster footer's small labels (Crew code, Hidden, Removed) share one
--- bottom line, so they line up with each other and the code box.
 local CODE_LINE = 15
 local ROW_HEIGHT = 44
 local ALT_HEIGHT = 20
 local SECTION = 26
 local INSET = 12
--- Buttons inside rows and headings, and the pickers that open a menu.
--- Window actions keep Skin.button's 24.
 local SMALL_BUTTON = 20
 local FEED_ENTRY = 38
 local REACT = 20
 local FEED_DAY = 26
--- The timeline's line runs through the middle of the entry pictures.
 local NODE = 26
 local NEW_DOT = Skin.UNREAD_DOT
 local LINE_X = INSET + NODE / 2 - 1
--- Last seen goes stale, so the open panel redraws this often.
 local REDRAW_EVERY = 30
--- Under this high, the Camp band is its short one.
 local CAMP_SMALL_UNDER = 460
 local SCROLL_STEP = 40
 
 local TITLE = "Best Friends in Forever"
--- Each tab's own empty state (UI/EmptyState.lua); Play times' line is
--- Core's note.
 local FEED_EMPTY = { art = "feed", title = "Quiet by the fire",
   text = "Dings, deaths, new Characters and Crew wins land here, and wait for you while you're away." }
 local WHEN_EMPTY_TITLE = "Too soon to tell"
@@ -87,24 +40,16 @@ local SPARES_EMPTY = { art = "spares", title = "The crate is empty",
   text = "Got something your Crew could use? Drop it on the slot below." }
 local PROFESSIONS_EMPTY = { art = "professions", title = "No trades yet",
   text = "When anyone learns a profession, it shows up here with their skill." }
--- The alone card under your own Roster row: its room above and below.
 local ALONE_CARD_PAD = 16
--- The setup view's block, centred in the window: Display name across it,
--- Start and Join in two columns below.
 local SETUP_WIDTH = 320
 local SETUP_COLUMN = 150
 local SETUP_COLUMNS_Y = -72
--- The When grid: a cell per hour, a row per day. It grows to fill the view,
--- so the cell and row sizes are its least; the legend's swatches stay at them.
 local WHEN_CELL = 11
 local WHEN_ROW = 18
 local WHEN_DAYS = 30
--- The grid's top, under the picker and the intro's room.
 local WHEN_TOP = -INSET - SMALL_BUTTON - 8 - 36
--- What the grid leaves below it: the legend, two lines of note and an inset.
 local WHEN_BELOW = 74
 local DAY_NAMES = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" }
--- Spares: a row per item, under a section heading.
 local SPARE_ROW = 44
 local SPARE_ICON = 28
 local SPARE_BUTTON = 58
@@ -112,14 +57,12 @@ local SPARE_SECTION = 28
 local SPARES_DROP = "Drop an item from your bags here to offer it to your Crew."
 local SPARES_HOW = "Offer an item: drop it on the slot above, or type /bff spares add and shift-click it into the chat box. Mail it to the winner, then Give it."
 local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
--- Professions: a row per Member, a column per profession, a tile each.
 local PROFESSION_HEAD = 26
 local PROFESSION_ICON = 16
 local PROFESSION_NAME = 82
 local PROFESSION_NAME_MAX = 140
 local PROFESSION_TILE = 18
 local PROFESSION_GAP = 1
--- The gap before cooking, fishing and first aid, with a hairline in it.
 local PROFESSION_DIVIDER = 6
 local PROFESSION_ROW = 25
 local PROFESSION_BAR = 2
@@ -135,12 +78,9 @@ local SORTS = { { "online", "Online first" }, { "level", "Level" }, { "name", "N
 
 local core
 local frame
--- The Camp band, and its height now (0 while there's no Camp).
 local camp
 local campHeight = 0
--- The fire's light on the window under the band (Firelight).
 local firelight
--- The Tip card under the band, and its height now (0 while there's no Tip).
 local tipCard
 local tipHeight = 0
 local TIP_BUTTON = 84
@@ -159,23 +99,17 @@ local professionsView
 local footer
 local rowFrames = {}
 local altFrames = {}
--- What the UI itself remembers: the tab, the sort and which Members show
--- Alts. Which Feed entries are New is Core's (openFeed, leaveFeed).
 local tab = "roster"
--- The When tab's Member, or nil for the Crew.
 local whenMember
 local order = "online"
 local expanded = {}
 
 local classColor = Skin.classColor
 
--- The state an empty tab shows: its own, or the alone state while you're
--- the only Member known. Still while the Camp is off.
 local function emptyState(own)
   return ns.EmptyState.pick(core:crew(), own, not core:setting("camp"))
 end
 
--- The content's width right of the sidebar, at the window's current size.
 local function contentWidth()
   return frame:GetWidth() - SIDEBAR - 1
 end
@@ -184,7 +118,6 @@ local function contentHeight()
   return frame:GetHeight() - HEADER - campHeight - tipHeight - 1
 end
 
--- A scroll view's width: the content less the thumb's gutter.
 local function listWidth()
   return contentWidth() - 6
 end
@@ -203,9 +136,8 @@ StaticPopupDialogs.BFF_REMOVE_MEMBER = {
   hideOnEscape = true,
 }
 
--- The tooltip goes beside the panel, level with the row under the mouse,
--- on whichever side has room. ANCHOR_RIGHT on a row near the top of the
--- screen put it in the screen's corner.
+-- WoW: GameTooltip's ANCHOR_RIGHT on a row near the top of the screen
+-- puts the tooltip in the screen's corner.
 local TOOLTIP_ROOM = 280
 local function placeBeside(owner)
   GameTooltip:SetOwner(owner, "ANCHOR_NONE")
@@ -217,10 +149,6 @@ local function placeBeside(owner)
   end
 end
 
--- Adds a Character's lines to the tooltip: row is its Member's Roster row
--- and character the Character (the row itself for the shown one). The
--- Pocket Camp shows the same over its figures. The caller sets the owner
--- and shows it.
 function Panel.characterTooltip(row, character)
   GameTooltip:AddLine(character.fullName, classColor(character.classFilename))
   GameTooltip:AddLine(("Level %d %s %s"):format(character.level, className(character.classFilename),
@@ -233,8 +161,6 @@ function Panel.characterTooltip(row, character)
   GameTooltip:AddLine(("Deaths: %d"):format(character.deaths or 0), MUTED[1], MUTED[2], MUTED[3])
   local gold = ns.Core.goldText(character.money)
   if gold then GameTooltip:AddLine(gold, MUTED[1], MUTED[2], MUTED[3]) end
-  -- A line per profession: icon, name and rank, then skill/max, gold at
-  -- 300/300. None when the Character's client never shared them.
   for _, profession in ipairs(character.professions or {}) do
     local icon = profession.icon and Skin.iconGlyph(profession.icon, 14) .. " " or ""
     local rank = profession.rank and (" %s%s|r"):format(Skin.hex(DIM), profession.rank) or ""
@@ -256,8 +182,6 @@ function Panel.characterTooltip(row, character)
   end
 end
 
--- The Character under the mouse: owner.row is its Member's row, and
--- owner.character the Character.
 local function showTooltip(owner)
   if not owner.row then return end
   placeBeside(owner)
@@ -269,8 +193,6 @@ local function hideTooltip()
   GameTooltip:Hide()
 end
 
--- Others' Characters: Whisper and Invite while being played, and Remove.
--- Your own: Set as Main, or back to the most recently played.
 local function showMenu(owner)
   local row, character = owner.row, owner.character
   if not row then return end
@@ -300,7 +222,6 @@ local function createTag(parent)
   return tag
 end
 
--- Lays tags out left to right after `anchor`, showing those with text.
 local function placeTags(anchor, tags)
   for _, tag in ipairs(tags) do
     if tag:GetText() ~= "" then
@@ -338,8 +259,6 @@ local function onRowClick(button, mouse)
   end
 end
 
--- A round status dot with a ring in the window's colour, so it reads on
--- top of a class icon.
 local function createDot(parent, size)
   local ring = parent:CreateTexture(nil, "OVERLAY", nil, 1)
   ring:SetSize(size + 4, size + 4)
@@ -367,7 +286,6 @@ local function createRow()
   row.icon = row:CreateTexture(nil, "ARTWORK")
   row.icon:SetSize(28, 28)
   row.icon:SetPoint("TOPLEFT", INSET, -7)
-  -- The Camp's seated figure, in the class icon's place.
   row.figure = ns.CampScene.figure(row)
   row.figure:SetPoint("BOTTOM", row.icon, "BOTTOM", 0, 1)
   row.dot = createDot(row, 8)
@@ -473,7 +391,6 @@ local function hideAll(lines, from)
   for i = from, #lines do lines[i]:Hide() end
 end
 
--- Places a line across the Roster, at y from its top.
 local function place(line, y)
   line:ClearAllPoints()
   line:SetPoint("TOPLEFT", rosterView.content, "TOPLEFT", 0, y)
@@ -492,10 +409,6 @@ local function showSortMenu(owner)
   end)
 end
 
--- "CREW ———— 2 Spares for you [Sort: Online first]" between your
--- row and the Members'. Core names each row's section; the first carries
--- the sort and Spares, and any later one (ASLEEP IN CAMP) is a plain label
--- and line.
 local function sectionLabel(parent)
   return Skin.sectionLabel(parent, INSET, -2)
 end
@@ -516,7 +429,6 @@ local function createSection()
   section.sort.iconRoom = Skin.leadIcon(section.sort, "sort", MUTED)
   section.sort:SetScript("OnClick", showSortMenu)
 
-  -- "2 Spares for you", which opens their tab.
   section.spares = CreateFrame("Button", nil, section)
   section.spares:SetHeight(18)
   section.spares:SetPoint("RIGHT", section.sort, "LEFT", -8, 0)
@@ -531,7 +443,6 @@ end
 
 local laterSections = {}
 
--- A later section's heading: the label, and the line to the right edge.
 local function laterSection(index)
   local heading = laterSections[index]
   if heading then return heading end
@@ -545,7 +456,6 @@ local function laterSection(index)
   return heading
 end
 
--- count is the open Spares you could use.
 local function drawSection(count)
   if not section then createSection() end
   for _, sort in ipairs(SORTS) do
@@ -559,16 +469,9 @@ local function drawSection(count)
   section.line:SetPoint("RIGHT", count > 0 and section.spares or section.sort, "LEFT", -8, 0)
 end
 
--- The sidebar: Roster, Feed, Goals, When, Spares, Professions, Together and Catches on top,
--- Settings and the addon's version at the bottom, as plain labels. The
--- version opens What's new, with the Unread dot in its margin while there
--- are changes you haven't seen. The selected one's chip marks it. In a short window (the Camp's band takes
--- room) the tabs get shorter so Settings stays clear of them.
 local function navButton(label, onClick)
   local button = CreateFrame("Button", nil, frame.sidebar)
   button:SetHeight(NAV_HEIGHT)
-  -- The selected tab and the hovered one get a light chip, inset from
-  -- the sidebar's edges.
   button.selected = Skin.chip(button, Skin.CHIP, NAV_CHIP_X, NAV_CHIP_Y, NAV_CHIP_RADIUS)
   Skin.chip(button, Skin.CHIP_HOVER, NAV_CHIP_X, NAV_CHIP_Y, NAV_CHIP_RADIUS, "HIGHLIGHT")
   button.label = Skin.label(button, "text", MUTED)
@@ -642,8 +545,6 @@ local function createNav()
   nav.version:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
--- unseen counts the Feed's unseen entries, and sparesUnseen the
--- Spare notices not yet shown.
 local function drawNav(unseen, sparesUnseen)
   if not nav then createNav() end
   setSelected(nav.roster, tab == "roster")
@@ -658,10 +559,7 @@ local function drawNav(unseen, sparesUnseen)
   nav.version.selected:SetShown(tab == "whatsnew")
   Skin.color(nav.version.label, tab == "whatsnew" and TEXT or DIM)
   nav.version.dot:SetShown(core:hasNewChanges())
-  -- A checkout carries no changelog: the version is only a label there.
   nav.version:EnableMouse(core:whatsNew() ~= nil)
-  -- Every tab and Settings, the sidebar's top inset and Settings' room
-  -- under it.
   local sidebarHeight = frame:GetHeight() - HEADER - campHeight - tipHeight - 1
   local height = math.min(NAV_HEIGHT, math.floor((sidebarHeight - NAV_TOP - NAV_BOTTOM) / NAV_ROWS))
   for _, button in ipairs({ nav.roster, nav.feed, nav.goals, nav.when, nav.spares, nav.professions, nav.together,
@@ -674,8 +572,6 @@ local function drawNav(unseen, sparesUnseen)
   nav.spares.badge:SetShown(sparesUnseen > 0 and tab ~= "spares")
 end
 
--- A scroll frame that scrolls with the mouse wheel, with a thin thumb on
--- the right showing where you are. view.content is what scrolls.
 local function updateThumb(view)
   local range = view:GetVerticalScrollRange()
   local thumb = view.thumb
@@ -706,7 +602,6 @@ local function createScrollView()
   view.content = CreateFrame("Frame", nil, view)
   view.content:SetSize(listWidth(), 1)
   view:SetScrollChild(view.content)
-  -- Rows anchor to the content, so they stretch with the window, live.
   view:SetScript("OnSizeChanged", function(self, width)
     self.content:SetWidth(width)
     updateThumb(self)
@@ -717,7 +612,6 @@ local function createScrollView()
   return view
 end
 
--- The Feed: a timeline, newest first.
 local function createFeedView()
   feedView = createScrollView()
   feedView:SetPoint("TOPLEFT")
@@ -730,9 +624,6 @@ local function createFeedView()
   feedView.empty = ns.EmptyState.new(feedView)
 end
 
--- A day's label, like the Roster's CREW, with its rule running to the
--- right. The timeline's line stops short of it (drawTimeline), so the
--- label needs no back: the fire's light shows behind it.
 local DAY_HEIGHT = 16
 local DAY_GAP = 4
 
@@ -747,10 +638,6 @@ local function createFeedDay()
   return day
 end
 
--- The timeline's line through the entry pictures: a stretch per day,
--- from under its label to just above the next one's (or past the last
--- entry), fading from the newest entry to the oldest. stretches holds
--- each one's { top, bottom } y.
 local function drawTimeline(stretches)
   local top = stretches[1] and stretches[1].top
   local bottom = stretches[1] and stretches[#stretches].bottom
@@ -780,8 +667,6 @@ local function drawTimeline(stretches)
   for i = shown + 1, #feedView.segments do feedView.segments[i]:Hide() end
 end
 
--- An entry: the kind's picture on the line, the text, and the time under
--- it.
 local function createFeedEntry()
   local entry = CreateFrame("Frame", nil, feedView.content)
   entry:SetHeight(FEED_ENTRY)
@@ -793,8 +678,6 @@ local function createFeedEntry()
   entry.text:SetPoint("TOPLEFT", node, "TOPRIGHT", 10, -2)
   entry.text:SetPoint("RIGHT", -INSET - 36, 0)
   entry.text:SetWordWrap(false)
-  -- New in this Feed visit: an unread dot in the margin, level with the
-  -- picture's centre.
   entry.new = Skin.unreadDot(entry)
   entry.new:SetPoint("CENTER", node, "LEFT", -(NEW_DOT / 2 + 3), 0)
   entry.time = Skin.label(entry, "small", MUTED)
@@ -804,7 +687,6 @@ local function createFeedEntry()
   entry.reactors:SetPoint("RIGHT", -INSET - 36, 0)
   entry.reactors:SetWordWrap(false)
 
-  -- The Reaction button, always shown like a toast's.
   entry.react = Skin.reactionButton(entry, REACT, function(self)
     local data = self:GetParent().data
     if data and data.key and core:react(data.key) and data.reaction == "cheer" then
@@ -816,8 +698,6 @@ local function createFeedEntry()
   return entry
 end
 
--- Who reacted, after the time: the Reaction's icon and their names, You
--- a step brighter than the others.
 local function reactorsText(entry)
   if #entry.reactors == 0 then return "" end
   local names = {}
@@ -841,7 +721,6 @@ local function drawFeedEntry(line, entry)
   line.new:SetShown(entry.new)
 end
 
--- Draws the Feed, which Panel.refresh has opened (core:openFeed).
 local function drawFeed(feed)
   if not feedView then createFeedView() end
   local y, dayCount, entryCount = -INSET, 0, 0
@@ -883,7 +762,6 @@ local function drawFeed(feed)
   updateThumb(feedView)
 end
 
--- Goals: drawn by GoalsTab into a scroll view of the panel's.
 local function drawGoals()
   if not goalsView then
     goalsView = createScrollView()
@@ -895,9 +773,6 @@ local function drawGoals()
   updateThumb(goalsView)
 end
 
--- Settings: drawn by SettingsTab into a scroll view of the panel's. Out of
--- a Crew there's no sidebar, so it's the window's full width, and Back
--- goes to the setup view.
 local function drawSettings(inCrew)
   if not settingsView then
     settingsView = createScrollView()
@@ -913,7 +788,6 @@ local function drawSettings(inCrew)
   updateThumb(settingsView)
 end
 
--- What's new: drawn by WhatsNewTab into a scroll view of the panel's.
 local function drawWhatsNew()
   if not whatsNewView then
     whatsNewView = createScrollView()
@@ -925,8 +799,6 @@ local function drawWhatsNew()
   updateThumb(whatsNewView)
 end
 
--- When: a menu to pick the Crew or a Member, a line saying what the
--- grid shows, the grid, a legend and a note when there's little data.
 local function showWhenMenu(owner)
   MenuUtil.CreateContextMenu(owner, function(_, root)
     root:CreateTitle("Show")
@@ -944,7 +816,6 @@ local function showWhenMenu(owner)
   end)
 end
 
--- A cell's shade: faint when 0, then more gold the more it holds.
 local function shadeCell(cell, value, max)
   if value <= 0 or max <= 0 then
     cell.texture:SetColorTexture(1, 1, 1, 0.05)
@@ -1030,7 +901,6 @@ local function createWhenView()
   whenView.note:SetWordWrap(true)
   whenView.note:SetJustifyH("LEFT")
 
-  -- The Crew's grid with nothing in it yet gives way to an empty state.
   whenView.grid = { whenView.intro, whenView.legendLow, whenView.legendHigh, whenView.note }
   for _, list in ipairs({ whenView.hours, whenView.days, whenView.cells }) do
     for _, item in ipairs(list) do whenView.grid[#whenView.grid + 1] = item end
@@ -1039,8 +909,6 @@ local function createWhenView()
   whenView.empty = ns.EmptyState.new(whenView)
 end
 
--- Sizes the grid to fill the view at the window's current size, in whole
--- pixels, and hangs the legend and note below it.
 local function placeWhenGrid()
   local cellWidth = math.max(WHEN_CELL, math.floor((contentWidth() - 2 * INSET - WHEN_DAYS) / 24))
   local rowHeight = math.max(WHEN_ROW, math.floor((contentHeight() + WHEN_TOP - WHEN_BELOW) / 7))
@@ -1097,8 +965,6 @@ local function drawWhen()
   whenView:Show()
 end
 
--- Spares: From the Crew, then Yours, each under a heading, in one
--- scrolling list.
 local getItemIcon = C_Item and C_Item.GetItemIconByID or GetItemIcon
 
 StaticPopupDialogs.BFF_GIVE_SPARE = {
@@ -1114,22 +980,19 @@ StaticPopupDialogs.BFF_GIVE_SPARE = {
   hideOnEscape = true,
 }
 
--- Places a heading or row across the list, at y from its top.
 local function placeSpare(line, y)
   line:ClearAllPoints()
   line:SetPoint("TOPLEFT", sparesView.content, "TOPLEFT", 0, y)
   line:SetPoint("TOPRIGHT", sparesView.content, "TOPRIGHT", 0, y)
 end
 
--- An item dropped on the drop slot, or a click on it while holding one:
--- a click with an item on the cursor may arrive as either, so both do the
--- same. The item always goes back to its bag slot.
+-- WoW: dropping an item from the cursor may arrive as OnReceiveDrag or
+-- as OnClick.
 local function onSpareDrop()
   if not GetCursorInfo() then return end
   ns.sayPosted(ns.Bags.postFromCursor(core))
 end
 
--- The drop slot: an empty item slot with a line saying what it's for.
 local function createSpareDrop(parent)
   local drop = CreateFrame("Button", nil, parent)
   drop:SetHeight(SPARE_ROW)
@@ -1162,7 +1025,6 @@ local function createSparesView()
   sparesView.empty = ns.EmptyState.new(sparesView.content)
 end
 
--- "FROM THE CREW ————— 2 of 20 Claims".
 local function spareHeading(index)
   local heading = sparesView.headings[index]
   if heading then return heading end
@@ -1178,7 +1040,6 @@ local function spareHeading(index)
   return heading
 end
 
--- A line of muted text in the list: no Spares yet, or how to post one.
 local function spareNote(index)
   local note = sparesView.notes[index]
   if note then return note end
@@ -1195,13 +1056,11 @@ local function showItemTooltip(row)
   GameTooltip:Show()
 end
 
--- Claims for one of your Characters, saying why not if it can't.
 local function claim(data, guid)
   local ok, reason = core:claimSpare(data.ownerId, data.id, guid)
   if not ok then ns.say(ns.MESSAGES[reason]) end
 end
 
--- Right-click Claim: pick which of your Characters it's for.
 local function showClaimMenu(owner, data)
   local claimFor = sparesView.claimFor
   if not claimFor or #claimFor == 0 then return end
@@ -1213,9 +1072,6 @@ local function showClaimMenu(owner, data)
   end)
 end
 
--- The buttons: Claim (left-click for the Character you play, right-click
--- to pick one) or Withdraw your Claim on the Crew's; Give and Withdraw on
--- yours.
 local function onSparePrimary(button, mouse)
   local row = button:GetParent()
   local data = row.data
@@ -1248,7 +1104,6 @@ local function createSpareRow()
   local row = CreateFrame("Button", nil, sparesView.content)
   row:SetHeight(SPARE_ROW)
   Skin.fill(row, Skin.HOVER, "HIGHLIGHT")
-  -- Shift-click puts the link in the chat box, like any item.
   row:SetScript("OnClick", function(self)
     local insertLink = ChatFrameUtil and ChatFrameUtil.InsertLink or ChatEdit_InsertLink
     if self.data and self.data.link and insertLink and IsModifiedClick("CHATLINK") then insertLink(self.data.link) end
@@ -1278,8 +1133,6 @@ local function createSpareRow()
   return row
 end
 
--- Places the buttons shown at the right. Returns the width left for the
--- text.
 local function placeSpareButtons(row, primary, secondary)
   row.primary:SetShown(primary ~= nil)
   row.secondary:SetShown(secondary ~= nil)
@@ -1301,8 +1154,6 @@ local function placeSpareButtons(row, primary, secondary)
   return listWidth() - 2 * INSET - SPARE_ICON - 8 - buttons - 4
 end
 
--- The item's link, then its required level on a badge, then a line under
--- them, all short of the buttons (width).
 local function drawSpareText(row, data, width)
   row.item:SetWidth(0)
   row.item:SetText(data.link or "Loading...")
@@ -1314,8 +1165,6 @@ local function drawSpareText(row, data, width)
   row.info:SetWidth(width)
 end
 
--- Draws a row as Core words it. A Given Spare of yours dims less than
--- one of the Crew's you can't use.
 local function drawSpareRow(row, data, yours)
   row.data, row.yours = data, yours
   row.icon:SetTexture(getItemIcon and getItemIcon(data.item) or QUESTION_MARK)
@@ -1387,9 +1236,6 @@ local function drawSpares()
   if view.unseen > 0 then core:sparesSeen() end
 end
 
--- Professions: the column icons on top, then a scrolling row per Member.
--- Clicking an icon sorts by that profession (again: back to the Roster's
--- order).
 local professionSort
 local drawProfessions
 
@@ -1447,10 +1293,6 @@ local function createProfessionsView()
   professionsView.empty = ns.EmptyState.new(professionsView)
 end
 
--- Where each column starts, from the left, how wide a tile is and how
--- wide the name column is. Twelve tiles fit at 18px at the smallest
--- window; more shrink them. A wider window grows the name column up to
--- its most, then the tiles take the rest, so the grid always fills it.
 local function professionColumns(professions)
   local divider = 0
   for _, p in ipairs(professions) do
@@ -1506,8 +1348,6 @@ local function professionIcon(index)
   return icon
 end
 
--- A tile's tooltip: the profession, then each of the Member's Characters who
--- have it, with rank and skill/max.
 local function tileTooltip(tile)
   local member, profession = tile.member, tile.profession
   GameTooltip:AddLine(profession.name, 1, 1, 1)
@@ -1525,7 +1365,6 @@ local function tileTooltip(tile)
   end
 end
 
--- A tile: the skill on a wash by rank, and a 2px skill/max bar under it.
 local function professionTile(row, index)
   local tile = row.tiles[index]
   if tile then return tile end
@@ -1553,7 +1392,6 @@ local function professionTile(row, index)
 end
 
 local function drawProfessionTile(tile, cell, width)
-  -- The tile, 2px of gap, then the bar.
   tile:SetSize(width, PROFESSION_TILE + 2 + PROFESSION_BAR)
   tile.width = width
   local shade = not cell and Skin.TILE_NONE or cell.capped and Skin.TILE_CAPPED
@@ -1601,7 +1439,6 @@ function drawProfessions()
     icon:ClearAllPoints()
     icon:SetPoint("TOPLEFT", professionsView.head, "TOPLEFT", xs[i] + (width - PROFESSION_ICON) / 2, -5)
     icon.texture:SetTexture(p.icon or QUESTION_MARK)
-    -- Nobody has it: desaturated at 55%, as an unused Reaction.
     icon.texture:SetDesaturated(not p.had)
     icon:SetAlpha(p.had and 1 or 0.55)
     icon:Show()
@@ -1618,8 +1455,6 @@ function drawProfessions()
       xs[sorted] + (width - PROFESSION_ICON) / 2, 1)
   end
 
-  -- Nobody in the Crew has a profession yet: an empty state instead of
-  -- the rows.
   local members = view.none and {} or view.members
   if view.none then
     professionsView.empty:Set(emptyState(PROFESSIONS_EMPTY))
@@ -1670,8 +1505,6 @@ function drawProfessions()
   updateThumb(professionsView.list)
 end
 
--- Puts the window where Core says it opens: the player's size and
--- position, kept on this screen, or the default size, centred.
 local function applyPlace()
   local saved = core:panelPlace(UIParent:GetWidth(), UIParent:GetHeight())
   frame:SetSize(saved.width, saved.height)
@@ -1683,9 +1516,8 @@ local function applyPlace()
   end
 end
 
--- Saves where a move or resize left the window. Core saves it account-wide
--- (not the game's layout cache, which is applied before the panel exists),
--- and its settingChanged redraws the views at the new size.
+-- WoW: the game's layout cache (SetUserPlaced) is applied before the panel
+-- exists.
 local function savePlace()
   frame.sizing, frame.moving = nil, nil
   frame:StopMovingOrSizing()
@@ -1693,13 +1525,11 @@ local function savePlace()
   core:setPanelPlace(frame:GetWidth(), frame:GetHeight(), frame:GetLeft(), frame:GetTop())
 end
 
--- The grip in the bottom right corner: drag to resize, double-click to go
--- back to the default size, centred. Anchored parts stretch while
--- dragging; the views redraw once, when it ends.
 local function createGrip()
   frame:SetResizable(true)
   local limits = ns.Core
-  -- Midnight's API; older clients had the min and max calls.
+  -- WoW: SetResizeBounds is Midnight's; older clients have SetMinResize and
+  -- SetMaxResize.
   if frame.SetResizeBounds then
     frame:SetResizeBounds(limits.PANEL_MIN_WIDTH, limits.PANEL_MIN_HEIGHT,
       limits.PANEL_MAX_WIDTH, limits.PANEL_MAX_HEIGHT)
@@ -1744,7 +1574,8 @@ local function create()
   frame:SetScript("OnDragStop", savePlace)
   createGrip()
   frame:SetScript("OnShow", Panel.refresh)
-  -- A move or resize the panel closed during still saves where it got to.
+  -- WoW: a frame hidden mid-move or mid-resize may get no OnDragStop or
+  -- OnMouseUp.
   frame:SetScript("OnHide", function()
     if frame.sizing or frame.moving then savePlace() end
     core:leaveFeed()
@@ -1753,8 +1584,6 @@ local function create()
     core:leaveWhatsNew()
     ns.WhatsNewTab.leave()
     ns.SettingsTab.leave()
-    -- Out of a Crew, Settings opens over the setup view only when asked
-    -- for; the panel comes back to setup.
     if tab == "settings" and not core:crew() then tab = "roster" end
   end)
   local sinceRedraw = 0
@@ -1766,13 +1595,11 @@ local function create()
     end
   end)
 
-  -- The bug report and Get in touch buttons, left of the close button.
   frame.contact = Skin.headerButton(frame.header, "message", "Get in touch", function() ns.Contact.show() end)
   frame.contact:SetPoint("RIGHT", frame.close, "LEFT", -2, 0)
   frame.report = Skin.headerButton(frame.header, "bug", "Report a bug", function() ns.Report.show() end)
   frame.report:SetPoint("RIGHT", frame.contact, "LEFT", -2, 0)
 
-  -- "● 2 of 3 online", left of those.
   frame.headerRight:ClearAllPoints()
   frame.headerRight:SetPoint("RIGHT", frame.report, "LEFT", -8, 0)
   frame.onlineDot = frame.header:CreateTexture(nil, "OVERLAY")
@@ -1797,9 +1624,6 @@ local function create()
   frame.content = CreateFrame("Frame", nil, frame)
 end
 
--- The Camp band, when Core has one: across the window, under the header,
--- at its full height, or the short one in a small window. Nil without a
--- Crew.
 local function drawCamp(inCrew)
   local view
   if inCrew then
@@ -1815,9 +1639,6 @@ local function drawCamp(inCrew)
   firelight:Place(camp, campHeight > 0 and frame:GetHeight() - HEADER - campHeight or nil)
 end
 
--- The Tip card: Core's text on the left, Turn on and No thanks on the
--- right. Either answers the Tip, and Core's changed event redraws without
--- it.
 local function createTip()
   tipCard = CreateFrame("Frame", nil, frame)
   Skin.fill(tipCard, Skin.SIDEBAR)
@@ -1834,8 +1655,6 @@ local function createTip()
   tipCard.accept:SetPoint("RIGHT", tipCard.dismiss, "LEFT", -6, 0)
 end
 
--- The Tip card, when Core has a Tip: across the window under the Camp
--- band, as high as its text.
 local function drawTip()
   local tip = core:tip()
   if not tip then
@@ -1847,7 +1666,7 @@ local function drawTip()
   tipCard.key = tip.key
   tipCard.accept:SetText(tip.accept)
   tipCard.dismiss:SetText(tip.dismiss)
-  -- Set outright, so the wrapped text has a height before layout.
+  -- WoW: a wrapping FontString has no height until its width is set.
   tipCard.text:SetWidth(frame:GetWidth() - 2 - 3 * INSET - 2 * TIP_BUTTON - 6)
   tipCard.text:SetText(tip.text)
   tipHeight = math.ceil(math.max(tipCard.text:GetStringHeight(), SMALL_BUTTON)) + 2 * TIP_PAD
@@ -1858,8 +1677,6 @@ local function drawTip()
   tipCard:Show()
 end
 
--- With a Crew the content sits right of the sidebar, under the Camp and
--- the Tip; without one it takes the whole window.
 local function layout(inCrew)
   drawCamp(inCrew)
   drawTip()
@@ -1875,8 +1692,6 @@ local function layout(inCrew)
   if not inCrew then frame.headerRight:SetText("") end
 end
 
--- The setup view, centred in the window: Display name, then Start a Crew
--- and Join a Crew side by side, a hairline between them.
 local function createSetup()
   setup = CreateFrame("Frame", nil, frame.content)
   setup:SetSize(SETUP_WIDTH, -SETUP_COLUMNS_Y + 90)
@@ -1939,7 +1754,6 @@ local function showSetup()
   setup:Show()
 end
 
--- Re-add a removed Member, from a menu of everyone removed.
 local function showRemovedMenu(owner)
   MenuUtil.CreateContextMenu(owner, function(_, root)
     root:CreateTitle("Removed Members")
@@ -1951,10 +1765,6 @@ local function showRemovedMenu(owner)
   end)
 end
 
--- Below the rows: the waiting, leaving or appear-offline line, then the
--- Crew code in a read-only box with the text selected (addons can't copy
--- to the clipboard), with the hidden count and removed Members right of
--- it.
 local function createFooter()
   footer = CreateFrame("Frame", nil, frame.content)
   footer:SetPoint("BOTTOMLEFT")
@@ -1984,8 +1794,8 @@ local function createFooter()
   footer.code:SetHeight(22)
   footer.code:SetJustifyH("CENTER")
   footer.code:SetPoint("LEFT", codeLabel, "RIGHT", 8, 0)
-  -- The text stays selected for copying; a faint selection keeps the code
-  -- from being the brightest thing in the panel.
+  -- WoW: addons can't write to the clipboard, so the code stays selected
+  -- for the player to copy.
   footer.code:SetHighlightColor(1, 1, 1, 0.15)
   footer.code:SetScript("OnEditFocusGained", function(box) box:HighlightText() end)
   footer.code:SetScript("OnTextChanged", function(box, userInput)
@@ -1996,7 +1806,6 @@ local function createFooter()
   end)
 end
 
--- Draws the footer and returns its height.
 local function drawFooter(crew, summary)
   if not footer then createFooter() end
   local removed = #core:removed()
@@ -2016,10 +1825,8 @@ local function drawFooter(crew, summary)
   footer.code:SetText(crew.code)
   footer.code:HighlightText()
 
-  -- Set outright, to the window's width, so the wrapped text has a height
-  -- before layout.
+  -- WoW: a wrapping FontString has no height until its width is set.
   footer.status:SetWidth(contentWidth() - 2 * INSET)
-  -- Waiting for the Crew is the alone card's to say, over the rows.
   local status = not crew.waiting and crew.status or nil
   footer.status:SetText(status or "")
   local height = 46
@@ -2029,9 +1836,6 @@ local function drawFooter(crew, summary)
   return height
 end
 
--- Hides every tab's view but the one named ("roster", "feed", "goals",
--- "when", "spares", "professions", "together", "catches", "whatsnew", "settings"; nil hides them all). Each draw function shows
--- its own.
 local function hideViewsBut(name)
   if name ~= "roster" then
     if rosterView then rosterView:Hide() end
@@ -2092,8 +1896,6 @@ local function drawRoster(crew, summary)
     place(row, y)
     drawRow(row, data)
     y = y - ROW_HEIGHT
-    -- While you're the only Member known, the alone card sits under your
-    -- own row.
     if data.own and crew.alone then
       rosterView.alone:Set(emptyState(nil))
       rosterView.alone:ClearAllPoints()
@@ -2119,7 +1921,6 @@ local function drawRoster(crew, summary)
   updateThumb(rosterView)
 end
 
--- Redraws from Core, if the panel is open.
 function Panel.refresh()
   if not frame or not frame:IsShown() then return end
   local crew = core:crew()
@@ -2135,12 +1936,8 @@ function Panel.refresh()
     return
   end
   if setup then setup:Hide() end
-  -- Showing the Feed starts or continues a Feed visit, before anything is
-  -- read; any other tab ends it.
   if tab == "feed" then core:openFeed() else core:leaveFeed() end
-  -- Likewise a Goals tab visit, for the latest win's "since you last looked".
   if tab == "goals" then core:openGoals() else core:leaveGoals() end
-  -- And a What's new visit, which marks the changes seen.
   if tab == "whatsnew" then core:openWhatsNew() else core:leaveWhatsNew() end
 
   local summary = core:summary()
@@ -2170,11 +1967,6 @@ function Panel.refresh()
   end
 end
 
--- Pause sharing shows in the Roster's footer, whose height the rows sit
--- above, so the open tab redraws. A new panel place (a resize, a move or a
--- reset) puts the window there and redraws the views at its size. The
--- Pocket Camp turned on in Settings answers its Tip, so the card goes.
--- The Settings tab redraws on any setting, so its controls show it.
 function Panel.settingChanged(key)
   if key == "panelPlace" and frame then applyPlace() end
   if key == "paused" or key == "panelPlace" or key == "camp" or key == "pocketCamp" or tab == "settings" then
@@ -2182,16 +1974,12 @@ function Panel.settingChanged(key)
   end
 end
 
--- You Cheered a Member (from the Feed, a toast or While you were away):
--- they hop, if they're seated by the fire, here and in the Pocket Camp.
 function Panel.cheered(memberId)
   if not memberId then return end
   if camp then camp:Hop(memberId) end
   ns.PocketCamp.cheered(memberId)
 end
 
--- Core's campReaction: a Reaction this client just attached plays in the
--- panel's Camp, while it shows.
 function Panel.campReaction(reaction)
   if camp and frame:IsShown() then camp:React(reaction) end
 end
@@ -2201,20 +1989,16 @@ function Panel.toggle()
   frame:SetShown(not frame:IsShown())
 end
 
--- Opens the panel on a tab: "roster", "feed", "goals", "when", "spares",
--- "professions", "together", "catches", "whatsnew" or "settings".
 function Panel.show(name)
   if not frame then create() end
   tab = name
   if frame:IsShown() then Panel.refresh() else frame:Show() end
 end
 
--- Steps aside, as Move toasts does while the sample toast is dragged.
 function Panel.hide()
   if frame then frame:Hide() end
 end
 
--- Opens the When tab on a Member, or the Crew for nil.
 function Panel.showWhen(memberId)
   whenMember = memberId
   Panel.show("when")

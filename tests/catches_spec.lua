@@ -1,6 +1,5 @@
 local load = require("tests.load")
 
--- Item IDs from the list (docs/research/fishing-catches.md).
 local SMALLFISH = 6291
 local MACKEREL = 6303
 local CATFISH_19 = 6363
@@ -9,7 +8,6 @@ local SUMMER_BASS = 13756
 local TASTYFISH = 19807
 local SHOE = 271647
 
--- A net with the given clients logged in and in one Crew, settled.
 local function crew(names)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -21,7 +19,6 @@ local function crew(names)
   return net, clients, ns
 end
 
--- A catch as Catches.read gives it: each item ID once, in Westfall.
 local function catch(...)
   local items = {}
   for i = 1, select("#", ...) do items[i] = { itemId = select(i, ...), quantity = 1 } end
@@ -34,8 +31,6 @@ local function typeOf(view, id)
   end
 end
 
--- A fake game's loot window: each slot as { link, quantity, currencyID,
--- isCoin }, whether it's fishing loot, and where the Character stands.
 local function game(slots, fishing, where)
   where = where or {}
   return {
@@ -207,7 +202,6 @@ describe("Catches", function()
       for i = 1, ns.Catches.UNLISTED_CAP + 5 do a.core:caught(catch(900000 + i)) end
       net:run(1)
       assert.equal(ns.Catches.UNLISTED_CAP, #a.core:catches().unlisted)
-      -- Listed types still go in once the cap is reached.
       assert.is_true(a.core:caught(catch(SMALLFISH)))
       assert.equal(1, a.core:catches().caught)
     end)
@@ -215,7 +209,6 @@ describe("Catches", function()
     it("never count Extras towards the types caught", function()
       local _, clients = crew({ "Ann" })
       local a = clients[1]
-      -- Spotted Sunfish (a quest item), Stranglekelp and the three rums.
       a.core:caught(catch(SUMMER_BASS, TASTYFISH, 1467, 3820, 20709, 21114, 21151))
       local view = a.core:catches()
       assert.equal(0, view.caught)
@@ -311,7 +304,6 @@ describe("Catches", function()
       assert.equal(0, #view.unlisted)
       assert.equal(20, a:rowFor({ memberId = "junkfield" }).level)
 
-      -- Unlisted catches past the cap from another client: the earliest kept.
       local many = {}
       for i = 1, ns.Catches.UNLISTED_CAP + 10 do many[900000 + i] = { t = 100 + i, n = 1 } end
       send("toomanyu", many)

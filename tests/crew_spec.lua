@@ -33,7 +33,6 @@ local function countEvents(deps, name)
   return n
 end
 
--- A code whose check character is right, built from 7 chosen characters.
 local function withCheck(body)
   local sum = 0
   for i = 1, 7 do
@@ -123,7 +122,6 @@ describe("Crew codes", function()
     local plain = code:gsub("-", "")
     assert.is_nil(crew.channel:find(plain:sub(1, 4), 1, true))
 
-    -- The same code always gives the same channel, a different one doesn't.
     local again = load().Core.new(newDeps()):joinCrew(code, "CC")
     assert.equal(crew.channel, again.channel)
     assert.equal(crew.password, again.password)
@@ -304,7 +302,6 @@ describe("Leaving the Crew", function()
     second:up()
     local record = tombstone(ns, deps.sent[1])
     assert.is_true(record.left)
-    -- The Character, its Play times, starting and leaving: four writes.
     assert.equal(1003, record.version)
     assert.is_nil(second:crew())
     assert.equal(1, countEvents(deps, "crewChanged"))

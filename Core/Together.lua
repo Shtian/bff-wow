@@ -1,26 +1,9 @@
--- Together: the Together tab, worked out from Roster's rows. The Crew's
--- Characters and the game's dungeons on one level line, placed and worded
--- so the UI only lays them out. Pure and stateless: tested through
--- Core:together(). See docs/design/together.md.
-
 local _, ns = ...
 
 local Together = {}
 ns.Together = Together
 
--- The game's dungeons, by the level they start at. kind is "dungeon",
--- "attunement" or "raid"; forever marks the ones new in WoW: Forever (from
--- Blizzard's "Explore the New Dungeons of World of Warcraft: Forever", Oct
--- 20 2026). Classic ranges are the usual recommended ones; the two new
--- raids' levels aren't published yet and are assumed to be 60. finals are
--- the DungeonEncounterIDs (ENCOUNTER_END's encounterID) of the boss whose
--- kill clears it, as far as they're known (docs/research/boss-kills.md):
--- datamined from Forever's DungeonEncounter table (wago.tools, build
--- 1.60.1.70755), not yet seen in a run. Where an instance has several
--- (one per difficulty or season, a wing, a side, or two bosses in no fixed
--- order), any of them clears it, until a run shows which Forever uses.
--- Names are keys too: Members' records keep their clears by them (docs/adr/
--- 0005), so renaming an instance orphans its clears.
+-- WoW: finals are DungeonEncounterIDs, as ENCOUNTER_END's encounterID gives them.
 local DUNGEONS = {
   { name = "Ragefire Chasm", from = 13, to = 18, where = "Orgrimmar", finals = { 2733, 2735 } },
   { name = "Hall of Thanes", from = 13, to = 18, where = "beneath Ironforge", forever = true, finals = { 3496 } },
@@ -68,8 +51,6 @@ for i, dungeon in ipairs(DUNGEONS) do
 end
 Together.DUNGEONS = DUNGEONS
 
--- The raids, shown together as one "Raids 5" entry at 60 when the Show
--- menu's Raids is on.
 local RAID_LIST = {}
 for _, dungeon in ipairs(DUNGEONS) do
   if dungeon.kind == "raid" then RAID_LIST[#RAID_LIST + 1] = dungeon end
@@ -84,15 +65,8 @@ local RAIDS = {
   raids = RAID_LIST,
 }
 
--- "Only near your level": dungeons whose range comes within this many
--- levels of you.
 local NEAR = 10
 
--- The line's geometry, in pixels: a level's width, the room left of level
--- 1 and right of the top level, the label rows above the axis, and the
--- gaps kept between neighbours in a row or a lane. The dungeon lanes below
--- the axis are as many as the dungeons need (together().lanes). UI reads
--- the same table to lay the line out.
 local LAYOUT = {
   levels = 60,
   level = 24,
@@ -101,14 +75,10 @@ local LAYOUT = {
   rows = 4,
   rowGap = 6,
   laneGap = 3,
-  -- A label's name is cut at this width.
   nameWidth = 96,
-  -- A bar shows at most this many Member dots, then "+N".
   dots = 4,
   dot = 8,
-  -- The Forever mark on a bar.
   foreverMark = 18,
-  -- The online dot before an online friend's label, and its gap.
   online = 10,
 }
 Together.LAYOUT = LAYOUT
@@ -119,8 +89,6 @@ local function xOf(level)
   return LAYOUT.left + (level - 1) * LAYOUT.level
 end
 
--- Text widths, when the UI doesn't hand in its own measure: roughly Arial
--- Narrow's.
 local function estimate(text, font)
   return #text * (font == "tiny" and 5 or 6)
 end
@@ -129,21 +97,16 @@ local function plural(count, one, many)
   return count == 1 and one or many
 end
 
--- The Roster's rule: within CAN_PLAY levels of the Character you play.
 local function canPlay(level, yourLevel)
   return math.abs(level - yourLevel) <= CAN_PLAY
 end
 
--- "can play", "4 ahead" or "10 behind", from you.
 local function apart(level, yourLevel)
   local gap = level - yourLevel
   if canPlay(level, yourLevel) then return "can play" end
   return ("%d %s"):format(math.abs(gap), gap > 0 and "ahead" or "behind")
 end
 
--- The Members, from Roster's rows (yours first): each with its name and
--- every Character the Roster shows, the shown one first. played marks the
--- Character being played while online.
 local function membersOf(rows)
   local members = {}
   for _, row in ipairs(rows) do
@@ -169,8 +132,6 @@ local function membersOf(rows)
   return members
 end
 
--- The Member's Character closest to level (that passes the test, if one is
--- given), or nil. A tie goes to the one shown first.
 local function closest(member, level, test)
   local best, bestGap
   for _, character in ipairs(member.characters) do
@@ -182,10 +143,6 @@ local function closest(member, level, test)
   return best
 end
 
--- Whether a Character shows on the line, under the Show menu's filters:
--- yours while played; others' Main and the Character they're playing.
--- Alts show only with filters.alts, offline Members' Characters only with
--- filters.offline.
 local function visible(character, filters)
   local member = character.member
   if member.own then return character.shown or filters.alts end
@@ -197,8 +154,6 @@ local function fits(level, dungeon)
   return level >= dungeon.from and level <= dungeon.to
 end
 
--- Friends: a group per level, its Characters you first, then whoever is
--- online, then Mains.
 local function before(a, b)
   if a.member.own ~= b.member.own then return a.member.own end
   if a.played ~= b.played then return a.played end
@@ -280,7 +235,6 @@ local function buildGroups(members, yourLevel, measure, filters, chosen)
   return groups
 end
 
--- Is [from, to) clear of everything in spans, gap pixels apart?
 local function free(spans, from, to, gap)
   for _, span in ipairs(spans) do
     if not (to + gap <= span[1] or from >= span[2] + gap) then return false end
@@ -288,9 +242,6 @@ local function free(spans, from, to, gap)
   return true
 end
 
--- Labels go in the rows above the axis, row 1 nearest it: yours first,
--- then online friends, then the nearest to your level. A label that finds
--- no room leaves just its dot.
 local function placeLabels(groups, yourLevel)
   local order = {}
   for i, group in ipairs(groups) do order[i] = group end
@@ -322,8 +273,6 @@ end
 
 local KINDS = { dungeon = "Dungeon", attunement = "Attunement", raid = "Raid" }
 
--- A dungeon's tooltip and the Members who fit it: each other Member with a
--- Character in its range, the one closest to your level, online first.
 local function describeDungeon(dungeon, others, yourLevel)
   local fitters = {}
   local almost = {}
@@ -403,9 +352,6 @@ local function describeDungeon(dungeon, others, yourLevel)
   return fitters, tooltip
 end
 
--- The dungeons the Show menu's filters leave on the line: every dungeon,
--- the attunement while Attunements is on, one entry for the raids while
--- Raids is on; with Only near your level, those within NEAR levels of you.
 local function shownDungeons(filters, yourLevel)
   local list = {}
   for _, dungeon in ipairs(DUNGEONS) do
@@ -422,7 +368,6 @@ local function shownDungeons(filters, yourLevel)
   return near
 end
 
--- Whether you and every chosen Member (any of their Characters) fit it.
 local function sharedBy(dungeon, yourLevel, chosen)
   if #chosen == 0 or not fits(yourLevel, dungeon) then return false end
   for _, member in ipairs(chosen) do
@@ -431,11 +376,6 @@ local function sharedBy(dungeon, yourLevel, chosen)
   return true
 end
 
--- Bars below the axis for every dungeon shown, placed most relevant first
--- in the first lane with room: ones you fit, then by how many Members fit.
--- A bar that finds no room opens a new lane, so none is left out. While
--- friends are chosen, the ones you all fit are shared and the rest faded.
--- Returns the bars and how many lanes they take.
 local function buildBars(dungeons, others, yourLevel, measure, chosen)
   local bars = {}
   for _, dungeon in ipairs(dungeons) do
@@ -465,9 +405,6 @@ local function buildBars(dungeons, others, yourLevel, measure, chosen)
       past = yourLevel > dungeon.to,
       x = xOf(dungeon.from) - LAYOUT.level / 2,
       width = math.max(span, content),
-      -- The plate: the level range's whole cells, as the can-play band
-      -- and the shaded decades. The raids' one level is too narrow for
-      -- its entry, so its whole entry is.
       range = raids and math.max(span, content) or span,
       tooltip = tooltip,
       shared = shared,
@@ -497,8 +434,6 @@ local function buildBars(dungeons, others, yourLevel, measure, chosen)
   return bars, #lanes
 end
 
--- The Show menu: its options with their current values, the key and the
--- help line.
 local function showMenu(filters)
   local function option(key, field, label)
     return { key = key, label = label, value = filters[field] }
@@ -529,7 +464,6 @@ local function showMenu(filters)
   }
 end
 
--- The stretches of the line, from 0 to width, with nothing in a lane.
 local function emptySpans(bars, width)
   local taken = {}
   for _, bar in ipairs(bars) do taken[#taken + 1] = { bar.x, bar.x + bar.width } end
@@ -543,8 +477,6 @@ local function emptySpans(bars, width)
   return spans
 end
 
--- "3 alts, 2 offline hidden", or nil when nothing is. Offline Members
--- hidden by the filter count once each; Alts count among the rest.
 local function hiddenNote(others, filters)
   local alts, offline = 0, 0
   for _, member in ipairs(others) do
@@ -563,8 +495,6 @@ local function hiddenNote(others, filters)
   return table.concat(parts, ", ") .. " hidden"
 end
 
--- What hovering a level on the line says: "28 · 6 dungeons", counting
--- the dungeons shown that it fits.
 local function levelTexts(bars)
   local texts = {}
   for level = 1, LAYOUT.levels do
@@ -578,8 +508,6 @@ local function levelTexts(bars)
   return texts
 end
 
--- Every other ten levels shaded, so the long line has a rhythm: 10 to 20,
--- 30 to 40 and 50 to 60, edge to edge on the tenth levels' ticks.
 local function decades()
   local list = {}
   for from = 10, LAYOUT.levels - 10, 20 do
@@ -589,8 +517,6 @@ local function decades()
   return list
 end
 
--- The overview's outline: how many dungeons shown fit each level, and
--- whether it's in your can-play band; most is the largest count.
 local function density(bars, yourLevel)
   local levels, most = {}, 0
   for level = 1, LAYOUT.levels do
@@ -604,9 +530,6 @@ local function density(bars, yourLevel)
   return { levels = levels, most = most }
 end
 
--- Hovering a bar lights the friends on the line who fit it, and hovering a
--- friend the bars they fit: each bar's groups and each group's bars, as
--- indexes.
 local function link(groups, bars)
   for _, group in ipairs(groups) do group.bars = {} end
   for b, bar in ipairs(bars) do
@@ -620,10 +543,6 @@ local function link(groups, bars)
   end
 end
 
--- Picking friends on the line: clicking a label or dot picks the Members
--- in it (memberIds), shift-clicking (add) adds them, and clicking what's
--- already picked clears it. No Members (your own dot) changes nothing.
--- Returns the new list of memberIds.
 function Together.select(selected, memberIds, add)
   local result = {}
   for i, id in ipairs(selected) do result[i] = id end
@@ -648,11 +567,6 @@ function Together.select(selected, memberIds, add)
   return result
 end
 
--- The Together tab from Roster's rows (yours first), or nil before you
--- play a Character. measure(text, font) is how wide a text is in pixels
--- in the font named ("small" or "tiny", as Skin's); without one, widths
--- are estimated. options: filters (the Show menu's offline, alts, near,
--- attunements and raids) and selected (memberIds picked on the line).
 function Together.view(rows, measure, options)
   local own = rows[1]
   if not own or not own.own then return nil end
@@ -669,7 +583,6 @@ function Together.view(rows, measure, options)
     end
   end
 
-  -- The chosen Members, as a list and by id; any is set while there are some.
   local chosen, selected = {}, {}
   for _, id in ipairs(options.selected or {}) do
     local member = byId[id]

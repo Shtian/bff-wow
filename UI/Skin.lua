@@ -1,9 +1,3 @@
--- Skin: BFF's own flat look, shared by the panel, the While you were away
--- popup, toasts and map pins. Dark windows, a gold accent, Arial Narrow
--- for text and Friz Quadrata for titles. Built from solid colour textures
--- and a few long-standing game textures, so it doesn't depend on Blizzard's
--- frame templates looking the same in every client.
-
 local _, ns = ...
 
 local Skin = {}
@@ -15,17 +9,15 @@ Skin.MUTED = { 0.68, 0.67, 0.72 }
 Skin.DIM = { 0.55, 0.54, 0.6 }
 Skin.ONLINE = { 0.44, 0.89, 0.44 }
 Skin.OFFLINE = { 0.33, 0.32, 0.37 }
--- 97% opaque: at 95%, bright world text read through a panel's empty
--- space.
 Skin.WINDOW = { 0.055, 0.051, 0.078, 0.97 }
 Skin.HEADER = { 0.1, 0.095, 0.13, 1 }
--- Washes and hairlines are in the firelight's cream, not pure white, so
--- the window feels lit by the Camp's fire (DESIGN.md, the Firelit Window
--- Rule). Skin.warm(alpha) is one at any strength.
 Skin.WARM = { 1, 0.925, 0.784 }
--- A colour's RGB at another alpha.
 function Skin.alpha(color, alpha)
   return { color[1], color[2], color[3], alpha }
+end
+-- WoW: ElvUI turns the default pixel snapping off.
+function Skin.snapToPixels(frame)
+  if frame.SetRoundLayoutToNearestPixel then frame:SetRoundLayoutToNearestPixel(true) end
 end
 function Skin.warm(alpha)
   return Skin.alpha(Skin.WARM, alpha)
@@ -35,39 +27,22 @@ Skin.RAISED = { 0.106, 0.102, 0.137, 1 }
 Skin.LINE = Skin.warm(0.075)
 Skin.BORDER = Skin.warm(0.1)
 Skin.HOVER = Skin.warm(0.05)
--- The selected sidebar tab's chip, and a hovered one's.
 Skin.CHIP = Skin.warm(0.09)
 Skin.CHIP_HOVER = Skin.warm(0.04)
--- A section label's rule: this strong by the label, fading out to its end.
 Skin.RULE = Skin.warm(0.11)
--- The Feed's timeline: this strong at the top, fading to the end as the
--- entries get older.
 Skin.TIMELINE_NEW = Skin.warm(0.16)
 Skin.TIMELINE_OLD = Skin.warm(0.03)
--- Every bar: a faint track and a neutral fill. Colour on a bar means
--- something (levels gained, a goal complete).
 Skin.TRACK = Skin.warm(0.08)
 Skin.BAR = { 1, 1, 1, 0.3 }
--- A secondary button's plate: the small buttons and the Skin buttons.
 Skin.SECONDARY = Skin.warm(0.06)
--- Ember Gold Deep, the Camp's deep gold: the arms of the spark that opens
--- a section label.
 Skin.EMBER_DEEP = { 0.94, 0.635, 0.11 }
--- The night settling at the panel's foot, away from the fire: this dark
--- at the very bottom, clear at the top of its rise.
 Skin.SETTLE = { 0.016, 0.012, 0.031, 0.55 }
--- News catching the light: a gold wash this strong at its left, where
--- the news starts, fading to the right. Your own rows take LIT_FROM and
--- LIT_TO; the latest-win plate is brighter, with its edge brighter along
--- the top.
 Skin.LIT_FROM = Skin.alpha(Skin.GOLD, 0.1)
 Skin.LIT_TO = Skin.alpha(Skin.GOLD, 0.02)
 Skin.LIT_PLATE_FROM = Skin.alpha(Skin.GOLD, 0.15)
 Skin.LIT_PLATE_TO = Skin.alpha(Skin.GOLD, 0.03)
 Skin.LIT_PLATE_EDGE = Skin.alpha(Skin.GOLD, 0.3)
 Skin.LIT_PLATE_TOP = Skin.alpha(Skin.GOLD, 0.55)
--- The Professions tab's tiles: neutral washes by rank (gold is news, not a
--- scale here), a lighter plate at 300, and a faint one for none.
 Skin.RANK_SHADES = {
   Apprentice = { 1, 1, 1, 0.11 },
   Journeyman = { 1, 1, 1, 0.19 },
@@ -76,33 +51,22 @@ Skin.RANK_SHADES = {
 }
 Skin.TILE_CAPPED = { 1, 1, 1, 0.66 }
 Skin.TILE_NONE = { 1, 1, 1, 0.035 }
--- A faint mark on the window: a bar's step ticks, a tile's "?".
 Skin.FAINT_MARK = { 1, 1, 1, 0.35 }
 
 Skin.HEADER_HEIGHT = 30
 
--- A muted grey for a picture's edge when its kind has no colour, and for
--- the overflow toast's icon.
 Skin.FEED_ICON_COLOR = { 0.82, 0.8, 0.86 }
--- Small icons inline in the While you were away popup: the max-level star,
--- the death skull and the Spare lines. The Feed tab and toasts draw
--- Skin.FEED_PICTURES instead.
 Skin.FEED_ICONS = {
   maxLevel = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1",
   death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
   newCharacter = "Interface\\FriendsFrame\\UI-Toast-FriendRequestIcon",
   joined = "Interface\\FriendsFrame\\UI-Toast-FriendOnlineIcon",
   left = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
-  -- Spares: a Give in the Feed, and the notices.
   gave = "Interface\\GossipFrame\\VendorGossipIcon",
   claimed = "Interface\\GossipFrame\\VendorGossipIcon",
   given = "Interface\\MINIMAP\\TRACKING\\Mailbox",
 }
 
--- Each Feed kind's picture, on the Feed tab and on toasts: a full-colour
--- spell or item icon, square, with a faded 1px edge in the kind's colour.
--- The small grey icons were hard to see on the dark window. A kind with no
--- picture gets the ding's plus.
 Skin.FEED_PICTURES = {
   ding = "Interface\\Icons\\Spell_ChargePositive",
   maxLevel = "Interface\\Icons\\Achievement_Level_80",
@@ -114,12 +78,8 @@ Skin.FEED_PICTURES = {
   gave = "Interface\\Icons\\INV_Misc_Bag_08",
   claimed = "Interface\\Icons\\INV_Misc_Bag_08",
   given = "Interface\\Icons\\INV_Letter_15",
-  -- A rare find draws its item's icon; this is until the game has it. The
-  -- Catches line in While you were away has no item of its own.
   rareFind = "Interface\\Icons\\INV_Misc_Fish_18",
   catches = "Interface\\Icons\\INV_Misc_Fish_18",
-  -- Profession entries draw the profession's own icon; this is for one
-  -- whose icon wasn't shared.
   newProfession = "Interface\\Icons\\INV_Misc_Book_11",
   professionSkill = "Interface\\Icons\\INV_Misc_Book_11",
   professionMaxed = "Interface\\Icons\\INV_Misc_Book_11",
@@ -142,16 +102,10 @@ Skin.FEED_EDGES = {
   newProfession = PROFESSION,
   professionSkill = PROFESSION,
   professionMaxed = Skin.GOLD,
-  -- A rare find's edge is its item's quality: none for common.
   rareFind = false,
 }
 local EDGE_ALPHA = 0.55
 
--- What's new: each kind of change's picture and edge, drawn as Feed
--- pictures. A big change (major) is a battle shout on gold, since it asks
--- something of you (make sure your friends update); a new feature (minor)
--- a gift on green, something gained; a small change or fix (patch) a
--- wrench on grey, quiet. Icons the game has had since launch.
 Skin.CHANGE_PICTURES = {
   major = "Interface\\Icons\\Ability_Warrior_BattleShout",
   minor = "Interface\\Icons\\INV_Misc_Gift_01",
@@ -162,13 +116,8 @@ Skin.CHANGE_EDGES = {
   minor = Skin.ONLINE,
   patch = { 0.6, 0.6, 0.66 },
 }
--- A given Reaction's edge: a quiet frame, not gold, so the Feed's gold stays
--- on the news.
 local GIVEN_EDGE = { 1, 1, 1, 0.3 }
 
--- Trophy colours (DESIGN.md, Trophy colours). Each Crew goal track's hue
--- is the Feed kind its news looks like: green for levels, red for deaths,
--- violet for professions. On the track icon's edge and its bar's fill.
 Skin.TROPHY_HUES = {
   crewLevels = Skin.ONLINE,
   everyone = Skin.ONLINE,
@@ -179,19 +128,12 @@ Skin.TROPHY_HUES = {
   catches = CREW,
   rares = DEATH,
 }
--- A trophy's tier, in WoW's item quality colours (Core says which): on a
--- medal's edge and foot. Rare is lifted from the game's #0070dd so it
--- reads on Night Window.
 Skin.TROPHY_QUALITIES = {
   uncommon = { 0.12, 1, 0 },
   rare = { 0.23, 0.61, 1 },
   epic = { 0.71, 0.36, 0.96 },
   legendary = { 1, 0.5, 0 },
 }
--- Item quality colours on items in Catches (DESIGN.md, the Catch Colours
--- Rule): a caught tile's faded edge and an item's name, by the game's
--- quality number. Common (1) has none: no edge, and its name in Ash Text.
--- Uncommon to legendary are the same shades as the trophy tiers.
 Skin.ITEM_QUALITIES = {
   [0] = { 0.62, 0.62, 0.62 },
   [2] = { 0.12, 1, 0 },
@@ -204,24 +146,19 @@ Skin.ITEM_EDGE_ALPHA = EDGE_ALPHA
 local getItemInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
 local getItemIcon = C_Item and C_Item.GetItemIconByID or GetItemIcon
 
--- An item as the game has it: its name, icon and quality colour (nil for
--- common), each nil while it isn't cached. Asking starts loading it, and
--- GET_ITEM_INFO_RECEIVED says when it has.
+-- WoW: item info is nil until the item is cached; asking starts the load,
+-- and GET_ITEM_INFO_RECEIVED fires once it's in.
 function Skin.item(itemId)
   local name, _, quality = getItemInfo(itemId)
   return name, getItemIcon(itemId), quality and Skin.ITEM_QUALITIES[quality]
 end
 
--- How a rare find shows its item, for Core: { text (the name in its
--- quality colour), icon, edge (the quality colour) }.
 function Skin.itemLook(itemId)
   local name, icon, quality = Skin.item(itemId)
   local text = name
   if name and quality then text = Skin.hex(quality) .. name .. "|r" end
   return { text = text, icon = icon, edge = quality }
 end
--- Each track's icon, on its Working on tile, its medals (but Every
--- profession's, which show the profession) and the cabinet.
 Skin.GOAL_ICONS = {
   crewLevels = "Interface\\Icons\\Achievement_Level_20",
   everyone = "Interface\\Icons\\Achievement_Level_30",
@@ -233,23 +170,13 @@ Skin.GOAL_ICONS = {
   rares = "Interface\\Icons\\Ability_Hunter_SniperShot",
 }
 
--- A clear's medal icon, by kind: a dungeon's and a raid's (DESIGN.md,
--- Medal). Classic icons, so Forever has them.
 Skin.CLEAR_ICONS = {
   dungeon = "Interface\\Icons\\INV_Misc_Head_Human_01",
   raid = "Interface\\Icons\\INV_Misc_Head_Dragon_Black",
 }
 
--- A Rare kill's medal icon (DESIGN.md, Medal). A classic icon, so Forever
--- has it.
 Skin.RARE_ICON = "Interface\\Icons\\INV_Misc_MonsterClaw_04"
 
--- A square picture `size` wide: an opaque back (so a line behind it is
--- covered), the edge, and the icon inset 1px with its own bevel cropped.
--- :SetKind(kind, icon, edge) draws a Feed kind, with the entry's own icon
--- and edge if it has them (a profession's icon, a rare find's item);
--- :SetPicture(texture, edgeColor) any icon, with no edge when edgeColor is
--- false.
 function Skin.feedPicture(parent, size)
   local frame = CreateFrame("Frame", nil, parent)
   frame:SetSize(size, size)
@@ -274,8 +201,6 @@ function Skin.feedPicture(parent, size)
   return frame
 end
 
--- Each Reaction's icon and name, on the Feed tab, While you were away and
--- toasts. Long-standing spell and achievement icons.
 Skin.REACTION_ICONS = {
   cheer = "Interface\\Icons\\INV_Misc_MissileSmall_Red",
   respects = "Interface\\Icons\\INV_Misc_Flower_04",
@@ -283,7 +208,6 @@ Skin.REACTION_ICONS = {
 }
 Skin.REACTION_NAMES = { cheer = "Cheer", respects = "Pay respects", welcome = "Welcome" }
 
--- A Reaction's icon inline in text: "|T...|t".
 function Skin.reactionGlyph(reaction, size)
   local icon = Skin.REACTION_ICONS[reaction]
   if not icon then return "" end
@@ -301,9 +225,6 @@ local function reactionHover(button, over)
   end
 end
 
--- A small square button with a Reaction's icon. :SetReaction(reaction,
--- done) shows it dim and clickable, or in full colour with a faint edge
--- once given.
 function Skin.reactionButton(parent, size, onClick)
   local button = CreateFrame("Button", nil, parent)
   button:SetSize(size, size)
@@ -339,10 +260,6 @@ local function font(name, path, size)
   return object
 end
 
--- Friz names things: window titles, headings (goal names) and labels
--- (section, day and column labels, written in capitals). Arial Narrow
--- carries everything else; tiny is for badges and chart captions, and
--- figure for the Goals tab's big progress numbers.
 Skin.fonts = {
   title = font("BFFFontTitle", FRIZ, 13),
   heading = font("BFFFontHeading", FRIZ, 12),
@@ -354,19 +271,16 @@ Skin.fonts = {
   figure = font("BFFFontFigure", NARROW, 18),
 }
 
--- A class's colour as r, g, b; white for an unknown class.
 function Skin.classColor(classFilename)
   local color = classFilename and RAID_CLASS_COLORS[classFilename]
   if color then return color.r, color.g, color.b end
   return 1, 1, 1
 end
 
--- A game icon inline in text, cropped inside its bevel: "|T...|t".
 function Skin.iconGlyph(texture, size)
   return ("|T%s:%d:%d:0:0:64:64:5:59:5:59|t"):format(texture, size, size)
 end
 
--- A colour as a text escape: "|cffrrggbb".
 function Skin.hex(color)
   return ("|cff%02x%02x%02x"):format(color[1] * 255, color[2] * 255, color[3] * 255)
 end
@@ -379,7 +293,6 @@ function Skin.color(target, color)
   end
 end
 
--- A solid texture, filling `frame` unless placed afterwards.
 function Skin.fill(frame, color, layer, sublevel)
   local texture = frame:CreateTexture(nil, layer or "BACKGROUND", nil, sublevel)
   texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
@@ -387,9 +300,7 @@ function Skin.fill(frame, color, layer, sublevel)
   return texture
 end
 
--- A flat chip filling `frame` inset by x and y, with its corners stepped
--- in over `radius` pixels so it reads as rounded (textures have no corner
--- radius). Returns an object whose :SetShown shows or hides every part.
+-- WoW: textures have no corner radius, so the corners are stepped in.
 function Skin.chip(frame, color, x, y, radius, layer)
   local chip = { parts = {} }
   local function part()
@@ -418,24 +329,17 @@ function Skin.chip(frame, color, x, y, radius, layer)
   return chip
 end
 
--- Shades a texture from one colour to another: left to right
--- ("HORIZONTAL") or bottom to top ("VERTICAL"). Set a white colour
--- texture first; the gradient tints it.
 function Skin.gradient(texture, orientation, from, to)
   texture:SetGradient(orientation, CreateColor(from[1], from[2], from[3], from[4] or 1),
     CreateColor(to[1], to[2], to[3], to[4] or 1))
 end
 
--- A gold wash on `frame` that's strongest at its left, for news that
--- catches the fire's light: your own row and the latest win.
 function Skin.litWash(frame, from, to)
   local texture = Skin.fill(frame, { 1, 1, 1, 1 })
   Skin.gradient(texture, "HORIZONTAL", from or Skin.LIT_FROM, to or Skin.LIT_TO)
   return texture
 end
 
--- A section label's rule, from the label to whatever ends it: a hairline
--- that fades out as it goes. Place it with SetPoint; its height is set.
 function Skin.rule(parent)
   local line = parent:CreateTexture(nil, "ARTWORK")
   line:SetColorTexture(1, 1, 1, 1)
@@ -444,7 +348,6 @@ function Skin.rule(parent)
   return line
 end
 
--- A 1px line along one edge of `frame`.
 function Skin.edge(frame, side, color, layer)
   local line = frame:CreateTexture(nil, layer or "BORDER")
   line:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
@@ -460,7 +363,6 @@ function Skin.edge(frame, side, color, layer)
   return line
 end
 
--- 1px lines round `frame`. Returns them.
 function Skin.border(frame, color)
   local lines = {}
   for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
@@ -477,7 +379,6 @@ function Skin.label(parent, fontName, color, layer)
   return label
 end
 
--- Masks `texture` to a circle.
 function Skin.round(parent, texture)
   local mask = parent:CreateMaskTexture()
   mask:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
@@ -486,11 +387,7 @@ function Skin.round(parent, texture)
   return texture
 end
 
--- Small flat icons, drawn from solid rectangles ({ x, y, width, height }
--- from the icon's top left) since Arial Narrow has no such glyphs: filter
--- is three narrowing bars, a funnel; sort is an up arrow beside a down one;
--- group is two rows of two squares; bug is a beetle with its wings split;
--- message is a speech bubble with two lines of text in it.
+-- WoW: the game's Arial Narrow has no glyphs for these icons.
 local ICONS = {
   group = { width = 10, height = 9, rects = { { 0, 0, 4, 4 }, { 6, 0, 4, 4 }, { 0, 5, 4, 4 }, { 6, 5, 4, 4 } } },
   filter = { width = 10, height = 8, rects = { { 0, 0, 10, 2 }, { 2, 3, 6, 2 }, { 4, 6, 2, 2 } } },
@@ -512,15 +409,11 @@ local ICONS = {
   } },
 }
 
--- One screen pixel in a frame's UI units.
 local function screenPixel(frame)
   local factor = PixelUtil and PixelUtil.GetPixelToUIUnitFactor and PixelUtil.GetPixelToUIUnitFactor() or 1
   return factor / frame:GetEffectiveScale()
 end
 
--- Lays an icon's rectangles out in whole screen pixels: each unit of the
--- drawing is the same number of pixels (about one UI unit's worth), so a
--- 1-unit stem and a 3-unit row keep their shape at any UI scale.
 local function layOutIcon(icon)
   local pixel = screenPixel(icon)
   local unit = math.max(1, math.floor(1 / pixel + 0.5)) * pixel
@@ -533,9 +426,6 @@ local function layOutIcon(icon)
   end
 end
 
--- The spark that opens a section label, like one off the Camp's fire: a
--- 5-unit cross in ember (75%, enough to read at 5px) with a gold heart, laid out in whole screen
--- pixels like the icons.
 local SPARK = { width = 5, height = 5, rects = { { 2, 0, 1, 5 }, { 0, 2, 5, 1 }, { 2, 2, 1, 1 } } }
 local SPARK_ARMS = 0.75
 local SPARK_GAP = 6
@@ -558,9 +448,6 @@ local function spark(parent)
   return icon
 end
 
--- A section label (Label font, Dusk Dim) behind the spark that opens it,
--- the spark at x, y from the parent's `point` (default "LEFT") and the
--- label level with it. Set its text in capitals.
 function Skin.sectionLabel(parent, x, y, point)
   local label = Skin.label(parent, "label", Skin.DIM)
   local lead = spark(parent)
@@ -570,7 +457,6 @@ function Skin.sectionLabel(parent, x, y, point)
   return label
 end
 
--- An icon by kind (a key of ICONS) in a colour; :SetColor recolours it.
 function Skin.icon(parent, kind, color)
   local icon = CreateFrame("Frame", nil, parent)
   icon.spec = ICONS[kind]
@@ -581,7 +467,7 @@ function Skin.icon(parent, kind, color)
     icon.parts[i] = part
   end
   layOutIcon(icon)
-  -- The UI scale may have changed since.
+  -- WoW: the UI scale can change while the icon is hidden.
   icon:SetScript("OnShow", layOutIcon)
   function icon:SetColor(value)
     for _, part in ipairs(self.parts) do part:SetVertexColor(value[1], value[2], value[3], value[4] or 1) end
@@ -590,8 +476,6 @@ function Skin.icon(parent, kind, color)
   return icon
 end
 
--- Puts an icon before a button's centred label, the pair centred together.
--- Returns the room the icon takes, to add to the button's width.
 function Skin.leadIcon(button, kind, color)
   local icon = Skin.icon(button, kind, color)
   local room = icon:GetWidth() + 4
@@ -602,7 +486,6 @@ function Skin.leadIcon(button, kind, color)
   return room
 end
 
--- A label on a small dark plate, like a level: call :SetText on the result.
 function Skin.badge(parent, fontName, textColor, plateColor)
   local plate = CreateFrame("Frame", nil, parent)
   plate:SetHeight(14)
@@ -616,9 +499,6 @@ function Skin.badge(parent, fontName, textColor, plateColor)
   return plate
 end
 
--- The Unread dot: a 6px Ember Gold dot (DESIGN.md), on a New Feed entry,
--- the sidebar's version label and What's new's changes. The caller places
--- it.
 Skin.UNREAD_DOT = 6
 
 function Skin.unreadDot(parent)
@@ -629,8 +509,6 @@ function Skin.unreadDot(parent)
   return dot
 end
 
--- The mark for what's new in WoW: Forever: an infinity like the one in the
--- game's emblem, white in the file so a caller can tint it.
 local FOREVER_MARK = "Interface\\AddOns\\BFF\\Media\\Forever"
 local FOREVER_MARK_WIDTH = 18
 local FOREVER_MARK_HEIGHT = 9
@@ -643,7 +521,6 @@ function Skin.foreverMark(parent, color)
   return mark
 end
 
--- The same mark inline in text, tinted: "|T...|t".
 function Skin.foreverGlyph(color)
   return ("|T%s:%d:%d:0:0:64:32:0:64:0:32:%d:%d:%d|t"):format(FOREVER_MARK, FOREVER_MARK_HEIGHT,
     FOREVER_MARK_WIDTH, color[1] * 255, color[2] * 255, color[3] * 255)
@@ -655,9 +532,6 @@ end
 
 local ON_GOLD = { 0.1, 0.08, 0 }
 
--- A button's plate and label for its kind and state. A disabled button,
--- primary or not, is a secondary plate with dim text: faded gold read as a
--- second primary.
 local function look(button, enabled)
   local gold = button.primary and enabled
   local fill = gold and Skin.GOLD or Skin.SECONDARY
@@ -668,9 +542,6 @@ local function look(button, enabled)
   Skin.color(button.label, gold and ON_GOLD or enabled and Skin.TEXT or Skin.DIM)
 end
 
--- A flat button. Primary ones are gold with dark text. It restyles itself
--- from OnEnable and OnDisable, so callers add to those with HookScript, not
--- SetScript.
 function Skin.button(parent, text, onClick, primary)
   local button = CreateFrame("Button", nil, parent)
   button:SetSize(96, 24)
@@ -692,7 +563,6 @@ function Skin.button(parent, text, onClick, primary)
   return button
 end
 
--- A small square checkbox with a label to its right; the label is clickable.
 function Skin.checkbox(parent, text, onClick)
   local check = CreateFrame("CheckButton", nil, parent)
   check:SetSize(14, 14)
@@ -713,24 +583,14 @@ function Skin.checkbox(parent, text, onClick)
   return check
 end
 
--- The switch for an on/off setting: a pill-shaped track with a round knob,
--- the knob at the right on an ember track while on, at the left on a
--- dimmed grey one while off. Embers are Ember Gold Deep, the spark's arms.
--- The on knob is the dark Header Plate: Firelight Cream on the ember was
--- too close in lightness to read.
 Skin.SWITCH_ON = Skin.EMBER_DEEP
 Skin.SWITCH_OFF = Skin.OFFLINE
 Skin.SWITCH_KNOB_ON = Skin.HEADER
 Skin.SWITCH_KNOB_OFF = Skin.MUTED
 local SWITCH_WIDTH, SWITCH_HEIGHT = 28, 16
 local KNOB, KNOB_INSET = 14, 1
--- How long the knob takes to slide across, in seconds.
 local SWITCH_SLIDE = 0.12
 
--- A switch (Skin.SWITCH_*), drawn by :SetOn(on, slide), sliding the knob
--- across when slide is true; setting the state it already has does
--- nothing, so a redraw doesn't cut a slide short. :SetEnabled fades it.
--- It takes no clicks: the caller makes its row clickable.
 function Skin.switch(parent)
   local switch = CreateFrame("Frame", nil, parent)
   switch:SetSize(SWITCH_WIDTH, SWITCH_HEIGHT)
@@ -741,7 +601,7 @@ function Skin.switch(parent)
     track[#track + 1] = texture
     return texture
   end
-  -- Textures have no corner radius: two round ends and a middle.
+  -- WoW: textures have no corner radius.
   for _, side in ipairs({ "LEFT", "RIGHT" }) do
     local cap = part()
     cap:SetSize(SWITCH_HEIGHT, SWITCH_HEIGHT)
@@ -793,7 +653,6 @@ function Skin.switch(parent)
   return switch
 end
 
--- A single-line text box on a dark plate.
 function Skin.editBox(parent, width)
   local box = CreateFrame("EditBox", nil, parent)
   box:SetSize(width, 24)
@@ -806,7 +665,6 @@ function Skin.editBox(parent, width)
   return box
 end
 
--- A grey X that hides `target`.
 function Skin.closeButton(parent, target)
   local button = CreateFrame("Button", nil, parent)
   button:SetSize(22, 22)
@@ -822,8 +680,6 @@ function Skin.closeButton(parent, target)
   return button
 end
 
--- A small square button in a window's header holding an icon by kind,
--- Smoke Muted, Ash Text while hovered, with a one-line tooltip.
 function Skin.headerButton(parent, kind, tooltip, onClick)
   local button = CreateFrame("Button", nil, parent)
   button:SetSize(22, 22)
@@ -845,9 +701,6 @@ function Skin.headerButton(parent, kind, tooltip, onClick)
   return button
 end
 
--- A movable window closing on Escape, with a title bar: frame.title on the
--- left, frame.headerRight for anything right of it (left of the close
--- button), and frame.header itself.
 function Skin.window(name, width, titleText)
   local frame = CreateFrame("Frame", name, UIParent)
   frame:SetWidth(width)
@@ -887,11 +740,6 @@ function Skin.window(name, width, titleText)
   return frame
 end
 
--- Animations: small reusable ones built on CreateAnimationGroup. Each
--- returns an object with :Play(delay), which starts it over after delay
--- seconds (none by default), :Stop(), which ends it at once, leaving the
--- frame as it's drawn without it, and group, its AnimationGroup (for
--- OnFinished and such).
 local Animation = {}
 Animation.__index = Animation
 
@@ -906,16 +754,10 @@ function Animation:Stop()
   self.group:Stop()
 end
 
--- delayed: the animations that wait out Play's delay (those that start
--- the group); prepare, if any, runs just before each play.
 local function animation(group, delayed, prepare)
   return setmetatable({ group = group, delayed = delayed, prepare = prepare }, Animation)
 end
 
--- A stamp: `frame` lands from `scale` times its size and clear to its own
--- size and opaque, over `duration` seconds, easing out. It fades in over
--- the first 60%. Play it with no delay: until it starts, the frame shows
--- as drawn.
 function Skin.stamp(frame, scale, duration)
   local group = frame:CreateAnimationGroup()
   local grow = group:CreateAnimation("Scale")
@@ -932,10 +774,6 @@ function Skin.stamp(frame, scale, duration)
   return animation(group, { grow, fade })
 end
 
--- A sweep: a band of light `width` wide crosses `frame` once, left to
--- right, over `duration` seconds, clipped to the frame and drawn over
--- everything in it. `color` is the band's middle, fading to clear at both
--- its edges, added to what's under it.
 function Skin.sweep(frame, width, color, duration)
   local clip = CreateFrame("Frame", nil, frame)
   clip:SetAllPoints()
@@ -959,13 +797,11 @@ function Skin.sweep(frame, width, color, duration)
   local move = group:CreateAnimation("Translation")
   move:SetDuration(duration)
   move:SetSmoothing("IN_OUT")
-  -- Across the frame as it's sized when played: its own width, which is
-  -- there as soon as it's set, unlike the clip's, worked out from anchors.
+  -- WoW: a frame's set width is there at once; a region sized by anchors
+  -- reads 0 until layout runs.
   return animation(group, { move }, function() move:SetOffset(frame:GetWidth() + width, 0) end)
 end
 
--- A ring of `color` round `frame`, `thickness` wide, its outer edge
--- `outset` pixels out from the frame's edge, added to what's under it.
 local function ring(frame, outset, thickness, color)
   local function line()
     local texture = frame:CreateTexture(nil, "OVERLAY")
@@ -988,10 +824,6 @@ local function ring(frame, outset, thickness, color)
   right:SetWidth(thickness)
 end
 
--- A shine: `frame`'s edge flares in `color` and fades, over `duration`
--- seconds (rising over the first third): a 2px ring across the edge and a
--- faint one just outside it, added to what's under them. Hidden between
--- plays.
 function Skin.shine(frame, color, duration)
   local glow = CreateFrame("Frame", nil, frame)
   glow:SetAllPoints()

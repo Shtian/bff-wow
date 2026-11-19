@@ -2,13 +2,9 @@ local load = require("tests.load")
 
 local HOUR, DAY = 3600, 86400
 local WEEK = 7 * DAY
--- Monday 2026-10-26 00:00 UTC.
 local MONDAY = 1792972800
--- Monday 20:00 UTC, the hour the Crew plays in these specs.
 local EVENING = MONDAY + 20 * HOUR
 
--- A net with the given clients logged in and in one Crew, settled shortly
--- before Monday 20:00 UTC. options maps a name to FakeNet:add options.
 local function crew(names, options)
   local ns = load()
   local net = ns.FakeNet.new({ clock = EVENING - 120 })
@@ -22,25 +18,19 @@ local function crew(names, options)
   return net, clients, ns, code
 end
 
--- Plays this Monday evening, 20:00–20:11 UTC, and stays on until the
--- heartbeat has shared it.
 local function firstMonday(net)
   net:run(11 * 60 + 5 * 60)
 end
 
--- Plays the next Monday evening, `weeks` weeks on: everyone online plays
--- 20:00–20:11 UTC, then stays on until the heartbeat has shared it.
 local function anotherMonday(net, weeks)
   net:step(EVENING + weeks * WEEK - 30)
   net:run(30 + 11 * 60 + 5 * 60 + 10)
 end
 
--- Monday 20:00 UTC in a grid shifted by `hours`.
 local function mondayEvening(view, hours)
   return view.grid[1][21 + (hours or 0)]
 end
 
--- The DATA messages a client put on the wire since `from`.
 local function dataSince(net, ns, from, name)
   local count = 0
   for i = from + 1, #net.wire do
@@ -54,7 +44,6 @@ describe("The When tab", function()
   it("shows how many Members usually play each hour, from records synced across the Crew", function()
     local net, clients = crew({ "Ann", "Bob", "Cleo" })
     local a, b = clients[1], clients[2]
-    -- One Monday evening isn't "usually".
     firstMonday(net)
     local view = b.core:playTimes()
     assert.equal(0, mondayEvening(view))
@@ -65,7 +54,6 @@ describe("The When tab", function()
     assert.equal("After 2 weeks of play, the hours the Crew usually plays show up here.", view.note)
     assert.equal(1, mondayEvening(b.core:playTimes(a.memberId)))
 
-    -- Two are, for each of the three Members, counted once each.
     anotherMonday(net, 1)
     view = b.core:playTimes()
     assert.equal(3, mondayEvening(view))
@@ -109,7 +97,6 @@ describe("The When tab", function()
     local a, b = clients[1], clients[2]
     firstMonday(net)
     anotherMonday(net, 1)
-    -- 20:00 UTC is 22:00 for Bob.
     assert.equal(2, mondayEvening(b.core:playTimes(), 2))
     assert.equal(0, mondayEvening(b.core:playTimes()))
     assert.equal(2, mondayEvening(b.core:playTimes(a.memberId), 2))
@@ -122,7 +109,6 @@ describe("The When tab", function()
     firstMonday(net)
     anotherMonday(net, 1)
     b:logout()
-    -- Two weeks on, Bob's last two Mondays still count; three weeks on, one does.
     anotherMonday(net, 3)
     assert.equal(2, mondayEvening(a.core:playTimes(b.memberId)))
     anotherMonday(net, 4)
@@ -170,7 +156,6 @@ describe("The When tab", function()
     assert.equal(0, mondayEvening(view))
     assert.equal(3, a.core:playTimes().max)
 
-    -- Malformed Play times aren't kept.
     a.core:received(ns.Codec.encode({
       type = "DATA", from = "garbled1",
       records = { {
@@ -186,24 +171,20 @@ describe("The When tab", function()
     local net, clients, ns = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
     local unseen = b.core:unseen()
-    -- Play until Ann's own record has her first ten minutes at 20:00.
     while mondayEvening(a.core:playTimes(a.memberId)) == 0 do net:step() end
     local wire = #net.wire
     net:run(5)
     assert.equal(0, dataSince(net, ns, wire, "Ann"))
     assert.equal(0, mondayEvening(b.core:playTimes(a.memberId)))
 
-    -- The heartbeat brings it.
     net:run(5 * 60)
     assert.equal(1, mondayEvening(b.core:playTimes(a.memberId)))
-    -- No Feed entry for it.
     assert.equal(unseen, b.core:unseen())
   end)
 
   it("doesn't count time twice across a reload", function()
     local net, clients = crew({ "Ann" })
     local a = clients[1]
-    -- Up to 20:05, a reload, then to 20:09:59: not quite ten minutes.
     net:run(120 - 40 + 5 * 60)
     a:reload()
     net:run(5 * 60 - 1)

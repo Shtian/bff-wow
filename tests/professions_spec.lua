@@ -1,6 +1,5 @@
 local load = require("tests.load")
 
--- Skill line IDs.
 local ALCHEMY, HERBALISM, MINING, TAILORING = 171, 182, 186, 197
 local COOKING, FISHING, FIRST_AID = 185, 356, 129
 
@@ -17,7 +16,6 @@ local function alchemist()
   }
 end
 
--- A net with the given clients logged in and in one Crew, settled.
 local function crew(names)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -35,7 +33,6 @@ local function feedSize(client)
   return n
 end
 
--- Each profession's name and skill/max, in order.
 local function summary(list)
   if list == nil then return nil end
   local result = {}
@@ -43,14 +40,15 @@ local function summary(list)
   return result
 end
 
--- A fake game: GetProfessions' five slots (prof1, prof2, first aid, fishing,
--- cooking) and what GetProfessionInfo says for each index.
+-- WoW: GetProfessions returns five slots: prof1, prof2, first aid, fishing,
+-- cooking.
 local function game(slots, infos, secret)
   return {
     getProfessions = function() return slots[1], slots[2], slots[3], slots[4], slots[5] end,
     getProfessionInfo = function(index)
       local info = infos[index]
-      -- name, icon, rank, maxRank, numSpells, spellOffset, skillLine, rankModifier
+      -- WoW: GetProfessionInfo returns name, icon, rank, maxRank, numSpells,
+      -- spellOffset, skillLine, rankModifier.
       return info[1], info[2], info[3], info[4], 0, 0, info[5], info[6] or 0
     end,
     isSecret = secret,
@@ -271,7 +269,6 @@ describe("Professions", function()
           [guid] = { guid = guid, name = "Future", level = 20, lastPlayed = net:now(), professions = future },
         } } },
       }))
-      -- Bob learns of them from Ann.
       b:logout()
       net:run(2)
       b:login()
@@ -287,7 +284,6 @@ describe("Professions", function()
       return result
     end
 
-    -- Each Member as "name: cells", "." for none, "?" when not shared.
     local function grid(view)
       local result = {}
       for i, member in ipairs(view.members) do
@@ -315,7 +311,6 @@ describe("Professions", function()
       net:run(2)
       b:play({ professions = { profession(MINING, "Mining", 75, 75), profession(COOKING, "Cooking", 150, 150, true) } })
       net:run(2)
-      -- Bob plays an Alt now, with better Cooking.
       b:play({ guid = "Player-0-BobAlt", name = "Bobalt", level = 3,
         professions = { profession(MINING, "Mining", 20, 75), profession(COOKING, "Cooking", 200, 225, true) } })
       b.core:setMain("Player-0-Bob")
@@ -337,7 +332,6 @@ describe("Professions", function()
       assert.is_true(view.professions[column(view, "Fishing")].secondary)
       local alchemy = view.professions[column(view, "Alchemy")]
       assert.is_true(alchemy.had)
-      -- Someone has it: their client's icon.
       assert.equal(1000 + ALCHEMY, alchemy.icon)
 
       local own, bob = view.members[1], view.members[2]
@@ -391,7 +385,6 @@ describe("Professions", function()
       assert.same({ "Ann", "Cleo", "Dan", "Bob" }, members("level"))
       assert.same({ "Ann", "Bob", "Cleo", "Dan" }, members("name"))
       assert.same({ "Ann", "Cleo", "Bob", "Dan" }, members("name", MINING))
-      -- Ties keep the Roster's order.
       assert.same({ "Ann", "Dan", "Bob", "Cleo" }, members("name", ALCHEMY))
     end)
 

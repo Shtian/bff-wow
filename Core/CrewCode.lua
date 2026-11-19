@@ -1,13 +1,8 @@
--- CrewCode: generates, normalises and checks Crew codes, and derives the
--- hidden channel's name and password from them. See
--- docs/design/joining-a-crew.md.
-
 local _, ns = ...
 
 local CrewCode = {}
 ns.CrewCode = CrewCode
 
--- Crockford's base32: no I, L, O or U.
 local ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 local BODY_LENGTH = 7
 local HASH_LENGTH = 7
@@ -21,8 +16,6 @@ local function char(n)
   return ALPHABET:sub(n + 1, n + 1)
 end
 
--- Each character's value times an odd weight (1, 3, … 13), mod 32. Odd
--- weights are invertible mod 32, so any single wrong character changes it.
 local function checkChar(body)
   local sum = 0
   for i = 1, BODY_LENGTH do
@@ -35,7 +28,6 @@ local function format(plain)
   return plain:sub(1, 4) .. "-" .. plain:sub(5)
 end
 
--- A new code such as K3F9-A2QX, from random() in [0, 1).
 function CrewCode.generate(random)
   local chars = {}
   for i = 1, BODY_LENGTH do
@@ -45,8 +37,6 @@ function CrewCode.generate(random)
   return format(body .. checkChar(body))
 end
 
--- The stored form of a typed code, or nil if it isn't a valid code. Case,
--- spaces and dashes don't matter; O reads as 0, and I and L as 1.
 function CrewCode.normalise(input)
   if type(input) ~= "string" then return nil end
   local plain = input:upper():gsub("[%s%-]", ""):gsub("O", "0"):gsub("[IL]", "1")
@@ -59,8 +49,7 @@ function CrewCode.normalise(input)
   return format(plain)
 end
 
--- 32-bit FNV-1a. The multiply by the FNV prime (2^24 + 403) is split so it
--- stays within a double's 53 bits.
+-- WoW: Lua 5.1 numbers are doubles, exact only up to 2^53.
 local function fnv1a(text)
   local hash = 2166136261
   for i = 1, #text do
@@ -79,7 +68,6 @@ local function base32(n)
   return table.concat(chars)
 end
 
--- The channel name and password for a normalised code. Neither contains it.
 function CrewCode.channel(code)
   return "BFF" .. base32(fnv1a("name:" .. code)), base32(fnv1a("pass:" .. code))
 end

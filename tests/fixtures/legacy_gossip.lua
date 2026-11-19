@@ -1,18 +1,3 @@
--- Gossip as BFF shipped it before #146, unchanged but for this header and
--- the two no-op methods at the end: a client that syncs like an older BFF,
--- for the mixed-version tests in sync_spec. Its DIGEST lists the own
--- record and the 9 newest others, with no partial flag; it treats a record
--- missing from any DIGEST as owed; and it sends no confirming or periodic
--- DIGEST. Don't change it to follow the current Gossip.
-
--- Gossip: when to talk. Two messages: a DIGEST lists the Member ids and
--- versions you hold, and DATA carries full records. Whoever holds something
--- newer than a DIGEST shows replies with DATA, whoever lacks something
--- replies with their own DIGEST, and a reply someone else already made is
--- dropped. Gossip talks only while the link is up (and in a Crew) and
--- not paused; a change made meanwhile goes out once it talks again.
--- See the sync resolution on #8 and docs/design/code-structure.md.
-
 local _, ns = ...
 
 local Gossip = {}
@@ -22,10 +7,8 @@ ns.Gossip = Gossip
 local REPLY_MIN, REPLY_MAX = 1, 4
 local ZONE_DELAY = 10
 local HEARTBEAT = 5 * 60
--- Ten entries of id and version always fit one 255-byte message.
 local DIGEST_SIZE = 10
 
--- Ledger:digest as it was then: the own record, then the newest others.
 local function legacyDigest(ledger, limit)
   local own = ledger:own()
   local others = {}
@@ -45,9 +28,6 @@ local function legacyDigest(ledger, limit)
   return versions
 end
 
--- ledger; now() and random() from Core; send(message) encodes and hands a
--- message to the link; beforeOwnSend() runs just before own DATA goes out,
--- so whatever only rides a send (where you stand) can be written first.
 function Gossip.new(ledger, now, random, send, beforeOwnSend)
   return setmetatable({
     ledger = ledger,
@@ -58,15 +38,11 @@ function Gossip.new(ledger, now, random, send, beforeOwnSend)
     linkUp = false,
     paused = false,
     open = false,
-    -- Own record changed since own DATA last went out, and when it's due.
     dirty = false,
     dataDue = nil,
     lastOwnSent = 0,
-    -- A DIGEST to send, and the ids it is meant to fetch; nil wanted means
-    -- it goes out whatever others send.
     digestDue = nil,
     wanted = nil,
-    -- DATA owed in reply: id -> true, and when it's due.
     owed = {},
     owedDue = nil,
   }, Gossip)
@@ -111,9 +87,6 @@ local function sendOwed(self)
   if #records > 0 then self.send({ type = "DATA", records = records }) end
 end
 
--- Starts or stops talking. Starting sends a fresh DIGEST, plus own DATA if
--- the own record changed meanwhile. Stopping drops replies owed, since the
--- DIGEST on starting again asks for whatever is still missing.
 local function update(self)
   local open = self.linkUp and not self.paused
   if open == self.open then return end
@@ -125,32 +98,20 @@ local function update(self)
   if self.dirty then sendOwn(self) else self.lastOwnSent = self.now() end
 end
 
--- Whether the link is up and Core is in a Crew. Every change to up sends a
--- fresh DIGEST.
 function Gossip:setLink(up)
   self.linkUp = up
   update(self)
 end
 
--- Pause sharing: fully silent, so others see you as offline.
 function Gossip:setPaused(paused)
   self.paused = paused
   update(self)
 end
 
--- Sends a message right away whether or not Gossip is talking (leaving the
--- Crew).
 function Gossip:sendNow(message)
   self.send(message)
 end
 
--- The own record changed. urgency is "now" (ding, death, new Character,
--- display name, Main, and any change that makes a Feed entry, such as a
--- profession milestone), "soon" (zone, debounced) or "later" (XP, gold,
--- other profession changes, Play times: waits for the next send or the
--- heartbeat).
--- Where you stand never calls this: it is written just before own DATA
--- goes out (beforeOwnSend).
 function Gossip:ownChanged(urgency)
   self.dirty = true
   local due
@@ -162,8 +123,6 @@ function Gossip:ownChanged(urgency)
   if due and (self.dataDue == nil or due < self.dataDue) then self.dataDue = due end
 end
 
--- How urgent a change to the Character being played is, from the
--- Character before (nil if new) and after.
 function Gossip.urgency(before, after)
   if before == nil or before.level ~= after.level or before.deaths ~= after.deaths then
     return "now"
@@ -173,11 +132,8 @@ function Gossip.urgency(before, after)
   return "later"
 end
 
--- A DIGEST from someone else: owe DATA for what we hold newer, and a DIGEST
--- of our own if they hold something newer or unknown to us.
 function Gossip:digestReceived(versions)
   local ledger = self.ledger
-  -- Their DIGEST fetches whatever ours was going to.
   if self.wanted then
     local covered = true
     for id in pairs(self.wanted) do
@@ -207,7 +163,6 @@ function Gossip:digestReceived(versions)
   end
 end
 
--- A record that went out on the wire, after the Ledger has merged it.
 function Gossip:recordSeen(id, version)
   local held = self.ledger:version(id)
   if self.owed[id] and version >= held then
@@ -220,7 +175,6 @@ function Gossip:recordSeen(id, version)
   end
 end
 
--- A removed Member: no reply is owed for them, nor a DIGEST to fetch them.
 function Gossip:forget(id)
   self.owed[id] = nil
   if isEmpty(self.owed) then self.owedDue = nil end
@@ -230,12 +184,10 @@ function Gossip:forget(id)
   end
 end
 
--- Sends a DIGEST now, so whoever holds something we lack replies with it.
 function Gossip:askAround()
   if self.open then sendDigest(self) end
 end
 
--- Called once a second: sends whatever is due.
 function Gossip:tick()
   if not self.open then return end
   local now = self.now()
@@ -249,6 +201,5 @@ function Gossip:tick()
   end
 end
 
--- Today's Core calls these; the older link never did.
 function Gossip.sendFailed() end
 function Gossip.peerGone() end

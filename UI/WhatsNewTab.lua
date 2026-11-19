@@ -1,18 +1,3 @@
--- WhatsNewTab: the panel's What's new view, drawn from Core's whatsNew(),
--- opened from the sidebar's version label. On top a Heading and a Small
--- line (what changed since you last looked), then, when a major release is
--- new, a raised plate with a gold edge asking you to make sure your friends
--- update, naming those on an older BFF. Then a section per release (its
--- version and date as a section label, with room above it) with a row per
--- change: a small Feed picture for its kind (Skin.CHANGE_PICTURES: big
--- change, new feature, small change or fix; hover names it), its title in
--- Body, and its detail in Small, cut to two lines; a click shows it whole.
--- The pictures mark where each change starts, so rows need no Hairlines,
--- which would read like the releases' rules. Releases new on this visit
--- carry the Unread dot left of each picture; the rest show titles only, in
--- Smoke Muted, until clicked. Panel owns the scroll
--- view; this fills its content. See docs/design/whats-new.md.
-
 local _, ns = ...
 
 local WhatsNewTab = {}
@@ -30,24 +15,19 @@ local TOP_GAP = 10
 local PLATE_PAD_X = 12
 local PLATE_PAD_Y = 10
 local PLATE_GAP = 8
--- A release's section label, as the Feed's day labels, with room above
--- every one but the first so releases read as groups.
 local SECTION = 26
 local RELEASE_GAP = 10
 local ENTRY_PAD = 5
--- A change's kind picture, and the title's indent past it.
 local PICTURE = 18
 local PICTURE_GAP = 8
 local DETAIL_GAP = 2
 local DETAIL_LINES = 2
--- The Unread dot, in the margin left of a change's title.
 local DOT = Skin.UNREAD_DOT
 
 local view
 local redraw
 local head, plate, older
 local sections, entries = {}, {}
--- Changes shown whole, by "version:index". Forgotten on leaving the view.
 local expanded = {}
 
 local function createHead()
@@ -58,8 +38,6 @@ local function createHead()
   head.line:SetPoint("TOPLEFT", head.title, "BOTTOMLEFT", 0, -4)
 end
 
--- Make sure your friends update: a lighter plate with a gold edge (the
--- Flat Ledger Rule's way to stand out).
 local function createPlate()
   plate = CreateFrame("Frame", nil, view.content)
   Skin.fill(plate, Skin.RAISED, "BACKGROUND")
@@ -91,8 +69,6 @@ local function entry(index)
   Skin.fill(item, Skin.HOVER, "HIGHLIGHT")
   item.picture = Skin.feedPicture(item, PICTURE)
   item.picture:SetPoint("TOPLEFT", INSET, -ENTRY_PAD)
-  -- The Unread dot in the margin, level with the picture's centre, as on
-  -- the Feed.
   item.dot = Skin.unreadDot(item)
   item.dot:SetPoint("CENTER", item.picture, "LEFT", -(DOT / 2 + 3), 0)
   item.title = Skin.label(item, "body", TEXT)
@@ -121,8 +97,6 @@ local function classHex(classFilename)
   return Skin.hex(TEXT)
 end
 
--- Draws the plate at y for friends ({ version, behind, everyone, text,
--- who }) and returns the y under it.
 local function drawPlate(friends, y, width)
   if not plate then createPlate() end
   plate:ClearAllPoints()
@@ -134,7 +108,6 @@ local function drawPlate(friends, y, width)
   plate.text:SetText(friends.text)
   local who = friends.who
   if #friends.behind > 0 then
-    -- The names in their class colours, which only the UI knows.
     local names = {}
     for i, friend in ipairs(friends.behind) do
       names[i] = ("%s%s|r (%s)"):format(classHex(friend.classFilename), friend.name, friend.version)
@@ -151,7 +124,6 @@ local function drawPlate(friends, y, width)
   return y - height - PLATE_GAP
 end
 
--- Draws a change at y and returns the y under it.
 local function drawEntry(item, change, key, new, y, width)
   item.key = change.detail and key or nil
   item.kindName = change.kindName
@@ -180,14 +152,11 @@ local function drawEntry(item, change, key, new, y, width)
   return y - height
 end
 
--- Draws whatsNew into the scroll view. onChange redraws the panel.
 function WhatsNewTab.draw(scrollView, core, width, onChange)
   view, redraw = scrollView, onChange
   local data = core:whatsNew()
   if not head then createHead() end
   if not older then older = Skin.label(view.content, "small", DIM) end
-  -- A checkout carries no changelog, and the version label doesn't open
-  -- the view there; should it be shown anyway, it's empty.
   head:SetShown(data ~= nil)
   local inner = width - 2 * INSET
   local y = -INSET
@@ -236,7 +205,6 @@ function WhatsNewTab.draw(scrollView, core, width, onChange)
   view.content:SetHeight(-y + INSET)
 end
 
--- The view was left: changes opened whole close again.
 function WhatsNewTab.leave()
   expanded = {}
 end

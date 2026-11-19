@@ -1,8 +1,7 @@
 local load = require("tests.load")
 
-local GOLD = 10000 -- copper
+local COPPER_PER_GOLD = 10000
 
--- A net with the given clients logged in and in one Crew, settled.
 local function crew(names)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -14,7 +13,6 @@ local function crew(names)
   return net, clients, ns
 end
 
--- The number of entries in the client's feed().
 local function feedSize(client)
   local n = 0
   for _, day in ipairs(client.core:feed().days) do n = n + #day.entries end
@@ -25,41 +23,39 @@ describe("Gold", function()
   it("sends a gold-only change along with the next send, within a minute", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
-    a:play({ money = 5 * GOLD, level = 11 })
+    a:play({ money = 5 * COPPER_PER_GOLD, level = 11 })
     net:run(2)
     local events = a:count("changed")
     local mark = #net.wire
-    a:play({ money = 6 * GOLD })
+    a:play({ money = 6 * COPPER_PER_GOLD })
     assert.is_true(a:count("changed") > events)
     net:run(30)
     assert.same({}, net:sent(mark, "Ann", "DATA"))
-    assert.equal(5 * GOLD, b:rowFor(a).money)
+    assert.equal(5 * COPPER_PER_GOLD, b:rowFor(a).money)
 
-    -- It rides along with the next send.
     a:play({ deaths = 1 })
     net:run(2)
-    assert.equal(6 * GOLD, b:rowFor(a).money)
+    assert.equal(6 * COPPER_PER_GOLD, b:rowFor(a).money)
 
-    -- Or goes out on its own within a minute, without the heartbeat.
-    a:play({ money = 7 * GOLD })
+    a:play({ money = 7 * COPPER_PER_GOLD })
     net:run(61)
-    assert.equal(7 * GOLD, b:rowFor(a).money)
+    assert.equal(7 * COPPER_PER_GOLD, b:rowFor(a).money)
   end)
 
   it("reaches the rest of the Crew on the right Character, shown and Alt", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
-    a:play({ money = 12 * GOLD, level = 11 })
+    a:play({ money = 12 * COPPER_PER_GOLD, level = 11 })
     net:run(2)
-    a:play({ guid = "Player-0-AnnAlt", name = "Annalt", level = 5, money = 3 * GOLD })
+    a:play({ guid = "Player-0-AnnAlt", name = "Annalt", level = 5, money = 3 * COPPER_PER_GOLD })
     net:run(2)
 
     local row = b:rowFor(a)
     assert.equal("Annalt", row.name)
-    assert.equal(3 * GOLD, row.money)
+    assert.equal(3 * COPPER_PER_GOLD, row.money)
     assert.equal(1, #row.alts)
     assert.equal("Ann", row.alts[1].name)
-    assert.equal(12 * GOLD, row.alts[1].money)
+    assert.equal(12 * COPPER_PER_GOLD, row.alts[1].money)
   end)
 
   it("leaves money out for a Character whose client never shared it", function()
@@ -76,14 +72,13 @@ describe("Gold", function()
   it("adds no Feed entry", function()
     local net, clients = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
-    a:play({ money = 1 * GOLD, level = 11 })
+    a:play({ money = 1 * COPPER_PER_GOLD, level = 11 })
     net:run(2)
     local own, theirs = feedSize(a), feedSize(b)
-    a:play({ money = 900 * GOLD })
+    a:play({ money = 900 * COPPER_PER_GOLD })
     a:play({ level = 12 })
     net:run(2)
-    assert.equal(900 * GOLD, b:rowFor(a).money)
-    -- Only the ding.
+    assert.equal(900 * COPPER_PER_GOLD, b:rowFor(a).money)
     assert.equal(own + 1, feedSize(a))
     assert.equal(theirs + 1, feedSize(b))
   end)
@@ -93,9 +88,9 @@ describe("Gold", function()
     assert.equal("Gold: 1,234", Core.goldText(12345678))
     assert.equal("Gold: 0", Core.goldText(9999))
     assert.equal("Gold: 0", Core.goldText(0))
-    assert.equal("Gold: 999", Core.goldText(999 * GOLD + 9999))
-    assert.equal("Gold: 1,000", Core.goldText(1000 * GOLD))
-    assert.equal("Gold: 1,234,567", Core.goldText(1234567 * GOLD))
+    assert.equal("Gold: 999", Core.goldText(999 * COPPER_PER_GOLD + 9999))
+    assert.equal("Gold: 1,000", Core.goldText(1000 * COPPER_PER_GOLD))
+    assert.equal("Gold: 1,234,567", Core.goldText(1234567 * COPPER_PER_GOLD))
     assert.is_nil(Core.goldText(nil))
   end)
 end)

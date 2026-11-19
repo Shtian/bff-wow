@@ -1,21 +1,12 @@
--- Bags: reads items in the bags for Spares. Posts the item on the
--- cursor (dropped on the Spares tab) or the first bag item matching
--- a link (/bff spares add), with its item GUID and binding, which Core
--- checks it can be traded by. Also finds where a posted item is now. See
--- docs/design/spares.md and docs/research/bag-items.md.
-
 local _, ns = ...
 
 local Bags = {}
 ns.Bags = Bags
 
 local getItemInfo = C_Item.GetItemInfo or GetItemInfo
--- The backpack and the equipped bags, the reagent bag included.
 local FIRST_BAG = BACKPACK_CONTAINER or 0
 local LAST_BAG = NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4
 
--- Where the first item in the bags with the same trimmed item string as
--- link is, or nil.
 local function find(link)
   local wanted = ns.Spares.itemString(link)
   for bag = FIRST_BAG, LAST_BAG do
@@ -29,9 +20,6 @@ local function find(link)
   return nil
 end
 
--- Posts the item at a location (an ItemLocation) as a Spare.
--- Returns the Spare's id and the item's link, or nil and a reason
--- (see BFF.lua's MESSAGES).
 local function post(core, location)
   if not (location and C_Item.DoesItemExist(location)) then return nil, "notInBags" end
   local link = C_Item.GetItemLink(location)
@@ -45,16 +33,11 @@ local function post(core, location)
   return id, link
 end
 
--- Posts the first item in the bags matching an item link, as post does.
--- Refuses a link that isn't an item, or one not in the bags.
 function Bags.postLink(core, link)
   if not ns.Spares.itemString(link) then return nil, "invalidItem" end
   return post(core, find(link))
 end
 
--- Posts the item on the cursor, then puts it back in its slot whether it
--- was taken or not. Returns as post, or nil and "invalidItem" when the
--- cursor holds something else (a spell, money), or nothing.
 function Bags.postFromCursor(core)
   local kind = GetCursorInfo()
   local location = kind == "item" and C_Cursor.GetCursorItem() or nil
@@ -63,11 +46,8 @@ function Bags.postFromCursor(core)
   return post(core, location)
 end
 
--- Where an item is by its GUID, for Core:bagsUpdated: whether it's in the
--- bags or bank (nil if the game can't say), and whether it's equipped.
--- IsItemGUIDInInventory covers the bank even while it's closed. Read the
--- location only once that's true, and never call IsValid() on it: for a
--- gone or banked item it's an empty ItemLocation, and IsValid() errors.
+-- WoW: IsItemGUIDInInventory covers the bank even while it's closed. For a gone or
+-- banked item GetItemLocation gives an empty ItemLocation, and IsValid() on it errors.
 function Bags.findItem(itemGuid)
   if not C_Item.IsItemGUIDInInventory then return nil, false end
   if not C_Item.IsItemGUIDInInventory(itemGuid) then return false, false end

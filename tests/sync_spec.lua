@@ -1,14 +1,13 @@
 local load = require("tests.load")
+local ROOM = load().Framing.ROOM
 
--- A random() that always gives the same value, to fix who replies first.
 local function fixed(value)
   return function() return value end
 end
 
--- A net with the given clients logged in and in one Crew, settled.
-local function crew(names, options)
+local function crew(names, options, netOptions)
   local ns = load()
-  local net = ns.FakeNet.new()
+  local net = ns.FakeNet.new(netOptions)
   local clients = {}
   for i, name in ipairs(names) do
     clients[i] = net:add(name, options and options[name]):login()
@@ -19,8 +18,6 @@ local function crew(names, options)
   return net, clients, ns, code
 end
 
--- The messages on the wire since `from` (an index into net.wire), decoded,
--- each with the sender's name.
 local function sentSince(net, _, from, name, kind)
   return net:sent(from, name, kind)
 end
@@ -166,7 +163,6 @@ describe("Gossip", function()
 
     assert.equal(11, c:rowFor(a).level)
     assert.is_false(c:rowFor(a).online)
-    -- Bob's reply, which Dan never sees, doesn't cancel Dan's.
     for _, name in ipairs({ "Bob", "Dan" }) do
       local data = sentSince(net, ns, mark, name, "DATA")
       assert.equal(1, #data, name)
@@ -183,8 +179,6 @@ describe("Gossip", function()
     a:play({ xp = 500 })
     b:relink()
     net:run(10)
-    -- Nobody is sent it early, and Ann's DIGESTs don't show it, so nobody
-    -- asks for it.
     assert.same({}, sentSince(net, ns, mark, "Ann", "DATA"))
     for _, digest in ipairs(sentSince(net, ns, mark)) do assert.is_nil(digest.to, digest.sender) end
 
@@ -215,8 +209,6 @@ describe("Gossip", function()
     assert.equal(500, b:rowFor(a).xp)
     assert.equal(500, c:rowFor(a).xp)
 
-    -- It went out: not again when it would have been due, and nobody
-    -- sends Ann her own record back.
     net:run(70)
     assert.equal(1, #sentSince(net, ns, mark, "Ann", "DATA"))
     for _, message in ipairs(sentSince(net, ns, mark, nil, "DATA")) do
@@ -235,7 +227,6 @@ describe("Gossip", function()
     net:run(3 * 60)
     local data, digests = sentSince(net, ns, mark, "Ann", "DATA"), sentSince(net, ns, mark, "Ann", "DIGEST")
     assert.is_true(#data >= 1)
-    -- Link up, confirming the ding, and one a minute.
     assert.is_true(#digests >= 4, "DIGESTs: " .. #digests)
     for _, message in ipairs(data) do assert.is_nil(message.to) end
     for _, message in ipairs(digests) do assert.is_nil(message.to) end
@@ -250,8 +241,6 @@ describe("Gossip", function()
     b:play({ level = 11 })
     net:run(2)
 
-    -- Cat's DIGEST on logging in shows Bob's ding missing, and Bob's own
-    -- shows Ann something newer; then Cat and Bob are gone.
     local mark = #net.wire
     c:login()
     net:step()
@@ -285,7 +274,6 @@ describe("Gossip", function()
     local a, b = clients[1], clients[2]
     net:run(60)
 
-    -- A DIGEST showing Bob's record newer and Cat's missing.
     local mark = #net.wire
     a.core:received(ns.Codec.encode({
       type = "DIGEST", from = b.memberId, turns = true,
@@ -376,7 +364,6 @@ describe("Gossip", function()
     net:run(5)
     assert.equal(12, b:rowFor(a).level)
 
-    -- And a crash that lost a ding: the game still knows the real level.
     a:play({ level = 13 })
     net:run(2)
     a:crash()
@@ -413,7 +400,8 @@ describe("Gossip", function()
   it("fits ten Members with three Characters each in one DIGEST", function()
     local names = {}
     for i = 1, 10 do names[i] = "Member" .. i end
-    local net, clients, ns = crew(names)
+    local LAST_TEN_DIGIT_TIME = 9999999000
+    local net, clients, ns = crew(names, nil, { clock = LAST_TEN_DIGIT_TIME })
     for _, client in ipairs(clients) do
       for n = 1, 2 do
         net:run(1)
@@ -436,8 +424,7 @@ describe("Gossip", function()
     local entries = 0
     for _ in pairs(digest.versions) do entries = entries + 1 end
     assert.equal(10, entries)
-    -- One chunk (Framing.ROOM).
-    assert.is_true(digest.size <= 247, "DIGEST is " .. digest.size .. " bytes")
+    assert.is_true(digest.size <= ROOM, "DIGEST is " .. digest.size .. " bytes")
   end)
 
   it("shows one out of date notice for messages from a newer BFF", function()
@@ -459,14 +446,12 @@ describe("Gossip", function()
   end)
 end)
 
--- The number of entries in a DIGEST.
 local function size(versions)
   local n = 0
   for _ in pairs(versions) do n = n + 1 end
   return n
 end
 
--- A Crew of `count` Members, Member1 to MemberN.
 local function bigCrew(count, options)
   local names = {}
   for i = 1, count do names[i] = "Member" .. i end
@@ -526,8 +511,6 @@ describe("Lost and failed sends", function()
     local a, b, c = clients[1], clients[2], clients[3]
     net:run(60)
 
-    -- Cat logs in having missed Ann's ding, so Ann owes Cat DATA; then a
-    -- send from Ann to Bob fails.
     c:logout()
     net:run(1)
     a:play({ level = 11 })
@@ -548,8 +531,6 @@ describe("Lost and failed sends", function()
 
     local mark = #net.wire
     net:run(10)
-    -- Cat still got what Ann owed, and Bob a DIGEST of his own that fetched
-    -- the death.
     assert.equal(11, c:rowFor(a).level)
     assert.equal(1, c:rowFor(a).deaths)
     assert.equal(1, b:rowFor(a).deaths)
@@ -606,8 +587,7 @@ describe("In a Crew of more than ten Members", function()
       rounds = rounds + 1
       assert.equal(10, size(digest.versions))
       assert.is_true(digest.partial)
-      -- One chunk (Framing.ROOM).
-      assert.is_true(digest.size <= 247, "DIGEST is " .. digest.size .. " bytes")
+      assert.is_true(digest.size <= ROOM, "DIGEST is " .. digest.size .. " bytes")
       for id in pairs(digest.versions) do listed[id] = true end
     end
     assert.is_true(rounds >= 2, "rounds: " .. rounds)
@@ -646,7 +626,6 @@ describe("In a Crew of more than ten Members", function()
 end)
 
 describe("Lost and reordered chunks", function()
-  -- Ann and Bob, with Ann's DATA too long for one chunk.
   local function pair()
     local net, clients, ns = crew({ "Ann", "Bob" }, {
       Ann = { character = {
@@ -658,7 +637,6 @@ describe("Lost and reordered chunks", function()
     return net, clients[1], clients[2], ns
   end
 
-  -- Ann's DATA sent since `mark`: how many chunks each took.
   local function dataChunks(net, ns, mark)
     local counts = {}
     for i, message in ipairs(net:sent(mark, "Ann", "DATA")) do counts[i] = ns.Framing.count(message.size) end
@@ -695,8 +673,6 @@ describe("Lost and reordered chunks", function()
     assert.is_true(dataChunks(net, ns, mark)[1] > 1)
     assert.equal(10, b:rowFor(a).level)
 
-    -- Given up on after 30 s, then a DIGEST of Bob's own to Ann, as after
-    -- a failed send.
     net:run(40)
     local asked = 0
     for _, digest in ipairs(net:sent(mark, "Bob", "DIGEST")) do
@@ -708,10 +684,6 @@ describe("Lost and reordered chunks", function()
 end)
 
 describe("Traffic", function()
-  -- Whispers (chunks, one per friend) each Member sends a minute over ten
-  -- minutes: the busiest Member's and the whole Crew's. Grinding, one
-  -- Member gains XP every 5 s, dings every 2 minutes and changes zone every
-  -- 3; idle, nobody plays.
   local function whispersPerMinute(count, grinding)
     local net, clients, ns = bigCrew(count)
     net:run(120)
@@ -741,8 +713,7 @@ describe("Traffic", function()
     it(("stays well under the throttle in a Crew of %d"):format(count), function()
       for _, grinding in ipairs({ false, true }) do
         local busiest, total = whispersPerMinute(count, grinding)
-        -- The server allows about one addon message a second per prefix
-        -- (and may not count whispers at all outside instances).
+        -- WoW: the server allows about one addon message a second per prefix.
         assert.is_true(busiest < 30, ("busiest Member: %.1f whispers a minute"):format(busiest))
         if os.getenv("BFF_TRAFFIC") then
           print(("Crew of %d, %s: busiest Member %.1f whispers/min, Crew %.1f"):format(
@@ -753,14 +724,28 @@ describe("Traffic", function()
   end
 end)
 
--- Gossip as an older BFF had it (tests/fixtures/legacy_gossip.lua).
+local LEGACY_GOSSIP = "tests/fixtures/legacy_gossip.lua"
+
+local function checksum(path)
+  local file = assert(io.open(path, "rb"))
+  local text = file:read("*a")
+  file:close()
+  local hash = 0
+  for i = 1, #text do hash = (hash * 31 + text:byte(i)) % 4294967296 end
+  return hash
+end
+
 local function legacyGossip()
   local legacy = {}
-  assert(loadfile("tests/fixtures/legacy_gossip.lua"))("BFF", legacy)
+  assert(loadfile(LEGACY_GOSSIP))("BFF", legacy)
   return legacy.Gossip
 end
 
 describe("A Crew with a Member on an older BFF", function()
+  it("runs the older BFF's Gossip exactly as it shipped", function()
+    assert.equal(3668508986, checksum(LEGACY_GOSSIP))
+  end)
+
   it("syncs both ways, and a lost ding still arrives within a minute", function()
     local net, clients = crew({ "Ann", "Bob", "Cat" }, { Bob = { gossip = legacyGossip() } })
     local a, b, c = clients[1], clients[2], clients[3]
@@ -773,7 +758,6 @@ describe("A Crew with a Member on an older BFF", function()
     assert.equal(12, a:rowFor(b).level)
     assert.equal(12, c:rowFor(b).level)
 
-    -- Lost from the older client to Ann, and from Ann to the older client.
     net.drop = function(_, from, to)
       return (from == "Bob" and to == "Ann") or (from == "Ann" and to == "Bob")
     end
@@ -822,7 +806,6 @@ describe("A Crew with a Member on an older BFF", function()
 end)
 
 describe("A message from a Character not known to be in the channel", function()
-  -- The last message on the wire from a client.
   local function lastFrom(net, name)
     for i = #net.wire, 1, -1 do
       if net.wire[i].from == name then return net.wire[i].message end
@@ -841,7 +824,6 @@ describe("A message from a Character not known to be in the channel", function()
     local message = lastFrom(net, "Bob")
     b.core:leaveCrew()
     net:run(5)
-    -- Gone from Ann's Roster: Ann holds only Bob's tombstone.
     assert.is_nil(a:rowFor(b))
     assert.is_true(a.core:fromKnownMember(message))
   end)

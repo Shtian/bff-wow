@@ -2,14 +2,10 @@ local load = require("tests.load")
 
 local Presence = load().Presence
 
--- A Presence with its own clock, recording what it reports: every held or
--- peer message delivered and who whispered it, each ready (with why), how often a peer arrived,
--- who is gone, how often it asked for a member list, and the trace.
 local function newPresence()
   local world = { time = 100, delivered = {}, from = {}, ready = {}, arrived = 0, gone = {}, asked = 0, lines = {} }
   world.presence = Presence.new({
     now = function() return world.time end,
-    -- As the channel link's key does: "Name-Realm" and "name" are one.
     key = function(name) return (name:gsub("%-.*$", "")):lower() end,
     trace = function(line) world.lines[#world.lines + 1] = line end,
     deliver = function(message, name)
@@ -21,7 +17,6 @@ local function newPresence()
     gone = function(name) world.gone[#world.gone + 1] = name end,
     askList = function() world.asked = world.asked + 1 end,
   })
-  -- Moves the clock on, ticking once a second as the channel link does.
   function world.advance(seconds)
     for _ = 1, seconds do
       world.time = world.time + 1
@@ -31,7 +26,6 @@ local function newPresence()
   return world, world.presence
 end
 
--- In the channel with Bob and Cat (on another realm), ready.
 local function withPeers()
   local world, presence = newPresence()
   presence:start()
@@ -40,6 +34,11 @@ local function withPeers()
 end
 
 describe("Presence", function()
+  it("waits out more than two DIGEST rounds before calling a peer silent", function()
+    local ns = load()
+    assert.is_true(ns.Presence.SILENCE > 2 * ns.Gossip.EVERY_MAX)
+  end)
+
   describe("ready", function()
     it("comes with the first member list since joining", function()
       local world, presence = newPresence()
@@ -241,7 +240,7 @@ describe("Presence", function()
       assert.equal("notice: No player named Dan Smith · not a peer (peers: bob, cat)", world.lines[#world.lines])
     end)
 
-    -- The member list can go on showing a Character who logged out.
+    -- WoW: the channel member list can go on naming a Character who logged out.
     describe("then a member list that still names them", function()
       it("doesn't add them again for 5 minutes", function()
         local world, presence = withPeers()
@@ -277,7 +276,6 @@ describe("Presence", function()
       assert.same({ "one" }, world.delivered)
       assert.same({ "Bob", "Cat-Realm" }, presence:targets())
       assert.equal(0, world.asked)
-      -- Back for good: the next member list changes nothing.
       presence:listed({ "Bob", "Cat-Realm" })
       assert.equal(0, world.arrived)
     end)
@@ -307,7 +305,6 @@ describe("Presence", function()
       assert.same({ "one" }, world.delivered)
     end)
 
-    -- #178: a peer's leaving doesn't cancel the whispers queued for them.
     it("is ours for a Character who left while a whisper to them is queued, however long", function()
       local world, presence = withPeers()
       presence:whispered("Bob")
@@ -347,7 +344,7 @@ describe("Presence", function()
       presence:offline()
       assert.same({ "Bob" }, world.gone)
       assert.same({ "Cat-Realm" }, presence:targets())
-      -- The chat filter may run after the event.
+      -- WoW: a chat filter may run after the chat event.
       assert.is_true(presence:hidesOffline())
       world.advance(3)
       assert.is_false(presence:hidesOffline())
@@ -398,10 +395,7 @@ describe("Presence", function()
     end)
   end)
 
-  -- A peer who is unreachable with no notice saying so: in a dungeon, or
-  -- logged out with a leave notice that never came.
   describe("silence", function()
-    -- With the link up, and a whisper to everyone a minute as the DIGEST is.
     local function minutes(world, presence, count)
       for _ = 1, count do
         for _, name in ipairs(presence:targets()) do presence:whispered(name) end
@@ -454,7 +448,6 @@ describe("Presence", function()
 
     it("counts from the first whisper they didn't answer, not from when they were last heard", function()
       local world, presence = listening()
-      -- Nothing whispered (as while Paused): no one has failed to answer.
       world.advance(600)
       assert.same({ "Bob", "Cat-Realm" }, presence:targets())
       presence:whispered("Bob")
@@ -479,8 +472,6 @@ describe("Presence", function()
       assert.same({}, presence:targets("Bob"))
     end)
 
-    -- Two peers who each lost the other's whispers would otherwise both
-    -- wait for the other to speak first.
     it("still lets one whisper through every 5 minutes", function()
       local world, presence = listening()
       presence:whispered("Bob")

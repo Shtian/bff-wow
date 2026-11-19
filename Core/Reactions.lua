@@ -1,21 +1,12 @@
--- Reactions: the pure parts of Reactions on Feed entries. Which Reaction
--- applies to which kind of entry, the key a Reaction points at an entry by
--- (owner, Character and what was reached, docs/adr/0002), how keys are
--- stored in the reacting Member's record, and the wording the owner sees.
--- Feed attaches Reactions to its entries. See docs/design/reactions.md.
-
 local _, ns = ...
 
 local Reactions = {}
 ns.Reactions = Reactions
 
 local DAY = 24 * 60 * 60
--- The reacting Member's record keeps Reactions this long, and at most
--- this many.
 Reactions.KEEP_FOR = 30 * DAY
 Reactions.KEEP_MAX = 50
 
--- The one Reaction each kind of entry has. Left has none.
 local FOR_KIND = {
   ding = "cheer",
   maxLevel = "cheer",
@@ -28,7 +19,6 @@ local FOR_KIND = {
   rareFind = "cheer",
 }
 
--- Kinds as stored in a record, kept short since records go over the wire.
 local CODES = {
   ding = "d", maxLevel = "m", newCharacter = "c", death = "x", joined = "j",
   newProfession = "p", professionSkill = "s", professionMaxed = "a", rareFind = "r",
@@ -36,20 +26,13 @@ local CODES = {
 local KINDS = {}
 for kind, code in pairs(CODES) do KINDS[code] = kind end
 
--- Kinds whose key has a number: the level, death total, joinedAt or
--- profession skill reached, or the type of Catch.
 local NUMBERED = { ding = true, death = true, joined = true, professionSkill = true, rareFind = true }
--- Kinds whose key also names the profession, by skill line ID.
 local PROFESSION = ns.Professions.KINDS
 
--- The Reaction an entry kind has ("cheer", "respects" or "welcome"), or nil.
 function Reactions.forKind(kind)
   return FOR_KIND[kind]
 end
 
--- The key a Reaction to this entry is made with: { memberId, guid, kind,
--- n, skillLine (profession kinds only) }, keyed to the top of a collapsed entry's range. Nil for an entry
--- that can't be reacted to, or one saved before it had what it needs.
 function Reactions.keyOf(entry)
   local kind = entry.kind
   if not FOR_KIND[kind] or type(entry.memberId) ~= "string" then return nil end
@@ -72,9 +55,6 @@ function Reactions.keyOf(entry)
   return { memberId = entry.memberId, guid = entry.guid, kind = kind, n = n, skillLine = skillLine }
 end
 
--- Whether a key falls on this entry: a collapsed ding, death or
--- profession milestone matches every level, death total or milestone in
--- its range.
 function Reactions.matches(entry, key)
   if entry.memberId ~= key.memberId or entry.kind ~= key.kind or entry.guid ~= key.guid
     or entry.skillLine ~= key.skillLine then
@@ -95,7 +75,6 @@ function Reactions.matches(entry, key)
   return true
 end
 
--- A well-formed key from anywhere (a UI caller or the wire), or nil.
 function Reactions.validKey(key)
   if type(key) ~= "table" or type(key.memberId) ~= "string" or not FOR_KIND[key.kind] then
     return nil
@@ -118,20 +97,16 @@ function Reactions.validKey(key)
   return { memberId = key.memberId, guid = key.guid, kind = key.kind, n = key.n, skillLine = key.skillLine }
 end
 
--- The same key as a string, to tell Reactions apart.
 function Reactions.id(key)
   local id = ("%s|%s|%s|%s"):format(key.memberId, key.kind, key.guid or "", key.n or "")
   if key.skillLine then id = id .. "|" .. key.skillLine end
   return id
 end
 
--- A key and when it was made, as stored in a record.
 function Reactions.item(key, time)
   return { m = key.memberId, g = key.guid, k = CODES[key.kind], n = key.n, p = key.skillLine, t = time }
 end
 
--- The well-formed Reactions in a record, as { key, time }. A malformed
--- item, or a list that isn't one, is skipped rather than refused.
 function Reactions.inRecord(record)
   local list = {}
   if type(record) ~= "table" or type(record.reactions) ~= "table" then return list end
@@ -146,8 +121,6 @@ function Reactions.inRecord(record)
   return list
 end
 
--- Drops the items older than KEEP_FOR, then all but the KEEP_MAX newest.
--- Items are kept in the order they were made.
 function Reactions.prune(list, now)
   for i = #list, 1, -1 do
     local item = list[i]
@@ -158,8 +131,6 @@ function Reactions.prune(list, now)
   while #list > Reactions.KEEP_MAX do table.remove(list, 1) end
 end
 
--- "Bob", "Bob and Cleo", "Bob, Cleo and Dan", and after three names "Bob,
--- Cleo, Dan and 2 others".
 function Reactions.names(names)
   local count = #names
   if count == 1 then return names[1] end
@@ -171,15 +142,10 @@ function Reactions.names(names)
     others == 1 and "other" or "others")
 end
 
--- The whole line: names and what they did, "Bob and Cleo cheered your ding
--- to 30".
 function Reactions.text(names, phrase)
   return Reactions.names(names) .. " " .. phrase
 end
 
--- What a Reaction did to the owner's entry, after the names: "cheered your
--- ding to 30", "paid respects (Jaina died)". character is the entry's
--- Character in the owner's record, and alt whether it isn't their Main.
 function Reactions.phrase(entry, character, alt)
   local name = character and character.name or "?"
   local kind = entry.kind

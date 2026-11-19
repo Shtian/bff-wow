@@ -1,13 +1,3 @@
--- Camp: the Crew as a small pixel campsite, worked out from Roster's rows
--- and Feed's entries, placed so the UI only draws it. Who is there, seated
--- by the fire or asleep, the graves recent deaths leave, the flowers
--- Respects put on them and the spark over a fresh max level. Also the
--- Pocket Camp, the cut-down one kept on screen: the fire, the online
--- Members, with what each is doing, and bedrolls for those who just went
--- offline. Pure and stateless: tested through
--- Core:camp() and Core:pocketCamp(). See docs/design/camp.md and
--- docs/design/pocket-camp.md.
-
 local _, ns = ...
 
 local Camp = {}
@@ -15,22 +5,6 @@ ns.Camp = Camp
 
 local DAY = 24 * 60 * 60
 
--- The Camp's geometry, in art pixels. x runs from the fire's centre,
--- negative to the left. The fire's logs keep `fire` clear on each side,
--- a figure is `seated` or `asleep` wide, a grave `grave` wide with
--- `graveGap` before it, `gap` sits between neighbours and `margin` inside
--- each edge of the band. The tent, `tent` wide, only shows when there's
--- room. UI reads the same table to draw it. The panel's band is between
--- `minColumns` and `maxColumns` wide; the popup's is `awayColumns`. The
--- Pocket Camp is `pocketRows` high and from `pocketColumns` (its usual
--- width, three seats each side) to `pocketMaxColumns` wide, in steps of
--- `pocketStep` (one more seat each side); a flying figure's griffin takes
--- `griffinFore` more towards the fire and `griffinAft` away from it, and a
--- doorway reaches `doorway` past the first and last figure standing in it,
--- whose figures stand `doorwayGap` apart, a little closer than `gap`. A
--- shapeshift form's sprite, wider than a figure, reaches `formFore` past
--- it towards the fire and `formAft` away from it, and `formTrot` further
--- for a form that trots to and fro.
 local LAYOUT = {
   fire = 9,
   seated = 12,
@@ -57,15 +31,10 @@ local LAYOUT = {
 }
 Camp.LAYOUT = LAYOUT
 
--- Graves and sparks last this long; each Member has at most `MEMBER_GRAVES`
--- graves, the Camp `GRAVES`.
 Camp.RECENT = DAY
 local MEMBER_GRAVES = 2
 local GRAVES = 4
 
--- Online Members, you first, in Roster's order; then sleepers, most
--- recent Last seen first. With onlineOnly, only those of the sleepers in
--- the set `sleepers` (if given).
 local function candidates(rows, onlineOnly, sleepers)
   local seated, asleep = {}, {}
   for _, row in ipairs(rows) do
@@ -85,11 +54,8 @@ local function candidates(rows, onlineOnly, sleepers)
   return seated
 end
 
--- The recent news per Member: graves (newest first, a death entry counting
--- as its deaths, capped per Member and in all) and sparks.
 local function news(entries, now)
   local graves, sparks, total = {}, {}, 0
-  -- entries come newest first.
   for _, entry in ipairs(entries) do
     if entry.memberId and now - entry.time < Camp.RECENT then
       if entry.kind == "maxLevel" then sparks[entry.memberId] = true end
@@ -110,11 +76,6 @@ local function news(entries, now)
   return graves, sparks
 end
 
--- Places a slot (a figure and its graves) on one side of the fire, if it
--- fits. A side is { sign, used, limit }; the figure is nearest the fire,
--- its graves outward. fore and aft (default 0) keep that much more clear
--- of the figure towards the fire and away from it, and gap (default
--- LAYOUT.gap) is how far it sits from its neighbour nearer the fire.
 local function placeOn(side, figure, graveCount, fore, aft, gap)
   local width = figure + (aft or 0) + graveCount * (LAYOUT.graveGap + LAYOUT.grave)
   local start = (side.used == 0 and LAYOUT.fire or side.used + (gap or LAYOUT.gap)) + (fore or 0)
@@ -134,15 +95,11 @@ local function placeOn(side, figure, graveCount, fore, aft, gap)
   return x, graveXs
 end
 
--- The side with the most room left: the one used least, ties to the left.
 local function roomier(left, right)
   if right.used < left.used then return right, left end
   return left, right
 end
 
--- Each actor's label room: twice the distance from its centre to the
--- nearer of the midpoints with its neighbours (the fire counting as one at
--- 0, the band's edges as the outer ones), less the gap.
 local function labelRoom(actors, left, right)
   local sorted = {}
   for i, actor in ipairs(actors) do sorted[i] = actor end
@@ -159,20 +116,6 @@ local function labelRoom(actors, left, right)
   end
 end
 
--- The Camp at `columns` art pixels wide, from Roster's rows (yours first)
--- and Feed's entries (newest first, as Feed:describe gives them), at time
--- now. options.tent false leaves the tent out; options.onlineOnly leaves
--- out sleepers and graves, but those in the set options.sleepers, which
--- take the room the online Members leave and aren't counted in more if
--- they don't fit; options.moreText words the count of who
--- didn't fit (default "+%d more"), options.room(row) gives the room a
--- row's figure needs beyond itself: towards the fire, and away from it,
--- and options.together(row) a key that rows next to each other share when
--- they should sit side by side, and the gap between them (default
--- LAYOUT.gap): they're placed on one side if they fit there, else as
--- many as fit on the roomier side and the rest one by one, and splits
--- then has their key (key to how many they are).
--- Returns { columns, actors, graves, tent, more, splits }; see Core:camp().
 function Camp.view(rows, entries, now, columns, options)
   options = options or {}
   columns = math.max(1, math.floor(columns))
@@ -185,15 +128,12 @@ function Camp.view(rows, entries, now, columns, options)
   local view = { columns = columns, actors = {}, graves = {} }
   local more = 0
   local list = candidates(rows, options.onlineOnly, options.sleepers)
-  -- A row's key and gap from options.together, for those up by the fire.
   local function keyOf(row)
     if options.together and (row.own or row.online) then return options.together(row) end
   end
   local function roomOf(row)
     if options.room then return options.room(row) end
   end
-  -- Rows that sit together, from the first of them: on the roomier side
-  -- if they all fit there, or the other. Where each went: row to { x, side }.
   local placed = {}
   local function placeTogether(first)
     local key, gap = keyOf(list[first])
@@ -213,8 +153,6 @@ function Camp.view(rows, entries, now, columns, options)
         return
       end
     end
-    -- Too many for either side: as many as fit on the roomier one, and the
-    -- rest one by one.
     local side = roomier(left, right)
     for j = first, last do
       local fore, aft = roomOf(list[j])
@@ -236,7 +174,6 @@ function Camp.view(rows, entries, now, columns, options)
     if placed[row] then
       x, graveXs, side = placed[row].x, {}, placed[row].side
     else
-      -- A slot that won't fit with its graves may fit without them.
       local first, second = roomier(left, right)
       for _, count in ipairs({ #own, 0 }) do
         for _, tried in ipairs({ first, second }) do
@@ -280,38 +217,26 @@ function Camp.view(rows, entries, now, columns, options)
   return view
 end
 
--- A pose in words, but "adventuring", which names its instance.
 local STATUS = {
   seated = "by the fire", fishing = "fishing", crafting = "crafting", gathering = "gathering",
   fighting = "fighting", vendor = "at a vendor", auction = "at the auction house", resting = "resting",
   afk = "away", flying = "flying",
 }
 
--- A shapeshift form in words, and the forms that trot.
 local FORM_STATUS = {
   wolf = "a ghost wolf", bear = "in bear form", cat = "in cat form", travel = "in travel form",
   seal = "in aquatic form", moonkin = "in moonkin form",
 }
 local TROTS = { wolf = true, travel = true }
--- The poses a form is drawn over: by the fire and fighting. Anything else
--- shows what's being done.
 local FORM_POSES = { seated = true, fighting = true }
 
--- The seat key of you and your group outside an instance (Camp.pocket):
--- no instance's name, so it never matches one.
 local GROUP = {}
 
--- The instances that are raids, by name.
 local RAIDS = {}
 for _, dungeon in ipairs(ns.Together.DUNGEONS) do
   if dungeon.kind == "raid" then RAIDS[dungeon.name] = true end
 end
 
--- What a row's Member is shown doing. In an instance (the record says
--- so, and it's newer than anything said before going in) it's that,
--- unless a spell of fishing or of a profession is on. Elsewhere what they
--- said they chose to do (flying, the auction house, a vendor) comes
--- first, then such a spell, fighting, away, resting, and by the fire.
 local function poseOf(row, doing)
   local id = row.memberId
   local said = not row.instance and doing.said[id] or nil
@@ -322,18 +247,10 @@ local function poseOf(row, doing)
   return said or "seated"
 end
 
--- A status with how long, from a minute on: "fighting · 3m". Under a
--- minute it's too soon to say.
 local function withTime(status, seconds)
   return seconds < 60 and status or status .. " · " .. ns.Text.ago(seconds)
 end
 
--- Each online Member's pose as the Pocket Camp shows it awake, by Member
--- id, as a key that differs whenever the pose does: the pose ("fighting"),
--- with the instance for one adventuring ("adventuring:The Deadmines"). A
--- form doesn't count: by the fire there's no time to show, and fighting in
--- one is still fighting. doing is as Camp.pocket takes it. Core keeps when
--- each began from these (doing.since).
 function Camp.poseKeys(rows, doing)
   local keys = {}
   for _, row in ipairs(rows) do
@@ -345,9 +262,6 @@ function Camp.poseKeys(rows, doing)
   return keys
 end
 
--- A Pocket Camp width in art pixels, the nearest of its steps: from
--- LAYOUT.pocketColumns, in steps of pocketStep, up to pocketMaxColumns.
--- Anything but a number is the usual width.
 function Camp.pocketWidth(columns)
   local low, high, step = LAYOUT.pocketColumns, LAYOUT.pocketMaxColumns, LAYOUT.pocketStep
   if type(columns) ~= "number" then return low end
@@ -355,18 +269,11 @@ function Camp.pocketWidth(columns)
   return low + math.floor((columns - low) / step + 0.5) * step
 end
 
--- How many seated figures fit in a Pocket Camp `columns` art pixels wide,
--- both sides of the fire. A flying figure takes more.
 function Camp.pocketSeats(columns)
   local room = math.floor(columns / 2) - LAYOUT.margin - LAYOUT.fire + LAYOUT.gap
   return 2 * math.max(0, math.floor(room / (LAYOUT.seated + LAYOUT.gap)))
 end
 
--- Which of Roster's rows (others') show a Character in your group:
--- Member id to true. party is the game's group, { guid, name, lastName }
--- per unit (Core:group()). A unit is matched by GUID, else by its full
--- name ("First Last", or the first name where it has no last name)
--- against the row's, ignoring case, as the channel link compares names.
 function Camp.grouped(rows, party)
   local found = {}
   for _, row in ipairs(rows) do
@@ -385,12 +292,6 @@ function Camp.grouped(rows, party)
   return found
 end
 
--- The online rows in the Pocket Camp's order: you, then your group, then
--- the rest. Within your group and within the rest: those sharing your
--- seat key (doorwayOf gives it: the instance of an adventuring row, or
--- GROUP for you and your group elsewhere), then each set of two or more
--- sharing one, together, in the order of its first, then the others; each
--- in Roster's order. The others' rows follow as they were.
 local function seatingOrder(rows, group, doorwayOf)
   local you, ranks, offline = nil, { {}, {} }, {}
   for _, row in ipairs(rows) do
@@ -435,10 +336,6 @@ local function seatingOrder(rows, group, doorwayOf)
   return ordered
 end
 
--- The doorways the adventuring actors stand in: next to each other on one
--- side, in the same instance, they share one. Each is { x, width,
--- instance, raid }, reaching LAYOUT.doorway past its first and last
--- figure, and each such actor's doorway is its index.
 local function doorways(actors)
   local list = {}
   local sorted = {}
@@ -458,52 +355,18 @@ local function doorways(actors)
         instance = actor.instance, raid = actor.raid,
       }
     end
-    -- Sorted by x, so a doorway's actors are always the latest ones.
     actor.doorway = #list
     previous = actor
   end
   return list
 end
 
--- How many figures standing in one doorway (LAYOUT.doorwayGap apart) fit
--- on one side of a Pocket Camp `columns` wide.
 local function doorwaySeats(columns)
   local room = math.floor(columns / 2) - LAYOUT.margin - LAYOUT.fire
   if room < LAYOUT.seated then return 0 end
   return 1 + math.floor((room - LAYOUT.seated) / (LAYOUT.seated + LAYOUT.doorwayGap))
 end
 
--- The Pocket Camp: the fire and the online Members, you first, as many as
--- fit, LAYOUT.pocketRows high. It's the narrowest of its widths (from
--- LAYOUT.pocketColumns in steps of pocketStep, up to maxColumns) that
--- everyone fits, or maxColumns if they don't; but past maxColumns (up to
--- pocketMaxColumns) for a doorway's set to fit on one side, when one side
--- of the widest can hold them. doing is what they're
--- up to, each by Member id: said (what they last said they're doing, as
--- Doing gives it), fishing (true while fishing) and working ("crafting"
--- or "gathering" while at a profession), form (the shapeshift form
--- each was last said to be in) and since (when each one's pose began, as
--- this client saw it: see Camp.poseKeys). Each actor is as in view(), with
--- pose (see Core:pocketCamp()), instance (its name, while in one), raid
--- (true if that's a raid), form (the shapeshift form drawn in its place,
--- seated or fighting, with trots true for one that trots, and the room
--- its sprite needs: LAYOUT.formFore and formAft), status (the pose in
--- words, or by the fire the form's: "in bear form"; from a minute in a
--- pose other than by the fire, with how long: "fighting · 3m", and since,
--- those seconds) and row (the
--- Member's Roster row, for the tooltip over the figure), and onAlt (true
--- while the Character shown isn't their Main; the tooltip line says "on
--- alt" too). A flying figure takes its griffin's room. Members that
--- didn't fit are counted in more ("+2"). group (Member id to true: Camp.grouped) are in your party or
--- raid: they sit right after you, marked group. Members adventuring in
--- the same instance sit side by side, in a doorway they share (doorways,
--- and each one's doorway: see doorways()). Outside an instance, you and
--- your group sit on your side of the fire, filling it first. bedrolls (Member id to when they were seen going offline)
--- are the Members asleep in a bedroll: after every online Member, as many
--- as fit at the width those need, never counted in more; pose "asleep",
--- status "asleep · 4m". tooltip lists who is doing what: { title, lines }.
--- shown is what the player chose to have marked (each on unless false):
--- alts, onAlt and "on alt" in the tooltip.
 function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, shown)
   group = group or {}
   shown = shown or {}
@@ -514,10 +377,6 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
     local form = doing.form and doing.form[id]
     if FORM_POSES[poses[id]] and FORM_STATUS[form] then forms[id] = form end
   end
-  -- Who sits together: a doorway's set (its instance), or, with you
-  -- outside an instance, you and your group outside one (GROUP), so
-  -- they're on your side of the fire. With you in a doorway, your group
-  -- outside it sits round the fire as anyone else does.
   local outside = true
   for _, row in ipairs(rows) do
     if row.own and poses[row.memberId] == "adventuring" then outside = false end
@@ -539,11 +398,6 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
       return key, key ~= GROUP and LAYOUT.doorwayGap or nil
     end,
   }
-  -- Wider, a step at a time: within maxColumns for anyone left out, and
-  -- as far as it takes (up to pocketMaxColumns) for a doorway's set split
-  -- up that one side of the widest can hold; a bigger raid is shown as it
-  -- comes. Your group split up outside an instance isn't worth any width:
-  -- they sit round the fire as usual.
   local function wanted(view, columns)
     for key, count in pairs(view.splits or {}) do
       if key ~= GROUP and count <= doorwaySeats(LAYOUT.pocketMaxColumns) then return true end
@@ -579,14 +433,12 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
       else
         actor.status = STATUS[actor.pose]
       end
-      -- How long they've been at it, from a minute on; never by the fire.
       local began = actor.pose ~= "seated" and doing.since and doing.since[actor.memberId]
       if began and now - began >= 60 then
         actor.since = now - began
         actor.status = withTime(actor.status, actor.since)
       end
     end
-    -- On an Alt: the Character shown isn't their Main.
     actor.onAlt = shown.alts ~= false and actor.row.onAlt or nil
     lines[i] = ("%s%s: %s"):format(actor.label, actor.onAlt and " (on alt)" or "", actor.status)
   end
@@ -596,11 +448,6 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
   return view
 end
 
--- The Camp's wording on Roster's rows (as Roster.rows gives them, in
--- `order`), in place: each row's status (right-hand text: "by the fire",
--- "asleep · 5m ago", or with the Camp off its Last seen), and each other
--- Member's section label ("BY THE FIRE" and "ASLEEP IN CAMP" under Online
--- first with the Camp on, else "CREW").
 function Camp.wordRows(rows, on, order)
   local split = on and (order == nil or order == "online")
   for _, row in ipairs(rows) do
@@ -618,8 +465,6 @@ function Camp.wordRows(rows, on, order)
   return rows
 end
 
--- The panel header's count: "2 of 5 by the fire", you counted, with the
--- Camp on; else "1 of 4 online", others only.
 function Camp.header(summary, on)
   if on then
     return ("%d of %d by the fire"):format(summary.online + 1, summary.members + 1)
@@ -627,10 +472,6 @@ function Camp.header(summary, on)
   return ("%d of %d online"):format(summary.online, summary.members)
 end
 
--- While you were away in the Camp's voice: the Camp at the popup's width
--- without the tent, each actor tagged with what their Main gained
--- (gained, as the scoreboard words it, and highlight for max level) from
--- the summary's member blocks, and the intro.
 function Camp.away(rows, entries, now, summary)
   local view = Camp.view(rows, entries, now, LAYOUT.awayColumns, { tent = false })
   local byMember = {}

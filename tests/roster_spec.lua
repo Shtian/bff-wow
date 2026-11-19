@@ -2,8 +2,6 @@ local load = require("tests.load")
 
 local DAY = 24 * 60 * 60
 
--- A net with the given clients logged in and in one Crew, settled. options
--- maps a name to FakeNet:add options.
 local function crew(names, options)
   local ns = load()
   local net = ns.FakeNet.new()
@@ -26,13 +24,11 @@ local function character(name, level, extra)
   return c
 end
 
--- Switches the client to another Character, as a relog onto it would.
 local function switchTo(client, name, level, extra)
   client.character = character(name, level, extra)
   client:play()
 end
 
--- Jumps the clock ahead, then lets the Crew settle.
 local function skip(net, seconds)
   net:step(net:now() + seconds)
   net:run(5)
@@ -144,8 +140,8 @@ describe("Roster", function()
       assert.equal(net:now() - row.lastSeen, row.sinceSeen)
     end)
 
-    -- Forever Characters have a last name: the channel says "Ann Smith"
-    -- left, while the record holds UnitName's first name, "Ann".
+    -- WoW: on Forever the channel names a leaving Character "Ann Smith",
+    -- while UnitName gives only "Ann".
     it("shows a Member offline when their Character leaves by first and last name", function()
       local net, clients = crew({ "Ann", "Bob" })
       local a, b = clients[1], clients[2]
@@ -215,8 +211,6 @@ describe("Roster", function()
   end)
 
   describe("sorting", function()
-    -- Ann (you, 20); Bea online at 30, Cid online at 21, Dot offline at 19
-    -- seen long ago, Eve offline at 45 and Fay offline at 50 seen since.
     local function fiveOthers()
       local net, clients = crew({ "Ann", "Bea", "Cid", "Dot", "Eve", "Fay" }, {
         Ann = { character = character("Ann", 20) },
@@ -268,7 +262,6 @@ describe("Roster", function()
 
       b:login()
       skip(net, 2 * DAY)
-      -- Bob's Main went unseen 30 days, and Cid has nothing left to show.
       assert.same({}, a:rowFor(b).alts)
       assert.is_nil(a:rowFor(c))
       assert.equal(2, a.core:summary().hidden)
@@ -338,7 +331,6 @@ describe("Roster", function()
   end)
 
   describe("Remove", function()
-    -- How many copies of a Member's record `from` sent in DATA since `mark`.
     local function copiesSent(net, ns, mark, from, id)
       local count = 0
       for i = mark + 1, #net.wire do
@@ -361,7 +353,6 @@ describe("Roster", function()
       net:run(2)
       assert.is_table(c:rowFor(b))
 
-      -- Bob dings while Ann is the only one online to hear it.
       c:logout()
       b:play({ level = 11 })
       net:run(5)
@@ -369,7 +360,6 @@ describe("Roster", function()
       b:logout()
       net:run(2)
 
-      -- Cid comes back and learns nothing about Bob from Ann.
       local mark = #net.wire
       c:login()
       net:run(20)
@@ -387,7 +377,6 @@ describe("Roster", function()
     it("sends no DIGEST meant only to fetch a Member removed meanwhile", function()
       local net, clients, ns = crew({ "Ann", "Bob", "Cid" })
       local a, b, c = clients[1], clients[2], clients[3]
-      -- Only Cid hears Bob's ding.
       a:logout()
       b:play({ level = 11 })
       net:run(5)
@@ -397,8 +386,6 @@ describe("Roster", function()
       a:login()
       net:run(10)
 
-      -- Cid's DIGEST tells Ann about Bob's newer version; Ann removes Bob
-      -- before her own DIGEST asking for it goes out.
       c:login()
       net:step()
       a.core:removeMember(b.memberId)
@@ -416,14 +403,10 @@ describe("Roster", function()
       local a, b = clients[1], clients[2]
       a.core:removeMember(b.memberId)
 
-      -- Several DIGEST rounds from Ann: nobody owes her Bob. Bob's own
-      -- sends are his to make, so only Cid's copies count.
       local mark = #net.wire
       net:run(5 * 60)
       assert.equal(0, copiesSent(net, ns, mark, "Cid", b.memberId))
 
-      -- Bob dings and logs out: Ann notes the version of the copy she
-      -- refuses, and her DIGESTs list it, so Cid doesn't send it again.
       b:play({ level = 11 })
       net:run(5)
       b:logout()
@@ -438,7 +421,6 @@ describe("Roster", function()
       local a, b = clients[1], clients[2]
       a.core:removeMember(b.memberId)
       b:logout()
-      -- Saved by an older BFF: no version for the removed Member.
       a.db.removed[b.memberId].version = nil
       a:reload()
 

@@ -31,7 +31,6 @@ local function character(overrides)
   return c
 end
 
--- Each alt's name, classFilename and level.
 local function alts(row)
   local result = {}
   for i, alt in ipairs(row.alts) do
@@ -120,7 +119,6 @@ describe("Your own Character", function()
     local memberId = first:rows()[1].memberId
     assert.is_string(memberId)
 
-    -- Relog onto another Character.
     local relog = newDeps(db)
     relog.clock = deps.clock + 60
     local second = load().Core.new(relog)

@@ -2,9 +2,7 @@ local load = require("tests.load")
 
 local DAY = 24 * 60 * 60
 
--- A made-up final boss for The Deadmines (tests/clears_spec.lua), and a
--- listed Rare.
-local FINALS = { [101] = "The Deadmines" }
+local FAKE_FINAL_BOSSES = { [101] = "The Deadmines" }
 local RAKSHIRI = 10200
 
 local function playing(name, extra)
@@ -16,11 +14,9 @@ local function playing(name, extra)
   return character
 end
 
--- A net with the given clients logged in and in one Crew. Settled unless
--- settle is false. start maps a name to what its Character starts with.
 local function crew(names, start, settle)
   local ns = load()
-  local net = ns.FakeNet.new({ finalBosses = FINALS })
+  local net = ns.FakeNet.new({ finalBosses = FAKE_FINAL_BOSSES })
   local clients = {}
   for i, name in ipairs(names) do
     clients[i] = net:add(name, { character = playing(name, start and start[name]) }):login()
@@ -31,7 +27,6 @@ local function crew(names, start, settle)
   return net, clients, code
 end
 
--- Jumps the clock on by seconds, in one step.
 local function later(net, seconds)
   net:step(net.clock + seconds)
 end
@@ -42,7 +37,6 @@ local function labels(trophies)
   return list
 end
 
--- Each client kills The Deadmines' final boss, in one party.
 local function clear(clients)
   local party = {}
   for i, client in ipairs(clients) do party[i] = { guid = client.character.guid, name = client.character.name } end
@@ -55,7 +49,6 @@ local function killRakshiri(client)
   client.core:rareKilled({ npcId = RAKSHIRI, zone = "Winterspring", subzone = "Everlook", mapId = 1452, signal = "loot" })
 end
 
--- The shelf's unseen trophies, as labels, newest first.
 local function unseen(trophies)
   local list = {}
   for _, trophy in ipairs(trophies.shelf) do
@@ -102,7 +95,6 @@ describe("Trophies", function()
     assert.same({
       "everyone 30", "deaths 25", "crewLevels 50", "everyone 20", "everyone 10",
     }, labels(shelf))
-    -- The baseline's, together.
     assert.equal(shelf[3].time, shelf[5].time)
     assert.is_true(shelf[5].time < shelf[2].time)
     assert.is_true(shelf[2].time >= reachedAt and shelf[2].time <= reachedAt + 3)
@@ -183,9 +175,7 @@ describe("Trophies", function()
     local net, clients = crew({ "Ann", "Bob" }, { Ann = { level = 30 }, Bob = { level = 21 } })
     local a, b = clients[1], clients[2]
 
-    -- Never opened: nothing counts as since.
     local trophies = b.core:trophies()
-    -- The baseline's rungs together: by track, the highest first.
     assert.equal("crewLevels 50", trophies.latest.track .. " " .. trophies.latest.label)
     assert.equal(0, trophies.sinceSeen)
 
@@ -201,9 +191,7 @@ describe("Trophies", function()
     b.core:openGoals()
     trophies = b.core:trophies()
     assert.equal("Everyone in the Crew has a Character at 30!", trophies.latest.text)
-    -- Crew deaths 25, besides the latest.
     assert.equal(1, trophies.sinceSeen)
-    -- Through the visit, redraws keep the count.
     b.core:openGoals()
     assert.equal(1, b.core:trophies().sinceSeen)
     b.core:leaveGoals()
@@ -214,7 +202,6 @@ describe("Trophies", function()
   it("aren't news when reached quietly: not fresh, nor counted since the tab was opened", function()
     local net, clients = crew({ "Ann", "Bob" }, { Ann = { level = 30, deaths = 30 }, Bob = { level = 21 } }, false)
     local a = clients[1]
-    -- Opened while the Crew is still being counted.
     a.core:openGoals()
     a.core:leaveGoals()
     net:run(40)
@@ -224,7 +211,6 @@ describe("Trophies", function()
     local trophies = a.core:trophies()
     assert.equal("deaths 50", trophies.latest.track .. " " .. trophies.latest.label)
     assert.is_true(trophies.latest.fresh)
-    -- The baseline's rungs: reached, but not news.
     assert.equal(0, trophies.sinceSeen)
     for i = 2, #trophies.shelf do assert.is_false(trophies.shelf[i].fresh) end
   end)
@@ -275,10 +261,8 @@ describe("Trophies", function()
       local trophies = b.core:trophies()
       assert.same({ "rareKills Rak'shiri", "clears Deadmines", "deaths 25" }, unseen(trophies))
       assert.is_true(trophies.latest.unseen)
-      -- The baseline's Everyone at 10: quiet, so never unseen.
       assert.equal("everyone 10", trophies.shelf[4].track .. " " .. trophies.shelf[4].label)
       assert.is_false(trophies.shelf[4].unseen)
-      -- A redraw within the visit keeps the same answer.
       b.core:openGoals()
       assert.same({ "rareKills Rak'shiri", "clears Deadmines", "deaths 25" }, unseen(b.core:trophies()))
 
@@ -292,7 +276,6 @@ describe("Trophies", function()
     it("count a clear from when it reached this client, so one synced days late is unseen", function()
       local net, clients = crew({ "Ann", "Bob" }, { Ann = { level = 10 }, Bob = { level = 10 } })
       local a, b = clients[1], clients[2]
-      -- Ann clears it locked down, so her record waits.
       a:lockdown(true)
       clear({ a })
       later(net, 2 * DAY)
@@ -307,11 +290,8 @@ describe("Trophies", function()
       b.core:openGoals()
       local trophies = b.core:trophies()
       assert.same({ "clears Deadmines" }, unseen(trophies))
-      -- Older than Bob's deaths by its own time, so not the latest win,
-      -- which was seen.
       assert.equal("deaths 25", trophies.latest.track .. " " .. trophies.latest.label)
       assert.is_false(trophies.latest.unseen)
-      -- Counted since you last looked, as it's unseen.
       assert.equal(1, trophies.sinceSeen)
     end)
 
@@ -338,14 +318,11 @@ describe("Trophies", function()
       a.core:openGoals()
       a.core:leaveGoals()
       later(net, DAY)
-      -- Bob joins already at 30 with deaths: what he brings is who counts changing.
       local b = net:add("Bob", { character = playing("Bob", { level = 30, deaths = 30 }) }):login()
       b:join(code)
       net:run(40)
       a.core:openGoals()
       local trophies = a.core:trophies()
-      -- Crew levels 50 with Bob's 30, reached here after the last look, but
-      -- quietly.
       assert.equal("crewLevels 50", trophies.latest.track .. " " .. trophies.latest.label)
       assert.is_true(trophies.latest.quiet)
       assert.same({}, unseen(trophies))

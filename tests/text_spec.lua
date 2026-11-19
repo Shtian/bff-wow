@@ -3,7 +3,6 @@ local load = require("tests.load")
 local Text = load().Text
 
 local HOUR, DAY = 3600, 86400
--- Monday 2026-11-02 00:00 UTC.
 local MONDAY = 1793577600
 
 describe("Text", function()
@@ -30,7 +29,6 @@ describe("Text", function()
   end)
 
   it("reads dates in local time", function()
-    -- Sunday 23:00 UTC is Monday at UTC+2; Monday 01:00 UTC is Sunday at UTC-2.
     assert.equal("MONDAY 02 NOVEMBER", Text.dayTitle(2, MONDAY - HOUR, 2 * HOUR))
     assert.equal("SUNDAY 01 NOVEMBER", Text.dayTitle(2, MONDAY + HOUR, -2 * HOUR))
     assert.equal("2 Nov", Text.shortDate(MONDAY - HOUR, 2 * HOUR))

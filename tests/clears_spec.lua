@@ -2,9 +2,7 @@ local load = require("tests.load")
 
 local DAY = 24 * 60 * 60
 
--- Made-up final bosses, since Forever's encounter IDs aren't known yet
--- (docs/research/boss-kills.md): every client of the net is handed these.
-local FINALS = {
+local FAKE_FINAL_BOSSES = {
   [101] = "The Deadmines",
   [102] = "Wailing Caverns",
   [672] = "Molten Core",
@@ -19,10 +17,9 @@ local function playing(name, extra)
   return character
 end
 
--- A net with the given clients logged in and in one Crew, settled.
 local function crew(names)
   local ns = load()
-  local net = ns.FakeNet.new({ finalBosses = FINALS })
+  local net = ns.FakeNet.new({ finalBosses = FAKE_FINAL_BOSSES })
   local clients = {}
   for i, name in ipairs(names) do
     clients[i] = net:add(name, { character = playing(name) }):login()
@@ -37,8 +34,6 @@ local function later(net, seconds)
   net:step(net.clock + seconds)
 end
 
--- The party as the game reads it: each client's Character, plus strangers
--- by name.
 local function party(clients, strangers)
   local list = {}
   for _, client in ipairs(clients) do
@@ -50,7 +45,6 @@ local function party(clients, strangers)
   return list
 end
 
--- Every client in the party kills the final boss: each records it.
 local function clear(clients, encounterId, instanceType, strangers)
   local results = {}
   for i, client in ipairs(clients) do
@@ -114,13 +108,11 @@ describe("Clears", function()
       assert.equal("The Crew cleared The Deadmines!", trophy.text)
       assert.is_true(trophy.fresh)
       assert.matches("^%d+ %a%a%a$", trophy.date)
-      -- One Feed entry, though two Members recorded it.
       assert.same({ "The Crew cleared The Deadmines!" }, goalTexts(client))
       assert.equal("clears", client.core:trophies().latest.track)
     end
     assert.same({ "You", "Bob" }, clearTrophies(a)[1].party)
     assert.same({ "Ann", "Bob" }, clearTrophies(c)[1].party)
-    -- Cleo wasn't there, and hears it live.
     assert.same({ "The Crew cleared The Deadmines!" }, liveTexts(c))
   end)
 
@@ -148,7 +140,6 @@ describe("Clears", function()
       { with({ success = false }), "wipe" },
       { with({ encounterId = 999 }), "unknown" },
       { with({ instanceType = "none" }), "notInstance" },
-      -- Secret values reach Core as nil.
       { with({ encounterId = false }), "unreadable" },
       { with({ success = "yes" }), "unreadable" },
       { with({ party = "everyone" }), "unreadable" },
@@ -168,7 +159,6 @@ describe("Clears", function()
 
   it("name only Members of the Crew in the party", function()
     local net, clients = crew({ "Ann", "Bob" })
-    -- Ann pugs it with three strangers; a nameless one is skipped.
     local a = clients[1]
     local group = party({ a }, { "Zed", "Yan", "Xia" })
     group[#group + 1] = {}
@@ -196,7 +186,6 @@ describe("Clears", function()
     local first = clearTrophies(d)[1].time
     later(net, 2 * DAY)
     clear({ c, d }, 101)
-    -- A repeat clear by the same party changes nothing.
     clear({ a, b }, 101)
     net:run(10)
 
@@ -213,7 +202,6 @@ describe("Clears", function()
   it("take the earliest clear's time, whichever record brings it first", function()
     local net, clients = crew({ "Ann", "Bob", "Cleo" })
     local a, b, c = clients[1], clients[2], clients[3]
-    -- Bob clears it first, but locked down, so his record waits.
     b:lockdown(true)
     clear({ b }, 101)
     local bobs = net.clock
@@ -235,12 +223,10 @@ describe("Clears", function()
     local cleo = net:add("Cleo", { character = playing("Cleo") }):login()
     cleo:join(code)
     net:run(40)
-    -- Ann knows Cleo already: news to her.
     clear({ cleo }, 102)
     net:run(10)
     assert.same({ "The Crew cleared Wailing Caverns!" }, goalTexts(a))
     a:logout()
-    -- Bob first sees Cleo's record with the clear in it.
     b:login()
     net:run(40)
     local trophy = clearTrophies(b)[1]
@@ -295,13 +281,12 @@ describe("Clears", function()
     assert.equal("Wailing Caverns", caverns.label)
     assert.equal("17–24", caverns.levels)
     assert.equal("60", slot(trophies.raids, "Molten Core").levels)
-    -- Level order, as on the Together tab.
     assert.equal("Ragefire Chasm", trophies.dungeons.slots[1].name)
   end)
 
   it("record nothing outside a Crew", function()
     local ns = load()
-    local net = ns.FakeNet.new({ finalBosses = FINALS })
+    local net = ns.FakeNet.new({ finalBosses = FAKE_FINAL_BOSSES })
     local a = net:add("Ann", { character = playing("Ann") }):login()
     local name, reason = a.core:encounterEnded({
       encounterId = 101, success = true, instanceType = "party", party = party({ a }),

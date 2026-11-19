@@ -1,17 +1,3 @@
--- Feed: turns a record as it was and as it is now into Feed entries (ding,
--- death, new Character, max level, joined and left the Crew, gave: a
--- Spare Given, matched by owner and id, and rare finds: the Crew's first
--- catch of a rare type), adds the
--- Crew-wide entries for Crew goals reached, and keeps the
--- account-wide log with its seen flags. A jump over skipped versions makes
--- at most one entry of each kind per Character, and the first sight of a
--- Member is a silent baseline, unless they joined the Crew after you. Also
--- attaches the Reactions Members' records carry to the entries they point
--- at, each with a seen flag on your own entries, and knows when sync has
--- settled after an initial login.
--- See docs/design/feed.md, docs/design/reactions.md and
--- docs/design/spares.md and docs/design/catches.md.
-
 local _, ns = ...
 
 local Feed = {}
@@ -22,11 +8,9 @@ local Reactions = ns.Reactions
 local Spares = ns.Spares
 
 local DAY = 24 * 60 * 60
--- Entries are kept this long, and at most this many.
 local KEEP_FOR = 30 * DAY
 local KEEP_MAX = 200
 
--- For "a new Character: Jaina (Mage)". Core has no game strings.
 local CLASS_NAMES = {
   DEATHKNIGHT = "Death Knight",
   DEMONHUNTER = "Demon Hunter",
@@ -37,13 +21,6 @@ local function className(classFilename)
   return CLASS_NAMES[classFilename] or classFilename:sub(1, 1) .. classFilename:sub(2):lower()
 end
 
--- db is the whole saved table; Feed keeps `feed` (the log, oldest first)
--- and `feedJoins` (the joinedAt last seen per Member, so re-adding a
--- Member doesn't announce their join again). Only an initial login waits
--- for sync to settle. itemLink(itemString) is the game's link for an item,
--- or nil while it isn't cached, for gave entries. itemLook(itemId) is how
--- the game shows an item ({ text, icon, edge }, each nil while it isn't
--- cached), or nil, for rare finds.
 function Feed.new(db, ledger, now, maxLevel, initialLogin, itemLink, itemLook)
   db.feed = db.feed or {}
   db.feedJoins = db.feedJoins or {}
@@ -62,8 +39,6 @@ local function memberName(self, record)
   return ns.Roster.memberName(record, self.now())
 end
 
--- Who an event happened to: "Ana", "Ana's Alt Jaina", "You" or "Your Alt
--- Jaina". The Main is the one the panel shows.
 local function subject(self, record, character, own)
   local main = ns.Roster.main(record, self.now())
   local alt = main ~= nil and character.guid ~= main.guid
@@ -80,12 +55,10 @@ local function newEntry(kind, record, own, text, character)
     guid = character and character.guid,
     text = text,
     own = own or nil,
-    -- Your own events are never news to you.
     seen = own or nil,
   }
 end
 
--- The entries for one Character, from how it was (nil if new) to how it is.
 local function characterEntries(self, record, was, character, own, list)
   if not was then
     local owner = own and "You have" or memberName(self, record) .. " has"
@@ -98,7 +71,6 @@ local function characterEntries(self, record, was, character, own, list)
   end
 
   local level, from = character.level, was.level
-  -- A level above your own max level means you're behind on a patch.
   if level > from and level <= self.maxLevel then
     local entry
     if level == self.maxLevel then
@@ -112,13 +84,11 @@ local function characterEntries(self, record, was, character, own, list)
     list[#list + 1] = entry
   end
 
-  -- A count that went down is a crash that lost a session's deaths.
   local deaths = (character.deaths or 0) - (was.deaths or 0)
   if deaths > 0 then
     local times = deaths == 1 and "" or (" %d times"):format(deaths)
     local entry = newEntry("death", record, own,
       ("%s died%s"):format(subject(self, record, character, own), times), character)
-    -- The death total reached keys Reactions (docs/adr/0002).
     entry.count, entry.to = deaths, character.deaths
     list[#list + 1] = entry
   end
@@ -134,16 +104,12 @@ local function characterEntries(self, record, was, character, own, list)
       text = ("%s reached %d %s"):format(who, news.milestone, news.name)
     end
     local entry = newEntry(news.kind, record, own, text, character)
-    -- The skill line and milestone key Reactions (docs/adr/0002).
     entry.skillLine, entry.profession, entry.icon = news.skillLine, news.name, news.icon
     entry.from, entry.milestone = news.from, news.milestone
     list[#list + 1] = entry
   end
 end
 
--- Attaches a Reaction by the Member id `by` to an entry: { by, n, time,
--- seen }, kept in the order they were made. Returns it, or nil when it was
--- already there or is the owner's own.
 local function attach(entry, by, key, time, seen)
   if by == entry.memberId then return nil end
   local list = entry.reactions or {}
@@ -158,7 +124,6 @@ local function attach(entry, by, key, time, seen)
   return reaction
 end
 
--- The newest entry a key falls on, or nil.
 local function find(self, key)
   local log = self.db.feed
   for i = #log, 1, -1 do
@@ -167,8 +132,6 @@ local function find(self, key)
   return nil
 end
 
--- A new entry takes the Reactions to it already in held records, so it
--- doesn't matter which record arrived first. They aren't news.
 local function attachHeld(self, entry)
   if not Reactions.forKind(entry.kind) then return end
   for id, record in self.ledger:records() do
@@ -178,7 +141,6 @@ local function attachHeld(self, entry)
   end
 end
 
--- Keeps the log oldest first by time; equal times keep arrival order.
 local function insert(self, entries)
   local log = self.db.feed
   for _, entry in ipairs(entries) do
@@ -190,11 +152,6 @@ local function insert(self, entries)
   return entries
 end
 
--- The Reactions in after that weren't in before, attached to the entries
--- they point at. A Reaction whose entry isn't in the log is ignored. Only
--- those to your own entries can be news, and never on first sight.
--- Returns the news as { entry, reaction }, and every Reaction attached
--- the same way, on anyone's entry, but not on first sight.
 local function reactionsChanged(self, before, after)
   local news, attached = {}, {}
   if after.left then return news, attached end
@@ -220,12 +177,10 @@ end
 local function crewEntry(self, kind, record)
   local verb = kind == "joined" and " joined the Crew" or " left the Crew"
   local entry = newEntry(kind, record, false, memberName(self, record) .. verb)
-  -- joinedAt keys Welcomes (docs/adr/0002).
   if kind == "joined" then entry.joinedAt = record.joinedAt end
   return entry
 end
 
--- Whether the log has the gave entry for this owner's Spare.
 local function hasGave(self, owner, id)
   for _, entry in ipairs(self.db.feed) do
     if entry.kind == "gave" and entry.memberId == owner and entry.spare == id then return true end
@@ -233,19 +188,14 @@ local function hasGave(self, owner, id)
   return false
 end
 
--- A gave entry: owner, the Spare's id and item, and who it went to.
--- Its text is worked out when it's described, once the item is cached.
 local function gaveEntry(self, record, own, spare)
   local entry = newEntry("gave", record, own, nil)
   entry.time = own and self.now() or record.version
   entry.spare, entry.item, entry.recipient = spare.id, spare.item, spare.to
-  -- The recipient's own notice already tells them.
   if spare.to == self.ledger:memberId() then entry.seen = true end
   return entry
 end
 
--- The Spares Given in after that weren't in before, as Spares tells
--- them, each once.
 local function gaveEntries(self, before, after, list)
   for _, spare in ipairs(Spares.newlyGiven(before, after)) do
     if not hasGave(self, after.id, spare.id) then
@@ -254,13 +204,10 @@ local function gaveEntries(self, before, after, list)
   end
 end
 
--- "Tor caught Feralas Ahi".
 local function caughtText(who, item)
   return ("%s caught %s"):format(who, item)
 end
 
--- The rare finds in a record that held the rare types in had, as entries
--- added to list. The time is the catch's, so every client agrees on it.
 local function rareEntries(self, had, record, own, list)
   local records = {}
   for _, held in self.ledger:records() do
@@ -272,16 +219,11 @@ local function rareEntries(self, had, record, own, list)
       or own and "You" or memberName(self, record)
     local entry = newEntry("rareFind", record, own, caughtText(who, rare.name), character)
     entry.time = rare.time
-    -- The type keys Reactions (docs/adr/0002).
     entry.catch, entry.itemId, entry.fish, entry.who = rare.id, rare.itemId, rare.name, who
     list[#list + 1] = entry
   end
 end
 
--- Someone else's record was kept: before is the copy held until now (nil
--- on first sight) and after the new one. Returns the new entries, the
--- new Reactions to your own entries as { entry, reaction }, and every
--- Reaction newly attached (not on first sight), the same way.
 function Feed:recordChanged(before, after)
   local list = {}
   local joins = self.db.feedJoins
@@ -306,7 +248,6 @@ function Feed:recordChanged(before, after)
   return insert(self, list), reactionsChanged(self, before, after)
 end
 
--- You joined a Crew: your own joined entry, which Welcomes attach to.
 function Feed:ownJoined()
   local own = self.ledger:own()
   local entry = newEntry("joined", own, true, "You joined the Crew")
@@ -314,9 +255,6 @@ function Feed:ownJoined()
   return insert(self, { entry })
 end
 
--- The Character being played changed: was is how it was (nil if new), and
--- guid names it in the own record. Your first Character ever is a silent
--- baseline. Returns the new entries.
 function Feed:ownChanged(was, guid)
   local list = {}
   local own = self.ledger:own()
@@ -325,24 +263,17 @@ function Feed:ownChanged(was, guid)
   return insert(self, list)
 end
 
--- You Gave one of your Spares ({ id, item, to }), as the Spares
--- module tells: your own gave entry. Returns the new entries.
 function Feed:ownGave(spare)
   if hasGave(self, self.ledger:memberId(), spare.id) then return {} end
   return insert(self, { gaveEntry(self, self.ledger:own(), true, spare) })
 end
 
--- You caught something, your record having held the rare types in had
--- (Catches.rareHeld) before: your own rare finds. Returns the new entries.
 function Feed:ownCaught(had)
   local list = {}
   rareEntries(self, had, self.ledger:own(), true, list)
   return insert(self, list)
 end
 
--- Crew goals were reached: one Crew-wide entry each ({ track, rung, text }
--- from Goals), naming no Member. They are news like any other Member's
--- entry. Returns the new entries.
 function Feed:goalsReached(reached)
   local list = {}
   for _, goal in ipairs(reached) do
@@ -351,7 +282,6 @@ function Feed:goalsReached(reached)
   return insert(self, list)
 end
 
--- Drops a Removed Member's entries.
 function Feed:dropMember(id)
   local log = self.db.feed
   for i = #log, 1, -1 do
@@ -359,23 +289,19 @@ function Feed:dropMember(id)
   end
 end
 
--- Leaving the Crew wipes the log.
 function Feed:clear()
   self.db.feed = {}
   self.db.feedJoins = {}
 end
 
--- Marks an entry, or a Reaction, seen.
 function Feed:markSeen(item)
   item.seen = true
 end
 
--- Whether a Reaction counts: a Removed Member's are hidden.
 local function shown(self, reaction)
   return not self.ledger:isRemoved(reaction.by)
 end
 
--- The unseen Reactions to an entry. Only your own entries have any.
 local function unseenReactions(self, entry)
   local list = {}
   if not entry.own then return list end
@@ -385,7 +311,6 @@ local function unseenReactions(self, entry)
   return list
 end
 
--- Marks every entry and Reaction seen. Returns true if any wasn't.
 local function markAllSeen(self)
   local any = false
   for _, entry in ipairs(self.db.feed) do
@@ -401,11 +326,6 @@ local function markAllSeen(self)
   return any
 end
 
--- The Feed tab is open: a visit starts, if one isn't open already. Every
--- entry unseen now, or with an unseen Reaction, is New until the visit
--- ends, and is then marked seen. Called on every draw of the tab, so what
--- arrives during the visit and is still unseen at the next draw is New
--- too. Returns true if anything was unseen.
 function Feed:open()
   local visit = self.visit or {}
   self.visit = visit
@@ -415,12 +335,10 @@ function Feed:open()
   return markAllSeen(self)
 end
 
--- The Feed tab was left: the visit ends, and nothing is New.
 function Feed:leave()
   self.visit = nil
 end
 
--- How many entries and Reactions haven't been seen.
 function Feed:unseen()
   local count = 0
   for _, entry in ipairs(self.db.feed) do
@@ -435,22 +353,16 @@ local function reactorName(self, id)
   return record and memberName(self, record) or "Someone"
 end
 
--- A gave entry's text: "Ana gave Bob [Cruel Barb]", "You gave Bob ...",
--- "Ana gave you ...".
 local function gaveText(self, entry)
   local giver = entry.own and "You" or reactorName(self, entry.memberId)
   local recipient = entry.recipient == self.ledger:memberId() and "you" or reactorName(self, entry.recipient)
   return ("%s gave %s %s"):format(giver, recipient, Spares.linkText(self.itemLink, entry.item))
 end
 
--- How the game shows a rare find's item, as Feed.new's itemLook: empty for
--- any other entry, or while the game can't say.
 local function lookOf(self, entry)
   return entry.kind == "rareFind" and self.itemLook(entry.itemId) or {}
 end
 
--- An entry's text: stored, except a gave entry's, worked out as shown, and
--- a rare find's, which shows the item as the game has it once it can.
 local function textOf(self, entry)
   if entry.kind == "gave" then return gaveText(self, entry) end
   local look = lookOf(self, entry)
@@ -458,7 +370,6 @@ local function textOf(self, entry)
   return entry.text
 end
 
--- The Members who reacted to an entry, each once, in the order they did.
 local function reactorIds(self, entry)
   local ids, counted = {}, {}
   for _, reaction in ipairs(entry.reactions or {}) do
@@ -478,8 +389,6 @@ local function hasReacted(self, entry)
   return false
 end
 
--- What Reactions to your own entry did, after the names: "cheered your ding
--- to 30".
 local function phrase(self, entry)
   local own = self.ledger:own()
   local character = own and entry.guid and own.characters[entry.guid]
@@ -488,9 +397,6 @@ local function phrase(self, entry)
   return Reactions.phrase(entry, character, alt)
 end
 
--- A Reaction to your own entry as news, for the chat line and the toast:
--- { text, reaction, name, phrase, entryKey, memberId }. Toasts merge news
--- with the same entryKey.
 function Feed:news(item)
   local name = reactorName(self, item.reaction.by)
   local words = phrase(self, item.entry)
@@ -499,17 +405,11 @@ function Feed:news(item)
     reaction = Reactions.forKind(item.entry.kind),
     name = name,
     phrase = words,
-    -- A Reaction only lands on an entry that has a key.
     entryKey = Reactions.id(Reactions.keyOf(item.entry)),
     memberId = item.reaction.by,
   }
 end
 
--- Your Reaction to someone else's entry. Ignores your own entries, Removed
--- Members, entries that can't be reacted to or aren't in the log, and
--- entries you already reacted to. Returns the key to store, nil and the
--- Reaction attached as { entry, reaction }; or nil and "reacted" when you
--- already had.
 function Feed:react(key)
   key = Reactions.validKey(key)
   if not key then return nil end
@@ -522,12 +422,6 @@ function Feed:react(key)
   return key, nil, { entry = entry, reaction = reaction }
 end
 
--- A Reaction just attached ({ entry, reaction }), as the Camp plays it:
--- { kind ("cheer", "respects" or "welcome"), memberId (whose entry), grave
--- (for Respects: the death's Reaction key as a string, as Camp keys its
--- graves) }. Nil when it plays nothing: a Removed Member's Reaction, one
--- on a Removed or Left Member's entry, or Respects on a death that
--- already had some (its Grave already has its flower).
 function Feed:campReaction(item)
   local entry, reaction = item.entry, item.reaction
   local ledger = self.ledger
@@ -545,18 +439,14 @@ function Feed:campReaction(item)
   return played
 end
 
--- The link came up in a Crew: settling starts, if it hasn't.
 function Feed:linkUp()
   self.settle:up()
 end
 
--- The link went down before settling: a half-synced summary is never
--- shown, so settling starts over at the next up().
 function Feed:linkDown()
   self.settle:down()
 end
 
--- DATA changed a record.
 function Feed:dataMerged()
   self.settle:data()
 end
@@ -565,8 +455,6 @@ function Feed:isSettled()
   return self.settle:isSettled()
 end
 
--- Called once a second: prunes the log, and settles once sync has gone
--- quiet. Returns true on the tick it settles.
 function Feed:tick()
   local now = self.now()
   local log = self.db.feed
@@ -576,24 +464,17 @@ function Feed:tick()
   return self.settle:tick()
 end
 
--- Entries that are the news, highlighted wherever they show: the Feed
--- tab, While you were away and toasts. Leaving isn't.
 local HIGHLIGHTED = { maxLevel = true, joined = true, goal = true, professionMaxed = true }
 
--- Entries listed with a Member in the summary (highlights), and of those,
--- the ones that tag them by name (max level has its star instead).
 local MEMBER_NEWS = { maxLevel = true, joined = true, left = true, goal = true }
 local TAGS = { joined = true, left = true }
 
--- A Reaction button in the summary: { key, reacted }, or nil.
 local function button(self, entry)
   local key = entry and Reactions.keyOf(entry)
   if not key then return nil end
   return { key = key, reacted = hasReacted(self, entry) }
 end
 
--- The entry a row's Cheer goes to: max level, else the highest ding, else
--- a new Character.
 local function cheerRank(entry)
   if entry.kind == "maxLevel" then return 1000 end
   if entry.kind == "ding" then return entry.level end
@@ -601,13 +482,6 @@ local function cheerRank(entry)
   return nil
 end
 
--- One Character's row in a Member's block: { name, main, from, level,
--- deaths, new, maxLevel, gained, cheer, respects }. gained is "new" or
--- "+N" levels, nil when neither. The level range runs from the
--- lowest "before" to the highest "after" (max level counts towards it), a
--- new Character has its level but no from, and deaths add up. Cheer is
--- keyed to the highest level and Respects to the highest death total. Nil
--- when the Character has none of these.
 local function characterRow(self, entries, character, isMain)
   local row = {
     name = character and character.name or "?",
@@ -645,11 +519,6 @@ local function characterRow(self, entries, character, isMain)
   return any and row or nil
 end
 
--- One Member's block: a row per Character with events, the Main's first,
--- then the rest by latest activity, and a Welcome when they joined. Each
--- row's label names its Character: "Alt Jaina", the Main's name, or nil
--- for a Main named like the Member. tags are { text, highlight } for
--- joined and left.
 local function memberBlock(self, id, entries)
   local record = self.ledger:record(id)
   local main = record and ns.Roster.main(record, self.now())
@@ -707,9 +576,6 @@ local function memberBlock(self, id, entries)
   return block
 end
 
--- Your Crew noticed: a line per own entry with unseen Reactions, naming
--- everyone who reacted to it, newest first: { text, reaction, time }.
--- Marks them seen.
 local function takeNoticed(self)
   local lines = {}
   for _, entry in ipairs(self.db.feed) do
@@ -736,23 +602,10 @@ local function takeNoticed(self)
   return lines
 end
 
--- While you were away: the unseen entries from other Members, one block
--- per Member, most recent activity first, the Crew goals reached, newest
--- first ({ text, time }), profession news, newest first ({ kind, text,
--- time, icon, cheer, highlight }), the unseen Reactions to your own,
--- spares: the Spare notices given (Spares:takeNews), then the
--- Gives, newest first ({ kind = "gave", text, time }), and catches: the
--- line of new types given (Catches.newTypesLine, { kind = "catches", text }),
--- then the rare finds, newest first ({ kind, text, time, icon, cheer }), as { members,
--- goals, spares, professions, catches, count, intro, maxLevel, noticed }, intro
--- being the scoreboard's "N things happened while you were away." and
--- maxLevel the top of its level bars. Marks them seen. Nil when there are
--- none.
 function Feed:takeSummary(spares, newTypesLine)
   spares = spares or {}
   local byMember, ids, goals, gives, professions, catches, count = {}, {}, {}, {}, {}, {}, 0
   for _, entry in ipairs(self.db.feed) do
-    -- Profession entries show as lines of their own, not on the scoreboard.
     if not entry.seen and ns.Professions.KINDS[entry.kind] then
       entry.seen = true
       count = count + 1
@@ -810,13 +663,6 @@ function Feed:takeSummary(spares, newTypesLine)
   }
 end
 
--- An entry as handed out: a fresh table UI may keep. Seen is false while
--- it has unseen Reactions, highlight says it's the news, and new that it
--- is New in the open Feed visit. reaction is the one that applies, key
--- what react() takes, reactors who reacted ({ memberId, name, you }, name
--- being "You" for you), reacted whether you have, and canReact whether
--- you can at all. A rare find's icon and edge (its picture's colour) are
--- the item's, nil while the game can't say.
 function Feed:describe(entry)
   local me = self.ledger:memberId()
   local reactors = {}
@@ -852,7 +698,6 @@ function Feed:describe(entry)
   }
 end
 
--- The entries from `time` on, newest first, as describe() gives them.
 function Feed:since(time)
   local list = {}
   local log = self.db.feed
@@ -863,9 +708,6 @@ function Feed:since(time)
   return list
 end
 
--- The log newest first, grouped by day (utcOffset shifts day boundaries
--- to local time): { days = { { daysAgo, time, title, entries } }, unseen },
--- title being "TODAY", "YESTERDAY" or "MONDAY 02 NOVEMBER".
 function Feed:view(utcOffset)
   local today = math.floor((self.now() + utcOffset) / DAY)
   local days = {}

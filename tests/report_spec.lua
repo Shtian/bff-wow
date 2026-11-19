@@ -1,7 +1,5 @@
 local wow = require("tests.wow_stubs")
 
--- /bff report's text, with a Crew of two others known and the link up to
--- one of them, in a dungeon during lockdown.
 local function report(options)
   options = options or {}
   local game = wow()

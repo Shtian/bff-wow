@@ -1,19 +1,9 @@
--- Catches: the pure parts of the Crew's fishing catches. The list of types
--- (data: a new type or zone is one row), reading what was fished from
--- the loot window (handed the API, so offline tests can fake it), how catches are
--- kept in a Member's own record, the Crew's catches over every record
--- (per type, the earliest catch and the Crew's count), and the Catches
--- tab over them. Stateless, tested through Core. See docs/design/catches.md and
--- docs/research/fishing-catches.md.
-
 local _, ns = ...
 
 local Catches = {}
 ns.Catches = Catches
 
--- Waters by zone level, lowest first: low and high are the band's zone
--- levels (none for New on Forever). Zones are as an English client names
--- them, for showing which zones a band covers.
+-- WoW: zone names are as the English client gives them.
 Catches.WATERS = {
   { id = "1-10", low = 1, high = 10, name = "Level 1–10", zones = { "Elwynn Forest", "Dun Morogh", "Teldrassil", "Durotar", "Mulgore",
     "Tirisfal Glades", "the capitals" } },
@@ -31,22 +21,13 @@ Catches.WATERS = {
     "Shark-Infested Waters" } },
 }
 
--- Water ids, lowest first, for the list below.
 local W1, W2, W3, W4, W5, W6, NEW = (function()
   local ids = {}
   for i, w in ipairs(Catches.WATERS) do ids[i] = w.id end
   return unpack(ids)
 end)()
 
--- The types, in the list's order. id is the item ID, or a family's key
--- for fish sold by weight (any of its items counts as it). name is the
--- English name, for when the game hasn't the item cached; the game's name
--- and icon come from the item ID. kind: "fish", "quest" (Nat Pagle's),
--- "bloated", "family", "contest", "treasure" or "notFish" (fished, but not
--- a fish). waters: lowest first. extra: shown but never counted, and why:
--- "season", "contest", "unconfirmed" (not confirmed on Forever yet),
--- "questItem" (only while on its quest) or "notFish". note: a line for the
--- tooltip, where there's something to know (where it bites, how to open it).
+-- WoW: the game has no item name or icon until the client has cached the item.
 local OPEN = "Right-click it to open it"
 local LOCKED = "Needs lockpicking"
 local CONTEST = "Only on Sundays, in the Stranglethorn Fishing Extravaganza (a fishing contest)"
@@ -67,7 +48,6 @@ end
 local function contest(id, name)
   return { id = id, name = name, kind = "contest", waters = { W4 }, note = CONTEST, extra = "contest" }
 end
--- Treasure is fished, but isn't a fish, so it's an Extra.
 local function treasure(id, name, waters, note)
   return { id = id, name = name, kind = "treasure", waters = waters, note = note, extra = "notFish" }
 end
@@ -76,7 +56,6 @@ local function notFish(id, name, waters, note)
 end
 
 Catches.TYPES = {
-  -- Fish (27 counted).
   fish(6291, "Raw Brilliant Smallfish", { W1, W2, W3 }),
   fish(6303, "Raw Slitherskin Mackerel", { W1, W2 }),
   fish(6289, "Raw Longjaw Mud Snapper", { W1, W2, W3 }),
@@ -104,12 +83,10 @@ Catches.TYPES = {
   fish(13757, "Lightning Eel", { W6 }),
   fish(13889, "Raw Whitescale Salmon", { W6 }),
   fish(13890, "Raw Plated Armorfish", { W6 }, "Eastern Plaguelands"),
-  -- Nat Pagle's quest fish (4).
   quest(16970, "Misty Reed Mahi Mahi", { W4 }, "Swamp of Sorrows"),
   quest(16968, "Sar'theris Striker", { W4 }, "Desolace"),
   quest(16969, "Savage Coast Blue Sailfin", { W4 }, "Stranglethorn Vale"),
   quest(16967, "Feralas Ahi", { W5 }, "Feralas"),
-  -- Bloated fish (10).
   bloated(6643, "Bloated Brilliant Smallfish", { W1, W2 }),
   bloated(6645, "Bloated Mud Snapper", { W1, W2 }),
   bloated(6647, "Bloated Bristle Whisker Catfish", { W2, W3 }),
@@ -120,7 +97,6 @@ Catches.TYPES = {
   bloated(21243, "Bloated Glossy Mightfish", { W5 }),
   bloated(13881, "Bloated Redgill", { W5, W6 }),
   bloated(13891, "Bloated Whitescale Salmon", { W6 }),
-  -- Fish sold by weight (7 families).
   family("mudSnapper", "Mud Snapper (by weight)", "Mud Snapper", { 6292, 6294, 6295 }, { W1, W2 }),
   family("catfish", "Catfish (by weight)", "Catfish", { 6309, 6310, 6311, 6363, 6364 }, { W2, W3 }),
   family("yellowtail", "Yellowtail (by weight)", "Yellowtail", { 13876, 13877, 13878, 13879, 13880 }, { W4, W5 }),
@@ -128,9 +104,6 @@ Catches.TYPES = {
   family("mightfish", "Mightfish (by weight)", "Mightfish", { 13914, 13915, 13916, 13917 }, { W5, W6 }),
   family("lobster", "Lobster (by weight)", "Lobster", { 13907, 13908, 13909, 13910, 13911, 13912, 13913 }, { W5, W6 }),
   family("salmon", "Salmon (by weight)", "Salmon", { 13901, 13902, 13903, 13904, 13905, 13906 }, { W6 }),
-  -- Extras: seasonal, the Sunday fishing contest, a quest item and not a
-  -- fish (herbs, rum and treasure). Treasure's
-  -- waters are Wowhead Forever's "fished in" zones.
   fish(13756, "Raw Summer Bass", { W4, W5, W6 }, "Only in summer", "season"),
   fish(13755, "Raw Winter Squid", { W4, W5 }, "Only in winter", "season"),
   contest(19807, "Speckled Tastyfish"),
@@ -158,24 +131,19 @@ Catches.TYPES = {
   treasure(21228, "Mithril Bound Trunk", { W4, W5, NEW }),
 }
 
--- Each type by id, each item ID to its type's id, and how many types count.
 local BY_ID, TYPE_OF = {}, {}
 Catches.TOTAL = 0
 for _, t in ipairs(Catches.TYPES) do
   t.items = t.items or { t.id }
-  -- The item whose name and icon the game shows for the type.
   t.itemId = t.items[1]
   BY_ID[t.id] = t
   for _, item in ipairs(t.items) do TYPE_OF[item] = t.id end
   if not t.extra then Catches.TOTAL = Catches.TOTAL + 1 end
 end
 
--- How many unlisted catches a record keeps: past it, a new one is dropped.
 Catches.UNLISTED_CAP = 50
--- A catches field with more entries than this is ignored as a whole.
 local MAX_ENTRIES = 400
 
--- The id of the type an item ID counts as, or nil when it isn't listed.
 function Catches.typeOf(itemId)
   return TYPE_OF[itemId]
 end
@@ -199,7 +167,7 @@ local function readAll(api)
   for slot = 1, count do
     local link = api.getLootSlotLink(slot)
     local _, _, quantity, currencyId, _, _, _, _, _, isCoin = api.getLootSlotInfo(slot)
-    -- A plain loop: ipairs would stop at a nil link before the rest.
+    -- WoW: GetLootSlotLink returns nil for a coin slot, and ipairs stops at a nil.
     local values = { link, quantity, currencyId, isCoin }
     for i = 1, 4 do
       if isSecret(values[i]) then return nil end
@@ -218,22 +186,12 @@ local function readAll(api)
   return { items = items, zone = text(zone), subzone = text(subzone), mapId = isItemId(mapId) and mapId or nil }
 end
 
--- What the loot window holds when it's fishing loot, through api:
--- isFishingLoot (IsFishingLoot), getNumLootItems, getLootSlotLink and
--- getLootSlotInfo (the globals of those names), zone (GetRealZoneText),
--- subzone (GetSubZoneText), mapId (C_Map.GetBestMapForUnit("player")) and
--- isSecret (issecretvalue, optional). The fished loot: { items, a { itemId,
--- quantity } per item slot (not coin or currency), zone, subzone, mapId
--- (each nil when unknown) }. Nil when the loot isn't from fishing, holds
--- no item, a value reads secret, or the read errors.
 function Catches.read(api)
   local ok, loot = pcall(readAll, api)
   if ok then return loot end
   return nil
 end
 
--- The key a fished item is kept under: its type's id, or its own item ID
--- when unlisted.
 local function keyOf(itemId)
   return TYPE_OF[itemId] or itemId
 end
@@ -246,12 +204,6 @@ local function unlistedCount(catches)
   return n
 end
 
--- Adds fished loot (as read() gives it) to the own record, caught at time by
--- the Character with GUID character. Its catches are { [key] = { t, n, z,
--- s, m, c } }: key the type's id, or the item ID of an unlisted catch; t
--- the first catch's time, z, s and m its zone, subzone and map ID, c the
--- Character's GUID, and n how many caught. Unlisted catches past
--- UNLISTED_CAP are dropped. Returns true if the record changed.
 function Catches.add(record, loot, time, character)
   if type(loot) ~= "table" or type(loot.items) ~= "table" then return false end
   local changed = false
@@ -287,12 +239,6 @@ local function validEntry(entry)
     and isText(entry.z) and isText(entry.s) and isMap(entry.m) and isText(entry.c)
 end
 
--- A record's catches, skipping anything malformed (a record from the wire
--- isn't shape-checked for them): for key, entry in valid(record), with
--- key a listed type's id or the item ID of an unlisted catch. A
--- family's item kept under its own ID (by an older list) counts as the
--- family; a key this list doesn't know as a family is skipped. Unlisted
--- catches past UNLISTED_CAP (the earliest kept) are skipped too.
 local function valid(record)
   local list = {}
   local catches = record.catches
@@ -305,7 +251,6 @@ local function valid(record)
     if id and validEntry(entry) then
       local had = list[id]
       if had then
-        -- Two keys for one type: the earlier first catch, both counts.
         local merged = entry.t < had.t and entry or had
         list[id] = { t = merged.t, z = merged.z, s = merged.s, m = merged.m, c = merged.c, n = had.n + entry.n }
       else
@@ -325,18 +270,14 @@ local function valid(record)
   return pairs(list)
 end
 
--- How many catches a record holds in all: every type's count. The Pocket
--- Camp shows a Member fishing when it grows (Core:pocketCamp()).
 function Catches.total(record)
   local total = 0
   for _, entry in valid(record) do total = total + entry.n end
   return total
 end
 
--- Kinds whose Crew-first catch is a rare find: Feed news.
 local RARE = { quest = true, contest = true }
 
--- The rare types a record holds, as a set of type ids.
 function Catches.rareHeld(record)
   local held = {}
   for key in valid(record) do
@@ -345,10 +286,6 @@ function Catches.rareHeld(record)
   return held
 end
 
--- The rare finds in a record: rare types it holds that aren't in had (as
--- rareHeld gives it) and that no other of the given records holds, so the
--- Crew hasn't had them. Oldest first: { id, itemId, name, time, guid (the
--- Character who caught it, nil when unknown) }.
 function Catches.rareFinds(had, record, records)
   local taken = {}
   for _, other in ipairs(records) do
@@ -372,7 +309,6 @@ function Catches.rareFinds(had, record, records)
   return finds
 end
 
--- How many counted types anyone in the given records has caught.
 function Catches.typesCaught(records)
   local caught, n = {}, 0
   for _, record in ipairs(records) do
@@ -387,8 +323,6 @@ function Catches.typesCaught(records)
   return n
 end
 
--- Who caught something first and where, in words: "Bob (Bobby),
--- Westfall, The Jansen Stead, 5m ago", or "You" for your own.
 local function catchText(first)
   local who = first.own and "You" or first.displayName or "Someone"
   if first.character and first.character ~= first.displayName then who = who .. " (" .. first.character .. ")" end
@@ -399,7 +333,6 @@ local function catchText(first)
   return table.concat(parts, ", ")
 end
 
--- Who caught something first, for the read.
 local function catcher(record, entry, ownId, now)
   local character = entry.c and type(record.characters) == "table" and record.characters[entry.c]
   local first = {
@@ -425,8 +358,6 @@ local function earlier(entry, record, best)
   return record.id < best.record.id
 end
 
--- The other Members who caught something, after the first, in the order
--- they first caught it: { memberId, displayName, own }.
 local function others(found, ownId)
   local list = {}
   if not found then return list end
@@ -444,8 +375,6 @@ local function others(found, ownId)
   return list
 end
 
--- The Crew's catches over the given records (ownId: your Member id, now:
--- the time). See Core:catches().
 function Catches.collect(records, ownId, now)
   local found = {}
   for _, record in ipairs(records) do
@@ -486,7 +415,6 @@ function Catches.collect(records, ownId, now)
   return view
 end
 
--- Whether you've caught a type yourself (collect()'s view of it).
 local function caughtByYou(t)
   if t.first.own then return true end
   for _, other in ipairs(t.others) do
@@ -495,10 +423,6 @@ local function caughtByYou(t)
   return false
 end
 
--- While you were away's line over the Crew's catches (collect()'s view):
--- the counted types not in told (a set of type ids) that others caught and
--- you haven't, each under whoever was first, "4 new types caught (Tor 3,
--- Mira 1)", most first. Nil when there are none.
 function Catches.newTypesLine(view, told)
   local byWho, names, total = {}, {}, 0
   for _, t in ipairs(view.types) do
@@ -519,8 +443,6 @@ function Catches.newTypesLine(view, told)
   return ("%d new %s caught (%s)"):format(total, total == 1 and "type" or "types", table.concat(parts, ", "))
 end
 
--- Adds the counted types caught in view to told, and returns it. With
--- since, only those first caught from then on.
 function Catches.markTold(told, view, since)
   for _, t in ipairs(view.types) do
     if t.first and not t.extra and (not since or t.first.time >= since) then told[t.id] = true end
@@ -528,18 +450,10 @@ function Catches.markTold(told, view, since)
   return told
 end
 
--- The Catches tab ------------------------------------------------------
-
--- The trophy steps: how many types the Crew has caught when a trophy
--- comes, the last being every type.
 Catches.STEPS = { 10, 20, 30, 40, Catches.TOTAL }
--- A first catch this recent is fresh: a gold line under its tile, and in
--- the tab's Recent first catches.
 Catches.FRESH = 3 * 24 * 60 * 60
 local RECENT = 3
 
--- The Group and Show menus' choices, in order. A tile's category is
--- what Show's Fish and Rare catches pick.
 local GROUPS = { { id = "where", label = "Where to fish" }, { id = "type", label = "Type" } }
 local SHOWS = {
   { id = "all", label = "All" },
@@ -569,7 +483,6 @@ end
 local WATER_NAME = {}
 for _, w in ipairs(Catches.WATERS) do WATER_NAME[w.id] = w.name end
 
--- "Tor", "Tor and you", "Tor, Simba and you".
 local function names(list)
   local words = {}
   for i, who in ipairs(list) do words[i] = who.own and "you" or who.displayName or "someone" end
@@ -585,9 +498,6 @@ local function place(first)
   return first.since .. " · " .. table.concat(parts, ", ")
 end
 
--- A tile's tooltip, under its name (which the game gives; unnamed when it
--- can't show): note, extra, firstBy and first, when, crew and count, also, none, hint and where (each nil
--- when there's nothing to say).
 local function tooltip(entry, named)
   local tip = { unnamed = "???" }
   if named then tip.note = entry.note end
@@ -629,7 +539,6 @@ local function tile(entry, opts)
   }
 end
 
--- Whether Show's choice shows a tile.
 local function shows(show, t)
   if show == "all" then return true end
   if show == "missing" then return not t.caught end
@@ -637,8 +546,6 @@ local function shows(show, t)
   return t.category == show
 end
 
--- The sections before Show picks from them: each { title, sub, tiles,
--- extras and uncounted (its count is how many were caught) }.
 local function sectionsFor(group, tiles)
   local sections = {}
   if group == "type" then
@@ -664,8 +571,6 @@ local function sectionsFor(group, tiles)
       end
     end
   end
-  -- Unlisted catches aren't placed in any water, since the list doesn't
-  -- know where they bite.
   local unlisted = { title = "Not on the list yet", sub = "Not counted", tiles = {}, uncounted = true }
   for _, t in ipairs(tiles) do
     if t.unlisted then unlisted.tiles[#unlisted.tiles + 1] = t end
@@ -679,8 +584,6 @@ local function sectionsFor(group, tiles)
   return sections
 end
 
--- A section's count on the right: "8 / 12" for counted types, "2 caught"
--- for a section that isn't counted, nil when it has neither.
 local function counted(s)
   local n, got, caught = 0, 0, 0
   for _, t in ipairs(s.tiles) do
@@ -703,17 +606,12 @@ local function levelWaters(level)
   return found
 end
 
--- The Catches tab over the Crew's catches (collect()'s view). opts: group
--- ("where" or "type"), show ("all", "fish", "rare", "extras" or
--- "missing"), names (show names of types not caught yet), now and level
--- (the Character you play, or nil). See Core:catchesTab().
 function Catches.tab(view, opts)
   local group = pick(GROUPS, opts.group)
   local show = pick(SHOWS, opts.show)
   local tiles = {}
   for i, entry in ipairs(view.types) do
     local t = tile(entry, opts)
-    -- Each type shows once, in the lowest water it's found in.
     t.water = entry.waters[1]
     tiles[i] = t
   end

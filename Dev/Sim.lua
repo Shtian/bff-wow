@@ -1,62 +1,22 @@
--- Sim: /bff sim attaches a few simulated Members to your real Core through
--- FakeNet, so the panel can be tried without another Member online. Their
--- records are kept and relayed like real ones, so it only runs in a Crew
--- where no one else is known yet: start a test Crew for it. It fills the
--- Camp: two sit by the fire, two fall asleep, one with a fresh max level,
--- and one by the fire leaves two graves. Also the dev
--- console (/bffdev, opened by /bff sim too): an action bar whose buttons
--- make the simulated Member selected in its list (click a row) ding, die, move, fish (a Catch, or now and then an
--- unlisted one), step through what they're doing (a vendor, the auction
--- house, fighting, away, resting, flying), shapeshift (each form in
--- turn), go into an instance (a dungeon,
--- then a raid, then back out), join or leave your group (for the Pocket
--- Camp's seating and shared doorways), hand in a quest, react to your newest
--- entry, offer a
--- test Spare or Claim your newest one, a Log in/out button on each row,
--- one that plays out a stretch of you being away so While you were away
--- shows (with Reactions to your entries), one that reaches the next Crew
--- deaths goal, one where simulated Members clear the next dungeon, one
--- where a simulated Member slays the next Rare, and a
--- live log of what your Core sends, receives and fires (and the sync
--- trace, with its Sync trace box). /bffdev toast [n]
--- shows sample toasts. Also the encounter logger: every ENCOUNTER_END is
--- printed and saved with what the game and BFF made of it, for
--- docs/research/boss-kills.md (/bffdev encounters), and the Rare logger:
--- every read that could tell a Rare kill, with what BFF made of it, for
--- docs/research/rare-mobs.md (/bffdev rares). Left out of releases;
--- it lives here, not in a file of its own, so the .toc (a shipped file)
--- stays as it is.
-
 local _, ns = ...
 
 local Sim = {}
 ns.Sim = Sim
 
 local DAY = 24 * 60 * 60
--- WoW: Forever's level span. Simulated Members keep to it even on a client
--- with a higher cap (testing on retail), so the Together line and the
--- Roster look as they will in game.
+-- WoW: Forever's level cap is 60.
 local MAX_LEVEL = 60
--- Their levels are around yours, or around this when you're above the
--- span (a retail Character).
 local BASE_LEVEL = 24
--- How long after starting the offline Members log out.
 local LOGOUT_AFTER = 20
--- How long after starting the Camp gets its news: Simone dies twice (two
--- graves) and Simba reaches max level (a spark) before going to sleep.
 local CAMP_NEWS_AFTER = 5
 
--- Made-up final bosses for every dungeon and raid, since Forever's
--- encounter IDs aren't known yet: the simulated Members' Cores know these,
--- so their clears are recorded through the real encounterEnded().
+-- WoW: Forever's encounter IDs aren't known yet.
 local SIM_BOSS = 900000
 local SIM_FINALS = {}
 for _, dungeon in ipairs(ns.Core.DUNGEONS) do
   if dungeon.kind == "dungeon" or dungeon.kind == "raid" then SIM_FINALS[SIM_BOSS + dungeon.index] = dungeon.name end
 end
 
--- Professions as Snapshot reads them: skill line ID, name, icon file ID,
--- then skill and max per Character that has it.
 local PROFESSIONS = {
   alchemy = { 171, "Alchemy", 136240 },
   herbalism = { 182, "Herbalism", 136246 },
@@ -79,30 +39,23 @@ local function professions(...)
   return list
 end
 
--- levelOffset is relative to the Character you play, so "can play" shows up.
--- The first Character is the one being played; the others were played
--- `ago` seconds earlier. main picks the Character set as Main, if any.
 local MEMBERS = {
-  -- Online on their Main, and can play with you.
   { name = "Simone", characters = {
     { name = "Simone", classFilename = "MAGE", levelOffset = 2, zone = "Westfall",
       professions = professions("herbalism", 300, 300, "alchemy", 287, 300, "cooking", 300, 300) },
     { name = "Simonette", classFilename = "PRIEST", levelOffset = -8, zone = "Darkshore", ago = 2 * DAY,
       professions = professions("tailoring", 140, 150, "firstAid", 150, 150) },
   } },
-  -- On an Alt, with a Main that can play with you.
   { name = "Simbad", main = 2, characters = {
     { name = "Simbad", classFilename = "ROGUE", levelOffset = 10, zone = "Redridge Mountains",
       professions = professions("skinning", 120, 150, "fishing", 211, 225) },
     { name = "Simbadsson", classFilename = "WARRIOR", levelOffset = -1, zone = "Wetlands", ago = DAY,
       professions = professions("mining", 300, 300, "blacksmithing", 262, 300) },
   } },
-  -- Logs out soon after, with an Alt unseen for 40 days (hidden).
   { name = "Simba", offline = true, characters = {
     { name = "Simba", classFilename = "DRUID", levelOffset = 6, zone = "Teldrassil" },
     { name = "Simbalina", classFilename = "HUNTER", levelOffset = -15, zone = "Durotar", ago = 40 * DAY },
   } },
-  -- Another sleeper for the Camp.
   { name = "Mirelle", offline = true, characters = {
     { name = "Mirelle", classFilename = "PALADIN", levelOffset = -5, zone = "Darkshore" },
   } },
@@ -113,30 +66,24 @@ local ZONES = {
   "Durotar", "The Barrens", "Ashenvale", "Stranglethorn Vale", "Ironforge",
 }
 
--- Each zone's uiMapID as the classic-era clients number them, then as
--- retail does, so the simulated Members get world map pins. Which
--- numbering a client uses isn't known up front (Forever may have its
--- own), so mapIdFor asks C_Map and takes the one whose map has the
--- zone's name, or else looks the name up in the client's map tree.
+-- WoW: classic-era clients and retail number uiMapIDs differently, and
+-- Forever may have its own numbering.
 local MAP_IDS = {
   ["Elwynn Forest"] = { 1429, 37 }, ["Westfall"] = { 1436, 52 }, ["Duskwood"] = { 1431, 47 },
   ["Redridge Mountains"] = { 1433, 49 }, ["Stormwind City"] = { 1453, 84 }, ["Durotar"] = { 1411, 1 },
-  -- Retail splits the Barrens; its Northern Barrens is 10.
+  -- WoW: retail splits the Barrens; its Northern Barrens is 10.
   ["The Barrens"] = { 1413, 10 }, ["Ashenvale"] = { 1440, 63 }, ["Stranglethorn Vale"] = { 1434, 224 },
   ["Ironforge"] = { 1455, 87 }, ["Teldrassil"] = { 1438, 57 }, ["Darkshore"] = { 1439, 62 },
   ["Wetlands"] = { 1437, 56 },
 }
--- Names other than the zone's own that count as a match.
 local MAP_ALIASES = { ["The Barrens"] = "Northern Barrens" }
--- zone -> resolved uiMapID. Misses aren't kept: inside an instance the
--- tree can't be read, and it can be once you're back out.
+-- WoW: inside an instance the C_Map tree can't be read; back out it can.
 local resolved = {}
 
 local function named(info, zone)
   return info and (info.name == zone or info.name == MAP_ALIASES[zone])
 end
 
--- The top of the map tree you stand in (the cosmic or world map).
 local function rootMap()
   local id = C_Map.GetBestMapForUnit("player")
   local info = id and C_Map.GetMapInfo(id)
@@ -147,8 +94,6 @@ local function rootMap()
   return id
 end
 
--- A zone or city map under the root with the zone's name, for clients
--- that number maps neither way.
 local function searchTree(zone)
   local root = rootMap()
   if not root then return nil end
@@ -173,7 +118,6 @@ local function mapIdFor(zone)
   return found
 end
 
--- A made-up spot somewhere in the middle of the zone, for locate().
 local function spotIn(zone)
   local mapId = mapIdFor(zone)
   if not mapId then return nil end
@@ -183,12 +127,9 @@ end
 local net
 local ticker
 local members
--- Your Member id, whose entries the React button reacts to.
 local yourId
--- Your Core, told who is in your group (tellGroup).
 local yourCore
 
--- The GUID of member i's Character j.
 local function guidFor(i, j)
   return ("Player-0-Sim%d-%d"):format(i, j)
 end
@@ -201,8 +142,6 @@ local function character(i, j, spec, yourLevel)
   }
 end
 
--- Plays each Character at its time, oldest first, ending on the one being
--- played now.
 local function playHistory(client, i, spec, yourLevel, now)
   local order = {}
   for j = #spec.characters, 1, -1 do order[#order + 1] = j end
@@ -221,9 +160,6 @@ local function playHistory(client, i, spec, yourLevel, now)
   if spec.main then client.core:setMain(guidFor(i, spec.main)) end
 end
 
--- Four weeks of made-up Play times for the When tab: each Member has
--- their own evening hours (UTC) and plays most weeks, plus weekend
--- afternoons now and then.
 local function playTimesHistory(i, now)
   local PlayTimes = ns.PlayTimes
   local current = PlayTimes.week(now)
@@ -245,12 +181,8 @@ local function playTimesHistory(i, now)
   return { since = now - 30 * 24 * 60 * 60, weeks = weeks }
 end
 
--- Fished items that aren't on Catches' list, so unlisted catches show.
 local UNLISTED = { 271647, 271648 }
 
--- The client fishes in the zone it's in, as Snapshot.catch would read it:
--- mostly something on the list, now and then an unlisted find. Returns
--- the item ID.
 local function fishUp(client)
   local itemId
   if math.random() < 0.1 then
@@ -268,8 +200,6 @@ local function fishUp(client)
   return itemId
 end
 
--- A few days of past catches for the first two Members, so /bff catches
--- has something in it from the start.
 local function fishHistory(client, i, now)
   if i > 2 then return end
   for day = 6, 1, -1 do
@@ -279,12 +209,6 @@ local function fishHistory(client, i, now)
   net.clock = now
 end
 
--- Starts the simulated Members. Returns true, or nil and "running" or
--- "notAlone".
--- Tells your Core who is in your group: the real one (Snapshot.party)
--- and the simulated Members online that the console's Group button put in
--- it, by their Character being played. Core ignores a group it already
--- has, so this can run every second.
 local function tellGroup()
   if not yourCore then return end
   local ok, party = pcall(ns.Snapshot.party)
@@ -313,10 +237,6 @@ function Sim.start(core)
   local you = net:attach(core)
   yourId = core.ledger:memberId()
   yourCore = core
-  -- The simulated Members only belong to the Crew the sim started in. Once
-  -- you leave it (or join another), nothing more passes between them and
-  -- you, or your Core would take their records into the new Crew and relay
-  -- them to its real Members.
   local code = crew.code
   local function inSimCrew()
     local current = core:crew()
@@ -349,15 +269,12 @@ function Sim.start(core)
   ticker = C_Timer.NewTicker(1, function()
     if not inSimCrew() then return Sim.stop(true) end
     net:step(GetServerTime())
-    -- A real GROUP_ROSTER_UPDATE tells Core the real group alone; put the
-    -- simulated Members back in it.
     tellGroup()
   end)
   ns.Console.open(core)
   return true
 end
 
--- One online simulated Member dings. Returns their Character's name, or nil.
 function Sim.ding()
   if not net then return nil end
   local online = {}
@@ -370,8 +287,6 @@ function Sim.ding()
   return client.character.name
 end
 
--- One online simulated Member catches something. Returns their
--- Character's name and the item ID, or nil.
 function Sim.fish()
   if not net then return nil end
   local online = {}
@@ -387,8 +302,6 @@ function Sim.isRunning()
   return net ~= nil
 end
 
--- What the console shows per simulated Member: name, online, and the
--- Character being played.
 function Sim.members()
   local list = {}
   for i, client in ipairs(members or {}) do
@@ -403,7 +316,6 @@ local function otherZone(current)
   return zone
 end
 
--- Reacts to your newest Feed entry the client can still react to.
 local function reactToYou(client, you)
   for _, day in ipairs(client.core:feed().days) do
     for _, entry in ipairs(day.entries) do
@@ -415,9 +327,6 @@ local function reactToYou(client, you)
   return false
 end
 
--- Gives the Reaction ("cheer", "respects" or "welcome") to the newest
--- entry of anyone's that takes it and the client can still react to: a
--- friend's ding or death, or a joined entry, for the Camp to play.
 local function reactWith(client, reaction)
   for _, day in ipairs(client.core:feed().days) do
     for _, entry in ipairs(day.entries) do
@@ -429,21 +338,17 @@ local function reactWith(client, reaction)
   return false
 end
 
--- Test Spares, as links the way the game hands them out: one
--- plain, one with an enchant, one with a scaling random suffix.
 local TEST_ITEMS = {
   { link = "|cff1eff00|Hitem:5191::::::::18:::::::|h[Cruel Barb]|h|r", level = 19 },
   { link = "|cff1eff00|Hitem:2042:1897:::::::20:::::::|h[Staff of Westfall]|h|r", level = 18 },
   { link = "|cff1eff00|Hitem:15210::::::-19:1238425:30:::::::|h[Raider Shortsword of the Monkey]|h|r", level = 15 },
 }
 
--- Offers a test Spare to the Crew.
 local function offer(client, i)
   local item = TEST_ITEMS[(i - 1) % #TEST_ITEMS + 1]
   return client.core:postSpare(item.link, item.level)
 end
 
--- Claims your newest Spare the client hasn't claimed yet.
 local function claimYours(client, you)
   for _, row in ipairs(client.core:spares().crew) do
     if row.ownerId == you and row.canClaim then
@@ -453,9 +358,6 @@ local function claimYours(client, you)
   return false
 end
 
--- Steps the Character's first profession short of 300 up to its next
--- milestone, or picks up Tailoring if it has none to raise. A Character
--- whose client never shared professions (Simba's) is left alone.
 local function skillUp(client)
   local known = client.character.professions
   if not known then return end
@@ -480,22 +382,13 @@ local function skillUp(client)
   end
 end
 
--- What the console's Doing button steps a simulated Member through, as
--- Snapshot.doing would report each.
 local DOING = { { vendor = true }, { auction = true }, { combat = true }, { afk = true }, { resting = true },
   { flying = true } }
 
--- What the console's Form button steps a simulated Member through: each
--- shapeshift form, then back to none.
 local FORMS = { "wolf", "bear", "cat", "travel", "seal", "moonkin" }
 
--- What the console's Inst button steps a simulated Member through: a
--- dungeon, then a raid, then back out to where they were. Two Members in
--- the same one share a doorway in the Pocket Camp.
 local INSTANCES = { "The Deadmines", "Molten Core" }
 
--- Tells the Member's Core what they're doing and the form they're in,
--- where the Doing and Form buttons have stepped them to.
 local function simulateDoing(client)
   local facts = {}
   for key, value in pairs(DOING[client.doingStep] or {}) do facts[key] = value end
@@ -503,7 +396,6 @@ local function simulateDoing(client)
   client.core:doing(facts)
 end
 
--- What each console button does to a simulated Member's client.
 local ACTIONS = {
   skill = skillUp,
   ding = function(client) client:play({ level = client.character.level + 1, xp = 0 }) end,
@@ -518,7 +410,6 @@ local ACTIONS = {
     client:play({ zone = zone })
   end,
   max = function(client) client:play({ level = net.maxLevel, xp = 0 }) end,
-  -- Switches to the Member's next Character, as logging in on an Alt would.
   alt = function(client)
     client.current = client.current % #client.characters + 1
     client.character = client.characters[client.current]
@@ -530,7 +421,6 @@ local ACTIONS = {
   respects = function(client) reactWith(client, "respects") end,
   welcome = function(client) reactWith(client, "welcome") end,
   fish = fishUp,
-  -- Steps through what a Member can be doing, then back to nothing.
   doing = function(client)
     client.doingStep = (client.doingStep or 0) % (#DOING + 1) + 1
     simulateDoing(client)
@@ -554,7 +444,6 @@ local ACTIONS = {
       client:play({ zone = zone })
     end
   end,
-  -- In or out of your group, as if they'd joined your party.
   group = function(client) client.grouped = not client.grouped or nil end,
   offer = function(client, i) offer(client, i) end,
   claim = function(client) claimYours(client, yourId) end,
@@ -563,9 +452,6 @@ local ACTIONS = {
   end,
 }
 
--- Makes simulated Member i do action (a key of ACTIONS). Online-only
--- actions do nothing while they're logged out. Returns true if it did
--- something.
 function Sim.act(i, action)
   local client = members and members[i]
   if not client or not ACTIONS[action] then return false end
@@ -575,7 +461,6 @@ function Sim.act(i, action)
   return true
 end
 
--- How long after Sim.away an offline Member who played logs out again.
 local AWAY_LOGOUT_AFTER = 5
 
 local function levelUp(client, levels)
@@ -588,10 +473,7 @@ local function playCharacter(client, j)
   client:play()
 end
 
--- What each simulated Member gets up to while you're away, by index.
 local AWAY = {
-  -- Rolls a new Character and plays it a little, then dings and dies on
-  -- the one they were on.
   function(client, i)
     local was = client.current
     local j
@@ -611,24 +493,17 @@ local AWAY = {
     client:play(levelUp(client, 3))
     client:play({ deaths = (client.character.deaths or 0) + 2 })
   end,
-  -- Dings and dies on the one they're on, then dings on the other.
   function(client)
     client:play(levelUp(client, 2))
     client:play({ deaths = (client.character.deaths or 0) + 1 })
     playCharacter(client, client.current % #client.characters + 1)
     client:play(levelUp(client, 1))
   end,
-  -- Reaches max level.
   function(client)
     client:play({ level = net.maxLevel, xp = 0 })
   end,
 }
 
--- Plays out a stretch of you being away: core goes back to how it is
--- right after logging in, so what happens next isn't announced, then each
--- simulated Member plays (logging in first if offline, and out again
--- after). Once sync settles, Core sends While you were away as on a real
--- login. Returns true, or nil and "notRunning".
 function Sim.away(core)
   if not net then return nil, "notRunning" end
   local log = core.log
@@ -649,9 +524,6 @@ function Sim.away(core)
   return true
 end
 
--- The first simulated Member online dies as many times as the Crew needs
--- to reach its next Crew deaths goal, so the goal's Feed entry and toast
--- show. Returns the rung, or nil and "notRunning" or "nobodyOnline".
 function Sim.goal(core)
   if not net then return nil, "notRunning" end
   local client
@@ -667,11 +539,6 @@ function Sim.goal(core)
   end
 end
 
--- The simulated Members online clear the first dungeon (or raid, with
--- kind "raid") the Crew hasn't, in one party, each recording it as their
--- client would. The Crew trophy's Feed entry and toast follow once their
--- records reach you. Returns the instance's name, or nil and
--- "notRunning", "nobodyOnline" or "allCleared".
 function Sim.clear(core, kind)
   if not net then return nil, "notRunning" end
   local party = {}
@@ -702,11 +569,6 @@ function Sim.clear(core, kind)
   return target.name
 end
 
--- One online simulated Member slays the first Rare the Crew hasn't, as
--- their client would record it from the loot window. The trophy's Feed
--- entry and toast follow once their record reaches you. Returns the
--- Member's Character name and the Rare's, or nil and "notRunning",
--- "nobodyOnline" or "allSlain".
 function Sim.rare(core)
   if not net then return nil, "notRunning" end
   local online = {}
@@ -725,9 +587,6 @@ function Sim.rare(core)
   return client.character.name, rare.name
 end
 
--- Logs the simulated Members out; you see them go offline. abandoned (you
--- left the sim's Crew) drops whatever is still on the wire instead, so
--- none of it reaches you.
 function Sim.stop(abandoned)
   if not net then return end
   if abandoned then
@@ -741,13 +600,10 @@ function Sim.stop(abandoned)
   ticker:Cancel()
   ns.ChannelLink.onSend = nil
   net, ticker, members = nil, nil, nil
-  -- Back to the real group alone.
   tellGroup()
   yourCore = nil
 end
 
--- Whether a record is one of the simulated Members': their Characters'
--- GUIDs all come from guidFor.
 local function isSimulated(record)
   local any = false
   for _, held in pairs(record.characters or {}) do
@@ -759,11 +615,6 @@ local function isSimulated(record)
   return any
 end
 
--- Clears simulated Members out of a real Crew they leaked into (the sim
--- once kept running after you left its Crew): each one held gets a newer
--- record saying they left, as if they had sent it themselves, so your Core
--- stops showing them and gossip carries it to the other Members. Returns
--- how many, or nil and "running".
 function Sim.purge(core)
   if net then return nil, "running" end
   local count = 0
@@ -780,10 +631,6 @@ function Sim.purge(core)
   return count
 end
 
--- Console: the dev window. Watching starts the first time it opens, by
--- wrapping the real Core's link, listener and incoming calls, and goes on
--- until a /reload.
-
 local Console = {}
 ns.Console = Console
 
@@ -794,7 +641,6 @@ local HEIGHT = 510
 local INSET = 12
 local ROW_HEIGHT = 28
 local BUTTON_WIDTH = 50
--- Enough for an evening of the sync trace.
 local MAX_LINES = 5000
 
 local SENT = "ffd14a"
@@ -804,10 +650,6 @@ local LINK = "c0a0ff"
 local DIM = "8c8a99"
 local TRACE = "e0a070"
 
--- The console's action bar, left to right: each acts on the simulated
--- Member selected in the list below it. Logging in and out is on each
--- Member's own row. React reacts to your newest entry; Cheer, Resp and
--- Welc give that Reaction to anyone's newest entry that takes it.
 local BUTTONS = {
   { "ding", "Ding" }, { "xp", "XP" }, { "die", "Die" }, { "zone", "Zone" },
   { "alt", "Alt" }, { "max", "Max" }, { "skill", "Skill" }, { "fish", "Fish" }, { "doing", "Doing" }, { "form", "Form" },
@@ -819,7 +661,6 @@ local BUTTONS = {
 
 local frame
 local watched
--- The simulated Member the action bar acts on (their index).
 local selected = 1
 local showChanged = false
 
@@ -832,16 +673,12 @@ local function log(text)
   frame.log:AddMessage(color(DIM, date("%H:%M:%S")) .. "  " .. text)
 end
 
--- The sync trace (/bff debug sync, or the console's Sync trace box) shows
--- here instead of chat once the console has been opened, hidden or not.
 ns.traceSink = function(stamp, text)
   if not frame then return false end
   frame.log:AddMessage(color(DIM, stamp) .. "  " .. color(TRACE, "trace  ") .. text)
   return true
 end
 
--- A Member id as a name: you, a simulated Member, or whoever the panel
--- shows for it.
 local function nameOf(id)
   if id == watched.ledger:memberId() then return "you" end
   for _, client in ipairs(members or {}) do
@@ -853,7 +690,6 @@ local function nameOf(id)
   return id
 end
 
--- A record in one line: who, and the Character they played last.
 local function describeRecord(record)
   local latest
   for _, c in pairs(record.characters or {}) do
@@ -864,7 +700,6 @@ local function describeRecord(record)
   return ("%s: %s L%s %s, %s deaths"):format(who, latest.name, latest.level, latest.zone or "?", latest.deaths or 0)
 end
 
--- A wire message in one line, and the Member id that sent it.
 local function describe(message)
   local decoded, reason = ns.Codec.decode(message)
   if type(decoded) ~= "table" then return color(DIM, "undecodable (" .. tostring(reason) .. ")") end
@@ -900,9 +735,6 @@ local function onEvent(event, arg)
   end
 end
 
--- Wraps the Core's ports on the instance, so every message and event also
--- reaches the log. Your own messages echoed back by the channel are left
--- out: they show once, as sent.
 local function watch(core)
   if watched then return end
   watched = core
@@ -978,7 +810,6 @@ local function refreshMembers()
   end
 end
 
--- Makes the selected simulated Member do action, and logs it.
 local function act(i, action)
   if Sim.act(i, action) then
     local member = Sim.members()[i]
@@ -987,7 +818,6 @@ local function act(i, action)
   refreshMembers()
 end
 
--- The action bar: who it acts on, then a button per action (BUTTONS).
 local function actionBar()
   local bar = CreateFrame("Frame", nil, frame)
   bar:SetHeight(22)
@@ -1009,11 +839,8 @@ local function actionBar()
   return bar
 end
 
--- Where the Member list starts, under the action bar.
 local LIST_TOP = Skin.HEADER_HEIGHT + 44 + 30
 
--- A simulated Member's row: a click selects them for the action bar, and
--- its one button logs them in or out.
 local function memberRow(i)
   local row = CreateFrame("Button", nil, frame)
   row:SetHeight(ROW_HEIGHT)
@@ -1029,7 +856,6 @@ local function memberRow(i)
   row.online = Skin.button(row, "Log out", function() act(i, "online") end)
   row.online:SetSize(64, 22)
   row.online:SetPoint("RIGHT", -4, 0)
-  -- Cut short with "..." rather than run under the button.
   row.label = Skin.label(row, "small", Skin.TEXT)
   row.label:SetPoint("TOPLEFT", 6, 0)
   row.label:SetPoint("BOTTOMLEFT", 6, 0)
@@ -1136,7 +962,6 @@ local function create()
   end)
   frame.log = messages
 
-  -- The simulated Members' rows follow their state, whoever changed it.
   local elapsedSince = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
     elapsedSince = elapsedSince + elapsed
@@ -1148,7 +973,6 @@ local function create()
   end)
 end
 
--- Opens the console, and starts watching core the first time.
 function Console.open(core)
   if not frame then create() end
   watch(core)
@@ -1162,7 +986,6 @@ function Console.toggle(core)
 end
 
 SLASH_BFFDEV1 = "/bffdev"
--- Sample toasts, one of each kind, for /bffdev toast.
 local SAMPLE_TOASTS = {
   { kind = "ding", text = "Simone dinged 24" },
   { kind = "death", text = "Simbad died 2 times" },
@@ -1182,14 +1005,9 @@ local SAMPLE_TOASTS = {
   { kind = "professionMaxed", text = "Simone maxed Alchemy", icon = 136240, highlight = true },
 }
 
--- The encounter logger: every ENCOUNTER_END, printed and saved in
--- BFF_DB.devEncounters (the newest ENCOUNTER_LOG_MAX), with whether each
--- value is secret, GetInstanceInfo(), the group, and what BFF made of it.
--- For docs/research/boss-kills.md.
 local ENCOUNTER_LOG_MAX = 200
 local SECRET = "<secret>"
 
--- A value as it can be saved and printed, and whether it's secret.
 local function plain(value)
   if issecretvalue and issecretvalue(value) then return SECRET, true end
   return value, false
@@ -1211,7 +1029,7 @@ local function logEncounter(...)
     entry.instance[field] = (plain(info[i]))
     if select(2, plain(info[i])) then entry.secret["instance." .. field] = true end
   end
-  -- Read raw here, so a secret GUID or name shows as secret, not missing.
+  -- WoW: in Midnight, UnitGUID and UnitName can return secret values.
   entry.party = {}
   local units = {}
   if IsInRaid() then
@@ -1256,8 +1074,6 @@ encounterFrame:SetScript("OnEvent", function(_, _, ...)
   if not ok then print("BFF dev: couldn't log ENCOUNTER_END: " .. tostring(err)) end
 end)
 
--- /bffdev encounters: how many are saved and the last few; with "clear",
--- empties the log.
 local function showEncounters(rest)
   if rest == "clear" then
     BFF_DB.devEncounters = nil
@@ -1272,18 +1088,8 @@ local function showEncounters(rest)
   end
 end
 
--- The Rare logger: every read that could tell a Rare kill (loot, the
--- target dying, PARTY_KILL, and units seen that are rare or whose
--- identity read secret), printed and saved in BFF_DB.devRares (the newest
--- RARE_LOG_MAX), with the values read ("<secret>" for a secret one), which
--- were secret, what the watch made of them and what Core did with each
--- kill. Snapshot hands each read to ns.rareSink. For
--- docs/research/rare-mobs.md, section 5.
 local RARE_LOG_MAX = 300
 
--- Whether a read is worth keeping: every kill signal, and a unit seen
--- only when it's a rare or its identity read secret (the target only:
--- nameplates in combat would flood it).
 local function worthLogging(info)
   if info.signal ~= "seen" then return true end
   if info.result == "secret" then return info.unit == "target" end
@@ -1317,8 +1123,6 @@ ns.rareSink = function(info, kills, results)
   log(color(EVENT, "rare  ") .. line)
 end
 
--- /bffdev rares: how many reads are saved and the last few, with what was
--- read; with "clear", empties the log.
 local function showRares(rest)
   if rest == "clear" then
     BFF_DB.devRares = nil
@@ -1338,14 +1142,6 @@ local function showRares(rest)
   end
 end
 
--- /bffdev toggles the console; /bffdev toast [n] shows n sample toasts
--- (default 1), straight to the toasts and not through Core; /bffdev purge
--- runs Sim.purge; /bffdev clear [raid] makes the simulated Members online
--- clear the next dungeon (or raid); /bffdev rare makes one slay the
--- next Rare; /bffdev encounters [clear] and /bffdev rares [clear] show
--- (or empty) the encounter and Rare logs; /bffdev unveil [days] opens the
--- Trophies tab as if last opened that many days ago (default 7), so the
--- Trophies that reached you since unveil again.
 SlashCmdList.BFFDEV = function(input)
   if not ns.core then return end
   local command, count = (input or ""):match("^%s*(%S*)%s*(%d*)")
@@ -1365,7 +1161,6 @@ SlashCmdList.BFFDEV = function(input)
   end
   if command == "unveil" then
     local days = tonumber(count) or 7
-    -- Hidden first, so the open visit ends and the next one reads seen.
     ns.Panel.hide()
     BFF_DB.goals.seen = GetServerTime() - days * 24 * 60 * 60
     ns.Panel.show("goals")
