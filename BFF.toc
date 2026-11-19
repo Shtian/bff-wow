@@ -54,6 +54,7 @@ Game/ChannelLink.lua
 UI/Skin.lua
 UI/CampSheet.lua
 UI/CampScene.lua
+UI/EmptyState.lua
 UI/Firelight.lua
 UI/Panel.lua
 UI/PocketCamp.lua

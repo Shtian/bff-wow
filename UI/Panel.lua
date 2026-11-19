@@ -78,10 +78,17 @@ local CAMP_SMALL_UNDER = 460
 local SCROLL_STEP = 40
 
 local TITLE = "Best Friends in Forever"
-local FEED_EMPTY_TITLE = "Nothing yet"
-local FEED_EMPTY = "Dings, deaths and new Characters show up here."
--- The stretch of timeline behind an empty Feed's one node.
-local FEED_EMPTY_LINE = 120
+-- Each tab's own empty state (UI/EmptyState.lua); Play times' line is
+-- Core's note.
+local FEED_EMPTY = { art = "feed", title = "Quiet by the fire",
+  text = "Dings, deaths, new Characters and Crew wins land here, and wait for you while you're away." }
+local WHEN_EMPTY_TITLE = "Too soon to tell"
+local SPARES_EMPTY = { art = "spares", title = "The crate is empty",
+  text = "Got something your Crew could use? Drop it on the slot below." }
+local PROFESSIONS_EMPTY = { art = "professions", title = "No trades yet",
+  text = "When anyone learns a profession, it shows up here with their skill." }
+-- The alone card under your own Roster row: its room above and below.
+local ALONE_CARD_PAD = 16
 -- The setup view's block, centred in the window: Display name across it,
 -- Start and Join in two columns below.
 local SETUP_WIDTH = 320
@@ -102,7 +109,6 @@ local SPARE_ROW = 44
 local SPARE_ICON = 28
 local SPARE_BUTTON = 58
 local SPARE_SECTION = 28
-local SPARES_NONE = "No Spares from the Crew right now."
 local SPARES_DROP = "Drop an item from your bags here to offer it to your Crew."
 local SPARES_HOW = "Offer an item: drop it on the slot above, or type /bff spares add and shift-click it into the chat box. Mail it to the winner, then Give it."
 local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
@@ -162,6 +168,12 @@ local order = "online"
 local expanded = {}
 
 local classColor = Skin.classColor
+
+-- The state an empty tab shows: its own, or the alone state while you're
+-- the only Member known. Still while the Camp is off.
+local function emptyState(own)
+  return ns.EmptyState.pick(core:crew(), own, not core:setting("camp"))
+end
 
 -- The content's width right of the sidebar, at the window's current size.
 local function contentWidth()
@@ -715,31 +727,7 @@ local function createFeedView()
   feedView.days = {}
   feedView.entries = {}
 
-  -- An empty Feed: a short stretch of the timeline with one faint node,
-  -- centred in the view, and what will show up beside it.
-  local empty = CreateFrame("Frame", nil, feedView)
-  empty:SetPoint("LEFT")
-  empty:SetPoint("RIGHT")
-  empty:SetHeight(FEED_EMPTY_LINE)
-  local line = empty:CreateTexture(nil, "BACKGROUND")
-  line:SetColorTexture(1, 1, 1, 1)
-  Skin.color(line, Skin.TRACK)
-  line:SetWidth(2)
-  line:SetPoint("TOPLEFT", LINE_X, 0)
-  line:SetPoint("BOTTOMLEFT", LINE_X, 0)
-  local node = Skin.feedPicture(empty, NODE)
-  node:SetPoint("LEFT", INSET, 0)
-  node:SetPicture(Skin.FEED_PICTURES.ding)
-  node.picture:SetDesaturated(true)
-  node.picture:SetAlpha(0.5)
-  local title = Skin.label(empty, "heading", TEXT)
-  title:SetPoint("BOTTOMLEFT", node, "RIGHT", 10, 1)
-  title:SetText(FEED_EMPTY_TITLE)
-  local text = Skin.label(empty, "small", MUTED)
-  text:SetPoint("TOPLEFT", node, "RIGHT", 10, -3)
-  text:SetText(FEED_EMPTY)
-  feedView.empty = empty
-  feedView.emptyText = text
+  feedView.empty = ns.EmptyState.new(feedView)
 end
 
 -- A day's label, like the Roster's CREW, with its rule running to the
@@ -882,8 +870,12 @@ local function drawFeed(feed)
   end
   hideAll(feedView.days, dayCount + 1)
   hideAll(feedView.entries, entryCount + 1)
-  feedView.emptyText:SetWidth(contentWidth() - 2 * INSET - NODE - 10)
-  feedView.empty:SetShown(entryCount == 0)
+  if entryCount == 0 then
+    feedView.empty:Set(emptyState(FEED_EMPTY))
+    feedView.empty:Place(feedView, listWidth(), contentHeight())
+  else
+    feedView.empty:Hide()
+  end
   if stretches[dayCount] then stretches[dayCount].bottom = y + 8 end
   drawTimeline(entryCount > 0 and stretches or {})
   feedView.content:SetHeight(math.max(-y + INSET, 1))
@@ -1037,6 +1029,14 @@ local function createWhenView()
   whenView.note = Skin.label(whenView, "small", MUTED)
   whenView.note:SetWordWrap(true)
   whenView.note:SetJustifyH("LEFT")
+
+  -- The Crew's grid with nothing in it yet gives way to an empty state.
+  whenView.grid = { whenView.intro, whenView.legendLow, whenView.legendHigh, whenView.note }
+  for _, list in ipairs({ whenView.hours, whenView.days, whenView.cells }) do
+    for _, item in ipairs(list) do whenView.grid[#whenView.grid + 1] = item end
+  end
+  for _, swatch in ipairs(whenView.legend) do whenView.grid[#whenView.grid + 1] = swatch.texture end
+  whenView.empty = ns.EmptyState.new(whenView)
 end
 
 -- Sizes the grid to fill the view at the window's current size, in whole
@@ -1084,6 +1084,15 @@ local function drawWhen()
   end
   if GameTooltip:GetOwner() and GameTooltip:GetOwner():GetParent() == whenView then
     showCellTooltip(GameTooltip:GetOwner())
+  end
+  local empty = view.empty and not view.memberId
+  for _, item in ipairs(whenView.grid) do item:SetShown(not empty) end
+  if empty then
+    whenView.empty:Set(emptyState({ art = "when", title = WHEN_EMPTY_TITLE, text = view.note }))
+    local top = INSET + SMALL_BUTTON
+    whenView.empty:Place(whenView, contentWidth(), contentHeight() - top, top)
+  else
+    whenView.empty:Hide()
   end
   whenView:Show()
 end
@@ -1150,6 +1159,7 @@ local function createSparesView()
   sparesView.rows = {}
   sparesView.notes = {}
   sparesView.drop = createSpareDrop(sparesView.content)
+  sparesView.empty = ns.EmptyState.new(sparesView.content)
 end
 
 -- "FROM THE CREW ————— 2 of 20 Claims".
@@ -1353,7 +1363,13 @@ local function drawSpares()
   end
 
   heading("FROM THE CREW", ("%d of %d Claims"):format(view.claims, view.maxClaims))
-  if #view.crew == 0 then note(SPARES_NONE) end
+  sparesView.empty:SetShown(#view.crew == 0)
+  if #view.crew == 0 then
+    sparesView.empty:Set(emptyState(SPARES_EMPTY))
+    sparesView.empty:ClearAllPoints()
+    sparesView.empty:SetPoint("TOPLEFT", sparesView.content, "TOPLEFT", 0, y - 10)
+    y = y - 10 - sparesView.empty:Layout(listWidth()) - 16
+  end
   list(view.crew, false)
   y = y - 6
   heading("YOURS", ("%d of %d up"):format(view.open, view.maxOpen))
@@ -1428,6 +1444,7 @@ local function createProfessionsView()
   professionsView.columnWash = Skin.fill(professionsView.list.content, Skin.HOVER, "BORDER")
   professionsView.columnWash:Hide()
   professionsView.rows = {}
+  professionsView.empty = ns.EmptyState.new(professionsView)
 end
 
 -- Where each column starts, from the left, how wide a tile is and how
@@ -1601,8 +1618,17 @@ function drawProfessions()
       xs[sorted] + (width - PROFESSION_ICON) / 2, 1)
   end
 
+  -- Nobody in the Crew has a profession yet: an empty state instead of
+  -- the rows.
+  local members = view.none and {} or view.members
+  if view.none then
+    professionsView.empty:Set(emptyState(PROFESSIONS_EMPTY))
+    professionsView.empty:Place(professionsView, contentWidth(), contentHeight() - PROFESSION_HEAD, PROFESSION_HEAD)
+  else
+    professionsView.empty:Hide()
+  end
   local y = 0
-  for i, member in ipairs(view.members) do
+  for i, member in ipairs(members) do
     local row = professionRow(i)
     row:ClearAllPoints()
     row:SetPoint("TOPLEFT", professionsView.list.content, "TOPLEFT", 0, y)
@@ -1630,7 +1656,7 @@ function drawProfessions()
     row:Show()
     y = y - PROFESSION_ROW
   end
-  hideAll(professionsView.rows, #view.members + 1)
+  hideAll(professionsView.rows, #members + 1)
 
   professionsView.divider:ClearAllPoints()
   professionsView.divider:SetShown(dividerX ~= nil)
@@ -1993,9 +2019,11 @@ local function drawFooter(crew, summary)
   -- Set outright, to the window's width, so the wrapped text has a height
   -- before layout.
   footer.status:SetWidth(contentWidth() - 2 * INSET)
-  footer.status:SetText(crew.status or "")
+  -- Waiting for the Crew is the alone card's to say, over the rows.
+  local status = not crew.waiting and crew.status or nil
+  footer.status:SetText(status or "")
   local height = 46
-  if crew.status then height = height + footer.status:GetStringHeight() + 6 end
+  if status then height = height + footer.status:GetStringHeight() + 6 end
   footer:SetHeight(height)
   footer:Show()
   return height
@@ -2030,7 +2058,11 @@ local function hideViewsBut(name)
 end
 
 local function drawRoster(crew, summary)
-  if not rosterView then rosterView = createScrollView() end
+  if not rosterView then
+    rosterView = createScrollView()
+    rosterView.alone = ns.EmptyState.new(rosterView.content)
+  end
+  rosterView.alone:SetShown(crew.alone)
   local footerHeight = drawFooter(crew, summary)
   rosterView:ClearAllPoints()
   rosterView:SetPoint("TOPLEFT")
@@ -2060,6 +2092,15 @@ local function drawRoster(crew, summary)
     place(row, y)
     drawRow(row, data)
     y = y - ROW_HEIGHT
+    -- While you're the only Member known, the alone card sits under your
+    -- own row.
+    if data.own and crew.alone then
+      rosterView.alone:Set(emptyState(nil))
+      rosterView.alone:ClearAllPoints()
+      rosterView.alone:SetPoint("TOPLEFT", rosterView.content, "TOPLEFT", 0, y - ALONE_CARD_PAD)
+      rosterView.alone:Show()
+      y = y - ALONE_CARD_PAD - rosterView.alone:Layout(listWidth()) - ALONE_CARD_PAD
+    end
     if expanded[data.memberId] then
       for _, altData in ipairs(data.alts) do
         altCount = altCount + 1

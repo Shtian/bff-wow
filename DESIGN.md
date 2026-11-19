@@ -258,7 +258,7 @@ Hues and tiers are `Skin.TROPHY_HUES` and `Skin.TROPHY_QUALITIES`; don't use the
 
 ### Hierarchy
 - **Window title** (Friz, 13px, Ember Gold): window and popup titles only.
-- **Heading** (Friz, 12px, Ash Text): names of things inside a window: Crew goal names, an empty state's line ("Nothing yet").
+- **Heading** (Friz, 12px, Ash Text): names of things inside a window: Crew goal names, an empty state's headline ("Quiet by the fire").
 - **Label** (Friz, 10px, Dusk Dim, in capitals): section labels (CREW, FROM THE CREW, YOURS, YOUR CREW NOTICED), Feed day labels (TODAY), column headings (LEVEL, GAINED) and setup labels (DISPLAY NAME, START A CREW). The strings are written in capitals; the game can't add letter spacing, and Friz holds capitals at 10px where Arial Narrow crowds.
 - **Body** (Arial Narrow, 15px): Member names and primary row text.
 - **Text** (Arial Narrow, 14px): default UI text, buttons, inputs, sidebar tabs.
@@ -375,7 +375,25 @@ Full panel width, under the header and above the sidebar and every tab: about 12
 300×40, Night Window at 88%, a 24px Feed picture (the Member's Camp figure instead, for an entry about a Member while the Camp is on), Body text (Ember Gold for news), and an optional Reaction button. A 2px timer line shows the time left at 18% white on every toast. Toasts fade over 0.6s.
 
 ### Empty state
-Centred in its view, built from the house's own shapes rather than an illustration. The empty Feed is a 120px stretch of the timeline with one node (the ding picture, desaturated at half strength, grey edge), a Heading beside it and one Small Smoke Muted line under that. The Trophies tab with nothing on its shelf (before the first sync has settled, or with nothing reached) shows a desaturated goal picture, 40px, with a Heading and a Small Smoke Muted line beside it, centred where the latest win and shelf would be; the Working on tiles stay below. The panel before joining a Crew is a 320px block centred in the window: Display name across, then Start a Crew and Join a Crew in two 150px columns split by a vertical Hairline.
+One component for every empty view (`UI/EmptyState.lua`, chosen in [#239](https://github.com/Shtian/bff-wow/issues/239)), stacked and centred: a small pixel **vignette** in the Camp's art on top, a **Heading** under it, one Small Smoke Muted **line** (at most 300px wide) on what will fill the view, and an **action** only where there's a next step. A view it fills on its own puts the block's middle about 40% of the way down; in a list (Spare Items, Trophies, Catches) it sits at the top, with the rest of the list below.
+
+The vignettes are 40×22 art pixels each, drawn at the Camp band's art unit (a whole number of screen pixels near 3 UI units), so they read as pieces of the Camp. One rendering rule holds for all of them: the subject fits a box of about 24×14, stands on one ground line, is outlined in near-black like the Pocket Camp's tools (only light sources, fire and moon, aren't), is lit from the left, and sits on a dithered patch of ground, cool everywhere and warm only under a fire. They move on the band's 6 ticks a second, and only while the Camp is on.
+
+| View | When | Vignette | Headline | Line | Action |
+|---|---|---|---|---|---|
+| Feed | no entries | a fire burned down to embers | Quiet by the fire | Dings, deaths, new Characters and Crew wins land here, and wait for you while you're away. | none |
+| Trophies | not settled | a stand with the cup's outline | Counting up the Crew | Goals the Crew has already reached show here once everyone's records are in. | none (Working on below) |
+| Trophies | settled, none | a stand with the cup's outline | The shelf is bare | Every goal the Crew reaches, dungeon it clears and Rare it slays puts a medal here. | none (Working on below) |
+| Play Times (The Crew) | nothing usual yet | an hourglass under the moon | Too soon to tell | Core's note: After 2 weeks of play, the hours the Crew usually plays show up here. | none |
+| Spare Items | no Crew Spares | the crate, emptied, its lid off | The crate is empty | Got something your Crew could use? Drop it on the slot below. | the drop slot already there |
+| Professions | nobody in the Crew has one | an anvil on a stump | No trades yet | When anyone learns a profession, it shows up here with their skill. | none |
+| Catches | Core's `empty` | a rod over a pond | Core's words (No catches yet, with the waters for your level) | | none |
+| any of these, and the Roster | alone, you started the Crew | a log by the fire, nobody on it | Your Crew hasn't arrived yet | Give your friends the Crew code. They join with /bff join, and show up here once one of them is online. | the Crew code in a read-only box that selects on focus, "Ctrl+C to copy" under it |
+| the same | alone, you joined with a code | the same | Waiting for the Crew | You're in. The rest of the Crew shows up here once one of them is online. | none |
+
+The alone state wins over a view's own while you're the only Member known (`crew().alone`); Catches and Professions count your own data, so they're only empty while you have none either. On the Roster it's a card under your own row, and the footer's "Waiting for your Crew" line goes while it shows. Dungeons, Catches' Nothing to show, a single Member's Play Times notes, What's new and Settings keep their own words.
+
+The panel before joining a Crew is a 320px block centred in the window: Display name across, then Start a Crew and Join a Crew in two 150px columns split by a vertical Hairline.
 
 ### Tooltips
 The game's own GameTooltip, with BFF's colours inside (class colour for the Character, Smoke Muted details, Online Green for online, Ember Gold for "can play"). A Roster row's tooltip opens beside the panel, level with the row, on whichever side has room; small controls (Reactions, heatmap cells, map pins) anchor to their right.
@@ -392,7 +410,7 @@ A 2px line fading in from gold, meeting a teal line at a small white spark: the 
 - **Do** build in-game UI from `UI/Skin.lua` helpers (`window`, `button`, `chip`, `edge`, `feedPicture`) and its colour constants. Never add one-off RGB values.
 - **Do** keep gold for news and the single primary action (The One Ember Rule).
 - **Do** make every bar Bar Fill on Bar Track unless its colour means something.
-- **Do** compose empty views, centred, from the timeline and Feed pictures.
+- **Do** give every empty view the Empty state component: a Camp vignette, a Heading and one line, centred.
 - **Do** use the game's own icons, cropped and edged, for meaning. Class colours come from `RAID_CLASS_COLORS`.
 - **Do** keep windows fixed in size across tabs, and scroll inside them.
 - **Do** render brand images from `docs/gallery/` so every image shares one template.

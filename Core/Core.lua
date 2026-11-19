@@ -1330,7 +1330,7 @@ function Core:playTimes(memberId)
     result.intro = ("How many of the %d Members usually play each hour: in %d of the last %d weeks. Your local time.")
       :format(result.max, result.usually, result.weeks)
     if result.empty then
-      result.note = ("Nobody usually plays at any hour yet. It takes %d weeks of play to show."):format(result.usually)
+      result.note = ("After %d weeks of play, the hours the Crew usually plays show up here."):format(result.usually)
     end
     return result
   end
@@ -2147,22 +2147,24 @@ local PAUSED = "You appear offline: the others don't see you. Change it in Setti
 local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
 
 -- The Crew: code, channel and password, leaving while a leave hasn't
--- reached the link yet, alone while no other Member is known, and status:
+-- reached the link yet, alone while no other Member is known, joined when
+-- you joined it with someone's code (not when you started it), and status:
 -- the Roster footer's line, the first that applies of leaving, appearing
--- offline (Pause sharing) and waiting for the Crew (alone), else nil. Nil
--- when not in a Crew.
+-- offline (Pause sharing) and waiting for the Crew (alone, with waiting
+-- true: the Roster's alone card says the same, so it drops the line), else
+-- nil. Nil when not in a Crew.
 function Core:crew()
   local saved = self.db.crew
   if not saved then return nil end
   local channel, password = ns.CrewCode.channel(saved.code)
   local alone = not self.ledger:knowsOthers()
-  local status
+  local status, waiting
   if saved.leaving then
     status = LEAVING
   elseif self:isPaused() then
     status = PAUSED
   elseif alone then
-    status = WAITING
+    status, waiting = WAITING, true
   end
   return {
     code = saved.code,
@@ -2170,7 +2172,9 @@ function Core:crew()
     password = password,
     leaving = saved.leaving,
     alone = alone,
+    joined = saved.joined == true,
     status = status,
+    waiting = waiting,
   }
 end
 
@@ -2198,7 +2202,7 @@ local function enter(self, code, displayName, joining)
   sendOwnNow(self)
   self.crewGoals:clear()
   self.db.catchTypesTold = nil
-  self.db.crew = { code = code }
+  self.db.crew = { code = code, joined = joining or nil }
   if joining then self.log:ownJoined() end
   self.listener("crewChanged")
   updateLink(self)
