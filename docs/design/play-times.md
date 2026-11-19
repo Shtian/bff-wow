@@ -28,7 +28,7 @@ The own record gains `playTimes = { since, week, slots }`:
 
 ## Showing: the Play Times tab
 
-A fourth tab in the sidebar, under Trophies, within the panel's fixed height. `/bff when` opens it. From `Core:playTimes(memberId?)`:
+A fourth tab in the sidebar, under Trophies, within the panel's fixed height. `/bff playtimes` opens it (`/bff play` too, and `/bff when` as a hidden alias). From `Core:playTimes(memberId?)`:
 
 - **The Crew** (default): a 7 × 24 grid, Monday to Sunday, 00 to 23, each cell shaded by how many Members **usually play** then (played in at least 2 of the last 4 weeks), out of every Member your Roster shows: you, and everyone not Left, not Removed and not hidden by the 30-day rule. The count is in each cell's tooltip.
 - **One Member:** picked from the "Show:" menu, or with "When does <display name> play?" on their row's right-click menu. Cells shaded by weeks played, 0 to 4.

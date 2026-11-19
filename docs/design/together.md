@@ -63,7 +63,7 @@ Then a key (Fits your level, Attunement, New in WoW: Forever, Friends who fit it
 
 ## Showing
 
-`UI/TogetherTab.lua`, a sidebar tab after Professions; `/bff together` opens it. It keeps to the panel's size, redrawn when a resize ends:
+`UI/TogetherTab.lua`, a sidebar tab after Professions; `/bff dungeons` opens it (`/bff together` too, as a hidden alias). It keeps to the panel's size, redrawn when a resize ends:
 
 - **Type:** a step larger than the rest of the panel, since the line is read at a glance: Skin's Text (14) where Core measures `small`, and Small (12) where it measures `tiny`.
 - **Toolbar** (32px): "As Gahzuria 24" in class colour, an "alt" tag when you're on an Alt, and at the right the hidden note, Clear while friends are picked, and a "Show" button with a filter icon before it (Skin's drawn icons: Arial Narrow has no such glyphs, nor ▾). The Play Times tab's "Show:" picker has the same icon, and the Roster's sort button an up and down arrow. The button opens the Show menu under it: 240px, Skin's checkboxes, each change redrawing the line straight away. Escape or a click outside closes it.

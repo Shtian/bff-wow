@@ -324,7 +324,11 @@ function commands.feed()
   ns.Panel.show("feed")
 end
 
-function commands.goals()
+function commands.roster()
+  ns.Panel.show("roster")
+end
+
+function commands.trophies()
   ns.Panel.show("goals")
 end
 
@@ -342,7 +346,7 @@ function commands.spares(rest)
   ns.sayPosted(ns.Bags.postLink(ns.core, link))
 end
 
-function commands.when()
+function commands.playtimes()
   ns.Panel.showWhen(nil)
 end
 
@@ -354,8 +358,12 @@ function commands.catches()
   ns.Panel.show("catches")
 end
 
-function commands.together()
+function commands.dungeons()
   ns.Panel.show("together")
+end
+
+function commands.whatsnew()
+  ns.Panel.show("whatsnew")
 end
 
 function commands.settings()
@@ -372,7 +380,6 @@ function commands.leave()
 end
 
 function commands.sim(rest)
-  if not ns.Sim then return say("/bff sim is only in a dev checkout.") end
   if rest == "stop" then
     ns.Sim.stop()
     say("simulated Members logged out.")
@@ -404,12 +411,20 @@ function commands.debug(rest)
   say(syncTrace and "sync trace on. /bff debug sync turns it off." or "sync trace off.")
 end
 
-local HELP = "/bff, /bff feed, /bff goals, /bff when, /bff spares, /bff spares add <item>, /bff professions, "
-  .. "/bff together, /bff catches, /bff start, /bff join <code>, /bff code, /bff name <name>, /bff settings, "
-  .. "/bff minimap, /bff leave, /bff report, /bff debug sync, /bff help"
+local function isDev()
+  return ns.Sim ~= nil
+end
 
-function commands.help()
-  say(HELP)
+local function sayLines(lines)
+  say(lines[1])
+  for i = 2, #lines do print(lines[i]) end
+end
+
+function commands.help(rest)
+  local word = rest:match("^%S*")
+  if word == "" then return sayLines(ns.Commands.help(isDev())) end
+  local lines = ns.Commands.helpFor(word, isDev())
+  if lines then sayLines(lines) else say(ns.Commands.unknown(word, isDev())) end
 end
 
 SLASH_BFF1 = "/bff"
@@ -418,11 +433,13 @@ SlashCmdList.BFF = function(input)
   local command, rest = (input or ""):match("^%s*(%S*)%s*(.-)%s*$")
   command = command:lower()
   if command == "" then
-    ns.Panel.toggle()
-  elseif commands[command] then
-    commands[command](rest)
+    return ns.Panel.toggle()
+  end
+  local name = ns.Commands.resolve(command, isDev())
+  if name then
+    commands[name](rest)
   else
-    commands.help()
+    say(ns.Commands.unknown(command, isDev()))
   end
 end
 
