@@ -9,39 +9,44 @@ local GOLD = "|cffffd14a"
 local GREY = "|cffadabb8"
 local CONTINUED = "   "
 
+local function form(args, about, brief)
+  return { args = args, about = about, brief = brief }
+end
+
 local ENTRIES = {
-  { name = "roster", group = "tab", forms = { { "", "open the Roster tab" } } },
-  { name = "feed", group = "tab", forms = { { "", "open the Feed tab" } } },
-  { name = "trophies", group = "tab", aliases = { "goals" }, forms = { { "", "open the Trophies tab" } } },
-  { name = "playtimes", group = "tab", aliases = { "play", "when" }, forms = { { "", "open the Play Times tab" } } },
+  { name = "roster", group = "tab", forms = { form("", "open the Roster tab") } },
+  { name = "feed", group = "tab", forms = { form("", "open the Feed tab") } },
+  { name = "trophies", group = "tab", aliases = { "goals" }, forms = { form("", "open the Trophies tab") } },
+  { name = "playtimes", group = "tab", aliases = { "play", "when" }, forms = { form("", "open the Play Times tab") } },
   { name = "spares", group = "tab", forms = {
-    { "", "open the Spare Items tab" },
-    { "add <item>", "offer an item from your bags: shift-click it in after add" },
+    form("", "open the Spare Items tab"),
+    form("add <item>", "put up an item from your bags as a Spare: shift-click it in after add",
+      "put up a Spare from your bags"),
   } },
-  { name = "professions", group = "tab", forms = { { "", "open the Professions tab" } } },
-  { name = "dungeons", group = "tab", aliases = { "together" }, forms = { { "", "open the Dungeons tab" } } },
-  { name = "catches", group = "tab", forms = { { "", "open the Catches tab" } } },
-  { name = "whatsnew", group = "tab", forms = { { "", "open What's new" } } },
-  { name = "start", group = "crew", forms = { { "", "start a Crew and show its code to share" } } },
-  { name = "join", group = "crew", forms = { { "<code>", "join a Crew with the code a friend shared" } } },
-  { name = "code", group = "crew", forms = { { "", "show your Crew code" } } },
-  { name = "name", group = "crew", forms = { { "<name>", "set the name your friends see" } } },
-  { name = "leave", group = "crew", forms = { { "", "leave your Crew" } } },
-  { name = "settings", group = "tools", forms = { { "", "open Settings" } } },
-  { name = "minimap", group = "tools", forms = { { "", "bring back a hidden minimap button" } } },
-  { name = "report", group = "tools", forms = { { "", "open a diagnostics report to copy into a bug report" } } },
+  { name = "professions", group = "tab", forms = { form("", "open the Professions tab") } },
+  { name = "dungeons", group = "tab", aliases = { "together" }, forms = { form("", "open the Dungeons tab") } },
+  { name = "catches", group = "tab", forms = { form("", "open the Catches tab") } },
+  { name = "whatsnew", group = "tab", forms = { form("", "open What's new") } },
+  { name = "start", group = "crew", forms = { form("", "start a Crew and show its Crew code to share") } },
+  { name = "join", group = "crew", forms = { form("<code>", "join a Crew with its Crew code") } },
+  { name = "code", group = "crew", forms = { form("", "show your Crew code") } },
+  { name = "name", group = "crew", forms = { form("<name>", "set your Display name, the name the Crew sees") } },
+  { name = "leave", group = "crew", forms = { form("", "leave your Crew") } },
+  { name = "settings", group = "tools", forms = { form("", "open Settings") } },
+  { name = "minimap", group = "tools", forms = { form("", "bring back a hidden minimap button") } },
+  { name = "report", group = "tools", forms = { form("", "open a diagnostics report to copy into a bug report") } },
   { name = "debug", group = "tools", forms = {
-    { "sync", "print the sync trace in chat as well, until you turn it off or reload" },
+    form("sync", "print the sync trace in chat as well, until you turn it off or reload"),
   } },
   { name = "help", group = "help", forms = {
-    { "", "list the commands" },
-    { "<command>", "more about one command" },
+    form("", "list the commands"),
+    form("<command>", "more about one command", "more about one"),
   } },
   { name = "sim", group = "dev", forms = {
-    { "", "add simulated Members, to try BFF alone" },
-    { "ding", "a simulated Member dings" },
-    { "fish", "a simulated Member catches something" },
-    { "stop", "log the simulated Members out" },
+    form("", "add simulated Members, to try BFF alone", "simulated Members, to try BFF alone"),
+    form("ding", "a simulated Member dings"),
+    form("fish", "a simulated Member catches something"),
+    form("stop", "log the simulated Members out"),
   } },
 }
 
@@ -89,7 +94,7 @@ end
 local function itemsIn(group)
   local items = {}
   for _, entry in ipairs(ENTRIES) do
-    if entry.group == group then items[#items + 1] = usage(entry.name, entry.forms[1][1]) end
+    if entry.group == group then items[#items + 1] = usage(entry.name, entry.forms[1].args) end
   end
   return items
 end
@@ -98,8 +103,16 @@ local function append(lines, more)
   for _, line in ipairs(more) do lines[#lines + 1] = line end
 end
 
-local function shown(entry, dev)
-  return entry and (dev or entry.group ~= "dev")
+local function entryFor(word, dev)
+  local entry = byWord[(word or ""):lower()]
+  if entry and (dev or entry.group ~= "dev") then return entry end
+end
+
+local function briefLine(name)
+  local entry = byWord[name]
+  for _, each in ipairs(entry.forms) do
+    if each.brief then return " " .. described(usage(name, each.args), each.brief) end
+  end
 end
 
 function Commands.names()
@@ -108,8 +121,8 @@ function Commands.names()
   return names
 end
 
-function Commands.resolve(word)
-  local entry = byWord[(word or ""):lower()]
+function Commands.resolve(word, dev)
+  local entry = entryFor(word, dev)
   return entry and entry.name
 end
 
@@ -117,19 +130,19 @@ function Commands.help(dev)
   local lines = { "BFF commands", " " .. described("", "open or close the panel") }
   append(lines, listed("Open a tab: ", itemsIn("tab"), ", "))
   append(lines, listed("Crew: ", itemsIn("crew"), " · "))
-  lines[#lines + 1] = " " .. described("spares add <item>", "offer an item from your bags")
+  lines[#lines + 1] = briefLine("spares")
   append(lines, listed("", itemsIn("tools"), " · "))
-  lines[#lines + 1] = " " .. described("help <command>", "more about one")
-  if dev then lines[#lines + 1] = " " .. described("sim", "simulated Members, to try BFF alone") end
+  lines[#lines + 1] = briefLine("help")
+  if dev then lines[#lines + 1] = briefLine("sim") end
   return lines
 end
 
 function Commands.helpFor(word, dev)
-  local entry = byWord[(word or ""):lower()]
-  if not shown(entry, dev) then return nil end
+  local entry = entryFor(word, dev)
+  if not entry then return nil end
   local lines = {}
-  for i, form in ipairs(entry.forms) do
-    lines[i] = described(usage(entry.name, form[1]), form[2])
+  for i, each in ipairs(entry.forms) do
+    lines[i] = described(usage(entry.name, each.args), each.about)
   end
   return lines
 end
@@ -158,7 +171,7 @@ function Commands.suggest(input, dev)
   input = (input or ""):lower()
   local best, bestScore
   for _, entry in ipairs(ENTRIES) do
-    if shown(entry, dev) then
+    if entryFor(entry.name, dev) then
       local words = { entry.name }
       append(words, entry.aliases or {})
       for _, word in ipairs(words) do

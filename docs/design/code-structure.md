@@ -173,7 +173,7 @@ Every file starts with `local _, ns = ...` and attaches itself to `ns`, the addo
 
 - **Runner:** busted under LuaJIT, linted with luacheck.
 - **The interface is the test surface.** Tests create Cores and check `rows()`, the While you were away summary, Feed entries, and the recorded listener events and sent messages. They never look inside `db`, Ledger or Gossip.
-- **Pure, stateless helper files may be tested directly**, table-style, as `codec_spec` does for Codec, `text_spec` for Text, `spare_rules_spec` for SpareRules, `professions_spec` for reading professions and `catches_spec` for reading the loot window. Anything with state or lifecycle in Core is tested through Core; the game-facing files below are tested through their own interfaces.
+- **Pure, stateless helper files may be tested directly**, table-style, as `codec_spec` does for Codec, `text_spec` for Text, `spare_rules_spec` for SpareRules, `commands_spec` for Commands, `professions_spec` for reading professions and `catches_spec` for reading the loot window. Anything with state or lifecycle in Core is tested through Core; the game-facing files below are tested through their own interfaces.
 - **Fake network** (`Dev/FakeNet.lua`):
   - One shared virtual clock and scheduler, so every run plays out the same way.
   - Each simulated client is a real Core with a fake link and its own `db`.

@@ -39,6 +39,8 @@ describe("Commands", function()
     assert.equal("whatsnew", Commands.resolve("whatsnew"))
     assert.is_nil(Commands.resolve("trophys"))
     assert.is_nil(Commands.resolve(""))
+    assert.is_nil(Commands.resolve("sim", false))
+    assert.equal("sim", Commands.resolve("sim", true))
   end)
 
   it("groups the help in a few short lines, with only tab names", function()
@@ -49,7 +51,7 @@ describe("Commands", function()
       " Open a tab: /bff roster, feed, trophies, playtimes, spares,",
       "   professions, dungeons, catches, whatsnew",
       " Crew: /bff start · join <code> · code · name <name> · leave",
-      " /bff spares add <item>  offer an item from your bags",
+      " /bff spares add <item>  put up a Spare from your bags",
       " /bff settings · minimap · report · debug sync",
       " /bff help <command>  more about one",
     }, lines)
@@ -85,7 +87,7 @@ describe("Commands", function()
     end
     assert.same({
       "/bff spares  open the Spare Items tab",
-      "/bff spares add <item>  offer an item from your bags: shift-click it in after add",
+      "/bff spares add <item>  put up an item from your bags as a Spare: shift-click it in after add",
     }, plainLines(Commands.helpFor("spares", false)))
     assert.equal("/bff trophies  open the Trophies tab", plain(Commands.helpFor("GOALS", false)[1]))
     assert.is_nil(Commands.helpFor("trophys", false))

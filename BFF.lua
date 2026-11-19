@@ -380,7 +380,6 @@ function commands.leave()
 end
 
 function commands.sim(rest)
-  if not ns.Sim then return say("/bff sim is only in a dev checkout.") end
   if rest == "stop" then
     ns.Sim.stop()
     say("simulated Members logged out.")
@@ -416,16 +415,16 @@ local function isDev()
   return ns.Sim ~= nil
 end
 
-function commands.help(rest)
-  if rest ~= "" then
-    local lines = ns.Commands.helpFor(rest, isDev())
-    if not lines then return say(ns.Commands.unknown(rest, isDev())) end
-    for _, line in ipairs(lines) do say(line) end
-    return
-  end
-  local lines = ns.Commands.help(isDev())
+local function sayLines(lines)
   say(lines[1])
   for i = 2, #lines do print(lines[i]) end
+end
+
+function commands.help(rest)
+  local word = rest:match("^%S*")
+  if word == "" then return sayLines(ns.Commands.help(isDev())) end
+  local lines = ns.Commands.helpFor(word, isDev())
+  if lines then sayLines(lines) else say(ns.Commands.unknown(word, isDev())) end
 end
 
 SLASH_BFF1 = "/bff"
@@ -434,9 +433,11 @@ SlashCmdList.BFF = function(input)
   local command, rest = (input or ""):match("^%s*(%S*)%s*(.-)%s*$")
   command = command:lower()
   if command == "" then
-    ns.Panel.toggle()
-  elseif ns.Commands.resolve(command) then
-    commands[ns.Commands.resolve(command)](rest)
+    return ns.Panel.toggle()
+  end
+  local name = ns.Commands.resolve(command, isDev())
+  if name then
+    commands[name](rest)
   else
     say(ns.Commands.unknown(command, isDev()))
   end
