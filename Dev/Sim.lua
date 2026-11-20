@@ -1157,6 +1157,11 @@ SlashCmdList.BFFDEV = function(input)
     print(("BFF dev: season %s (now %s)."):format(rest, tostring(ns.core:season() or "none")))
     return
   end
+  if command == "daynight" then
+    if not ns.core:forcePhase(rest) then return print("BFF dev: /bffdev daynight day/night/auto") end
+    print(("BFF dev: day and night %s (now %s)."):format(rest, tostring(ns.core:phase() or "off")))
+    return
+  end
   if command == "rare" then
     local name, rare = Sim.rare(ns.core)
     print(name and ("BFF dev: %s slays %s."):format(name, rare) or ("BFF dev: no Rare kill (%s)."):format(rare))

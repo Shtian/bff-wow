@@ -198,6 +198,7 @@ local function start(isInitialLogin)
     initialLogin = isInitialLogin,
     maxLevel = GetMaxLevelForPlayerExpansion(),
     utcOffset = utcOffset(),
+    daylight = ns.Snapshot.daylight,
     locate = ns.Snapshot.locate,
     itemLink = ns.Snapshot.itemLink,
     itemLook = ns.Skin.itemLook,

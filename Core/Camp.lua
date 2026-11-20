@@ -74,6 +74,16 @@ function Camp.season(now, utcOffset)
   return nil
 end
 
+local DAWN = 5 * 60 + 30
+local DUSK = 21 * 60
+
+function Camp.phase(isDay, hour, minute)
+  if isDay ~= nil then return isDay and "day" or "night" end
+  if type(hour) ~= "number" or type(minute) ~= "number" then return "night" end
+  local clock = hour * 60 + minute
+  return clock >= DAWN and clock < DUSK and "day" or "night"
+end
+
 Camp.RECENT = DAY
 local MEMBER_GRAVES = 2
 local GRAVES = 4
@@ -273,6 +283,7 @@ local function arrange(rows, entries, now, columns, options, petted)
   end
   local season = SEASON[options.season]
   view.season = season and season.key
+  view.phase = options.phase
   local decor = season and (options.tent == false or view.tent) and season.decor or {}
   for _, key in ipairs(decor) do
     local x = placeOn(roomier(left, right), DECOR[key].width, 0, nil, nil, nil, DECOR[key].gap)
@@ -480,7 +491,7 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
   end
   rows = seatingOrder(rows, group, seatKey)
   local options = {
-    tent = false, onlineOnly = true, moreText = "+%d", sleepers = bedrolls, season = shown.season,
+    tent = false, onlineOnly = true, moreText = "+%d", sleepers = bedrolls, season = shown.season, phase = shown.phase,
     room = function(row)
       if poses[row.memberId] == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
       local form = forms[row.memberId]
@@ -573,8 +584,8 @@ function Camp.header(summary, on)
   return ("%d of %d online"):format(summary.online, summary.members)
 end
 
-function Camp.away(rows, entries, now, summary, season)
-  local view = Camp.view(rows, entries, now, LAYOUT.awayColumns, { tent = false, season = season })
+function Camp.away(rows, entries, now, summary, season, phase)
+  local view = Camp.view(rows, entries, now, LAYOUT.awayColumns, { tent = false, season = season, phase = phase })
   local byMember = {}
   for _, member in ipairs(summary.members) do byMember[member.memberId] = member end
   for _, actor in ipairs(view.actors) do

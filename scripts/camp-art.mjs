@@ -3,7 +3,8 @@
 // Media/Dither50.tga and Media/Dither25.tga (the Dungeons tab's bar fills),
 // Media/CampBackdrop.tga (the static night sky, hills, pines and the fire's
 // glow on the ground), Media/CampPocketBackdrop.tga (the Pocket Camp's
-// soft-edged piece of it), Media/CampLight.tga (the fire's light on the
+// soft-edged piece of it), the same two by day (…Day) and in winter
+// (…Winter, …DayWinter), Media/CampLight.tga (the fire's light on the
 // window under the band), Media/EmptyStates.tga (the empty states'
 // vignettes) and UI/CampSheet.lua (where each sprite sits). The
 // grids come from the prototype (prototype/ui-personality). Run it after
@@ -48,6 +49,18 @@ const SLEEP = [
   ["ZZZZ", "..Z.", ".Z..", "ZZZZ"],
   ["ZZZZZ", "...Z.", "..Z..", ".Z...", "ZZZZZ"],
 ];
+// The sky's lights (docs/design/camp.md, Day and night; chosen in #267):
+// the sun, its rays pulsing between two frames, and the crescent moon.
+// Light sources, so not outlined. The stars are single pixels in the
+// backdrop's star tones, the brightest the glint.
+const SUN_PAL = { W: "#fff3c4", Y: "#ffe9a0", G: "#ffd14a" };
+const SUN = [
+  ["....G....", ".G..G..G.", "...YYY...", "..YWWWY..", "GGYWWWYGG", "..YWWWY..", "...YYY...", ".G..G..G.", "....G...."],
+  [".........", "....G....", "..GYYYG..", "..YWWWY..", ".GYWWWYG.", "..YWWWY..", "..GYYYG..", "....G....", "........."],
+];
+const MOON = ["..MMMM", ".MMM..", "MMM...", "MMM...", "MMM...", ".MMM..", "..MMMM"];
+const MOON_PAL = { M: "#d8d4c4" };
+const STAR_TONES = { dim: "#4a4c6e", mid: "#7d7f9e" };
 // The Pocket Camp's poses and one-off animations (docs/design/pocket-camp.md).
 // A fishing rod held out from a seated figure's hand, its line and bobber
 // hanging from the tip; drawn mirrored on the fire's right.
@@ -671,6 +684,8 @@ const SPRITES = [
   ["glint", skin(GLINT)], ["glintPale", skin(GLINT_PALE)], ["petal", skin(PETAL)],
   ["tent", tent()], ["tentSnow", tentSnow(tent())], ["bedSnow", skin(BED_SNOW.rows)],
   ["treePine", paint(outlined(PINE), { ...PAL, ...TREE_PAL })],
+  ["sun1", paint(SUN[0], SUN_PAL)], ["sun2", paint(SUN[1], SUN_PAL)], ["moon", paint(MOON, MOON_PAL)],
+  ["starDim", paint(["S"], { S: STAR_TONES.dim })], ["starMid", paint(["S"], { S: STAR_TONES.mid })],
   ["snowflake", paint(["N"], { N: SNOW.cap })], ["snowflakeFar", paint(["N"], { N: SNOW.far })],
   ...LIGHTS.map((color, i) => [`light${i + 1}`, paint(["L"], { L: color })]),
   ["pumpkin1", pumpkin(0)], ["pumpkin2", pumpkin(1)],
@@ -786,61 +801,150 @@ function sheet() {
 const BACK_W = 384, BACK_H = 52, FILE_W = 512, FILE_H = 64;
 const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]].map((r) => r.map((v) => (v + 0.5) / 16));
 const rnd = (s) => { const x = Math.sin(s * 127.1) * 43758.5453; return x - Math.floor(x); };
-// The sky's top colour, which UI fills the band with above the art.
-const SKY_TOP = "#070a1e";
+// The backdrops by night and by day (docs/design/camp.md, Day and night;
+// chosen in #267 from prototypes/camp-day-night.html on the
+// prototype/267-day-night branch). Night is the sky as it always was;
+// day is look A, Clear: a blue sky dithered to a pale horizon, a few
+// clouds, blue-grey hills with a lit crest, grass, and the fire's glow
+// reaching half as far. Each look's snow is winter's ground. UI fills the
+// band above the art with the sky's top colour.
+const NIGHT = {
+  sky: ["#070a1e", "#0a0d26", "#0e1030", "#141335", "#1c1636"], hills: "#0e0f26",
+  snow: { ground: SNOW.ground, dusk: SNOW.dusk, far: SNOW.far },
+};
+const DAY = {
+  sky: ["#3b62a8", "#4a74b6", "#5c86c2", "#7299cc", "#8fb0d8"], clouds: { c: "#eef0f4", s: "#c4cede" },
+  hills: "#6a7f9a", crest: "#7d92aa", pines: "#2f4a3a",
+  ground: ["#4f6b3a", "#3e5730"], glow: ["#6a6a34", "#86743a"], glowReach: 0.5,
+  snow: { ground: "#d4dae4", dusk: "#b4bece", far: "#9aa6b8" },
+};
+const CLOUDS = [
+  ["....cccc.....", "..ccccccccc..", ".cccccccccccc", "..sssssssss.."],
+  ["..ccc...", ".cccccc.", "cccccccc", ".ssssss."],
+];
+// [x in the 384-wide art, y from its top, shape]; the fire is on x 192.
+const CLOUD_SPOTS = [[38, 14, 0], [112, 18, 1], [226, 13, 0], [298, 17, 1], [350, 14, 1], [150, 13, 1]];
+const mix = (a, b, t) => "#" + hex(a).map((v, i) => Math.round(v + (hex(b)[i] - v) * t).toString(16).padStart(2, "0")).join("");
+// Day pines: a shadow side, a side lit by the sun from the right, a dark
+// band under each tier, a lit tip on each tier's right, a trunk, and a
+// hazier far tree line along the hills' crest.
+function dayTrees(L) {
+  const far = mix(L.pines, L.hills, 0.55);
+  return { mid: L.pines, deep: mix(L.pines, "#0b0a12", 0.42), lit: mix(L.pines, "#e8f0a0", 0.2),
+    tip: mix(L.pines, "#f0f4c0", 0.38), far, farLit: mix(far, L.crest, 0.6), trunk: mix("#3a2518", L.hills, 0.2),
+    snowLit: L.snow.ground, snowShade: L.snow.dusk };
+}
+// Night pines: the old silhouette colour, a darker shadow side and under
+// each tier, a faint cool rim of moonlight on the right, the fire's warmth
+// on the lower branches facing it (fading out 80 columns away), and a far
+// tree line barely lighter than the hills.
+const NIGHT_TREES = { mid: "#090a18", deep: "#05060e", lit: "#11142c", tip: "#181c38", far: "#0c0d22", farLit: "#101230",
+  trunk: "#120c10", warm: "#2c1b17", snowLit: "#3e4058", snowShade: "#262838" };
 
-function backdrop() {
+function backdrop(look, winter) {
+  const night = look === NIGHT, L = look;
   const img = image(FILE_W, FILE_H);
   const ox = (FILE_W - BACK_W) / 2, oy = FILE_H - BACK_H;
   const W = BACK_W, H = BACK_H;
   const put = (x, y, color) => set(img, ox + x, oy + y, color);
   const rect = (x, y, w, h, color) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(x + i, y + j, color); };
   const cx = W / 2, horizon = H - 13;
-  const sky = [SKY_TOP, "#0a0d26", "#0e1030", "#141335", "#1c1636"];
+  const sky = L.sky;
   // The file's rows above the art carry on the top colour.
-  for (let y = 0; y < oy; y++) for (let x = 0; x < FILE_W; x++) set(img, x, y, SKY_TOP);
+  for (let y = 0; y < oy; y++) for (let x = 0; x < FILE_W; x++) set(img, x, y, sky[0]);
   for (let y = 0; y < horizon; y++) for (let x = 0; x < W; x++) {
     const f = (y / horizon) * (sky.length - 1), i = Math.floor(f), d = f - i;
     put(x, y, sky[Math.min(sky.length - 1, i + (d > BAYER[y % 4][x % 4] ? 1 : 0))]);
   }
-  for (let i = 0; i < W * 0.28; i++) {
-    const x = Math.floor(rnd(i + 1) * W), y = Math.floor(rnd(i + 50) * (horizon - 8));
-    put(x, y, rnd(i + 9) > 0.8 ? "#fff3c4" : rnd(i + 3) > 0.5 ? "#7d7f9e" : "#4a4c6e");
-  }
-  for (const [dx, dy, w] of [[2, 0, 4], [1, 1, 3], [0, 2, 3], [0, 3, 3], [0, 4, 3], [1, 5, 3], [2, 6, 4]]) {
-    rect(Math.floor(W * 0.83) + dx, 4 + dy, w, 1, "#d8d4c4");
-  }
-  for (let x = 0; x < W; x++) {
-    const h = 7 + Math.round(3 * Math.sin(x * 0.05) + 2 * Math.sin(x * 0.13 + 1));
-    rect(x, horizon - h, 1, h, "#0e0f26");
-  }
-  const pine = (x, h, color) => {
-    for (let y = 0; y < h; y++) {
-      const w = Math.floor(((y % 5) + y * 0.55) * 0.62) + 1;
-      rect(x - w, horizon - h + y, w * 2 + 1, 1, color);
+  if (night) {
+    for (let i = 0; i < W * 0.28; i++) {
+      const x = Math.floor(rnd(i + 1) * W), y = Math.floor(rnd(i + 50) * (horizon - 8));
+      put(x, y, rnd(i + 9) > 0.8 ? "#fff3c4" : rnd(i + 3) > 0.5 ? "#7d7f9e" : "#4a4c6e");
     }
-    rect(x, horizon, 1, 2, color);
+    for (const [dx, dy, w] of [[2, 0, 4], [1, 1, 3], [0, 2, 3], [0, 3, 3], [0, 4, 3], [1, 5, 3], [2, 6, 4]]) {
+      rect(Math.floor(W * 0.83) + dx, 4 + dy, w, 1, "#d8d4c4");
+    }
+  }
+  if (L.clouds) {
+    for (const [x, y, k] of CLOUD_SPOTS) {
+      CLOUDS[k].forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") put(x + i, y + j, L.clouds[ch]); }));
+    }
+  }
+  const hill = (x) => 7 + Math.round(3 * Math.sin(x * 0.05) + 2 * Math.sin(x * 0.13 + 1));
+  for (let x = 0; x < W; x++) {
+    const h = hill(x);
+    rect(x, horizon - h, 1, h, L.hills);
+    if (L.crest) put(x, horizon - h, L.crest);
+  }
+  const T = night ? NIGHT_TREES : dayTrees(L);
+  const b = (x, y) => BAYER[(y + 64) % 4][(x + 64) % 4];
+  for (let x = 2, i = 0; x < W; x += 3 + Math.floor(rnd(i + 300) * 3), i++) {
+    const h = 3 + Math.floor(rnd(i + 310) * 4), base = horizon - hill(x) + 2;
+    for (let y = 0; y < h; y++) {
+      const w = Math.floor((y + 1) * 0.6);
+      for (let k = -w; k <= w; k++) put(x + k, base - h + y, k > 0 && b(x + k, y) < 0.6 ? T.farLit : T.far);
+    }
+  }
+  const pine = (x, h, seed) => {
+    const top = horizon - h, tier = 4 + Math.floor(rnd(seed) * 2);
+    put(x, top - 1, winter ? T.snowLit : T.mid);
+    const warmth = T.warm ? Math.max(0, 1 - Math.abs(x - cx) / 80) : 0, toFire = Math.sign(cx - x);
+    let aboveL = 0, aboveR = 0;
+    for (let y = 0; y < h; y++) {
+      const inTier = y % tier, row = top + y;
+      const w = Math.floor((inTier + y * 0.55) * 0.62) + 1;
+      const wl = w - (inTier === tier - 1 || rnd(seed + y * 1.3) > 0.7 ? 0 : 1);
+      const wr = w - (inTier === tier - 1 || rnd(seed + y * 2.1) > 0.75 ? 0 : 1);
+      for (let k = -wl; k <= wr; k++) {
+        const u = k / Math.max(1, w), d = b(x + k, row);
+        let c = T.mid;
+        if (u > 0.3 && (u - 0.3) / 0.7 > d * 0.85) c = T.lit;
+        else if (u < -0.25 && (-u - 0.25) / 0.75 > d * 0.8) c = T.deep;
+        if (inTier <= 1 && y > 2 && Math.abs(k) < w - 1 && !(u > 0.5 && d < 0.4)) c = T.deep;
+        if (inTier === tier - 1 && k === wr && w > 1) c = T.tip;
+        if (warmth && Math.sign(k) === toFire && Math.abs(u) > 0.45 && y > h * 0.35 && d < warmth * 0.9) c = T.warm;
+        const exposed = y === 0 || k < -aboveL || k > aboveR;
+        if (winter && exposed && d < 0.8) c = k >= 0 ? T.snowLit : T.snowShade;
+        put(x + k, row, c);
+      }
+      aboveL = wl; aboveR = wr;
+      if (inTier === tier - 1 && w > 2 && rnd(seed + y * 3.7) > 0.5) put(x - wl - 1, row + 1, T.deep);
+    }
+    rect(x, horizon - 1, 1, 3, T.trunk);
   };
   for (let i = 0; i < W / 9; i++) {
     const x = Math.floor(i * 9 + rnd(i + 20) * 7), far = Math.abs(x - cx) < 30;
     if (far && rnd(i) > 0.3) continue;
-    pine(x, 12 + Math.floor(rnd(i + 70) * (far ? 5 : 11)), "#090a18");
+    pine(x, 12 + Math.floor(rnd(i + 70) * (far ? 5 : 11)), i * 13.7 + 5);
   }
   const glow = ["#141019", "#201619", "#35231a", "#573518", "#7a4c18"];
   for (let y = horizon; y < H; y++) for (let x = 0; x < W; x++) {
-    const dx = (x - cx) / 52, dy = (y - (H - 5)) / 9, d = Math.sqrt(dx * dx + dy * dy);
-    const v = Math.max(0, 1 - d) * (glow.length - 1), i = Math.floor(v);
-    put(x, y, glow[Math.min(glow.length - 1, i + (v - i > BAYER[y % 4][x % 4] ? 1 : 0))]);
+    const dx = (x - cx) / 52, dy = (y - (H - 5)) / 9, d = Math.sqrt(dx * dx + dy * dy), bayer = BAYER[y % 4][x % 4];
+    if (night) {
+      const v = Math.max(0, 1 - d) * (glow.length - 1), i = Math.floor(v);
+      put(x, y, glow[Math.min(glow.length - 1, i + (v - i > bayer ? 1 : 0))]);
+      continue;
+    }
+    const f = (y - horizon) / (H - horizon - 1);
+    let c = L.ground[f > bayer ? 1 : 0];
+    const g = 1 - d / L.glowReach;
+    if (g > 0) {
+      const v = g * L.glow.length, i = Math.floor(v), k = i + (v - i > bayer ? 1 : 0);
+      if (k > 0) c = L.glow[Math.min(L.glow.length - 1, k - 1)];
+    }
+    put(x, y, c);
   }
-  return img;
+  return winter ? withSnow(img, L.snow, !night) : img;
 }
 
-// Winter's ground: the backdrop with snow away from the fire's glow, by
-// how far each spot is from the fire (0 at the fire, 1 well clear), solid
-// a way out and dithered where it meets the glow, darker at the top, and
-// a dithered far-tone edge on the horizon.
+// Winter's ground: snow away from the fire's glow, by how far each spot is
+// from the fire (0 at the fire, 1 well clear), solid a way out and
+// dithered where it meets the glow, darker at the top. By night a dithered
+// far-tone edge runs along the horizon; by day that edge read as a rail
+// through the scene, so it's dropped and the ground row under it is
+// snowed too.
 const HORIZON_ROW = 12;
-function winterBackdrop(back) {
+function withSnow(back, snow, day) {
   const img = { width: back.width, height: back.height, pixels: Uint8Array.from(back.pixels) };
   const fire = FILE_W / 2;
   const clear = (x, row) => {
@@ -851,11 +955,11 @@ function winterBackdrop(back) {
   for (let x = 0; x < img.width; x++) {
     const bayer = (y) => BAYER[y % 4][x % 4];
     const top = FILE_H - 1 - HORIZON_ROW;
-    if (lit(x, top) && bayer(top) < clear(x, HORIZON_ROW)) set(img, x, top, SNOW.far);
-    for (let row = 0; row < HORIZON_ROW - 1; row++) {
+    if (!day && lit(x, top) && bayer(top) < clear(x, HORIZON_ROW)) set(img, x, top, snow.far);
+    for (let row = 0; row < HORIZON_ROW - (day ? 0 : 1); row++) {
       const y = FILE_H - 1 - row, k = clear(x, row);
       if (!lit(x, y) || k <= 0 || bayer(y) >= k) continue;
-      set(img, x, y, row >= HORIZON_ROW - 3 && bayer(y) < k - 0.5 ? SNOW.dusk : SNOW.ground);
+      set(img, x, y, row >= HORIZON_ROW - 3 && bayer(y) < k - 0.5 ? snow.dusk : snow.ground);
     }
   }
   return img;
@@ -1127,20 +1231,21 @@ function vignetteSheet() {
 }
 
 const { img, placed } = sheet();
-const back = backdrop();
 writeFileSync(join(root, "Media", "CampSprites.tga"), tga(img));
-writeFileSync(join(root, "Media", "CampBackdrop.tga"), tga(back));
-writeFileSync(join(root, "Media", "CampPocketBackdrop.tga"), tga(pocketBackdrop(back)));
-const winterBack = winterBackdrop(back);
-writeFileSync(join(root, "Media", "CampBackdropWinter.tga"), tga(winterBack));
-writeFileSync(join(root, "Media", "CampPocketBackdropWinter.tga"), tga(pocketBackdrop(winterBack)));
+for (const [name, look, winter] of [
+  ["", NIGHT, false], ["Winter", NIGHT, true], ["Day", DAY, false], ["DayWinter", DAY, true],
+]) {
+  const back = backdrop(look, winter);
+  writeFileSync(join(root, "Media", `CampBackdrop${name}.tga`), tga(back));
+  writeFileSync(join(root, "Media", `CampPocketBackdrop${name}.tga`), tga(pocketBackdrop(back)));
+}
 writeFileSync(join(root, "Media", "CampLight.tga"), tga(light()));
 writeFileSync(join(root, "Media", "Dither50.tga"), tga(dither((x, y) => (x + y) % 2 === 0)));
 writeFileSync(join(root, "Media", "Dither25.tga"), tga(dither((x, y) => x % 2 === 0 && y % 2 === 0)));
 const vignettes = vignetteSheet();
 writeFileSync(join(root, "Media", "EmptyStates.tga"), tga(vignettes.img));
 
-const [skyR, skyG, skyB] = hex(SKY_TOP).map((v) => +(v / 255).toFixed(3));
+const skyColor = (look) => hex(look.sky[0]).map((v) => +(v / 255).toFixed(3)).join(", ");
 const lines = placed.map((s) => `    ${s.name} = { ${s.x}, ${s.y}, ${s.w}, ${s.h} },`);
 const vignetteLines = vignettes.art.map((v) =>
   `      ${v.name} = { hold = ${v.hold}, ${v.cells.map((c) => `{ ${c.x}, ${c.y} }`).join(", ")} },`);
@@ -1156,6 +1261,10 @@ ${lines.join("\n")}
   backdrop = {
     file = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampBackdrop",
     seasons = { winter = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampBackdropWinter" },
+    day = {
+      file = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampBackdropDay",
+      seasons = { winter = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampBackdropDayWinter" },
+    },
     width = ${FILE_W},
     height = ${FILE_H},
     fire = ${FILE_W / 2},
@@ -1163,6 +1272,10 @@ ${lines.join("\n")}
   pocketBackdrop = {
     file = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampPocketBackdrop",
     seasons = { winter = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampPocketBackdropWinter" },
+    day = {
+      file = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampPocketBackdropDay",
+      seasons = { winter = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampPocketBackdropDayWinter" },
+    },
     width = ${POCKET_FILE_W},
     height = ${POCKET_FILE_H},
     fire = ${POCKET_FILE_W / 2},
@@ -1201,7 +1314,7 @@ ${Object.keys(PETS).map((key) => `    ${key} = { awake = "${petSprite(key)}", id
     tentLights = { ${TENT_LIGHTS.map(([x, y]) => `{ ${x}, ${tent().length - 1 - y} }`).join(", ")} },
     lights = ${LIGHTS.length},
   },
-  sky = { ${skyR}, ${skyG}, ${skyB} },
+  sky = { night = { ${skyColor(NIGHT)} }, day = { ${skyColor(DAY)} } },
 }
 `);
 console.log(`CampSprites ${img.width}x${img.height}, ${placed.length} sprites; CampBackdrop ${FILE_W}x${FILE_H}; EmptyStates ${vignettes.img.width}x${vignettes.img.height}`);
