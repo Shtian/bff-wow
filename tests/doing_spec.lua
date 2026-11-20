@@ -20,7 +20,6 @@ local function crew(names)
   local code = clients[1]:join()
   for i = 2, #clients do clients[i]:join(code) end
   net:run(40)
-  for _, client in ipairs(clients) do client.core:setSetting("pocketCamp", true) end
   return net, clients, ns
 end
 
@@ -239,7 +238,6 @@ describe("What a Member is doing", function()
     net:run(3)
     assert.equal("vendor", poseOf(a, b))
     b:reload()
-    b.core:setSetting("pocketCamp", true)
     net:run(20)
     assert.equal("seated", poseOf(a, b))
   end)

@@ -22,7 +22,7 @@ A small pixel campfire you can keep on screen while you play, with every friend 
 - **Watch the news happen:** a ding gets a gold star, a max level bursts into sparks, a death turns into a skeleton, and a crew goal makes the fire flare purple.
 - **Hover a friend** to see their character, level and zone. Click the Camp to open BFF, and drag it anywhere.
 
-It's off by default: BFF offers it once when you log in, or turn it on in Settings.
+It's on by default; turn it off in Settings if you'd rather not have it.
 
 ![A campfire on screen](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/02-pocket.png)
 

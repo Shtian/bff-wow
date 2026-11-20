@@ -15,12 +15,8 @@ local NAV_CHIP_X = 6
 local NAV_CHIP_Y = 2
 local NAV_CHIP_RADIUS = 2
 local VERSION_HEIGHT = 18
-local INSET = 12
-local SMALL_BUTTON = 20
 local NEW_DOT = Skin.UNREAD_DOT
 local REDRAW_EVERY = 30
-local TIP_BUTTON = 84
-local TIP_PAD = 10
 
 local TITLE = "Best Friends in Forever"
 local SETUP_WIDTH = 320
@@ -52,8 +48,6 @@ local frame
 local camp
 local campHeight = 0
 local firelight
-local tipCard
-local tipHeight = 0
 local setup
 local nav
 local pages = {}
@@ -140,7 +134,7 @@ end
 
 local function drawNav()
   if not nav then createNav() end
-  local sidebarHeight = frame:GetHeight() - HEADER - campHeight - tipHeight - 1
+  local sidebarHeight = frame:GetHeight() - HEADER - campHeight - 1
   local height = math.min(NAV_HEIGHT, math.floor((sidebarHeight - NAV_TOP - NAV_BOTTOM) / #nav.buttons))
   for _, entry in ipairs(TABS) do
     local button = nav[entry.key]
@@ -201,7 +195,7 @@ local function drawTab(entry, inCrew)
   local page = pageFor(entry)
   page.width = frame:GetWidth() - (inCrew and SIDEBAR + 1 or 2)
   page.listWidth = page.width - ns.ScrollView.GUTTER
-  page.height = frame:GetHeight() - HEADER - campHeight - tipHeight - 1
+  page.height = frame:GetHeight() - HEADER - campHeight - 1
   page.campShown = camp:IsShown()
   page.frame:Show()
   entry.module.draw(page)
@@ -336,48 +330,9 @@ local function drawCamp(inCrew)
   firelight:Place(camp, campHeight > 0 and frame:GetHeight() - HEADER - campHeight or nil)
 end
 
-local function createTip()
-  tipCard = CreateFrame("Frame", nil, frame)
-  Skin.fill(tipCard, Skin.SIDEBAR)
-  Skin.edge(tipCard, "BOTTOM", Skin.LINE)
-  Skin.edge(tipCard, "LEFT", GOLD)
-  tipCard.text = Skin.label(tipCard, "small", TEXT)
-  tipCard.text:SetPoint("LEFT", INSET, 0)
-  tipCard.text:SetWordWrap(true)
-  tipCard.dismiss = Skin.button(tipCard, "", function() core:dismissTip(tipCard.key) end)
-  tipCard.dismiss:SetSize(TIP_BUTTON, SMALL_BUTTON)
-  tipCard.dismiss:SetPoint("RIGHT", -INSET, 0)
-  tipCard.accept = Skin.button(tipCard, "", function() core:acceptTip(tipCard.key) end, true)
-  tipCard.accept:SetSize(TIP_BUTTON, SMALL_BUTTON)
-  tipCard.accept:SetPoint("RIGHT", tipCard.dismiss, "LEFT", -6, 0)
-end
-
-local function drawTip()
-  local tip = core:tip()
-  if not tip then
-    tipHeight = 0
-    if tipCard then tipCard:Hide() end
-    return
-  end
-  if not tipCard then createTip() end
-  tipCard.key = tip.key
-  tipCard.accept:SetText(tip.accept)
-  tipCard.dismiss:SetText(tip.dismiss)
-  -- WoW: a wrapping FontString has no height until its width is set.
-  tipCard.text:SetWidth(frame:GetWidth() - 2 - 3 * INSET - 2 * TIP_BUTTON - 6)
-  tipCard.text:SetText(tip.text)
-  tipHeight = math.ceil(math.max(tipCard.text:GetStringHeight(), SMALL_BUTTON)) + 2 * TIP_PAD
-  tipCard:ClearAllPoints()
-  tipCard:SetPoint("TOPLEFT", 1, -HEADER - campHeight)
-  tipCard:SetPoint("TOPRIGHT", -1, -HEADER - campHeight)
-  tipCard:SetHeight(tipHeight)
-  tipCard:Show()
-end
-
 local function layout(inCrew)
   drawCamp(inCrew)
-  drawTip()
-  local top = -HEADER - campHeight - tipHeight
+  local top = -HEADER - campHeight
   frame.sidebar:SetShown(inCrew)
   frame.sidebar:ClearAllPoints()
   frame.sidebar:SetPoint("TOPLEFT", 1, top)
@@ -471,7 +426,7 @@ end
 
 function Panel.settingChanged(key)
   if key == "panelPlace" and frame then applyPlace() end
-  if key == "paused" or key == "panelPlace" or key == "camp" or key == "seasons" or key == "dayNight" or key == "pocketCamp"
+  if key == "paused" or key == "panelPlace" or key == "camp" or key == "seasons" or key == "dayNight"
     or tab == "settings" then
     Panel.refresh()
   end

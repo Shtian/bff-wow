@@ -44,17 +44,7 @@ local function chatLine(entry)
 end
 
 local pendingAway
-local pendingTip
 local eventFrame = CreateFrame("Frame")
-
-local function showTip(tip)
-  if InCombatLockdown() then
-    pendingTip = tip
-    eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-  else
-    ns.TipDialog.show(tip)
-  end
-end
 
 local function showAway(summary)
   if InCombatLockdown() then
@@ -112,13 +102,11 @@ local function onCoreEvent(event, arg, more)
   if event == "changed" then
     ns.Panel.refresh()
     ns.PocketCamp.refresh()
-    ns.TipDialog.refresh()
     ns.Minimap.refresh()
     ns.MapPins.refresh()
   elseif event == "settingChanged" then
     ns.Panel.settingChanged(arg, more)
     ns.PocketCamp.settingChanged(arg, more)
-    ns.TipDialog.refresh()
     ns.Minimap.settingChanged(arg, more)
     ns.Toasts.settingChanged(arg, more)
     ns.MapPins.settingChanged(arg, more)
@@ -137,8 +125,6 @@ local function onCoreEvent(event, arg, more)
   elseif event == "feedEntry" or event == "reaction" or event == "spare" then
     if more.chat then chatLine(arg) end
     if more.toast then ns.Toasts.show(arg) end
-  elseif event == "tip" then
-    showTip(arg)
   elseif event == "pocketCampAnimation" then
     ns.PocketCamp.animate(arg)
   elseif event == "campReaction" then
@@ -214,7 +200,6 @@ local function start(isInitialLogin)
   ns.ChannelLink.setCrew(ns.core:crew())
   ns.Panel.start(ns.core)
   ns.PocketCamp.start(ns.core)
-  ns.TipDialog.start(ns.core)
   ns.Minimap.start(ns.core)
   ns.MapPins.start(ns.core)
   ns.Toasts.start(ns.core)
@@ -270,10 +255,9 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     end
   elseif event == "PLAYER_REGEN_ENABLED" then
     eventFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
-    local summary, tip = pendingAway, pendingTip
-    pendingAway, pendingTip = nil, nil
+    local summary = pendingAway
+    pendingAway = nil
     if summary then ns.Away.show(summary) end
-    if tip and ns.core:tip() then ns.TipDialog.show(tip) end
   end
 end)
 
