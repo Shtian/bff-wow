@@ -63,6 +63,19 @@ local function entry(client, text)
 end
 
 local layout = load().Core.CAMP_LAYOUT
+local seasons = load().Core.SEASONS
+
+local function assertApart(list, columns, at)
+  local left, right = -math.floor(columns / 2), columns - math.floor(columns / 2)
+  for i, span in ipairs(list) do
+    assert.is_true(span[1] >= left and span[2] <= right, "out of the band " .. at)
+    assert.is_true(span[2] <= -layout.fire or span[1] >= layout.fire, "on the fire " .. at)
+    for j = i + 1, #list do
+      local other = list[j]
+      assert.is_true(span[2] <= other[1] or other[2] <= span[1], "overlap " .. at)
+    end
+  end
+end
 
 local function spans(view)
   local list = {}
@@ -179,39 +192,38 @@ describe("The Camp", function()
     clients[6]:logout()
     net:run(5)
     local a = clients[1]
-    local sawTent, sawNoTent, sawPets, sawTree, sawNoTree = false, false, false, false, false
+    local sawTent, sawNoTent, sawPets = false, false, false
+    local sawDecor, sawNoDecor = {}, {}
     for columns = 128, 375 do
       a.core:forceSeason("off")
       local plain = a.core:camp(columns)
-      a.core:forceSeason("winter")
-      local view = a.core:camp(columns)
-      assert.same(spans(plain), spans(view), ("the tree moved someone at %d"):format(columns))
-      assert.same({ plain.tent, plain.more }, { view.tent, view.more }, ("the tree took the tent's room at %d"):format(columns))
-      local list = spans(view)
-      for _, actor in ipairs(view.actors) do sawPets = sawPets or actor.pet ~= nil end
-      if view.tent then
-        list[#list + 1] = { view.tent.x, view.tent.x + layout.tent }
+      for _, season in ipairs(seasons) do
+        a.core:forceSeason(season.key)
+        local view = a.core:camp(columns)
+        local at = ("%s at %d"):format(season.key, columns)
+        assert.same(spans(plain), spans(view), "decor moved someone: " .. at)
+        assert.same({ plain.tent, plain.more }, { view.tent, view.more }, "decor took the tent's room: " .. at)
+        local list = spans(view)
+        if view.tent then list[#list + 1] = { view.tent.x, view.tent.x + layout.tent } end
+        for i, piece in ipairs(view.decor or {}) do
+          assert.equal(season.decor[i], piece.key, at)
+          assert.is_truthy(view.tent, "decor without the tent: " .. at)
+          list[#list + 1] = { piece.x, piece.x + layout[piece.key] }
+        end
+        if view.decor then sawDecor[season.key] = true else sawNoDecor[season.key] = true end
+        assertApart(list, columns, at)
+      end
+      local list = spans(plain)
+      for _, actor in ipairs(plain.actors) do sawPets = sawPets or actor.pet ~= nil end
+      if plain.tent then
+        list[#list + 1] = { plain.tent.x, plain.tent.x + layout.tent }
         sawTent = true
       else
         sawNoTent = true
       end
-      for _, piece in ipairs(view.decor or {}) do
-        assert.equal("tree", piece.key)
-        assert.is_truthy(view.tent, ("a tree without the tent at %d"):format(columns))
-        list[#list + 1] = { piece.x, piece.x + layout.tree }
-      end
-      if view.decor then sawTree = true else sawNoTree = true end
-      local left, right = -math.floor(columns / 2), columns - math.floor(columns / 2)
-      for i, span in ipairs(list) do
-        assert.is_true(span[1] >= left and span[2] <= right, ("out of the band at %d"):format(columns))
-        assert.is_true(span[2] <= -layout.fire or span[1] >= layout.fire, ("on the fire at %d"):format(columns))
-        for j = i + 1, #list do
-          local other = list[j]
-          assert.is_true(span[2] <= other[1] or other[2] <= span[1], ("overlap at %d"):format(columns))
-        end
-      end
+      assertApart(list, columns, ("at %d"):format(columns))
       local labels = {}
-      for _, actor in ipairs(view.actors) do
+      for _, actor in ipairs(plain.actors) do
         local centre = actor.x + actor.width / 2
         labels[#labels + 1] = { centre - actor.labelWidth / 2, centre + actor.labelWidth / 2 }
       end
@@ -224,8 +236,11 @@ describe("The Camp", function()
     assert.is_true(sawTent)
     assert.is_true(sawNoTent)
     assert.is_true(sawPets)
-    assert.is_true(sawTree)
-    assert.is_true(sawNoTree)
+    for _, season in ipairs(seasons) do
+      local placed = #season.decor > 0
+      assert.equal(placed, sawDecor[season.key] == true, season.key)
+      assert.is_true(sawNoDecor[season.key], season.key)
+    end
   end)
 
   describe("graves", function()
@@ -681,7 +696,7 @@ end)
 describe("Seasons", function()
   local DEC_1_2026 = 1796083200
   local JAN_3_2027 = 1798934400
-  local JUL_1_2026 = 1782864000
+  local SEP_1_2026 = 1788220800
   local HOUR = 60 * 60
 
   it("are yearly windows of real dates that never overlap", function()
@@ -716,11 +731,29 @@ describe("Seasons", function()
     assert.equal("winter", season(DEC_1_2026 + 31 * DAY, 0))
     assert.equal("winter", season(JAN_3_2027 - 1, 0))
     assert.is_nil(season(JAN_3_2027, 0))
-    assert.is_nil(season(JUL_1_2026, 0))
+    assert.is_nil(season(SEP_1_2026, 0))
     assert.equal("winter", season(DEC_1_2026 - HOUR, HOUR))
     assert.is_nil(season(DEC_1_2026 + HOUR - 1, -HOUR))
     assert.is_nil(season(JAN_3_2027 - HOUR, HOUR))
     assert.equal("winter", season(JAN_3_2027 + HOUR - 1, -HOUR))
+  end)
+
+  it("puts autumn, the lunar new year and Midsummer on their fixed days, both days included", function()
+    local season = load().Camp.season
+    local windows = {
+      { "autumn", 1792281600, 1793577600 },
+      { "lunar", 1800576000, 1802476800 },
+      { "midsummer", 1781913600, 1783296000 },
+    }
+    for _, window in ipairs(windows) do
+      local key, first, after = window[1], window[2], window[3]
+      assert.is_nil(season(first - 1, 0), key)
+      assert.equal(key, season(first, 0))
+      assert.equal(key, season(after - 1, 0))
+      assert.is_nil(season(after, 0), key)
+      assert.equal(key, season(first - HOUR, HOUR))
+      assert.is_nil(season(after - HOUR, HOUR), key)
+    end
   end)
 
   it("come on camp(), the Pocket Camp and While you were away, from Core's utcOffset", function()
@@ -764,7 +797,7 @@ describe("Seasons", function()
   end)
 
   it("can be forced for a dev check, off or back to the date, and refuse an unknown key", function()
-    local _, clients = crew({ "Ann" }, nil, { clock = JUL_1_2026 })
+    local _, clients = crew({ "Ann" }, nil, { clock = SEP_1_2026 })
     local a = clients[1]
     assert.is_nil(a.core:camp(COLUMNS).season)
     local before = a:count("changed")
@@ -777,6 +810,33 @@ describe("Seasons", function()
     assert.is_nil(a.core:camp(COLUMNS).season)
     assert.is_true(a.core:forceSeason("auto"))
     assert.is_nil(a.core:camp(COLUMNS).season)
+  end)
+
+  it("place the pumpkin and the Midsummer pole like the tree, and give the lunar new year no decor", function()
+    local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal", "Ivy" }
+    local net, clients = crew(names, nil, { clock = SEP_1_2026 })
+    local a = clients[1]
+    a.core:setSetting("pocketCamp", true)
+    local expected = { winter = "tree", autumn = "pumpkin", midsummer = "pole" }
+    for _, season in ipairs(seasons) do
+      assert.same(expected[season.key] and { expected[season.key] } or {}, season.decor, season.key)
+      a.core:forceSeason(season.key)
+      assert.is_nil(a.core:pocketCamp().decor, season.key)
+    end
+    for i = 3, #names do clients[i]:logout() end
+    net:run(5)
+    skip(net, 10 * 60)
+    local half = layout.pocketColumns / 2
+    for _, season in ipairs(seasons) do
+      a.core:forceSeason(season.key)
+      local roomy = a.core:pocketCamp()
+      assert.equal(layout.pocketColumns, roomy.columns, season.key)
+      local piece = roomy.decor and roomy.decor[1]
+      assert.equal(expected[season.key], piece and piece.key, season.key)
+      if piece then
+        assert.is_true(piece.x >= -half and piece.x + layout[piece.key] <= half, season.key)
+      end
+    end
   end)
 
   describe("winter's tree", function()

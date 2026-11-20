@@ -20,14 +20,14 @@ camp(columns) -> nil, or {
   graves = { { memberId, x, flower = true | nil, key } },
   tent = { x } | nil, -- only when there's room
   more = 2, moreText = "+2 more", -- Members that didn't fit; nil when all did
-  season = "winter" | nil, -- see Seasons
-  decor = { { key = "tree", x } } | nil, -- the season's pieces that fit
+  season = "winter" | "autumn" | "lunar" | "midsummer" | nil, -- see Seasons
+  decor = { { key = "tree" | "pumpkin" | "pole", x } } | nil, -- the season's pieces that fit
 }
 ```
 
 A grave's `key` is the death's Reaction key as a string (`Reactions.id` of the entry's key, docs/design/reactions.md), so the band can find the Grave that Respects bloom. Every Grave of a collapsed "died 3 times" entry shares it, as they share the flower. It's nil for an entry saved before it had a death total.
 
-Positions are art pixels from the fire's centre, negative to the left; `x` is a sprite's left edge. The geometry is `Core.CAMP_LAYOUT`: the fire keeps 9 columns clear each side, a seated figure is 12 wide and a sleeper 18, a grave 8 with a 2-column gap, neighbours 4 apart, 2 columns clear inside each edge, the tent 36, a season's tree 11 with a 4-column gap. The panel's band runs 128 to 375 columns; the popup's is 120.
+Positions are art pixels from the fire's centre, negative to the left; `x` is a sprite's left edge. The geometry is `Core.CAMP_LAYOUT`: the fire keeps 9 columns clear each side, a seated figure is 12 wide and a sleeper 18, a grave 8 with a 2-column gap, neighbours 4 apart, 2 columns clear inside each edge, the tent 36, a season's tree 11, pumpkin 13 and Midsummer pole 15, each with a 4-column gap. The panel's band runs 128 to 375 columns; the popup's is 120.
 
 ## Rules
 
@@ -105,12 +105,12 @@ A Member chooses a small pet that sits beside their figure in the panel's Camp, 
 
 ## Seasons
 
-At certain times of year the Camp is decorated: in the panel's Camp, While you were away and the Pocket Camp ([#243](https://github.com/Shtian/bff-wow/issues/243)). Each season is inspired by the time of year and never names or copies a game event. The first is winter. Autumn, the lunar new year and Midsummer follow in their own ticket.
+At certain times of year the Camp is decorated: in the panel's Camp, While you were away and the Pocket Camp ([#243](https://github.com/Shtian/bff-wow/issues/243)). Each season is inspired by the time of year and never names or copies a game event. Four so far: winter, autumn, the lunar new year and Midsummer ([#244](https://github.com/Shtian/bff-wow/issues/244)).
 
-- **Dates.** `Core.SEASONS` (`Camp.SEASONS`): a fixed yearly window in your local date (Core's `utcOffset`, as `Text` uses), not the game's calendar or holiday APIs, so it works on Forever whatever they are. Winter is `{ key = "winter", from = { 12, 1 }, to = { 1, 2 }, decor = { "tree" } }`, both days included; a window can wrap the new year. At most one season at a time: windows never overlap, which a test checks. `Camp.season(now, utcOffset)` is pure. `Core:season()` works it out on each read, so a session running past midnight on the first or last day picks it up at the next redraw (the Pocket Camp's 30 s one, the panel's own).
+- **Dates.** `Core.SEASONS` (`Camp.SEASONS`): a fixed yearly window in your local date (Core's `utcOffset`, as `Text` uses), not the game's calendar or holiday APIs, so it works on Forever whatever they are. Winter is `{ key = "winter", from = { 12, 1 }, to = { 1, 2 }, decor = { "tree" } }`, both days included; a window can wrap the new year. The others: `lunar` 22 Jan to 12 Feb (a fixed approximation of the lunar new year's usual spread), `midsummer` 20 Jun to 5 Jul and `autumn` 18 Oct to 1 Nov. At most one season at a time: windows never overlap, which a test checks. `Camp.season(now, utcOffset)` is pure. `Core:season()` works it out on each read, so a session running past midnight on the first or last day picks it up at the next redraw (the Pocket Camp's 30 s one, the panel's own).
 - **Reads.** `camp()`, `pocketCamp()` and the away summary's `camp` carry `season` and `decor`. Both are nil while the setting or the Camp is off, or outside every window.
 - **Setting.** "Seasonal decorations" (`seasons`), next to "Show the Camp" and greyed out while it's off, on by default, saved as `seasonsOff`.
-- **Layout.** A season's pieces (`decor`) are placed by `Camp.view` after everyone and after the tent, each on the side with more room, only where it fits (`Core.CAMP_LAYOUT.tree`, 11, and `treeGap`, 4). So a piece takes no Member's seat or Grave and never the tent's room, and in the panel's Camp it shows only with the tent: it's dropped first. While you were away and the Pocket Camp have no tent and show it when there's room. The Pocket Camp never widens for it.
+- **Layout.** A season's pieces (`decor`) are placed by `Camp.view` after everyone and after the tent, each on the side with more room, only where it fits (`Core.CAMP_LAYOUT.tree`, 11, `pumpkin`, 13, and `pole`, 15, each `decorGap`, 4, from its neighbour). So a piece takes no Member's seat or Grave and never the tent's room, and in the panel's Camp it shows only with the tent: it's dropped first. While you were away and the Pocket Camp have no tent and show it when there's room. The Pocket Camp never widens for it.
 - **Dev.** `/bffdev season <key|off|auto>` (`core:forceSeason`) forces a season, or none, until `auto` or a reload, to check the art outside its window. The setting still wins.
 
 ### Winter
@@ -125,6 +125,34 @@ At certain times of year the Camp is decorated: in the panel's Camp, While you w
   - **The ground:** a snowy field, a departure from the spec's cap along the ground line. A line in the snow's white across the horizon read as a rail running through the figures, even dithered; a dusting under the figures and snow on the hills' crests were tried too. The field reads most as winter and keeps the fire's glow warm.
   - **The tree:** the pine with baubles, over a bare tree with lights: it reads as a decorated tree at 1x.
   - **The lights:** a steady twinkle, over lights chasing along the roof, which pulled the eye from the figures. On the roof's slopes rather than along the valance's hem, where they read as part of the canvas.
+
+### Autumn
+
+- **The pumpkin.** `pumpkin1` and `pumpkin2`: a carved pumpkin (13 by 12 outlined), on the ground at row 3, its face glowing from inside. The two frames swap the face's bright and dim pixels on every tick, so it flickers on the fire's tick. Lit on the right and mirrored on the fire's right, like the tree.
+- **Bats.** Every 20 to 40 s, one or two bats (`bat1` and `bat2`, two wing frames, flapping on every tick) cross the whole band in 4 s, 6 rows below its top, bobbing a row. The second follows 4 ticks later, 3 rows lower. They're drawn behind everything but the backdrop (BACKGROUND 2), so labels and head marks are over them (`BATS` in `UI/CampScene.lua`).
+- **The fire.** `fireAutumn1` to `fireAutumn3`: the fire's frames with its yellows pulled to amber. The goal flare still replaces them while it plays.
+
+### The lunar new year
+
+- **Paper lanterns.** A string (`lanternString`, one pixel stretched in runs) sags 3 rows across the band from its top row, with 4 to 6 lanterns (one per 60 columns), red and gold in turn (`lanternRed`, `lanternGold`, 5 by 8), spaced evenly on each side of the fire, half each (the left one more when odd), between 4 columns in from the band's edge and 14 columns from the fire, where the firework bursts. Each sways a column either way in an 8-step cycle of 4 ticks a step, out of step with its neighbours. The whole string shows only where every lantern clears every name and hat: the lowest lantern's bottom has to be above the tallest hat's top plus the label gap and 4 rows of name. So the panel's band (40 rows) has lanterns; the short band (26) and the Pocket Camp (34) have none (`LANTERNS`, `lanternsFit`).
+- **The firework.** Every 30 to 60 s a rocket (a `glint` with an `emberWarm` tail) rises from row 18 for 1 s to 11 rows below the band's top (row 20 at least), then bursts: the max-level burst's seven sparks flying out over 1.8 s, sparks then embers, in red (`sparkRed`, `emberCool`) and gold (`spark`, `ember`) in turn. Its reach is the burst's 9, or less where the band is shorter: a small pop in the short band (`FIREWORK`).
+
+### Midsummer
+
+- **The bonfire.** `bonfire1` to `bonfire3`: new frames, 13 by 17, wider and taller than the fire's, in its palette, on the same logs. The goal flare still replaces them while it plays.
+- **The Midsummer pole.** `midsummerPole`: a leafy mast with a crossbar, two arms from the top to the crossbar's ends and a wreath hung from each end, a few flowers (15 by 24), on the ground at row 4, lit on the right and mirrored on the fire's right. It isn't outlined, as an outline fills the triangle in, and it stands still.
+- **Fireflies.** 8 (`firefly`, `fireflyDim`): each drifts slowly round its own spot, 7 columns and 3 rows either way, and is lit for 14 ticks of every 20 to 35, dim on the first and last. One is hidden while it's within 7 columns of the fire and no more than 20 rows above the flame's bottom row, so it never lands on the bonfire, or over a figure, up to the top of its name (`FIREFLIES`).
+
+**Chosen** from a prototype (`prototypes/camp-seasons.html` on [#261](https://github.com/Shtian/bff-wow/pull/261)'s branch), judged in the panel's band, the short band and the Pocket Camp at 1x and 2x (decision on [#244](https://github.com/Shtian/bff-wow/issues/244)):
+
+- **Pumpkin:** carved, over a lantern-style one (tall, ribbed, glowing slits). Placed like the tree, after everyone and the tent, not one seat from the fire, so it never costs a seat.
+- **Bats:** every 20 to 40 s, over every 8 to 15 s, so they don't distract in the Pocket Camp.
+- **Fire:** tinted a touch more orange, over leaving today's.
+- **Lanterns:** a few big ones, over many small ones. Dropped where they don't clear the names, rather than hiding only the lanterns that would cover one.
+- **Firework:** a rocket rising, then the burst, over the burst alone, which read as someone reaching max level. A small pop in the short band is fine.
+- **Bonfire:** new, wider frames, over today's frames drawn taller as the goal flare does, which read as a stretched fire.
+- **Pole:** a Midsummer pole of the classic shape (from a reference photo), over a pole with streamers and a pole with a wreath and ribbons.
+- **Fireflies:** 8, over 4: with names and the fire kept clear, about 3 are lit at a time in a full band.
 
 ## Reactions, live
 
