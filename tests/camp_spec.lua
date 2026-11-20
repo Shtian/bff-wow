@@ -213,18 +213,17 @@ describe("The Camp", function()
         if view.decor then sawDecor[season.key] = true else sawNoDecor[season.key] = true end
         assertApart(list, columns, at)
       end
-      local view = plain
-      local list = spans(view)
-      for _, actor in ipairs(view.actors) do sawPets = sawPets or actor.pet ~= nil end
-      if view.tent then
-        list[#list + 1] = { view.tent.x, view.tent.x + layout.tent }
+      local list = spans(plain)
+      for _, actor in ipairs(plain.actors) do sawPets = sawPets or actor.pet ~= nil end
+      if plain.tent then
+        list[#list + 1] = { plain.tent.x, plain.tent.x + layout.tent }
         sawTent = true
       else
         sawNoTent = true
       end
       assertApart(list, columns, ("at %d"):format(columns))
       local labels = {}
-      for _, actor in ipairs(view.actors) do
+      for _, actor in ipairs(plain.actors) do
         local centre = actor.x + actor.width / 2
         labels[#labels + 1] = { centre - actor.labelWidth / 2, centre + actor.labelWidth / 2 }
       end

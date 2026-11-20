@@ -45,7 +45,7 @@ local DECOR = {
 }
 local BATS = { every = { 20, 40 }, crossing = 4, below = 6, margin = 8, late = 4, drop = 3, bob = 1.2, waves = 4 }
 local FIREWORK = { every = { 30, 60 }, rocket = 1, from = 18, lowest = 20, headroom = 11, edge = 3, spark = 2 }
-local LANTERNS = { sag = 3, perColumns = 70, fewest = 4, most = 6, fireClear = 14, edge = 4,
+local LANTERNS = { sag = 3, perColumns = 60, fewest = 4, most = 6, fireClear = 14, edge = 4,
   sprites = { "lanternRed", "lanternGold" }, sway = { 0, 0, 1, 1, 0, 0, -1, -1 }, swayStep = 4, swayLag = 3 }
 local FIREFLIES = { count = 8, seed = 23, low = 4, high = 8, drift = 7, rise = 3, fireReach = 7, fireRows = 20,
   every = 20, spread = 5, lit = 14 }
@@ -308,6 +308,10 @@ local function hideRest(list)
   for i = list.used + 1, #list do hideParts(list[i]) end
 end
 
+local function rowsOf(scene)
+  return scene.view and scene.view.rows or scene.rows
+end
+
 local function put(scene, t, x, row)
   t:ClearAllPoints()
   t:SetPoint("BOTTOMLEFT", scene.art, "BOTTOMLEFT", (scene.fire + x) * scene.unit, row * scene.unit)
@@ -343,7 +347,7 @@ local function celebrating(scene, actor, f, late)
 end
 
 local function markRow(scene, name, row)
-  local rows = scene.view.rows or scene.rows
+  local rows = rowsOf(scene)
   if not rows then return row end
   return math.min(row, rows - Sheet.sprites[name][4])
 end
@@ -542,7 +546,7 @@ local function drawCheer(scene, parts, actor, top, played)
   local color = step and CHEER_BURST.colors[step]
   local furthest = math.floor(1 + (#CHEER_BURST.colors - 1) * CHEER_BURST.reach + 0.5)
   local centre = top + CHEER_BURST.row
-  local rows = scene.view and scene.view.rows or scene.rows
+  local rows = rowsOf(scene)
   if rows then centre = math.min(centre, rows - 1 - furthest) end
   for i, way in ipairs(CHEER_BURST.ways) do
     local glint = parts.cheer[i]
@@ -690,7 +694,9 @@ local function drawActor(scene, parts, actor, f)
     label:SetTextColor(Skin.classColor(actor.classFilename))
   end
   label:SetShown(text ~= nil)
-  scene.clearOf[#scene.clearOf + 1] = { left = x - 1, right = x + actor.width, top = labelRow + NAME_ROWS }
+  local halfName = (actor.labelWidth or actor.width) / 2
+  scene.clearOf[#scene.clearOf + 1] = { left = math.min(x - 1, centre - halfName), right = math.max(x + actor.width, centre + halfName),
+    top = labelRow + NAME_ROWS }
 
   if actor.spark then
     setSprite(parts.spark, "spark", scene.unit)
@@ -754,7 +760,7 @@ local function flakeCount(columns)
 end
 
 local function drawFlakes(scene, f, falling)
-  local columns, rows = scene.view.columns, scene.view.rows or scene.rows
+  local columns, rows = scene.view.columns, rowsOf(scene)
   local count = falling and flakeCount(columns) or 0
   local step = math.floor(f / FLAKES.every)
   for i, flake in ipairs(scene.flakes) do
@@ -796,20 +802,23 @@ local function drawTentSeason(scene, f, art)
   end
 end
 
-local function sometime(range)
+local function randomIn(range)
   return range[1] + math.random() * (range[2] - range[1])
 end
 
-local function rowsOf(scene)
-  return scene.view.rows or scene.rows
+local function comesRound(scene, key, every, lasts, on)
+  if not on then return false end
+  local now = GetTime()
+  scene.nextAt[key] = scene.nextAt[key] or now + randomIn(every)
+  if now < scene.nextAt[key] then return false end
+  scene.nextAt[key] = now + lasts + randomIn(every)
+  return true
 end
 
 local function drawBats(scene, f, flying)
   local now = GetTime()
-  if flying and not scene.batsAt then scene.batsAt = now + sometime(BATS.every) end
-  if flying and now >= scene.batsAt then
+  if comesRound(scene, "bats", BATS.every, BATS.crossing, flying) then
     scene.batPass = { start = now, two = math.random() < 0.5, rightward = math.random() < 0.5 }
-    scene.batsAt = now + BATS.crossing + sometime(BATS.every)
   end
   local pass = flying and scene.batPass
   local columns, rows = scene.view.columns, rowsOf(scene)
@@ -831,10 +840,8 @@ end
 
 local function drawFirework(scene, launching)
   local now = GetTime()
-  if launching and not scene.fireworkAt then scene.fireworkAt = now + sometime(FIREWORK.every) end
-  if launching and now >= scene.fireworkAt then
+  if comesRound(scene, "firework", FIREWORK.every, FIREWORK.rocket + BURST_EVERY, launching) then
     scene.fireworkStart = now
-    scene.fireworkAt = now + FIREWORK.rocket + BURST_EVERY + sometime(FIREWORK.every)
   end
   local played = launching and scene.fireworkStart and now - scene.fireworkStart
   local rows = rowsOf(scene)
@@ -883,18 +890,18 @@ local function lanternsFit(scene)
   return lowest > namesReach()
 end
 
+local function spread(list, from, to, count)
+  local step = (to - from) / count
+  for i = 1, count do list[#list + 1] = math.floor(from + (i - 0.5) * step + 0.5) end
+end
+
 local function lanternColumns(scene)
   local columns = scene.view.columns
   local count = math.max(LANTERNS.fewest, math.min(LANTERNS.most, math.floor(columns / LANTERNS.perColumns + 0.5)))
-  local step = columns / (count + 1)
   local list = {}
-  for i = 1, count + 1 do
-    local column = math.floor(i * step + 0.5)
-    local clear = math.abs(column - scene.fire) >= LANTERNS.fireClear
-    if #list < count and clear and column >= LANTERNS.edge and column < columns - LANTERNS.edge then
-      list[#list + 1] = column
-    end
-  end
+  local left = math.ceil(count / 2)
+  spread(list, LANTERNS.edge, scene.fire - LANTERNS.fireClear, left)
+  spread(list, scene.fire + LANTERNS.fireClear, columns - LANTERNS.edge, count - left)
   return list
 end
 
@@ -1151,6 +1158,7 @@ function CampScene.new(parent, options)
       return { art = texture(band.art, "BORDER", 3) }
     end),
     clearOf = {},
+    nextAt = {},
     graveParts = pool(function()
       return {
         grave = texture(band.art, "ARTWORK", 0),
