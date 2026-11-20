@@ -84,7 +84,7 @@ describe("What's new", function()
       assert.are.equal("What's new in BFF", view.title)
       assert.are.equal("You're on 2.3.0, from 15 Nov", view.line)
       assert.are.same({ "2.3.0", "2.2.0", "2.1.0", "2.0.0", "1.6.2" }, newFlags(view))
-      assert.is_nil(view.friends)
+      assert.is_nil(view.updateNotice)
     end)
   end)
 

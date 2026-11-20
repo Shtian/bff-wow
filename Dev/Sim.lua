@@ -506,9 +506,9 @@ local AWAY = {
 
 function Sim.away(core)
   if not net then return nil, "notRunning" end
-  local log = core.feedState
-  log.settle:restart()
-  if core.linkUp then log:linkUp() end
+  local feed = core.feedState
+  feed.settle:restart()
+  if core.linkUp then feed:linkUp() end
   local current = members
   for i, client in ipairs(members) do
     local wasOffline = not client.core
