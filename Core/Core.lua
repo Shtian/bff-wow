@@ -1078,7 +1078,7 @@ local function percent(field, default, low, high)
   }
 end
 
-Core.PANEL_MIN_WIDTH, Core.PANEL_MIN_HEIGHT = 460, 380
+Core.PANEL_MIN_WIDTH, Core.PANEL_MIN_HEIGHT = 460, 460
 Core.PANEL_WIDTH, Core.PANEL_HEIGHT = 640, 520
 Core.PANEL_MAX_WIDTH, Core.PANEL_MAX_HEIGHT = 900, 800
 

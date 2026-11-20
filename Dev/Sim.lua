@@ -1152,7 +1152,7 @@ SlashCmdList.BFFDEV = function(input)
     if not ns.core:forceSeason(rest) then
       local keys = {}
       for _, season in ipairs(ns.Core.SEASONS) do keys[#keys + 1] = season.key end
-      return print(("BFF dev: /bffdev season <%s|off|auto>"):format(table.concat(keys, "|")))
+      return print(("BFF dev: /bffdev season %s/off/auto"):format(table.concat(keys, "/")))
     end
     print(("BFF dev: season %s (now %s)."):format(rest, tostring(ns.core:season() or "none")))
     return

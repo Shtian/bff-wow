@@ -70,7 +70,7 @@ The **Catches** tab, after Dungeons in the sidebar, or `/bff catches`, is a fiel
 - **Recent first catches:** a strip at the bottom with up to 3 first catches from the last 3 days, newest first, unlisted ones too: "Tor caught Feralas Ahi", the item in its quality colour and the rest not gold, with the zone and when on the right. In a short panel (under 300px of content) it holds 2, and in a narrow one the zone is left out.
 - **States:** a Crew with no catches at all sees "No catches yet" and "When anyone in the Crew catches a fish, it shows up here. Start in the waters for your level: Level 20–35." (the highest band whose lowest level the Character you play has reached) above the grid. A Show that leaves nothing says so ("The Crew has caught every type." for Not caught yet) and "Change "Show" to see more."
 - Item quality colours are allowed here by DESIGN.md's Catch Colours Rule (`Skin.ITEM_QUALITIES`).
-- The sidebar now has 8 tabs. In a short window (the panel's minimum height with the Camp's short band) its rows get shorter than 30px so Settings stays clear of them.
+- The sidebar now has 8 tabs. In a short window its rows get shorter than 30px so Settings stays clear of them.
 
 ## News
 

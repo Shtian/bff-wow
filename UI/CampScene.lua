@@ -10,7 +10,6 @@ local LAYOUT = ns.Core.CAMP_LAYOUT
 CampScene.BAND_TARGET = 3
 CampScene.FIGURE_TARGET = 2
 CampScene.HEIGHT = 120
-CampScene.SHORT_HEIGHT = 78
 local FPS = 6
 local HOP_FOR = 0.7
 local CHEER_BURST = { x = 5.5, row = 2, reach = 0.9, fade = 0.6,
