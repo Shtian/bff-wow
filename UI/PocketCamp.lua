@@ -262,7 +262,7 @@ local function create()
     elseif overCrate() then
       ns.Panel.show("spares")
     elseif overCup() then
-      ns.Panel.show("goals")
+      ns.Panel.show("trophies")
     else
       ns.Panel.toggle()
     end

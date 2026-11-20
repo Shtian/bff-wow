@@ -506,9 +506,9 @@ local AWAY = {
 
 function Sim.away(core)
   if not net then return nil, "notRunning" end
-  local log = core.log
-  log.settle:restart()
-  if core.linkUp then log:linkUp() end
+  local feed = core.feedState
+  feed.settle:restart()
+  if core.linkUp then feed:linkUp() end
   local current = members
   for i, client in ipairs(members) do
     local wasOffline = not client.core
@@ -1172,7 +1172,7 @@ SlashCmdList.BFFDEV = function(input)
     local days = tonumber(count) or 7
     ns.Panel.hide()
     BFF_DB.goals.seen = GetServerTime() - days * 24 * 60 * 60
-    ns.Panel.show("goals")
+    ns.Panel.show("trophies")
     print(("BFF dev: Trophies tab opened as if last looked at %d days ago."):format(days))
     return
   end

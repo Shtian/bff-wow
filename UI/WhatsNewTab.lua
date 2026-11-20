@@ -44,7 +44,7 @@ local function createPlate()
   Skin.border(plate, GOLD)
   plate.title = Skin.label(plate, "heading", TEXT)
   plate.title:SetPoint("TOPLEFT", PLATE_PAD_X, -PLATE_PAD_Y)
-  plate.title:SetText("Make sure your friends update too")
+  plate.title:SetText("Make sure the whole Crew updates too")
   plate.text = Skin.label(plate, "small", MUTED)
   plate.text:SetPoint("TOPLEFT", plate.title, "BOTTOMLEFT", 0, -4)
   plate.who = Skin.label(plate, "small", MUTED)
@@ -97,7 +97,7 @@ local function classHex(classFilename)
   return Skin.hex(TEXT)
 end
 
-local function drawPlate(friends, y, width)
+local function drawPlate(notice, y, width)
   if not plate then createPlate() end
   plate:ClearAllPoints()
   plate:SetPoint("TOPLEFT", view.content, "TOPLEFT", INSET, y)
@@ -105,12 +105,12 @@ local function drawPlate(friends, y, width)
   local inner = width - 2 * PLATE_PAD_X
   plate.title:SetWidth(inner)
   plate.text:SetWidth(inner)
-  plate.text:SetText(friends.text)
-  local who = friends.who
-  if #friends.behind > 0 then
+  plate.text:SetText(notice.text)
+  local who = notice.who
+  if #notice.behind > 0 then
     local names = {}
-    for i, friend in ipairs(friends.behind) do
-      names[i] = ("%s%s|r (%s)"):format(classHex(friend.classFilename), friend.name, friend.version)
+    for i, member in ipairs(notice.behind) do
+      names[i] = ("%s%s|r (%s)"):format(classHex(member.classFilename), member.name, member.version)
     end
     who = "Still on an older BFF: " .. table.concat(names, ", ")
   end
@@ -172,7 +172,7 @@ function WhatsNewTab.draw(scrollView, core, width, onChange)
   end
 
   if plate then plate:Hide() end
-  if data and data.friends then y = drawPlate(data.friends, y, inner) end
+  if data and data.updateNotice then y = drawPlate(data.updateNotice, y, inner) end
 
   local sectionCount, entryCount = 0, 0
   for _, release in ipairs(data and data.releases or {}) do

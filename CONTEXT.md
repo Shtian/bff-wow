@@ -112,7 +112,7 @@ A Character is within 3 levels of the Character you play, so you can play togeth
 _Avoid_: In range, near, fits
 
 **Fits (a dungeon)**:
-A Character fits a dungeon when its level is inside the dungeon's recommended range. Separate from Can play: a friend can fit a dungeon you fit and still be too far from you to play together.
+A Character fits a dungeon when its level is inside the dungeon's recommended range. Separate from Can play: a Member's Character can fit a dungeon you fit and still be too far from you to play together.
 _Avoid_: Can do, eligible
 
 **Last seen**:

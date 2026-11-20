@@ -27,7 +27,7 @@ How sure each answer is:
 
 ## 1. Where a list can come from
 
-**Verdict: no source can be queried for "every rare on Forever". The list has to be curated by hand and shipped as data, keyed by NPC ID, like `finals` in `Core/Together.lua` and the Catches list.**
+**Verdict: no source can be queried for "every rare on Forever". The list has to be curated by hand and shipped as data, keyed by NPC ID, like `finals` in `Core/Dungeons.lua` and the Catches list.**
 
 - Wowhead Forever is the best source per NPC: its tooltip endpoint confirms the name, level, classification and zone of a known ID. It can't be searched by classification from a script (*third party*).
 - The fan lists above are useful leads, especially for Forever's new rares, but they're third party and partly contradict each other: ForeverChanges' header says "42 rares in 18 zones" but lists a different number.

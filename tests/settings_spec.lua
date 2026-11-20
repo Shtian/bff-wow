@@ -106,11 +106,11 @@ local SETTINGS = {
   { key = "toastPosition", default = nil, other = { x = 400, y = 600 } },
   { key = "panelPlace", default = nil, other = { width = 600, height = 500, left = 100, top = 900 } },
   { key = "paused", default = false, other = true },
-  { key = "togetherOffline", default = true, other = false },
-  { key = "togetherAlts", default = false, other = true },
-  { key = "togetherNear", default = false, other = true },
-  { key = "togetherAttunements", default = true, other = false },
-  { key = "togetherRaids", default = false, other = true },
+  { key = "dungeonsOffline", default = true, other = false },
+  { key = "dungeonsAlts", default = false, other = true },
+  { key = "dungeonsNear", default = false, other = true },
+  { key = "dungeonsAttunements", default = true, other = false },
+  { key = "dungeonsRaids", default = false, other = true },
 }
 
 describe("Settings list", function()
@@ -134,7 +134,7 @@ describe("Settings list", function()
     assert.same({ "Show the Pocket Camp", "Backdrop opacity", "Lock its position and size", "In combat" },
       { sections[4].settings[1].label, sections[4].settings[2].label, sections[4].settings[3].label,
         sections[4].settings[4].label })
-    assert.same({ key = "pocketCampAlts", kind = "toggle", label = "ALT over a friend playing an alt", value = true,
+    assert.same({ key = "pocketCampAlts", kind = "toggle", label = "ALT over a Member playing an alt", value = true,
       needs = "pocketCamp" }, sections[5].settings[1])
     assert.same({ key = "pocketCampSpares", kind = "toggle", label = "A crate by the fire for unseen Spare notices",
       value = true, needs = "pocketCamp" }, sections[5].settings[2])
@@ -263,6 +263,18 @@ describe("Settings list", function()
     assert.same({ x = 12, y = 34 }, core:setting("toastPosition"))
     assert.is_true(core:setting("paused"))
     assert.equal(200, core:minimapIcon().minimapPos)
+  end)
+
+  it("reads the Dungeons tab's choices from where an older BFF saved them", function()
+    local db = { together = { offlineOff = true, alts = true, near = true, attunementsOff = true, raids = true } }
+    local core = newCore(db)
+    assert.is_false(core:setting("dungeonsOffline"))
+    assert.is_true(core:setting("dungeonsAlts"))
+    assert.is_true(core:setting("dungeonsNear"))
+    assert.is_false(core:setting("dungeonsAttunements"))
+    assert.is_true(core:setting("dungeonsRaids"))
+    core:setSetting("dungeonsRaids", false)
+    assert.is_nil(db.together.raids)
   end)
 
   it("has named methods that agree with the generic ones", function()

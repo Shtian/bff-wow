@@ -19,7 +19,7 @@ local ENTRIES = {
   { name = "trophies", group = "tab", aliases = { "goals" }, forms = { form("", "open the Trophies tab") } },
   { name = "playtimes", group = "tab", aliases = { "play", "when" }, forms = { form("", "open the Play Times tab") } },
   { name = "spares", group = "tab", forms = {
-    form("", "open the Spare Items tab"),
+    form("", "open the Spares tab"),
     form("add <item>", "put up an item from your bags as a Spare: shift-click it in after add",
       "put up a Spare from your bags"),
   } },

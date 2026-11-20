@@ -186,8 +186,8 @@ ns.CampSheet = {
     rows = 22,
     art = {
       feed = { hold = 1, { 1, 1 }, { 43, 1 }, { 85, 1 }, { 127, 1 }, { 169, 1 }, { 211, 1 } },
-      goals = { hold = 1, { 1, 25 } },
-      when = { hold = 2, { 43, 25 }, { 85, 25 }, { 127, 25 } },
+      trophies = { hold = 1, { 1, 25 } },
+      playTimes = { hold = 2, { 43, 25 }, { 85, 25 }, { 127, 25 } },
       spares = { hold = 1, { 169, 25 } },
       professions = { hold = 1, { 211, 25 } },
       catches = { hold = 2, { 1, 49 }, { 43, 49 }, { 85, 49 } },

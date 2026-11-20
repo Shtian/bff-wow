@@ -80,16 +80,18 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `toastSound` | the sound's name, or nil for the default |
   | `toastPosition` | `{ x, y }`, or nil for the default |
   | `panelPlace` | `{ width, height, left, top }` in whole UI units (top left corner from the screen's bottom left), size within 460×380 to 900×800; nil for the default 640×520, centred |
-  | `togetherOffline` | `offlineOff = true` inside `together`, or nil while on |
-  | `togetherAlts` | `alts = true` inside `together`, or nil while off |
-  | `togetherNear` | `near = true` inside `together`, or nil while off |
-  | `togetherAttunements` | `attunementsOff = true` inside `together`, or nil while on |
-  | `togetherRaids` | `raids = true` inside `together`, or nil while off |
+  | `dungeonsOffline` | `offlineOff = true` inside `together`, or nil while on |
+  | `dungeonsAlts` | `alts = true` inside `together`, or nil while off |
+  | `dungeonsNear` | `near = true` inside `together`, or nil while off |
+  | `dungeonsAttunements` | `attunementsOff = true` inside `together`, or nil while on |
+  | `dungeonsRaids` | `raids = true` inside `together`, or nil while off |
   | `catchesNames` | `names = true` inside `catches`, or nil while off |
+
+  The Dungeons tab's choices keep the `together` table, the tab's old name, so an install from before the rename keeps them; renaming it would drop them.
 
 - **Core's interface:** `setting(key)`, `setSetting(key, value)` and `settings()` (the page's sections). A setting set by a button (`panelPlace`, `toastPosition`) also carries `button`, the button's text (Reset, Move), beside its label. The named methods (`isPaused()`, `setToasts(on)` and the rest) stay as hand-written one-line wrappers, so they're greppable.
 - **Events:** a real change fires `settingChanged(key, value)`, not `changed`; setting a value it already has fires nothing. Core's own reactions run first (Pause sharing pauses Gossip).
-- **The page:** the panel's Settings view, in a scroll view of the panel's. A section label per section (You first, drawn by hand, then one per section of `settings()`), and under it a row per setting split by Hairlines: the label on the left, wrapping in a narrow window, and the control at the right. Every on/off setting is a **switch** (DESIGN.md, Inputs), and its whole row is clickable; the rows are built in a loop from `settings()`, so a new on/off setting needs only a list entry. Settings with no section, the Dungeons tab's Show menu choices (`docs/design/together.md`) and the Catches tab's names checkbox (`docs/design/catches.md`), aren't on the page; those menus show them; nor are `pocketCampPosition`, `pocketCampScale` and `pocketCampColumns`, which dragging the Pocket Camp and its corner grip set. Map pin size is a segmented control (the chosen one on a chip), the sound a picker opening a menu with Play beside it, Move toasts and Reset BFF window small buttons, and the backdrop opacity a flat slider with its value; all read and write through `setting()` and `setSetting()`. A control greys out while what it needs is off. Leave Crew sits under Appear offline. Any `settingChanged` redraws the view while it's open.
+- **The page:** the panel's Settings view, in a scroll view of the panel's. A section label per section (You first, drawn by hand, then one per section of `settings()`), and under it a row per setting split by Hairlines: the label on the left, wrapping in a narrow window, and the control at the right. Every on/off setting is a **switch** (DESIGN.md, Inputs), and its whole row is clickable; the rows are built in a loop from `settings()`, so a new on/off setting needs only a list entry. Settings with no section, the Dungeons tab's Show menu choices (`docs/design/dungeons.md`) and the Catches tab's names checkbox (`docs/design/catches.md`), aren't on the page; those menus show them; nor are `pocketCampPosition`, `pocketCampScale` and `pocketCampColumns`, which dragging the Pocket Camp and its corner grip set. Map pin size is a segmented control (the chosen one on a chip), the sound a picker opening a menu with Play beside it, Move toasts and Reset BFF window small buttons, and the backdrop opacity a flat slider with its value; all read and write through `setting()` and `setSetting()`. A control greys out while what it needs is off. Leave Crew sits under Appear offline. Any `settingChanged` redraws the view while it's open.
 
 Display name and Look aren't in the list: they're part of your Member record and spread to the Crew.
 

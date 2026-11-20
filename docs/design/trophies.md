@@ -13,7 +13,7 @@ A Crew trophy is either a Crew goal rung reached or an instance the Crew has cle
 - the payload is readable: `encounterId` a number, `success` a boolean, `party` a table (else `"unreadable"`, and nothing happens: no error);
 - the boss died (`"wipe"` otherwise);
 - you're in a party or raid instance (`"notInstance"`);
-- the encounter is a known final boss (`"unknown"`): `finals` in the dungeon table (`Core/Together.lua`), collected as `Core.FINAL_BOSSES`. Attunements have none;
+- the encounter is a known final boss (`"unknown"`): `finals` in the dungeon table (`Core/Dungeons.lua`), collected as `Core.FINAL_BOSSES`. Attunements have none;
 - you're in a Crew (`"noCrew"`).
 
 The clear goes into the own record's `clears[instance]`: `t`, the first clear's time, and `m`, the Member ids of every clearing party: you, and each held Member (not Left) owning a party member's Character, matched by GUID, else by name. Strangers aren't named. A repeat clear changes the record only if someone new was in the party. The record goes out with the next DATA ("now" urgency), which waits while the link is down (encounters are in messaging lockdown).

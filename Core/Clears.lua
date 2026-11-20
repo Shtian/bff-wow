@@ -5,7 +5,7 @@ ns.Clears = Clears
 
 local INSTANCES = {}
 local FINAL_BOSSES = {}
-for _, dungeon in ipairs(ns.Together.DUNGEONS) do
+for _, dungeon in ipairs(ns.Dungeons.DUNGEONS) do
   if dungeon.kind == "dungeon" or dungeon.kind == "raid" then
     INSTANCES[dungeon.name] = dungeon
     for _, id in ipairs(dungeon.finals or {}) do FINAL_BOSSES[id] = dungeon.name end
@@ -19,7 +19,7 @@ end
 
 function Clears.instances(kind)
   local list = {}
-  for _, dungeon in ipairs(ns.Together.DUNGEONS) do
+  for _, dungeon in ipairs(ns.Dungeons.DUNGEONS) do
     if dungeon.kind == kind then list[#list + 1] = dungeon end
   end
   return list

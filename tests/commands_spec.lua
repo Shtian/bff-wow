@@ -86,7 +86,7 @@ describe("Commands", function()
       assert.truthy(plain(lines[1]):find("^/bff " .. name), name)
     end
     assert.same({
-      "/bff spares  open the Spare Items tab",
+      "/bff spares  open the Spares tab",
       "/bff spares add <item>  put up an item from your bags as a Spare: shift-click it in after add",
     }, plainLines(Commands.helpFor("spares", false)))
     assert.equal("/bff trophies  open the Trophies tab", plain(Commands.helpFor("GOALS", false)[1]))

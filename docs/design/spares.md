@@ -26,7 +26,7 @@ They live in the owner's record, in an optional `spares` list. Each one has shor
 
 ### Posting one
 
-The Spare Items tab has a **drop slot** above your own list (#74, after the research in #65 and #67, `docs/research/bag-items.md`). Dropping a bag item on it offers that item, and so does clicking it while holding one: on retail a click with an item held arrives as either `OnReceiveDrag` or `OnClick`, so both do the same. BFF reads the item's location from `C_Cursor.GetCursorItem()` and always calls `ClearCursor()`, so the item goes back to its bag slot whether it was taken or refused. It works with any bag addon that puts items on the cursor, and in combat, instances and encounters. While messaging is locked down the post waits and goes out when the lockdown lifts, like any other record change.
+The Spares tab has a **drop slot** above your own list (#74, after the research in #65 and #67, `docs/research/bag-items.md`). Dropping a bag item on it offers that item, and so does clicking it while holding one: on retail a click with an item held arrives as either `OnReceiveDrag` or `OnClick`, so both do the same. BFF reads the item's location from `C_Cursor.GetCursorItem()` and always calls `ClearCursor()`, so the item goes back to its bag slot whether it was taken or refused. It works with any bag addon that puts items on the cursor, and in combat, instances and encounters. While messaging is locked down the post waits and goes out when the lockdown lifts, like any other record change.
 
 `/bff spares add`, then shift-click the item into the chat box, still works. It offers the first item in the bags with the same trimmed item string, and refuses the item if there isn't one.
 
@@ -86,8 +86,8 @@ Spare notices go through the same settings and seen-marking as Reactions: a chat
 - Claims that don't win, expiry and withdrawal are silent. So is a winner moving up because the owner Removed the one ahead, or a Claim expiring.
 - The first sight of a Member (joining, reinstalling) is a silent baseline, the same rule as Feed entries.
 - In While you were away they show in a **Spares** section, with the Gives that were made meanwhile.
-- With chat lines and toasts both off, they stay unseen. Opening the Spare Items tab marks them seen, and its sidebar button shows how many are unseen.
-- Clicking a notice's toast opens the Spare Items tab.
+- With chat lines and toasts both off, they stay unseen. Opening the Spares tab marks them seen, and its sidebar button shows how many are unseen.
+- Clicking a notice's toast opens the Spares tab.
 
 The owner's client remembers the winner it last told of per Spare, so a reload doesn't tell it again.
 
@@ -102,7 +102,7 @@ A Give makes a **gave** Feed entry for the owner: "Ana gave Bob [Cruel Barb]", "
 
 ## The panel
 
-### Spare Items tab
+### Spares tab
 
 A sidebar tab under Play Times, opened by `/bff spares`, within the panel's fixed height and scrolling:
 
@@ -116,7 +116,7 @@ The Crew heading shows "2 Spares for you": other Members' open Spares one of you
 ## Changes to Core's interface
 
 - **Commands:** `postSpare(link, level, inBags?)`, where `inBags` is `{ guid, isBound, bindType }` from the bags: an untradeable item is refused, and the item GUID is kept locally, never in the record, `withdrawSpare(id)`, `giveSpare(id)`, `claimSpare(ownerId, id, guid?)`, `withdrawClaim(ownerId, id)`, `sparesSeen()` and `bagsUpdated()` (on `BAG_UPDATE_DELAYED`). Each write bumps the own record's version and goes out now. Like Reactions, they're local writes that work in combat and offline.
-- **Reads:** `spares()` for the tab, worded by Core: each row's `info` line, which buttons show (`primary`: Claim or Give with `enabled`, `secondary`: Withdraw), and `highlight` and `dimmed` flags, plus `claimFor`, your Characters for the Claim menu, Main first, as "Jaina (30)"; `summary().spares` for the Roster's count, and `spareItems()`, the item GUIDs of the open Spares the Character being played posted (`{ [id] = itemGuid }`).
+- **Reads:** `spares()` for the tab, worded by Core: each row's `info` line, which buttons show (`primary`: Claim or Give with `enabled`, `secondary`: Withdraw), and `highlight` and `dimmed` flags, plus `claimFor`, your Characters for the Claim menu, Main first, as "Jaina (30)"; `rosterCounts().spares` for the Roster's count, and `spareItems()`, the item GUIDs of the open Spares the Character being played posted (`{ [id] = itemGuid }`).
 - **Listener events:** `spare(news)`, like `reaction`. `spareGone({ action, id, item, link, winner })` at login: `action` is `"withdrawn"` or `"ask"`. `awaySummary(summary)` gains `spares`, the notices then the Gives, newest first.
 - **Ports:** `itemLink(itemString)`, optional: the game's link for an item string, or nil while it isn't cached. `findItem(itemGuid)`, optional: whether the item is in the bags or bank (nil if the game can't say) and whether it's equipped.
 - **Member record:** gains `spares` and `claims`. Like `reactions`, they're not part of the record's checked shape, so a client that doesn't know them keeps and relays them unchanged, and a malformed item is skipped rather than getting the record dropped.

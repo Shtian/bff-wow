@@ -34,7 +34,7 @@ Core/SpareRules.lua
 Core/Spares.lua
 Core/Feed.lua
 Core/Roster.lua
-Core/Together.lua
+Core/Dungeons.lua
 Core/Camp.lua
 Core/Clears.lua
 Core/Rares.lua
@@ -61,9 +61,9 @@ UI/Firelight.lua
 UI/Panel.lua
 UI/PocketCamp.lua
 UI/TipDialog.lua
-UI/TogetherTab.lua
+UI/DungeonsTab.lua
 UI/CatchesTab.lua
-UI/GoalsTab.lua
+UI/TrophiesTab.lua
 UI/WhatsNewTab.lua
 UI/SettingsTab.lua
 UI/Minimap.lua
