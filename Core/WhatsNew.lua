@@ -178,7 +178,7 @@ local function newestAmong(rows, versionOf)
   return newest, members
 end
 
-function WhatsNew:takeNewerLine(rows, versionOf)
+function WhatsNew:takeNewerBffLine(rows, versionOf)
   if not self.version then return nil end
   local newest, members = newestAmong(rows, versionOf)
   if not newest or not Changelog.newer(newest, self.version) then return nil end
@@ -186,8 +186,7 @@ function WhatsNew:takeNewerLine(rows, versionOf)
   if told and not Changelog.newer(newest, told) then return nil end
   self.db.newerBffTold = newest
   local others = #members - 1
-  local who = others == 0 and members[1] .. " has it"
-    or ("%s and %d %s have it"):format(members[1], others, others == 1 and "other" or "others")
+  local who = others == 0 and members[1] .. " has it" or ("%s and %s have it"):format(members[1], plural(others, "other"))
   return {
     version = newest,
     members = members,

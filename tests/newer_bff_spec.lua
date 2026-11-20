@@ -7,7 +7,7 @@ local function playing(name)
   }
 end
 
-describe("A friend on a newer BFF", function()
+describe("A Member on a newer BFF", function()
   local net
 
   local function client(name, version, db)
@@ -148,19 +148,16 @@ describe("A friend on a newer BFF", function()
   end)
 
   it("ignores Members who left or were removed", function()
-    local ann = client("Ann", "v2.2.0"):login()
-    local bob = client("Bob", "v2.2.0"):login()
-    local cat = client("Cat", "v2.2.0"):login()
+    local ann = client("Ann", "dev"):login()
+    local bob = client("Bob", "v2.3.0"):login()
+    local cat = client("Cat", "v2.3.0"):login()
     crew(ann, bob, cat)
     bob.core:leaveCrew()
     net:run(10)
     ann.core:removeMember(cat.memberId)
-    bob:logout()
-    cat:logout()
-    bob.version, cat.version = "v2.3.0", "v2.3.0"
-    bob:login()
-    cat:login()
-    net:run(60)
+    ann.version = "v2.2.0"
+    ann:reload()
+    net:run(120)
     assert.are.same({}, told(ann))
   end)
 

@@ -181,7 +181,7 @@ function Core.new(deps)
   self.online = ns.Roster.online(self.ledger, deps.now())
   self.known = knownMembers(self.ledger)
   self.whatsNewState = ns.WhatsNew.new(deps.db, deps.version, deps.changelog, fresh)
-  self.bffOf = function(id)
+  self.bffVersionOf = function(id)
     local record = self.ledger:record(id)
     return record and record.bff
   end
@@ -554,7 +554,7 @@ end
 
 local function tellNewerBff(self)
   if not (self.db.crew and self.feedState:isSettled()) then return end
-  local line = self.whatsNewState:takeNewerLine(ns.Roster.rows(self.ledger, self.now()), self.bffOf)
+  local line = self.whatsNewState:takeNewerBffLine(ns.Roster.rows(self.ledger, self.now()), self.bffVersionOf)
   if line then self.listener("newerBff", line) end
 end
 
@@ -824,7 +824,7 @@ function Core:leaveWhatsNew()
 end
 
 function Core:whatsNew()
-  return self.whatsNewState:view(ns.Roster.rows(self.ledger, self.now()), self.bffOf)
+  return self.whatsNewState:view(ns.Roster.rows(self.ledger, self.now()), self.bffVersionOf)
 end
 
 local function savedIn(db, parent)
