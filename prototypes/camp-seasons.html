@@ -8,7 +8,8 @@
                Firework A a burst (the max-level burst's sparks in red and gold), B a rocket rising, then the burst.
                Shown next to the max-level burst it reuses.
     Midsummer  Bonfire A today's frames drawn taller (as the goal flare is) in warmer colours, B new, wider frames.
-               Pole A streamers flowing out from the top, B a flower wreath with ribbons hanging straight down.
+               Pole A streamers flowing out from the top, B a flower wreath with ribbons hanging straight down,
+               C a Midsummer pole: leafy mast, crossbar, two arms making a triangle, a wreath hanging from each end.
                Fireflies A 4, B 8.
   Toggles: scale (1x is the game's art unit: 3 UI units in the band, 2 in the Pocket Camp), the goal flare over
   the fire, the world behind the Pocket Camp, and the picks used by the sections that aren't comparing that
@@ -95,8 +96,8 @@
 <p class="sub">Turn on the goal flare in the bar: the flare replaces the flame frames, as it does today.</p>
 <div class="row" id="bonfire-close"></div>
 <div id="bonfire-bands"></div>
-<h3>7 · The ribbon pole</h3>
-<p class="sub">Decor, placed like the tree. The ribbons flutter in 2 frames on every third tick.</p>
+<h3>7 · The pole</h3>
+<p class="sub">Decor, placed like the tree, 15 wide. A and B: the ribbons flutter in 2 frames on every third tick. C stands still.</p>
 <div class="row" id="pole-close"></div>
 <div id="pole-bands"></div>
 <h3>8 · Fireflies</h3>
@@ -365,8 +366,10 @@ const BONFIRE = [
   ["....R........", "....RR....R..", "...RORR...RR.", "...ROORR.ROR.", ".R.ROOOR.ROR.", ".RRROGOORROR.", "RROOOGGOOOOR.", "ROOGGGGGGOOR.",
     "RROGGYGGGGORR", "ROOGYYYYGGOOR", "ROGGYYYYYGGOR", "ROGYYYYWYYGOR", "ROGYYYWWWYGOR", ".ROGYYYWYGOR.", ".ROGYYYYYGOR.", "..ROGGGGGOR..", "...ROOOOOR..."],
 ];
-// Ribbon poles: 11 wide, built as grids so they can be copied across. a/A the pole, G its knob, 1-5 ribbons.
-const RIBBON_PAL = { 1: "#ff5a44", 2: "#ffd14a", 3: "#7fc4ee", 4: "#f2b8d0", 5: "#70e370", g: "#2c5a33", h: "#468a46", w: "#fff3c4" };
+// Poles. C, the Midsummer pole after the one at #244: a leafy mast, a crossbar, two arms from the top to its
+// ends and a wreath hanging from each end, 15 wide, not outlined (the outline fills the triangle). Lit on the
+// right. A and B are ribbon poles 11 wide, built as grids so they can be copied across. a/A the pole, G its knob, 1-5 ribbons.
+const RIBBON_PAL = { 1: "#ff5a44", 2: "#ffd14a", 3: "#7fc4ee", 4: "#f2b8d0", 5: "#70e370", g: "#2c5a33", h: "#468a46", i: "#6db35e", w: "#fff3c4" };
 function pole(height, draw) {
   const grid = Array.from({ length: height }, () => Array(11).fill("."));
   const set = (x, y, c) => { if (x >= 0 && x < 11 && y >= 0 && y < height) grid[y][x] = c; };
@@ -376,6 +379,38 @@ function pole(height, draw) {
   return grid.map((r) => r.join(""));
 }
 const POLES = {
+  maypole: {
+    label: "C · Midsummer pole",
+    outline: false,
+    frames: [
+      [
+        ".......Y.......",
+        "......hih......",
+        ".....h.h.i.....",
+        "....h..h..i....",
+        "...h...h...i...",
+        "..h....h....i..",
+        ".h.....h.....i.",
+        "ghhihhiPhihhihi",
+        ".hg....h....gi.",
+        "h..W...i...P..i",
+        "g..h...h...h..i",
+        ".hg....h....gi.",
+        ".......h.......",
+        "......gh.......",
+        ".......h.......",
+        ".......hi......",
+        ".......h.......",
+        ".......h.......",
+        "......gh.......",
+        ".......h.......",
+        ".......hi......",
+        ".......h.......",
+        ".......h.......",
+        "......ghi......",
+      ],
+    ],
+  },
   streamers: {
     label: "A · Streamers",
     frames: [0, 1].map((k) => pole(22, (set) => {
@@ -403,7 +438,7 @@ const FIREFLY = { on: "#d8f070", dim: "#6a8a30" };
 
 const DECOR = {
   pumpkin: { width: 11, gap: 4, row: 3 },
-  pole: { width: 11, gap: 4, row: 4 },
+  pole: { width: 15, gap: 4, row: 4 },
 };
 const LAYOUT = { fire: 9, seated: 12, asleep: 18, grave: 8, graveGap: 2, gap: 4, margin: 2, tent: 36, pet: 13, petGap: 1,
   pocketColumns: 112, pocketMaxColumns: 304, pocketStep: 32, pocketRows: 34, awayColumns: 120 };
@@ -448,7 +483,10 @@ const hatArt = (key) => sprite("hat" + key, () => art(outlined(HATS[key].rows), 
 const petArt = (key, asleep) => sprite("pet" + key + asleep, () => art(outlined(PETS[key][asleep ? "asleep" : "sit"]), { ...PAL, ...PET_PAL }));
 const pumpkinArt = (key, k) => sprite("pumpkin" + key + k, () => art(outlined(PUMPKINS[key].rows),
   { ...PAL, ...PUMPKIN_PAL, 1: GLOW[k], 2: GLOW[1 - k] }));
-const poleArt = (key, k) => sprite("pole" + key + k, () => art(outlined(POLES[key].frames[k]), { ...PAL, ...RIBBON_PAL }));
+const poleArt = (key, k) => sprite("pole" + key + k, () => {
+  const frames = POLES[key].frames, rows = frames[k % frames.length];
+  return art(POLES[key].outline === false ? rows : outlined(rows), { ...PAL, ...RIBBON_PAL });
+});
 const lanternArt = (key, i) => sprite("lantern" + key + i, () => art(LANTERNS[key].rows, LANTERN_PALS[i]));
 const sparkArt = (red) => sprite("spark" + red, () => art(SPARK, red ? SPARK_RED : SPARK_GOLD));
 
@@ -528,7 +566,7 @@ function pocketView(cast, room, decor) {
 let tick = 0;
 const query = new URLSearchParams(location.search);
 const pick = { season: "autumn", pumpkin: "carved", bats: "spec", fire: "orange", lanterns: "big", firework: "rocket",
-  bonfire: "tall", pole: "streamers", fireflies: "4", scale: 1, flare: "off", world: "bright" };
+  bonfire: "tall", pole: "maypole", fireflies: "4", scale: 1, flare: "off", world: "bright" };
 for (const k of Object.keys(pick)) if (query.has(k)) pick[k] = typeof pick[k] === "number" ? +query.get(k) : query.get(k);
 const BATS = { spec: [120, 240], often: [48, 90] };
 const FIREWORK_EVERY = [180, 360];
