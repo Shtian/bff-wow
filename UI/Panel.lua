@@ -1627,7 +1627,7 @@ local function drawCamp(inCrew)
   local view
   if inCrew then
     local width = frame:GetWidth() - 2
-    local columns, height = camp:Measure(width, ns.CampScene.ROWS)
+    local columns, height = camp:Measure(width, ns.CampScene.BAND_ROWS)
     view = core:camp(columns)
     campHeight = view and height or 0
   else

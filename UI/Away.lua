@@ -344,7 +344,7 @@ function Away.show(summary)
   local top = -Skin.HEADER_HEIGHT
   frame:SetWidth(summary.camp and CAMP_WIDTH or WIDTH)
   if summary.camp then
-    local _, height = frame.camp:Measure(CAMP_WIDTH - 2, ns.CampScene.ROWS)
+    local _, height = frame.camp:Measure(CAMP_WIDTH - 2, ns.CampScene.BAND_ROWS)
     frame.camp:SetHeight(height)
     top = top - height
   end

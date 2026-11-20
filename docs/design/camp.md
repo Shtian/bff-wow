@@ -62,7 +62,7 @@ Alt lines keep plain Last seen. Feed day titles stay TODAY and YESTERDAY, Feed r
 
 ## UI
 
-- **Band.** `UI/CampScene.lua`, across the full panel width under the header, above the sidebar and content, on every tab. 40 art rows high, about 120 UI units: an art pixel is 3 UI units rounded to whole screen pixels, so the band's height in UI units varies a little with the UI scale, but every screen gets the same scene. (It used to be 120 UI units rounded down to whole art pixels, which left 38 rows at some scales and no lanterns.) There used to be a short band (78 high) in panels under 460 high; it went when the panel's minimum height rose to 460, as it left no room for the lanterns. Every tab's height is what's left below it.
+- **Band.** `UI/CampScene.lua`, across the full panel width under the header, above the sidebar and content, on every tab. 40 art rows high (`BAND_ROWS`), about 120 UI units: an art pixel is 3 UI units rounded to whole screen pixels, so the band's height in UI units varies a little with the UI scale, but every screen gets the same scene, lanterns included. One size at every panel height, so the panel's minimum height is 460. Every tab's height is what's left below it.
 - **Art unit.** One art pixel is a whole number of screen pixels nearest 3 UI units in the band (2 on rows and toasts), from `PixelUtil.GetPixelToUIUnitFactor()` and the frame's effective scale. Worked out on every draw, so `UI_SCALE_CHANGED`, `DISPLAY_SIZE_CHANGED` (App redraws the panel) and a panel resize all pick it up. Every size and offset is art pixels times the unit. Names stay in UI units, and the Camp is never `SetScale`d.
 - **Textures.** Every Camp texture is set once with `"CLAMP", "CLAMP", "NEAREST"`. The art's origin frame has `SetRoundLayoutToNearestPixel(true)` where the client has it, since ElvUI turns default texture snapping off. The band clips its children.
 - **Backdrop.** `Media/CampBackdrop.tga`, 512×64, the 384×52 backdrop art at the bottom with the fire on column 256. A fixed-size texture anchored on a whole art pixel; no texture-coordinate crop. The band's sky colour fills above it.
@@ -194,7 +194,7 @@ campReaction({ kind = "cheer" | "respects" | "welcome", memberId, grave })
 
 - **Cheer: the hop with a gold burst**, over the hop alone, so a friend's Cheer reads as a celebration and not only a twitch. The prototype's burst had a fifth step; it's four here so it ends with the hop.
 - **Respects: grows row by row, then petals drift**, over popping in with a petal puff or fading in with drifting petals. It reads as growing even at 4 rows, and it's the gentlest for a death.
-- **Welcome: the wave with "hi!"**, over a heart or a star instead of the bubble. It's the arrival's own greeting, so a Welcome looks like what it says. The bubble covers the name while it shows, as an arrival's already does, and the short band needs the clamp above.
+- **Welcome: the wave with "hi!"**, over a heart or a star instead of the bubble. It's the arrival's own greeting, so a Welcome looks like what it says. The bubble covers the name while it shows, as an arrival's already does, and the Pocket Camp needs the clamp above.
 
 **Traffic.** None. Reactions already travel in records; this only reads what this client attaches.
 
