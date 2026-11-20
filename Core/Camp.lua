@@ -40,7 +40,7 @@ local DECOR = {
 }
 
 Camp.SEASONS = {
-  { key = "winter", from = { 12, 15 }, to = { 1, 2 }, decor = { "tree" } },
+  { key = "winter", from = { 12, 1 }, to = { 1, 2 }, decor = { "tree" } },
 }
 local SEASON = {}
 for _, season in ipairs(Camp.SEASONS) do SEASON[season.key] = season end

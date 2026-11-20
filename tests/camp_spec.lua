@@ -679,7 +679,7 @@ describe("Pets", function()
 end)
 
 describe("Seasons", function()
-  local DEC_15_2026 = 1797292800
+  local DEC_1_2026 = 1796083200
   local JAN_3_2027 = 1798934400
   local JUL_1_2026 = 1782864000
   local HOUR = 60 * 60
@@ -708,23 +708,23 @@ describe("Seasons", function()
     end
   end)
 
-  it("puts winter from 15 Dec to 2 Jan in your local date, across the new year", function()
+  it("puts winter from 1 Dec to 2 Jan in your local date, across the new year", function()
     local season = load().Camp.season
-    assert.is_nil(season(DEC_15_2026 - 1, 0))
-    assert.equal("winter", season(DEC_15_2026, 0))
-    assert.equal("winter", season(DEC_15_2026 + 17 * DAY - 1, 0))
-    assert.equal("winter", season(DEC_15_2026 + 17 * DAY, 0))
+    assert.is_nil(season(DEC_1_2026 - 1, 0))
+    assert.equal("winter", season(DEC_1_2026, 0))
+    assert.equal("winter", season(DEC_1_2026 + 31 * DAY - 1, 0))
+    assert.equal("winter", season(DEC_1_2026 + 31 * DAY, 0))
     assert.equal("winter", season(JAN_3_2027 - 1, 0))
     assert.is_nil(season(JAN_3_2027, 0))
     assert.is_nil(season(JUL_1_2026, 0))
-    assert.equal("winter", season(DEC_15_2026 - HOUR, HOUR))
-    assert.is_nil(season(DEC_15_2026 + HOUR - 1, -HOUR))
+    assert.equal("winter", season(DEC_1_2026 - HOUR, HOUR))
+    assert.is_nil(season(DEC_1_2026 + HOUR - 1, -HOUR))
     assert.is_nil(season(JAN_3_2027 - HOUR, HOUR))
     assert.equal("winter", season(JAN_3_2027 + HOUR - 1, -HOUR))
   end)
 
   it("come on camp(), the Pocket Camp and While you were away, from Core's utcOffset", function()
-    local net, clients = crew({ "Ann", "Bob" }, { Ann = { utcOffset = HOUR } }, { clock = DEC_15_2026 - HOUR - 60 })
+    local net, clients = crew({ "Ann", "Bob" }, { Ann = { utcOffset = HOUR } }, { clock = DEC_1_2026 - HOUR - 60 })
     local a, b = clients[1], clients[2]
     a.core:setSetting("pocketCamp", true)
     assert.is_nil(a.core:camp(COLUMNS).season)
@@ -748,7 +748,7 @@ describe("Seasons", function()
   end)
 
   it("are nil with Seasonal decorations off, or the Camp off", function()
-    local _, clients = crew({ "Ann", "Bob" }, nil, { clock = DEC_15_2026 + DAY })
+    local _, clients = crew({ "Ann", "Bob" }, nil, { clock = DEC_1_2026 + DAY })
     local a = clients[1]
     a.core:setSetting("pocketCamp", true)
     assert.is_true(a.core:setting("seasons"))
@@ -781,7 +781,7 @@ describe("Seasons", function()
 
   describe("winter's tree", function()
     it("stands after everyone and the tent, on the side with more room left", function()
-      local _, clients = crew({ "Ann", "Bob", "Cid" }, nil, { clock = DEC_15_2026 })
+      local _, clients = crew({ "Ann", "Bob", "Cid" }, nil, { clock = DEC_1_2026 })
       local view = clients[1].core:camp(375)
       assert.equal(1, #view.decor)
       local tree, tent = view.decor[1], view.tent
@@ -795,7 +795,7 @@ describe("Seasons", function()
 
     it("is in the Pocket Camp only when it has spare width, and never widens it", function()
       local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal", "Ivy" }
-      local net, clients = crew(names, nil, { clock = DEC_15_2026 })
+      local net, clients = crew(names, nil, { clock = DEC_1_2026 })
       local a = clients[1]
       a.core:setSetting("pocketCamp", true)
       local crowded = a.core:pocketCamp()
