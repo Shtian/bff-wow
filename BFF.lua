@@ -132,6 +132,8 @@ local function onCoreEvent(event, arg, more)
     ns.MapPins.refresh()
   elseif event == "notice" then
     say(MESSAGES[arg])
+  elseif event == "newerBff" then
+    say(arg.text)
   elseif event == "feedEntry" or event == "reaction" or event == "spare" then
     if more.chat then chatLine(arg) end
     if more.toast then ns.Toasts.show(arg) end

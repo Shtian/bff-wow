@@ -165,3 +165,32 @@ function WhatsNew:takeAwayLine()
     more = more > 0 and "and " .. plural(more, "more change") or nil,
   }
 end
+
+local function newestAmong(rows, versionOf)
+  local newest, members
+  for _, row in ipairs(rows) do
+    local version = not row.own and Changelog.version(versionOf(row.memberId))
+    if version then
+      if not newest or Changelog.newer(version, newest) then newest, members = version, {} end
+      if version == newest then members[#members + 1] = row.displayName or row.name end
+    end
+  end
+  return newest, members
+end
+
+function WhatsNew:takeNewerLine(rows, versionOf)
+  if not self.version then return nil end
+  local newest, members = newestAmong(rows, versionOf)
+  if not newest or not Changelog.newer(newest, self.version) then return nil end
+  local told = Changelog.version(self.db.newerBffTold)
+  if told and not Changelog.newer(newest, told) then return nil end
+  self.db.newerBffTold = newest
+  local others = #members - 1
+  local who = others == 0 and members[1] .. " has it"
+    or ("%s and %d %s have it"):format(members[1], others, others == 1 and "other" or "others")
+  return {
+    version = newest,
+    members = members,
+    text = ("BFF %s is out: %s. Update on CurseForge to get what's new."):format(newest, who),
+  }
+end
