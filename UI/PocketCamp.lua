@@ -205,7 +205,7 @@ local function showTooltip()
     GameTooltip:AddLine(("%s: %s"):format(actor.label, actor.status), 1, 1, 1)
   elseif actor then
     if actor.since then GameTooltip:AddLine(actor.status, 1, 1, 1) end
-    ns.Panel.characterTooltip(actor.row, actor.row)
+    ns.CharacterTooltip.add(actor.row, actor.row)
     if actor.group then GameTooltip:AddLine("In your group", 1, 1, 1) end
   else
     GameTooltip:AddLine(view.tooltip.title)

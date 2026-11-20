@@ -549,8 +549,10 @@ local function drawCabinet(trophies, width)
   return y
 end
 
-function TrophiesTab.draw(scrollView, theCore, width, onChange)
-  view, core, redraw = scrollView, theCore, onChange
+function TrophiesTab.draw(page)
+  view, core, redraw = page:scrollView(), page.core, page.redraw
+  core:openTrophies()
+  local width = page.listWidth
   local trophies = core:trophies()
   if trophies.count == 0 then cabinetOpen = false end
   startPools()
@@ -567,16 +569,13 @@ function TrophiesTab.draw(scrollView, theCore, width, onChange)
   for _, frame in pairs({ plate, empty, seeAll, tiles, cabinetHead }) do
     if frame.drawn ~= drawCount then frame:Hide() end
   end
-  view.content:SetHeight(-y + INSET)
+  view:Fit(-y + INSET)
   unveiled = true
 end
 
-function TrophiesTab.hidden()
+function TrophiesTab.leave(closed)
+  core:leaveTrophies()
   stopUnveil()
   unveiled = false
-end
-
-function TrophiesTab.leave()
-  TrophiesTab.hidden()
-  cabinetOpen = false
+  if not closed then cabinetOpen = false end
 end

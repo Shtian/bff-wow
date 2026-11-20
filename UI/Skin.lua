@@ -12,6 +12,10 @@ Skin.OFFLINE = { 0.33, 0.32, 0.37 }
 Skin.WINDOW = { 0.055, 0.051, 0.078, 0.97 }
 Skin.HEADER = { 0.1, 0.095, 0.13, 1 }
 Skin.WARM = { 1, 0.925, 0.784 }
+function Skin.hideFrom(list, from)
+  for i = from, #list do list[i]:Hide() end
+end
+
 function Skin.alpha(color, alpha)
   return { color[1], color[2], color[3], alpha }
 end

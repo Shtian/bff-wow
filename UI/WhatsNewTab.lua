@@ -24,6 +24,7 @@ local DETAIL_GAP = 2
 local DETAIL_LINES = 2
 local DOT = Skin.UNREAD_DOT
 
+local core
 local view
 local redraw
 local head, plate, older
@@ -152,8 +153,10 @@ local function drawEntry(item, change, key, new, y, width)
   return y - height
 end
 
-function WhatsNewTab.draw(scrollView, core, width, onChange)
-  view, redraw = scrollView, onChange
+function WhatsNewTab.draw(page)
+  core, view, redraw = page.core, page:scrollView(), page.redraw
+  core:openWhatsNew()
+  local width = page.listWidth
   local data = core:whatsNew()
   if not head then createHead() end
   if not older then older = Skin.label(view.content, "small", DIM) end
@@ -202,9 +205,10 @@ function WhatsNewTab.draw(scrollView, core, width, onChange)
     older:SetText(data.older)
     y = y - TOP_GAP - older:GetStringHeight()
   end
-  view.content:SetHeight(-y + INSET)
+  view:Fit(-y + INSET)
 end
 
 function WhatsNewTab.leave()
+  core:leaveWhatsNew()
   expanded = {}
 end
