@@ -420,6 +420,56 @@ function tent() {
   return out;
 }
 
+// Winter (docs/design/camp.md, Seasons), from the prototype
+// (prototypes/camp-winter.html on PR #260's branch): snow on the tent's
+// roof and each bedroll, a small pine with baubles, coloured lights on the
+// tent's roof, falling flakes, and the ground away from the fire's glow
+// under snow, in its own copy of each backdrop.
+const SNOW = { cap: PAL.N, shade: PAL.Z, far: "#8c8a9e", ground: "#262838", dusk: "#3e4058" };
+const TREE_PAL = { g: "#2c5a33", h: "#468a46", i: "#6db35e", j: "#9bd47a" };
+// Lit on the right, the fire's side when left of it; CampScene mirrors it on the fire's right.
+const PINE = [
+  "....Y....",
+  "...YWY...",
+  "....h....",
+  "...ghi...",
+  "..gRhhi..",
+  "...ghj...",
+  "..gFhhi..",
+  ".gghhhGi.",
+  "..ghhhj..",
+  ".gPhhhhi.",
+  "gghhhRhhj",
+  "....B....",
+];
+const LIGHTS = ["#ff5a44", "#ffd14a", "#70e370", "#7fc4ee", "#f2b8d0"];
+// A sleeper's snow, along the bedroll's top edge over the blanket.
+const BED_SNOW = { x: 9, rows: ["ZNNNNNNZ"] };
+// The roof's snow, over the tent: the top pixel of each column of the
+// roof that isn't outline, and the one under it in every other column, so
+// it reads on the pale canvas.
+function tentSnow(grid) {
+  const out = grid.map((row) => row.map(() => null));
+  for (let x = 0; x < grid[0].length; x++) {
+    for (let y = 3; y <= 13; y++) {
+      const c = grid[y][x];
+      if (c && c !== PAL.K) {
+        out[y][x] = SNOW.cap;
+        if (y < 12) out[y + 1][x] = x % 2 ? SNOW.cap : SNOW.shade;
+        break;
+      }
+    }
+  }
+  return out;
+}
+// The tent's lights, on its outline just outside the roof's slopes, three
+// a side, as x from the sprite's left and y from its top.
+const TENT_CX = 17;
+const TENT_LIGHTS = [[8, -1], [5, -1], [2, -1], [2, 1], [5, 1], [8, 1]].map(([j, side]) => {
+  const hw = Math.round(1 + j * 1.6);
+  return [TENT_CX + side * (hw + 1), 3 + j];
+});
+
 // Shapeshift forms (docs/design/pocket-camp.md), from the prototype
 // (prototypes/shapeshift-sprites.html on PR #217's branch): fill-only grids facing right, the
 // way a figure left of the fire faces it, outlined like the tools. Each
@@ -541,7 +591,10 @@ const SPRITES = [
   ["logs", skin(LOGS)], ["seat", skin(SEAT)], ["sleep1", skin(SLEEP[0])], ["sleep2", skin(SLEEP[1])], ["sleep3", skin(SLEEP[2])],
   ["ember", skin(EMBER)], ["emberCool", skin(EMBER_COOL)], ["emberWarm", skin(EMBER_WARM)],
   ["glint", skin(GLINT)], ["glintPale", skin(GLINT_PALE)], ["petal", skin(PETAL)],
-  ["tent", tent()],
+  ["tent", tent()], ["tentSnow", tentSnow(tent())], ["bedSnow", skin(BED_SNOW.rows)],
+  ["treePine", paint(outlined(PINE), { ...PAL, ...TREE_PAL })],
+  ["snowflake", paint(["N"], { N: SNOW.cap })], ["snowflakeFar", paint(["N"], { N: SNOW.far })],
+  ...LIGHTS.map((color, i) => [`light${i + 1}`, paint(["L"], { L: color })]),
   ["rod", skin(ROD)], ["star", skin(STAR)], ["fish", skin(FISH)],
   ["smoke1", skin(SMOKE[0])], ["smoke2", skin(SMOKE[1])], ["skeleton", skin(SKELETON)],
   ["flare1", paint(flare(FIRE[0]), FLARE_PAL)], ["flare2", paint(flare(FIRE[1]), FLARE_PAL)],
@@ -691,6 +744,32 @@ function backdrop() {
     const dx = (x - cx) / 52, dy = (y - (H - 5)) / 9, d = Math.sqrt(dx * dx + dy * dy);
     const v = Math.max(0, 1 - d) * (glow.length - 1), i = Math.floor(v);
     put(x, y, glow[Math.min(glow.length - 1, i + (v - i > BAYER[y % 4][x % 4] ? 1 : 0))]);
+  }
+  return img;
+}
+
+// Winter's ground: the backdrop with snow away from the fire's glow, by
+// how far each spot is from the fire (0 at the fire, 1 well clear), solid
+// a way out and dithered where it meets the glow, darker at the top, and
+// a dithered far-tone edge on the horizon.
+const HORIZON_ROW = 12;
+function winterBackdrop(back) {
+  const img = { width: back.width, height: back.height, pixels: Uint8Array.from(back.pixels) };
+  const fire = FILE_W / 2;
+  const clear = (x, row) => {
+    const dx = (x - fire) / 52, dy = (row - 4) / 9;
+    return Math.min(1, Math.max(0, (Math.sqrt(dx * dx + dy * dy) - 0.55) / 0.45));
+  };
+  const lit = (x, y) => img.pixels[(y * img.width + x) * 4 + 3] > 0;
+  for (let x = 0; x < img.width; x++) {
+    const bayer = (y) => BAYER[y % 4][x % 4];
+    const top = FILE_H - 1 - HORIZON_ROW;
+    if (lit(x, top) && bayer(top) < clear(x, HORIZON_ROW)) set(img, x, top, SNOW.far);
+    for (let row = 0; row < HORIZON_ROW - 1; row++) {
+      const y = FILE_H - 1 - row, k = clear(x, row);
+      if (!lit(x, y) || k <= 0 || bayer(y) >= k) continue;
+      set(img, x, y, row >= HORIZON_ROW - 3 && bayer(y) < k - 0.5 ? SNOW.dusk : SNOW.ground);
+    }
   }
   return img;
 }
@@ -965,6 +1044,9 @@ const back = backdrop();
 writeFileSync(join(root, "Media", "CampSprites.tga"), tga(img));
 writeFileSync(join(root, "Media", "CampBackdrop.tga"), tga(back));
 writeFileSync(join(root, "Media", "CampPocketBackdrop.tga"), tga(pocketBackdrop(back)));
+const winterBack = winterBackdrop(back);
+writeFileSync(join(root, "Media", "CampBackdropWinter.tga"), tga(winterBack));
+writeFileSync(join(root, "Media", "CampPocketBackdropWinter.tga"), tga(pocketBackdrop(winterBack)));
 writeFileSync(join(root, "Media", "CampLight.tga"), tga(light()));
 writeFileSync(join(root, "Media", "Dither50.tga"), tga(dither((x, y) => (x + y) % 2 === 0)));
 writeFileSync(join(root, "Media", "Dither25.tga"), tga(dither((x, y) => x % 2 === 0 && y % 2 === 0)));
@@ -986,12 +1068,14 @@ ${lines.join("\n")}
   },
   backdrop = {
     file = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampBackdrop",
+    seasons = { winter = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampBackdropWinter" },
     width = ${FILE_W},
     height = ${FILE_H},
     fire = ${FILE_W / 2},
   },
   pocketBackdrop = {
     file = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampPocketBackdrop",
+    seasons = { winter = "Interface\\\\AddOns\\\\BFF\\\\Media\\\\CampPocketBackdropWinter" },
     width = ${POCKET_FILE_W},
     height = ${POCKET_FILE_H},
     fire = ${POCKET_FILE_W / 2},
@@ -1024,6 +1108,11 @@ ${HATS.map((hat) => `    ${hat.key} = { sprite = "${hatSprite(hat.key)}", brow =
   },
   pets = {
 ${Object.keys(PETS).map((key) => `    ${key} = { awake = "${petSprite(key)}", idle = "${petSprite(key, "Idle")}", asleep = "${petSprite(key, "Asleep")}" },`).join("\n")}
+  },
+  winter = {
+    bedSnow = ${BED_SNOW.x},
+    tentLights = { ${TENT_LIGHTS.map(([x, y]) => `{ ${x}, ${tent().length - 1 - y} }`).join(", ")} },
+    lights = ${LIGHTS.length},
   },
   sky = { ${skyR}, ${skyG}, ${skyB} },
 }

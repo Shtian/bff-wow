@@ -30,6 +30,18 @@ local ROW = {
   seat = 3, seated = 4, hop = 6, standing = 3, asleep = 3, grave = 3, flower = 2,
   logs = 3, fire = 5, tent = 5, ember = 16, crate = 1, cup = 19, pet = 3,
 }
+local FLAKES = { fewest = 6, most = 10, every = 2, drift = 5, seed = 11, farEvery = 3, fireReach = 6, flameRows = 12 }
+local TWINKLE = { order = { 3, 1, 5, 2, 4, 6 }, every = 4, flash = 2 }
+local SEASON_ART = {
+  winter = { snow = true, flakes = true, lights = Sheet.winter },
+}
+local DECOR = {
+  tree = { sprite = "treePine", row = 4, width = LAYOUT.tree },
+}
+
+local function seasonArt(view)
+  return SEASON_ART[view.season] or {}
+end
 local PET_IDLE = { every = 24, spread = 25, ticks = 3, seed = 7 }
 local PET_HOP_LATE = 1
 local CRATE_X = -1
@@ -560,6 +572,7 @@ local function drawActor(scene, parts, actor, f)
   local walkedIn = actor.pose ~= "asleep" and playing(scene, "arrive", actor.memberId)
   local welcomed = not walkedIn and actor.pose ~= "asleep" and playing(scene, "welcome", actor.memberId) ~= nil
   local dead = actor.pose ~= "asleep" and playing(scene, "death", actor.memberId) ~= nil
+  parts.snow:Hide()
   drawPet(scene, parts, actor, f, dead or actor.form ~= nil or (walkedIn and walkedIn < WALK_FOR))
   if walkedIn or welcomed then
     x, top, hatTop = drawArrival(scene, parts, actor, f, walkedIn)
@@ -630,6 +643,10 @@ local function drawActor(scene, parts, actor, f)
     put(scene, parts.cloth, x, ROW.asleep)
     put(scene, parts.skin, x, ROW.asleep)
     local bed = ROW.asleep + Sheet.sprites.asleep[4]
+    if seasonArt(scene.view).snow then
+      setSprite(parts.snow, "bedSnow", scene.unit)
+      put(scene, parts.snow, x + Sheet.winter.bedSnow, bed - 1)
+    end
     local shown = math.floor(f / SLEEP_STEP) % 5
     shown = shown == 4 and 0 or math.min(shown + 1, 3)
     for i, z in ipairs(parts.sleep) do
@@ -713,6 +730,73 @@ local function drawBloom(scene, parts, grave, played)
   end
 end
 
+local function noise(seed)
+  local x = math.sin(seed * 127.1) * 43758.5453
+  return x - math.floor(x)
+end
+
+local function flakeCount(columns)
+  local wider = (FLAKES.most - FLAKES.fewest) * (columns - LAYOUT.minColumns) / (LAYOUT.maxColumns - LAYOUT.minColumns)
+  return math.max(FLAKES.fewest, math.min(FLAKES.most, FLAKES.fewest + math.floor(wider)))
+end
+
+local function drawFlakes(scene, f, falling)
+  local columns, rows = scene.view.columns, scene.view.rows or scene.rows
+  local count = falling and flakeCount(columns) or 0
+  local step = math.floor(f / FLAKES.every)
+  for i, flake in ipairs(scene.flakes) do
+    local column = math.floor(noise(FLAKES.seed + i * 7.3) * columns) + math.floor((step + i * 3) / FLAKES.drift)
+    local x = column % columns - scene.fire
+    local row = rows - 1 - (math.floor(noise(FLAKES.seed + i * 3.1 + 40) * rows) + step) % rows
+    local onFire = math.abs(x) <= FLAKES.fireReach and row >= ROW.logs and row <= ROW.fire + FLAKES.flameRows
+    if i <= count and not onFire then
+      setSprite(flake, i % FLAKES.farEvery == 0 and "snowflakeFar" or "snowflake", scene.unit)
+      put(scene, flake, x, row)
+    else
+      flake:Hide()
+    end
+  end
+end
+
+local function drawTentSeason(scene, f, art)
+  local tent = scene.view.tent
+  local s = Sheet.sprites.tent
+  local mirrored = tent and tent.x > 0
+  local x = tent and tent.x + math.floor((LAYOUT.tent - s[3]) / 2)
+  if tent and art.snow then
+    setSprite(scene.tentSnow, "tentSnow", scene.unit, mirrored)
+    put(scene, scene.tentSnow, x, ROW.tent)
+  else
+    scene.tentSnow:Hide()
+  end
+  local lights = tent and art.lights and art.lights.tentLights or {}
+  local flashing = #lights > 0 and TWINKLE.order[math.floor(f / TWINKLE.every) % #lights + 1]
+  for i, light in ipairs(scene.tentLights) do
+    local at = lights[i]
+    if at then
+      local lit = i == flashing and f % TWINKLE.every < TWINKLE.flash
+      setSprite(light, lit and "glint" or "light" .. ((i - 1) % art.lights.lights + 1), scene.unit)
+      put(scene, light, x + (mirrored and s[3] - 1 - at[1] or at[1]), ROW.tent + at[2])
+    else
+      light:Hide()
+    end
+  end
+end
+
+local function drawSeason(scene, f)
+  local art = seasonArt(scene.view)
+  drawFlakes(scene, f, art.flakes)
+  drawTentSeason(scene, f, art)
+  scene.decorParts.used = 0
+  for _, piece in ipairs(scene.view.decor or {}) do
+    local decor = DECOR[piece.key]
+    local t = take(scene.decorParts)
+    setSprite(t.art, decor.sprite, scene.unit, piece.x > 0)
+    put(scene, t.art, piece.x + math.floor((decor.width - Sheet.sprites[decor.sprite][3]) / 2), decor.row)
+  end
+  hideRest(scene.decorParts)
+end
+
 local function drawFrame(scene, f)
   local view = scene.view
   local unit = scene.unit
@@ -784,6 +868,7 @@ local function drawFrame(scene, f)
   else
     scene.tent:Hide()
   end
+  drawSeason(scene, f)
 end
 
 local function onUpdate(band)
@@ -854,6 +939,7 @@ function CampScene.new(parent, options)
         cloth = texture(band.art, "ARTWORK", 1),
         skin = texture(band.art, "ARTWORK", 2),
         hat = texture(band.art, "ARTWORK", 3),
+        snow = texture(band.art, "ARTWORK", 3),
         sleep = {
           texture(band.art, "ARTWORK", 2),
           texture(band.art, "ARTWORK", 2),
@@ -877,6 +963,9 @@ function CampScene.new(parent, options)
         fillRight = texture(band.art, "BORDER", 1),
         right = texture(band.art, "BORDER", 1),
       }
+    end),
+    decorParts = pool(function()
+      return { art = texture(band.art, "BORDER", 0) }
     end),
     graveParts = pool(function()
       return {
@@ -903,8 +992,12 @@ function CampScene.new(parent, options)
   Skin.snapToPixels(scene.art)
   band.art = scene.art
   scene.backdrop = scene.art:CreateTexture(nil, "BACKGROUND", nil, 1)
-  scene.backdrop:SetTexture(scene.backdropArt.file, "CLAMP", "CLAMP", "NEAREST")
   scene.tent = texture(scene.art, "BORDER", 0)
+  scene.tentSnow = texture(scene.art, "BORDER", 1)
+  scene.tentLights = {}
+  for i = 1, #Sheet.winter.tentLights do scene.tentLights[i] = texture(scene.art, "BORDER", 2) end
+  scene.flakes = {}
+  for i = 1, FLAKES.most do scene.flakes[i] = texture(scene.art, "BACKGROUND", 2) end
   scene.logs = texture(scene.art, "ARTWORK", 0)
   scene.flame = texture(scene.art, "ARTWORK", 1)
   scene.crate = texture(scene.art, "ARTWORK", 2)
@@ -929,6 +1022,11 @@ function CampScene.new(parent, options)
     scene.horde = UnitFactionGroup ~= nil and UnitFactionGroup("player") == "Horde"
     puffShifts(scene, view)
     local art = scene.backdropArt
+    local file = art.seasons and art.seasons[view.season] or art.file
+    if scene.backdropFile ~= file then
+      scene.backdrop:SetTexture(file, "CLAMP", "CLAMP", "NEAREST")
+      scene.backdropFile = file
+    end
     if art.band then
       scene.backdrop:SetTexCoord(0, 1, bandCoords(art, view.columns))
       scene.backdrop:SetSize(art.width * scene.unit, art.band * scene.unit)

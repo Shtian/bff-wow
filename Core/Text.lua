@@ -43,6 +43,11 @@ function Text.dayTitle(daysAgo, time, utcOffset)
   return ("%s %02d %s"):format(WEEKDAYS[weekday], day, MONTHS[month]):upper()
 end
 
+function Text.monthDay(time, utcOffset)
+  local _, day, month = localDate(time, utcOffset)
+  return month, day
+end
+
 function Text.shortDate(time, utcOffset)
   local _, day, month = localDate(time, utcOffset)
   return ("%d %s"):format(day, MONTHS[month]:sub(1, 3))
