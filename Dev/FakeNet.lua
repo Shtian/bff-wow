@@ -134,6 +134,7 @@ function FakeNet:add(name, options)
     db = options.db or {},
     random = options.random or seeded(seedFor(name)),
     utcOffset = options.utcOffset,
+    daylight = copy(options.daylight),
     location = copy(options.location),
     bags = copy(options.bags) or {},
     gossip = options.gossip,
@@ -185,6 +186,10 @@ local function newCore(client, initialLogin)
     initialLogin = initialLogin,
     maxLevel = net.maxLevel,
     utcOffset = client.utcOffset,
+    daylight = function()
+      local daylight = client.daylight or {}
+      return daylight.isDay, daylight.hour, daylight.minute
+    end,
     locate = function() return copy(client.location) end,
     itemLink = function(itemString) return net.items[itemString] end,
     itemLook = function(itemId) return net.looks[itemId] end,

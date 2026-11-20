@@ -471,7 +471,7 @@ end
 
 function Panel.settingChanged(key)
   if key == "panelPlace" and frame then applyPlace() end
-  if key == "paused" or key == "panelPlace" or key == "camp" or key == "seasons" or key == "pocketCamp"
+  if key == "paused" or key == "panelPlace" or key == "camp" or key == "seasons" or key == "dayNight" or key == "pocketCamp"
     or tab == "settings" then
     Panel.refresh()
   end

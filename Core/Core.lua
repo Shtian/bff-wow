@@ -127,6 +127,7 @@ function Core.new(deps)
     maxLevel = deps.maxLevel,
     ledger = ns.Ledger.new(deps.db, deps.now, deps.random, deps.initialLogin == true),
     utcOffset = type(deps.utcOffset) == "number" and deps.utcOffset or 0,
+    daylight = type(deps.daylight) == "function" and deps.daylight or function() end,
     finalBosses = type(deps.finalBosses) == "table" and deps.finalBosses or ns.Clears.FINAL_BOSSES,
     linkUp = false,
     upSince = nil,
@@ -161,6 +162,7 @@ function Core.new(deps)
     on = function() return self.db.crew ~= nil and self:setting("camp") and self:setting("pocketCamp") end,
     setting = function(key) return self:setting(key) end,
     season = function() return self:season() end,
+    phase = function() return self:phase() end,
     spot = function(row) return shownSpot(self, row) end,
   })
   local Gossip = type(deps.gossip) == "table" and deps.gossip or ns.Gossip
@@ -474,11 +476,30 @@ function Core:forceSeason(key)
   return true
 end
 
+local PHASES = { day = true, night = true }
+
+function Core:phase()
+  if not (self:setting("camp") and self:setting("dayNight")) then return nil end
+  if self.forcedPhase then return self.forcedPhase end
+  return ns.Camp.phase(self.daylight())
+end
+
+function Core:forcePhase(key)
+  if not (key == "auto" or PHASES[key]) then return false end
+  self.forcedPhase = PHASES[key] and key or nil
+  self.listener("changed")
+  return true
+end
+
+function Core:daylightChanged()
+  self.listener("changed")
+end
+
 function Core:camp(columns)
   if not self:setting("camp") then return nil end
   local now = self.now()
   return ns.Camp.view(ns.Roster.rows(self.ledger, now), self.feedState:since(now - ns.Camp.RECENT), now, columns,
-    { season = self:season() })
+    { season = self:season(), phase = self:phase() })
 end
 
 function Core:pocketCamp()
@@ -546,7 +567,7 @@ local function awaySummary(self)
   if self:setting("camp") then
     local now = self.now()
     summary.camp, summary.intro = ns.Camp.away(ns.Roster.rows(self.ledger, now),
-      self.feedState:since(now - ns.Camp.RECENT), now, summary, self:season())
+      self.feedState:since(now - ns.Camp.RECENT), now, summary, self:season(), self:phase())
   end
   self.listener("awaySummary", summary)
   self.listener("changed")
@@ -999,6 +1020,11 @@ local SETTINGS = {
     key = "seasons", section = NOTIFICATIONS, kind = "toggle", needs = "camp",
     label = "Seasonal decorations",
     saved = offFlag("seasonsOff"),
+  },
+  {
+    key = "dayNight", section = NOTIFICATIONS, kind = "toggle", needs = "camp",
+    label = "Day and night",
+    saved = offFlag("dayNightOff"),
   },
   {
     key = "mapPins", section = NOTIFICATIONS, kind = "toggle",

@@ -276,6 +276,20 @@ function Snapshot.doing()
   }
 end
 
+-- WoW: C_DateAndTime.IsDayTime and DIEL_CYCLE_CHANGED are Forever's, behind its minimap's sun and moon.
+function Snapshot.daylight()
+  if C_DateAndTime and C_DateAndTime.IsDayTime then return C_DateAndTime.IsDayTime() end
+  return nil, GetGameTime()
+end
+
+local function watchDaylight(core)
+  local event = "DIEL_CYCLE_CHANGED"
+  if not (C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid(event)) then return end
+  local frame = CreateFrame("Frame")
+  frame:RegisterEvent(event)
+  frame:SetScript("OnEvent", function() core:daylightChanged() end)
+end
+
 local WINDOW_EVENTS = {
   MERCHANT_SHOW = { "vendor", true }, MERCHANT_CLOSED = { "vendor", false },
   AUCTION_HOUSE_SHOW = { "auction", true }, AUCTION_HOUSE_CLOSED = { "auction", false },
@@ -331,4 +345,5 @@ function Snapshot.start(core)
   watchDoing(core)
   watchRares(core)
   watchGroup(core)
+  watchDaylight(core)
 end

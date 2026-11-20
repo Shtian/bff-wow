@@ -874,3 +874,84 @@ describe("Seasons", function()
     end)
   end)
 end)
+
+describe("Day and night", function()
+  it("follow the game's day and night, or realm time from 05:30 to 21:00 without it", function()
+    local phase = load().Camp.phase
+    assert.equal("day", phase(true))
+    assert.equal("night", phase(false))
+    assert.equal("day", phase(true, 23, 0))
+    assert.equal("night", phase(nil, 5, 29))
+    assert.equal("day", phase(nil, 5, 30))
+    assert.equal("day", phase(nil, 20, 59))
+    assert.equal("night", phase(nil, 21, 0))
+    assert.equal("night", phase(nil, 0, 0))
+    assert.equal("night", phase(nil, nil, nil))
+  end)
+
+  it("come on camp(), the Pocket Camp and While you were away", function()
+    local net, clients = crew({ "Ann", "Bob" }, { Ann = { daylight = { isDay = true } } })
+    local a, b = clients[1], clients[2]
+    a.core:setSetting("pocketCamp", true)
+    assert.equal("day", a.core:camp(COLUMNS).phase)
+    assert.equal("day", a.core:pocketCamp().phase)
+    assert.equal("night", b.core:camp(COLUMNS).phase)
+    a.daylight = { hour = 22, minute = 0 }
+    assert.equal("night", a.core:camp(COLUMNS).phase)
+    a.daylight = { isDay = true }
+    a:logout()
+    net:run(5)
+    b:play({ level = 11 })
+    net:run(15)
+    a.events = {}
+    a:login()
+    net:run(40)
+    local summary
+    for _, event in ipairs(a.events) do
+      if event[1] == "awaySummary" then summary = event[2] end
+    end
+    assert.equal("day", summary.camp.phase)
+  end)
+
+  it("redraw when the game says day turned to night", function()
+    local _, clients = crew({ "Ann" }, { Ann = { daylight = { isDay = true } } })
+    local a = clients[1]
+    local before = a:count("changed")
+    a.daylight = { isDay = false }
+    a.core:daylightChanged()
+    assert.equal(before + 1, a:count("changed"))
+    assert.equal("night", a.core:camp(COLUMNS).phase)
+  end)
+
+  it("are nil with Day and night off, or the Camp off", function()
+    local _, clients = crew({ "Ann" }, { Ann = { daylight = { isDay = true } } })
+    local a = clients[1]
+    a.core:setSetting("pocketCamp", true)
+    assert.is_true(a.core:setting("dayNight"))
+    a.core:setSetting("dayNight", false)
+    assert.is_nil(a.core:camp(COLUMNS).phase)
+    assert.is_nil(a.core:pocketCamp().phase)
+    assert.is_true(a.core:forcePhase("day"))
+    assert.is_nil(a.core:camp(COLUMNS).phase)
+    a.core:setSetting("dayNight", true)
+    assert.equal("day", a.core:camp(COLUMNS).phase)
+    a.core:setSetting("camp", false)
+    assert.is_nil(a.core:phase())
+  end)
+
+  it("can be forced for a dev check, back to the game, and refuse an unknown key", function()
+    local _, clients = crew({ "Ann" }, { Ann = { daylight = { isDay = true } } })
+    local a = clients[1]
+    local before = a:count("changed")
+    assert.is_true(a.core:forcePhase("night"))
+    assert.equal(before + 1, a:count("changed"))
+    assert.equal("night", a.core:camp(COLUMNS).phase)
+    assert.is_false(a.core:forcePhase("dusk"))
+    assert.equal("night", a.core:camp(COLUMNS).phase)
+    assert.is_true(a.core:forcePhase("day"))
+    a.daylight = { isDay = false }
+    assert.equal("day", a.core:camp(COLUMNS).phase)
+    assert.is_true(a.core:forcePhase("auto"))
+    assert.equal("night", a.core:camp(COLUMNS).phase)
+  end)
+end)

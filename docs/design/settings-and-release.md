@@ -64,6 +64,7 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `minimap` | `hide = true` inside the minimap table LibDBIcon reads, or nil while on |
   | `camp` | `campOff = true`, or nil while on |
   | `seasons` | `seasonsOff = true`, or nil while on |
+  | `dayNight` | `dayNightOff = true`, or nil while on |
   | `mapPins` | `mapPinsOff = true`, or nil while on |
   | `mapPinSize` | `"small"` or `"large"`, or nil for medium (anything else reads as medium) |
   | `pocketCamp` | `pocketCamp = true`, or nil while off |

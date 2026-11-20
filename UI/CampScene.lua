@@ -49,9 +49,20 @@ local LANTERNS = { sag = 3, perColumns = 60, fewest = 4, most = 6, fireClear = 1
 local FIREFLIES = { count = 8, seed = 23, low = 4, high = 8, drift = 7, rise = 3, fireReach = 7, fireRows = 20,
   every = 20, spread = 5, lit = 14 }
 local NAME_ROWS = 4
+local NIGHT_ONLY = { bats = true, fireworks = true, fireflies = true }
+local SKY = { column = 7, row = 30, rows = 9, sunEvery = 12, stars = 4, moonClear = { 3, 2 },
+  spots = { { 0.17, 33 }, { 0.41, 37 }, { 0.69, 32 }, { 0.94, 36 }, { 0.06, 31 }, { 0.29, 35 }, { 0.58, 34 },
+    { 0.82, 38 } },
+  twinkle = { shortest = 30, spread = 19, step = 11, seed = 3, dimBelow = 0.35, midBelow = 0.72 } }
 
 local function seasonArt(view)
-  return SEASON_ART[view.season] or {}
+  local art = SEASON_ART[view.season]
+  if not art or view.phase ~= "day" then return art or {} end
+  local byDay = {}
+  for key, value in pairs(art) do
+    if not NIGHT_ONLY[key] then byDay[key] = value end
+  end
+  return byDay
 end
 local PET_IDLE = { every = 24, spread = 25, ticks = 3, seed = 7 }
 local PET_HOP_LATE = 1
@@ -959,6 +970,84 @@ local function drawFireflies(scene, f, glowing)
   end
 end
 
+local function skyBox(name)
+  local s = Sheet.sprites[name]
+  local left = SKY.column - math.floor(s[3] / 2)
+  local bottom = SKY.row + math.floor((SKY.rows - s[4]) / 2)
+  return { left = left, right = left + s[3] - 1, bottom = bottom, top = bottom + s[4] - 1 }
+end
+
+local function inBox(box, column, row)
+  return column >= box.left and column <= box.right and row >= box.bottom and row <= box.top
+end
+
+local function lanternBoxes(scene)
+  local boxes = {}
+  if not (seasonArt(scene.view).lanterns and lanternsFit(scene)) then return boxes end
+  local reach = Sheet.sprites.lanternRed[3] - 1
+  for _, column in ipairs(lanternColumns(scene)) do
+    local row = stringRow(scene, column)
+    boxes[#boxes + 1] = { left = column - reach, right = column + reach, bottom = row - Sheet.sprites.lanternRed[4],
+      top = row }
+  end
+  return boxes
+end
+
+local function starTone(i, f)
+  local t = SKY.twinkle
+  local period = t.shortest + (i * t.step) % t.spread
+  local p = (f + math.floor(noise(i + t.seed) * period)) % period
+  local level = 1 - math.abs(2 * p / period - 1)
+  if level < t.dimBelow then return "starDim" end
+  if level < t.midBelow then return "starMid" end
+  return "glint"
+end
+
+local function hideStars(scene, from)
+  for i = from, #scene.stars do scene.stars[i]:Hide() end
+end
+
+local function drawStars(scene, f, moon)
+  local columns, rows = scene.view.columns, rowsOf(scene)
+  local clear = SKY.moonClear
+  local near = { left = moon.left - clear[1], right = moon.right + clear[1], bottom = moon.bottom - clear[2],
+    top = moon.top + clear[2] }
+  local lanterns = lanternBoxes(scene)
+  local drawn = 0
+  for i, spot in ipairs(SKY.spots) do
+    local column, row = math.floor(spot[1] * (columns - 1) + 0.5), spot[2]
+    local open = drawn < SKY.stars and row <= rows - 2 and not inBox(near, column, row)
+    for _, box in ipairs(lanterns) do
+      if open and inBox(box, column, row) then open = false end
+    end
+    if open then
+      drawn = drawn + 1
+      local star = scene.stars[drawn]
+      setSprite(star, starTone(i - 1, f), scene.unit)
+      put(scene, star, column - scene.fire, row)
+    end
+  end
+  hideStars(scene, drawn + 1)
+end
+
+local function drawSky(scene, f)
+  local phase = scene.skyLights and scene.view.phase
+  local name = phase == "day" and "sun" .. (math.floor(f / SKY.sunEvery) % 2 + 1) or phase == "night" and "moon"
+  local box = name and skyBox(name)
+  if not box or box.top > rowsOf(scene) - 1 then
+    scene.skyLight:Hide()
+    hideStars(scene, 1)
+    return
+  end
+  setSprite(scene.skyLight, name, scene.unit)
+  put(scene, scene.skyLight, box.left - scene.fire, box.bottom)
+  if phase == "night" then
+    drawStars(scene, f, box)
+  else
+    hideStars(scene, 1)
+  end
+end
+
 local function drawSeason(scene, f)
   local art = seasonArt(scene.view)
   drawFlakes(scene, f, art.flakes)
@@ -967,6 +1056,7 @@ local function drawSeason(scene, f)
   drawFirework(scene, art.fireworks)
   drawLanterns(scene, f, art.lanterns)
   drawFireflies(scene, f, art.fireflies)
+  drawSky(scene, f)
   scene.decorParts.used = 0
   for _, piece in ipairs(scene.view.decor or {}) do
     local decor = DECOR[piece.key]
@@ -1107,6 +1197,7 @@ function CampScene.new(parent, options)
     gains = options.gains,
     names = options.names ~= false,
     backdropArt = options.backdrop or Sheet.backdrop,
+    skyLights = not options.backdrop,
     target = options.target or CampScene.BAND_TARGET,
     crisp = options.crisp ~= false,
     hops = {},
@@ -1173,8 +1264,7 @@ function CampScene.new(parent, options)
   band.scene = scene
   local sky = band:CreateTexture(nil, "BACKGROUND", nil, 0)
   sky:SetAllPoints()
-  sky:SetColorTexture(Sheet.sky[1], Sheet.sky[2], Sheet.sky[3], 1)
-  sky:SetShown(options.backdrop == nil)
+  sky:SetShown(scene.skyLights)
   scene.sky = sky
 
   scene.art = CreateFrame("Frame", nil, band)
@@ -1187,9 +1277,12 @@ function CampScene.new(parent, options)
   scene.tentSnow = texture(scene.art, "BORDER", 1)
   scene.tentLights = {}
   for i = 1, #Sheet.winter.tentLights do scene.tentLights[i] = texture(scene.art, "BORDER", 2) end
+  scene.skyLight = texture(scene.art, "BACKGROUND", 2)
+  scene.stars = {}
+  for i = 1, SKY.stars do scene.stars[i] = texture(scene.art, "BACKGROUND", 2) end
   scene.flakes = {}
-  for i = 1, FLAKES.most do scene.flakes[i] = texture(scene.art, "BACKGROUND", 2) end
-  scene.bats = { texture(scene.art, "BACKGROUND", 2), texture(scene.art, "BACKGROUND", 2) }
+  for i = 1, FLAKES.most do scene.flakes[i] = texture(scene.art, "BACKGROUND", 3) end
+  scene.bats = { texture(scene.art, "BACKGROUND", 3), texture(scene.art, "BACKGROUND", 3) }
   scene.rocket = { texture(scene.art, "BORDER", 3), texture(scene.art, "BORDER", 3) }
   scene.fireworkSparks = {}
   for i = 1, #BURST.ways do scene.fireworkSparks[i] = texture(scene.art, "BORDER", 3) end
@@ -1219,7 +1312,10 @@ function CampScene.new(parent, options)
     scene.horde = UnitFactionGroup ~= nil and UnitFactionGroup("player") == "Horde"
     puffShifts(scene, view)
     local art = scene.backdropArt
-    local file = art.seasons and art.seasons[view.season] or art.file
+    local look = view.phase == "day" and art.day or art
+    local file = look.seasons and look.seasons[view.season] or look.file
+    local top = Sheet.sky[view.phase == "day" and "day" or "night"]
+    scene.sky:SetColorTexture(top[1], top[2], top[3], 1)
     if scene.backdropFile ~= file then
       scene.backdrop:SetTexture(file, "CLAMP", "CLAMP", "NEAREST")
       scene.backdropFile = file

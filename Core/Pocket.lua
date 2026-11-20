@@ -22,6 +22,7 @@ function Pocket.new(deps)
     isOn = deps.on,
     setting = deps.setting,
     season = deps.season,
+    phase = deps.phase,
     spot = deps.spot,
     trophiesSince = deps.feed:isSettled() and deps.now() or nil,
     fishing = {},
@@ -141,7 +142,7 @@ local function pocketView(self)
   for id, since in pairs(self.bedrolls) do
     if now - since < BEDROLL_FOR then bedrolls[id] = since end
   end
-  local shown = { alts = self.setting("pocketCampAlts"), season = self.season() }
+  local shown = { alts = self.setting("pocketCampAlts"), season = self.season(), phase = self.phase() }
   return ns.Camp.pocket(rows, self.feed:since(now - ns.Camp.RECENT), now, doing, bedrolls,
     self.setting("pocketCampColumns"), ns.Camp.grouped(rows, self.party), shown)
 end
