@@ -31,6 +31,23 @@
 
 
 
+
+## 2.13.0
+<sub>2026-11-20</sub>
+
+- *(minor)*
+  Choose a pet for your Camp figure in Settings › You › Look: a cat, dog, owl, frog, rabbit or fox. It sits beside you in the Camp, the Pocket Camp and While you were away, idles now and then, curls up asleep beside your bedroll and hops when you're cheered. Your whole Crew sees it. When the band is narrow, pets are left out first, so nobody loses their seat. Members on an older BFF don't see pets yet.
+- *(minor)*
+  The Camp dresses up for winter from 1 December to 2 January: snow on the ground, the tent and the bedrolls, a few falling flakes, a small decorated pine and twinkling lights on the tent, in the Camp, the Pocket Camp and While you were away. Turn it off with Settings › Seasonal decorations.
+- *(minor)*
+  The Camp dresses up three more times a year, in the Camp, the Pocket Camp and While you were away. Autumn (18 October to 1 November): a carved pumpkin by the fire, bats crossing the sky now and then, and a more orange fire. The lunar new year (22 January to 12 February): red and gold paper lanterns strung over the panel's Camp, and now and then a firework over the fire. Midsummer (20 June to 5 July): a bonfire, a Midsummer pole and fireflies. Turn them off with Settings › Seasonal decorations.
+- *(patch)*
+  The sidebar says Spares instead of Spare Items. The Dungeons tab, What's new, Settings and the empty Roster now talk about Members and the Crew instead of friends.
+- *(patch)*
+  The Camp keeps its full height at every panel size.
+
+  The panel can no longer be made shorter than 460, and a smaller saved panel grows to fit. The Camp is the same height on every screen and UI scale.
+
 ## 2.12.0
 <sub>2026-11-19</sub>
 
