@@ -66,8 +66,10 @@ local GLIDE_FROM = 260
 local GLIDE_TIME = 0.7
 
 local view
+local page
 local core
 local lit = false
+local opening = true
 local selected = {}
 local barFrames = {}
 local labelFrames, dotFrames, stemTextures = {}, {}, {}
@@ -188,7 +190,7 @@ local function dungeonTooltip(owner)
 end
 
 local function redraw()
-  if view then DungeonsTab.draw(view:GetParent(), core, lit) end
+  if page then DungeonsTab.draw(page) end
 end
 
 local function pick(memberIds, add)
@@ -1171,12 +1173,10 @@ function DungeonsTab.scrolled()
   view.empty:SetShown(empty)
 end
 
-function DungeonsTab.draw(parent, theCore, campOn)
-  core = theCore
-  lit = campOn and true or false
-  if not view then createView(parent) end
-  local opening = not view:IsVisible()
-  view:Show()
+function DungeonsTab.draw(thePage)
+  page, core = thePage, thePage.core
+  lit = page.campShown and true or false
+  if not view then createView(page.frame) end
   local data = core:dungeons(measure, selected)
   view.data = data
   view.guideTag.level = nil
@@ -1225,6 +1225,7 @@ function DungeonsTab.draw(parent, theCore, campOn)
   drawDungeons(data)
   drawOverview(data)
   if opening then
+    opening = false
     -- WoW: a frame's width may not be laid out until the next frame.
     scrollTo(data.you - view.scroller:GetWidth() / 2 - GLIDE_FROM)
     view.glide = GetTime()
@@ -1234,6 +1235,6 @@ function DungeonsTab.draw(parent, theCore, campOn)
   DungeonsTab.escapeKeys()
 end
 
-function DungeonsTab.hide()
-  if view then view:Hide() end
+function DungeonsTab.leave()
+  opening = true
 end

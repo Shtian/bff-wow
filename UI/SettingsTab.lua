@@ -30,7 +30,6 @@ local SLIDER = 120
 local SLIDER_VALUE = 36
 
 local view, core
-local onBack
 local back
 local sections
 local rows = {}
@@ -360,7 +359,7 @@ end
 local extras = { paused = createLeave }
 
 local function create()
-  back = smallButton(view.content, "Back", function() if onBack then onBack() end end)
+  back = smallButton(view.content, "Back", function() ns.Panel.show("roster") end)
   sections = { createYou() }
   for _, section in ipairs(core:settings()) do
     local list = {}
@@ -399,10 +398,11 @@ local function placeRow(row, y, first, width)
   return y - height
 end
 
-function SettingsTab.draw(scrollView, theCore, width, backToSetup)
-  view, core, onBack = scrollView, theCore, backToSetup
+function SettingsTab.draw(page)
+  view, core = page:scrollView(), page.core
   if not sections then create() end
   local crew = core:crew()
+  local width = page.listWidth
 
   local values, hidden = {}, {}
   for _, section in ipairs(core:settings()) do
@@ -428,8 +428,8 @@ function SettingsTab.draw(scrollView, theCore, width, backToSetup)
   leaveRow:SetShown(crew ~= nil and not crew.leaving)
 
   local y = -INSET
-  back:SetShown(onBack ~= nil)
-  if onBack then
+  back:SetShown(crew == nil)
+  if not crew then
     back:ClearAllPoints()
     back:SetPoint("TOPLEFT", view.content, "TOPLEFT", INSET, y)
     y = y - SMALL_BUTTON - TOP_GAP
@@ -449,7 +449,7 @@ function SettingsTab.draw(scrollView, theCore, width, backToSetup)
       end
     end
   end
-  view.content:SetHeight(-y + INSET)
+  view:Fit(-y + INSET)
 end
 
 function SettingsTab.leave()

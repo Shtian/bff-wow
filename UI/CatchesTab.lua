@@ -27,13 +27,13 @@ local RECENT_ICON = 16
 local RECENT_LABEL = 14
 local RECENT_SHORT = 300
 local RECENT_NARROW = 400
-local THUMB = 6
-local SCROLL_STEP = 40
+local SCROLLBAR = 6
 local EMPTY_PAD = 18
 local UNCAUGHT_ALPHA = 0.45
 local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local view
+local page
 local core
 local group = "where"
 local show = "all"
@@ -155,33 +155,8 @@ local function createSection()
   return frame
 end
 
-local function scrollBy(delta)
-  local scroller = view.scroller
-  local range = scroller:GetVerticalScrollRange()
-  scroller:SetVerticalScroll(math.min(range, math.max(0, scroller:GetVerticalScroll() - delta * SCROLL_STEP)))
-  CatchesTab.updateThumb()
-end
-
-function CatchesTab.updateThumb()
-  local scroller = view.scroller
-  local range = scroller:GetVerticalScrollRange()
-  local thumb = view.thumb
-  if range <= 0 then
-    scroller:SetVerticalScroll(0)
-    thumb:Hide()
-    return
-  end
-  if scroller:GetVerticalScroll() > range then scroller:SetVerticalScroll(range) end
-  local visible = scroller:GetHeight()
-  local height = math.max(24, visible * visible / (visible + range))
-  thumb:SetHeight(height)
-  thumb:ClearAllPoints()
-  thumb:SetPoint("TOPRIGHT", scroller, "TOPRIGHT", THUMB - 2, -(visible - height) * scroller:GetVerticalScroll() / range)
-  thumb:Show()
-end
-
 local function redraw()
-  if view and view:IsShown() then CatchesTab.draw(view:GetParent(), core) end
+  if view and view:IsVisible() then CatchesTab.draw(page) end
 end
 
 local function showMenu(owner, menu, onPick)
@@ -224,8 +199,8 @@ local function setPicker(button, text)
   button:SetWidth(button.label:GetStringWidth() + button.iconRoom + 16)
 end
 
-local function createView(parent)
-  view = CreateFrame("Frame", nil, parent)
+local function createView()
+  view = CreateFrame("Frame", nil, page.frame)
   view:SetAllPoints()
 
   view.summary = CreateFrame("Frame", nil, view)
@@ -252,19 +227,8 @@ local function createView(parent)
   Skin.edge(view.recent, "TOP", Skin.LINE)
   view.recent.label = Skin.sectionLabel(view.recent, INSET, -10, "TOPLEFT")
 
-  view.scroller = CreateFrame("ScrollFrame", nil, view)
-  view.scroller:EnableMouseWheel(true)
-  view.scroller:SetScript("OnMouseWheel", function(_, delta) scrollBy(delta) end)
-  view.content = CreateFrame("Frame", nil, view.scroller)
-  view.content:SetSize(1, 1)
-  view.scroller:SetScrollChild(view.content)
-  view.scroller:SetScript("OnSizeChanged", function(_, width)
-    view.content:SetWidth(width)
-    CatchesTab.updateThumb()
-  end)
-  view.thumb = view.scroller:CreateTexture(nil, "OVERLAY")
-  view.thumb:SetColorTexture(1, 1, 1, 0.18)
-  view.thumb:SetWidth(3)
+  view.scroller = page:scrollView()
+  view.content = view.scroller.content
 
   view.message = CreateFrame("Frame", nil, view.content)
   view.message.title = Skin.label(view.message, "heading", TEXT)
@@ -463,29 +427,23 @@ local function drawSections(data, width)
   return -y + 6
 end
 
-function CatchesTab.draw(parent, theCore)
-  core = theCore
-  if not view then createView(parent) end
-  view:Show()
+function CatchesTab.draw(thePage)
+  page, core = thePage, thePage.core
+  if not view then createView() end
   local data = core:catchesTab(group, show)
   view.data = data
-  local width, height = parent:GetWidth(), parent:GetHeight()
+  local width, height = page.width, page.height
 
   local top = drawSummary(data, width)
   local bottom = drawRecent(data, width, height)
   view.scroller:ClearAllPoints()
   view.scroller:SetPoint("TOPLEFT", 0, -top)
-  view.scroller:SetPoint("BOTTOMRIGHT", -THUMB, bottom)
-  view.content:SetWidth(width - THUMB)
-  view.content:SetHeight(drawSections(data, width - THUMB))
-  CatchesTab.updateThumb()
+  view.scroller:SetPoint("BOTTOMRIGHT", -SCROLLBAR, bottom)
+  view.content:SetWidth(page.listWidth)
+  view.scroller:Fit(drawSections(data, page.listWidth))
 
   local owner = GameTooltip:GetOwner()
   if owner and owner.tile and owner:GetParent() == view.content and owner:IsShown() and owner:IsMouseOver() then
     tileTooltip(owner)
   end
-end
-
-function CatchesTab.hide()
-  if view then view:Hide() end
 end
