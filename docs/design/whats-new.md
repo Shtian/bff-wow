@@ -39,6 +39,8 @@ From top to bottom, in the panel's content area (no window of its own, so the pa
 
 Each Member's record carries `bff`, the BFF version they run (a release version; a checkout sends none). It's written whenever the own record is, so a friend's update reaches the Crew on their next login. Older BFFs ignore the field, so it needs no protocol bump.
 
+When another Member of the Crew runs a newer release than yours, BFF says so in one chat line, naming the highest version, a Member who has it (with how many others do) and CurseForge: "BFF 2.14.0 is out: Mirelle has it. Update on CurseForge to get what's new." It checks when another Member's record is applied and once sync has settled after a login, so versions saved from earlier sessions count too. It's said once per version, account-wide (`db.newerBffTold`, the highest version told), and again only for a version newer than that. Only release versions count on both sides: a checkout never says it, and a Member on a checkout never sets it off. Members who left or were removed don't count. A major release isn't covered: it bumps the protocol, so an older client can't read the newer record and gets the "out of date" notice instead.
+
 ## Not decided here
 
 - Showing the out-of-date friends anywhere else (the Roster), or before a major release is seen.

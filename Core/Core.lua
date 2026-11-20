@@ -181,6 +181,10 @@ function Core.new(deps)
   self.online = ns.Roster.online(self.ledger, deps.now())
   self.known = knownMembers(self.ledger)
   self.whatsNewState = ns.WhatsNew.new(deps.db, deps.version, deps.changelog, fresh)
+  self.bffVersionOf = function(id)
+    local record = self.ledger:record(id)
+    return record and record.bff
+  end
   return self
 end
 
@@ -548,6 +552,12 @@ local function checkOnline(self)
   if onlineChanged(self) then self.listener("changed") end
 end
 
+local function tellNewerBff(self)
+  if not (self.db.crew and self.feedState:isSettled()) then return end
+  local line = self.whatsNewState:takeNewerBffLine(ns.Roster.rows(self.ledger, self.now()), self.bffVersionOf)
+  if line then self.listener("newerBff", line) end
+end
+
 local function awaySummary(self)
   if not self:isAwayPopupOn() then
     self.whatsNewState:takeAwayLine()
@@ -612,6 +622,7 @@ function Core:tick()
   if self.feedState:tick() then
     self.pocket:syncSettled()
     awaySummary(self)
+    tellNewerBff(self)
   end
   if self.db.crew and self.crewGoals:tick() then
     self.db.catchTypesTold = self.db.catchTypesTold or ns.Catches.markTold({}, self:catches())
@@ -813,11 +824,7 @@ function Core:leaveWhatsNew()
 end
 
 function Core:whatsNew()
-  local ledger = self.ledger
-  return self.whatsNewState:view(ns.Roster.rows(ledger, self.now()), function(id)
-    local record = ledger:record(id)
-    return record and record.bff
-  end)
+  return self.whatsNewState:view(ns.Roster.rows(self.ledger, self.now()), self.bffVersionOf)
 end
 
 local function savedIn(db, parent)
@@ -1545,6 +1552,7 @@ local function dataReceived(self, records, from, whispered)
   end
   if changed then
     checkGoals(self)
+    tellNewerBff(self)
     local told = self.db.catchTypesTold
     if told then ns.Catches.markTold(told, self:catches(), self.sessionStart) end
   end
