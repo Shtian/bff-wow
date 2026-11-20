@@ -32,6 +32,24 @@
 
 
 
+
+## 2.14.0
+<sub>2026-11-20</sub>
+
+- *(minor)*
+  The Camp now follows the game's day and night. By day the panel's Camp and While you were away show a blue sky, a sunny backdrop and the sun, and the Pocket Camp shows a daylit backdrop. By night you get the familiar night scene, now with a moon and a few twinkling stars. Fireflies, the firework and bats come out only at night. Turn it off with "Day and night" in Settings.
+- *(minor)*
+  When someone in your Crew runs a newer BFF, a chat line names the version and who has it, once per release, so you know to update on CurseForge.
+- *(patch)*
+  Internal: the Pocket Camp's live state (fishing and working, bedrolls, how long a pose is held, the trophy cup, the Spares crate and the figure menus) moved out of Core into its own module. Nothing you see changes.
+- *(patch)*
+  Internal: every panel tab (Roster, Feed, Trophies, Play Times, Spares, Professions, Dungeons, Catches, Settings and What's new) now has its own module behind one shared interface, and the panel only hosts them. Nothing you see changes.
+- *(patch)*
+  The Dungeons tab glides to your Character the first time you open it.
+
+  Before, it only did so when you came back to the tab.
+- *(patch)* What's new leaves out internal changes that don't affect what you see.
+
 ## 2.13.0
 <sub>2026-11-20</sub>
 
