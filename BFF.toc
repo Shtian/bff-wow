@@ -42,6 +42,7 @@ Core/Goals.lua
 Core/Where.lua
 Core/Doing.lua
 Core/WhatsNew.lua
+Core/Pocket.lua
 Core/Core.lua
 
 Link/Presence.lua

@@ -185,13 +185,18 @@ describe("The Pocket Camp", function()
   end)
 
   it("reads an old saved Hide in combat as Hide, and nothing saved as Stay", function()
-    local _, clients = crew({ "Ann", "Bob" })
-    local core = clients[1].core
-    assert.equal("stay", core:pocketCamp().inCombat)
-    core.db.pocketCampCombatHide = true
-    assert.equal("hide", core:pocketCamp().inCombat)
-    core.db.pocketCampCombatHide = false
-    assert.equal("stay", core:pocketCamp().inCombat)
+    local function inCombat(saved)
+      local ns = load()
+      local net = ns.FakeNet.new()
+      local a = net:add("Ann", { db = saved }):login()
+      a:join()
+      net:run(5)
+      a.core:setSetting("pocketCamp", true)
+      return a.core:pocketCamp().inCombat
+    end
+    assert.equal("stay", inCombat({}))
+    assert.equal("hide", inCombat({ pocketCampCombatHide = true }))
+    assert.equal("stay", inCombat({ pocketCampCombatHide = false }))
   end)
 
   it("sends nothing more for what it does in combat", function()
@@ -981,22 +986,13 @@ describe("Playing together", function()
   end)
 
   it("orders you, your group, each set sharing an instance, then the rest, whatever the Roster's order", function()
-    local ns = load()
-    local function row(id, extra)
-      local r = { memberId = id, name = id, fullName = id, online = true, classFilename = "MAGE", lastSeen = 0 }
-      for k, v in pairs(extra or {}) do r[k] = v end
-      return r
-    end
-    local rows = {
-      row("you", { own = true, instance = "The Deadmines" }),
-      row("d"), row("e", { instance = "Ragefire Chasm" }), row("f"), row("g", { instance = "Ragefire Chasm" }),
-      row("h", { instance = "The Deadmines" }), row("b"), row("c", { instance = "The Deadmines" }),
-    }
-    local doing = { said = {}, fishing = {}, working = {} }
-    local view = ns.Camp.pocket(rows, {}, 0, doing, {}, 304, { b = true, c = true })
-    local ids = {}
-    for i, actor in ipairs(view.actors) do ids[i] = actor.memberId end
-    assert.same({ "you", "c", "b", "h", "e", "g", "d", "f" }, ids)
+    local net, clients = crew({ "Ann", "Bea", "Cal", "Dot", "Eli", "Fin", "Gus", "Hal" })
+    local a, cal, eli, fin, gus, hal = clients[1], clients[3], clients[5], clients[6], clients[7], clients[8]
+    a.core:setSetting("pocketCampColumns", 304)
+    inside(net, { a, fin, hal }, "The Deadmines")
+    inside(net, { cal, eli }, "Ragefire Chasm")
+    a.core:group({ unit(a), unit(gus), unit(hal) })
+    assert.same({ "You", "Hal", "Gus", "Fin", "Cal", "Eli", "Bea", "Dot" }, order(a.core:pocketCamp()))
   end)
 
   it("puts Members in the same instance in one shared doorway, and others in one each", function()
@@ -1068,17 +1064,21 @@ describe("Playing together", function()
   end)
 
   it("doesn't grow past its max width for a raid too big for one side of the widest", function()
-    local ns = load()
+    local names = {}
+    for i = 1, 12 do names[i] = "M" .. string.char(96 + i) end
+    local net, clients, ns = crew(names)
+    local a = clients[1]
     local layout = ns.Core.CAMP_LAYOUT
-    local rows = {}
-    for i = 1, 12 do
-      rows[i] = { memberId = "m" .. i, name = "m" .. i, fullName = "m" .. i, online = true, own = i == 1 or nil,
-        classFilename = "MAGE", lastSeen = 0, instance = i > 1 and "Molten Core" or nil }
+    local raid = {}
+    for i = 2, 12 do raid[#raid + 1] = clients[i] end
+    inside(net, raid, "Molten Core")
+    assert.equal(layout.pocketColumns, a.core:pocketCamp().columns)
+    for i = 11, 12 do
+      clients[i]:move({ mapId = 1429, x = 0.5, y = 0.5 })
+      clients[i]:play({ zone = "Elwynn Forest" })
     end
-    local doing = { said = {}, fishing = {}, working = {} }
-    assert.equal(layout.pocketColumns, ns.Camp.pocket(rows, {}, 0, doing, {}, nil, {}).columns)
-    for i = 11, 12 do rows[i].instance = nil end
-    assert.equal(layout.pocketMaxColumns, ns.Camp.pocket(rows, {}, 0, doing, {}, nil, {}).columns)
+    net:run(15)
+    assert.equal(layout.pocketMaxColumns, a.core:pocketCamp().columns)
   end)
 
   it("seats your group outside your instance round the fire, not across from you together", function()
