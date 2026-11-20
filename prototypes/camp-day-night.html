@@ -1,6 +1,9 @@
 <!doctype html>
 <!--
   PROTOTYPE, throwaway (#267). Question: what should the Camp look like by day, and what sun, moon and stars?
+  Chosen (the defaults below): look A Clear, sun A rayed at the top left, moon A crescent at the top left, stars A
+  (4 pixels fading), detailed pines by day and subtle ones at night. Top left is the one place clear of the lunar
+  lanterns at every width and of the firework at night.
   Variants, each shown side by side in its own section:
     Day look  A Clear (blue sky, a few clouds), B Muted (low contrast, a haze over the hills),
               C Storybook (bright and saturated, big clouds), D Dim (day, but kept close to the dark window).
@@ -988,7 +991,7 @@ const pocketCast = [
 ];
 
 const query = new URLSearchParams(location.search);
-const pick = { look: "A", sun: "A", sunAt: "right", moon: "B", moonAt: "right", stars: "A", starCount: "4",
+const pick = { look: "A", sun: "A", sunAt: "left", moon: "A", moonAt: "left", stars: "A", starCount: "4",
   season: "none", phase: "day", trees: "detailed", nightTrees: "subtle", nightOnly: "hide", world: "bright", scale: 1 };
 for (const k of Object.keys(pick)) if (query.has(k)) pick[k] = typeof pick[k] === "number" ? +query.get(k) : query.get(k);
 if (query.has("variant")) pick.look = query.get("variant");
