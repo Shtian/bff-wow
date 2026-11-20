@@ -37,7 +37,7 @@ function Pocket:on()
   return self.isOn()
 end
 
-function Pocket:settled()
+function Pocket:syncSettled()
   self.trophiesSince = self.now()
 end
 
@@ -133,7 +133,7 @@ local function doingOf(self, rows, now)
   return doing
 end
 
-local function scene(self)
+local function pocketView(self)
   local now = self.now()
   local rows = ns.Roster.rows(self.ledger, now)
   local doing = doingOf(self, rows, now)
@@ -188,7 +188,7 @@ end
 
 function Pocket:animateMember(kind, memberId)
   if not self:on() then return end
-  for _, actor in ipairs(scene(self).actors) do
+  for _, actor in ipairs(pocketView(self).actors) do
     if actor.memberId == memberId and actor.pose ~= "asleep" then
       self.listener("pocketCampAnimation", { kind = kind, memberId = memberId })
     end
@@ -239,7 +239,7 @@ end
 function Pocket:view()
   if not self:on() then return nil end
   local setting = self.setting
-  local view = scene(self)
+  local view = pocketView(self)
   view.opacity = setting("pocketCampOpacity") / 100
   view.locked = setting("pocketCampLocked")
   view.inCombat = setting("pocketCampCombat")

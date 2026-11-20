@@ -589,7 +589,7 @@ function Core:tick()
   shareWhere(self)
   shareDoing(self)
   if self.feedState:tick() then
-    self.pocket:settled()
+    self.pocket:syncSettled()
     awaySummary(self)
   end
   if self.db.crew and self.crewGoals:tick() then

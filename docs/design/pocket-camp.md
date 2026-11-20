@@ -58,7 +58,7 @@ UI never reads a setting or a Member record. `UI/PocketCamp.lua` creates its fra
 ## Rules
 
 - **Who:** the Members whose Roster row is online, you first, then your group, then the rest (see Together, below), then the bedrolls (below). No other sleepers, no Graves or tent. Online Members that don't fit are counted in `more` ("+2").
-- **Bedrolls:** a Member whose row goes from online to offline (a logout, or timing out) sleeps in a bedroll, the Camp's sleeper art, for 10 minutes from when this client saw it (`BEDROLL_FOR` in `Core/Core.lua`), then is gone. Pose `asleep`, status "asleep · 4m" ("asleep" under a minute), and the same line in the whole-Camp tooltip, after the online figures.
+- **Bedrolls:** a Member whose row goes from online to offline (a logout, or timing out) sleeps in a bedroll, the Camp's sleeper art, for 10 minutes from when this client saw it (`BEDROLL_FOR` in `Core/Pocket.lua`), then is gone. Pose `asleep`, status "asleep · 4m" ("asleep" under a minute), and the same line in the whole-Camp tooltip, after the online figures.
   - Bedrolls take the seats after every online Member, most recent Last seen first, in the room the online Members leave at the width they need. They're the first left out, never counted in "+N", and never make it wider.
   - Coming back online within the 10 minutes swaps the bedroll for the usual figure, which walks in.
   - A Member who leaves the Crew or is removed gets none, and loses one they had.
@@ -154,7 +154,7 @@ In a section of their own on the Settings page, Pocket Camp, after Toasts (`docs
 
 All account-wide. With `camp` off the Pocket Camp never shows, whatever its own setting says.
 
-`pocketCampAlts` and `pocketCampSpares` are **Shown in the Pocket Camp**, a section of its own after Pocket Camp: what the figures are marked with and what stands by the fire, each on by default so a player can opt out. Both are greyed out while the Pocket Camp is off (`needs = "pocketCamp"`). The next mark worth a choice is one more entry there, read in `pocketView` into `shown` (a figure's) or in `pocketCamp()` (the fire's, as the crate is).
+`pocketCampAlts` and `pocketCampSpares` are **Shown in the Pocket Camp**, a section of its own after Pocket Camp: what the figures are marked with and what stands by the fire, each on by default so a player can opt out. Both are greyed out while the Pocket Camp is off (`needs = "pocketCamp"`). The next mark worth a choice is one more entry there, read in Pocket's `pocketView` into `shown` (a figure's) or in `Pocket:view()` (the fire's, as the crate is).
 
 ## UI
 
