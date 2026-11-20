@@ -9,8 +9,7 @@ local LAYOUT = ns.Core.CAMP_LAYOUT
 
 CampScene.BAND_TARGET = 3
 CampScene.FIGURE_TARGET = 2
-CampScene.HEIGHT = 120
-CampScene.SHORT_HEIGHT = 78
+CampScene.BAND_ROWS = 40
 local FPS = 6
 local HOP_FOR = 0.7
 local CHEER_BURST = { x = 5.5, row = 2, reach = 0.9, fade = 0.6,
@@ -1237,10 +1236,9 @@ function CampScene.new(parent, options)
     onUpdate(band)
   end
 
-  function band:Measure(width, height)
+  function band:Measure(width, rows)
     scene.unit = CampScene.artUnit(band, scene.target)
     local columns = math.floor(width / scene.unit)
-    local rows = math.floor(height / scene.unit)
     scene.fire = math.floor(columns / 2)
     scene.rows = rows
     return columns, rows * scene.unit

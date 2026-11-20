@@ -29,7 +29,6 @@ local NODE = 26
 local NEW_DOT = Skin.UNREAD_DOT
 local LINE_X = INSET + NODE / 2 - 1
 local REDRAW_EVERY = 30
-local CAMP_SMALL_UNDER = 460
 local SCROLL_STEP = 40
 
 local TITLE = "Best Friends in Forever"
@@ -1628,7 +1627,7 @@ local function drawCamp(inCrew)
   local view
   if inCrew then
     local width = frame:GetWidth() - 2
-    local columns, height = camp:Measure(width, frame:GetHeight() < CAMP_SMALL_UNDER and ns.CampScene.SHORT_HEIGHT or ns.CampScene.HEIGHT)
+    local columns, height = camp:Measure(width, ns.CampScene.BAND_ROWS)
     view = core:camp(columns)
     campHeight = view and height or 0
   else

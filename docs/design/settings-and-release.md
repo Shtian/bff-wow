@@ -79,7 +79,7 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `toasts` | `toastsOff = true`, or nil while on |
   | `toastSound` | the sound's name, or nil for the default |
   | `toastPosition` | `{ x, y }`, or nil for the default |
-  | `panelPlace` | `{ width, height, left, top }` in whole UI units (top left corner from the screen's bottom left), size within 460×380 to 900×800; nil for the default 640×520, centred |
+  | `panelPlace` | `{ width, height, left, top }` in whole UI units (top left corner from the screen's bottom left), size within 460×460 to 900×800; nil for the default 640×520, centred |
   | `dungeonsOffline` | `offlineOff = true` inside `together`, or nil while on |
   | `dungeonsAlts` | `alts = true` inside `together`, or nil while off |
   | `dungeonsNear` | `near = true` inside `together`, or nil while off |
