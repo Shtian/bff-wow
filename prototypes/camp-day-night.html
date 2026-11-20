@@ -1,0 +1,1138 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway (#267). Question: what should the Camp look like by day, and what sun, moon and stars?
+  Variants, each shown side by side in its own section:
+    Day look  A Clear (blue sky, a few clouds), B Muted (low contrast, a haze over the hills),
+              C Storybook (bright and saturated, big clouds), D Dim (day, but kept close to the dark window).
+              Each look is a sky gradient, hills, pines, grass, the fire's weaker glow and its own winter snow.
+    Sun       A rayed (rays pulse every 2 s), B a disc in a dithered halo, C a small plain disc.
+    Moon      A today's crescent (the one baked into the backdrop, which the 40-row band crops off),
+              B full with craters, C half, its dark side faintly showing.
+    Stars     A single pixels fading dim, mid, bright; B the same, flashing a small cross at their brightest.
+    Place     above the fire, top left or top right, for the sun and the moon separately.
+  Every look is shown in the panel's band (375 and 128 columns, the window under it lit by the fire), While you
+  were away (146 columns, laid out for 120, its window unlit) and the Pocket Camp (no sky, no sun, backdrop at 60%,
+  over a bright and a dark world). The panel's short band was dropped after #244 (c9e27ed), so every band is 40 rows.
+  At 40 rows the backdrop covers the whole band, so the "sky colour" fill above it never shows: the sky gradient is
+  what you see.
+  The floating bar at the bottom (or the left and right arrow keys) cycles the look used by sections 3 to 6.
+  The sticky bar sets the other picks. URL params set any pick, e.g. ?look=B&sun=C&season=winter&scale=2.
+  Day art is between DAY-BEGIN and DAY-END. Palette, figures, hats, pets, the tent, the fire, the season pieces and
+  the night backdrop are copied from scripts/camp-art.mjs, UI/CampScene.lua and prototypes/camp-seasons.html
+  (#261's branch); the lanterns follow UI/CampScene.lua's spread. The layout is a port of Core/Camp.lua's arrange.
+  Crew data is fake. The scene steps at the band's 6 ticks a second.
+  Run: open the file in a browser.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Camp day and night</title>
+<style>
+  :root { --gold:#ffd14a; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99; --window:#0e0d14; --raised:#1b1a23;
+    --warm:255,236,200; --border:rgba(var(--warm),.10); --narrow:"Arial Narrow","Archivo Narrow",sans-serif; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; color:var(--text); background:#14121b; font:14px/1.35 var(--narrow); padding-bottom:90px; }
+  h1 { font:600 18px system-ui; margin:20px 16px 4px; text-align:center; }
+  h2 { font:600 16px system-ui; color:var(--gold); margin:48px 16px 6px; text-align:center; }
+  h4 { font:600 12px system-ui; color:var(--muted); margin:16px 16px 4px; text-align:center; }
+  p.sub { color:var(--muted); text-align:center; max-width:860px; margin:0 auto 12px; padding:0 16px; font:13px/1.45 system-ui; }
+  canvas { image-rendering:pixelated; image-rendering:crisp-edges; display:block; }
+  .readout { text-align:center; color:var(--dim); font:12px system-ui; margin:4px 16px 0; min-height:16px; }
+  .readout b { color:var(--muted); font-weight:600; }
+  .readout b.bad { color:#f2665c; }
+  .slider { display:flex; justify-content:center; align-items:center; gap:10px; color:var(--muted); font:13px system-ui; margin:6px 16px; }
+  .slider input { width:min(420px, 70vw); }
+  #toggles { position:sticky; top:0; z-index:5; background:rgba(20,18,27,.95); border-bottom:1px solid var(--border);
+    display:flex; flex-wrap:wrap; gap:8px 18px; justify-content:center; padding:10px 16px; color:var(--muted); font:13px system-ui; }
+  .group { display:flex; gap:4px; align-items:center; }
+  .group button { font:13px system-ui; color:var(--text); background:var(--raised); border:1px solid rgba(255,255,255,.14); padding:3px 9px; border-radius:4px; cursor:pointer; }
+  .group button.on { background:var(--gold); color:#1a1400; border-color:var(--gold); }
+  .row { display:flex; flex-wrap:wrap; justify-content:center; gap:20px; padding:0 16px; }
+  .cell { display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .cell .name { font:600 13px system-ui; color:var(--text); }
+  .tag { font:11px system-ui; color:var(--dim); text-align:center; margin-top:10px; }
+  .variant { margin:26px auto 0; max-width:100%; }
+  .variant > .name { text-align:center; font:600 14px system-ui; margin-bottom:2px; }
+  .variant > .name small { font-weight:400; color:var(--muted); }
+  .scroll { overflow-x:auto; padding:0 16px; }
+  .unit { width:max-content; margin:0 auto; }
+  .pockets { display:flex; justify-content:center; gap:16px; flex-wrap:wrap; padding:0 16px; }
+  .win { overflow:hidden; border-top:1px solid rgba(var(--warm),.10); }
+  .win .r { display:flex; justify-content:space-between; border-top:1px solid rgba(var(--warm),.075); color:var(--text); }
+  .win .r:first-child { border-top:0; }
+  .win .r span:last-child { color:var(--dim); }
+  #switcher { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:10; display:flex; align-items:center; gap:6px;
+    background:#f4f1ea; color:#16131c; border-radius:999px; padding:6px 8px; box-shadow:0 6px 24px rgba(0,0,0,.5); font:600 13px system-ui; }
+  #switcher button { border:0; background:#16131c; color:#f4f1ea; width:28px; height:28px; border-radius:50%; font:600 15px system-ui; cursor:pointer; }
+  #switcher span { min-width:190px; text-align:center; }
+</style>
+</head>
+<body>
+<h1>Day and night in the Camp</h1>
+<p class="sub">The Camp was drawn as a night scene against a dark window. These are four day looks, three suns, three moons and two kinds of star, each in the panel's band, While you were away and the Pocket Camp. Names and the window under the band are there so you can judge contrast and how bright the band reads over the dark panel.</p>
+<div id="toggles"></div>
+
+<h2>1 · The day look</h2>
+<p class="sub">Sky, hills, pines, grass and the fire's weaker light on it, with the sun from the bar. Tonight's scene first, for reference. The window under the panel's band is lit by the fire as it is today; While you were away's isn't.</p>
+<div id="looks"></div>
+
+<h2>2 · Winter by day</h2>
+<p class="sub">Each look's own snow on the ground, solid away from the fire and dithered into its glow, with the tree, the caps, the tent's lights and the flakes. The flakes are today's sprite: check they still read against a pale sky.</p>
+<div id="winter"></div>
+
+<h2>3 · The sun</h2>
+<p class="sub">Close up on each look's sky, then in the band with the look, place and season from the bar.</p>
+<div id="sun-close"></div>
+<div id="sun-bands"></div>
+
+<h2>4 · The moon and the stars</h2>
+<p class="sub">Over tonight's backdrop, which already has its baked-in stars. The new stars are the few that twinkle, slowly (each over 5 to 8 s).</p>
+<div class="row" id="moon-close"></div>
+<div id="moon-bands"></div>
+<div id="star-bands"></div>
+
+<h2>5 · Where they sit</h2>
+<p class="sub">Each place in the lunar new year, where the lanterns hang across the top, at the narrowest band, While you were away and the widest. By day the sun; by night the moon, stars and the firework over the fire (the bar's "Firework now" plays it). The readout says what the sun or moon runs into.</p>
+<div id="places"></div>
+
+<h2>6 · Together, with your picks</h2>
+<p class="sub">Phase in the bar: day, night, or flipping every 10 s to see the instant swap at a redraw.</p>
+<h4>The panel's band: drag to resize</h4>
+<div class="slider">columns <input type="range" id="band-cols" min="128" max="375" step="1" value="300"><span id="band-cols-v"></span></div>
+<div class="scroll"><div class="unit" id="band-unit"><canvas id="band"></canvas><div class="win" id="band-win"></div></div></div>
+<div class="readout" id="band-out"></div>
+<h4>While you were away (146 columns, laid out for 120)</h4>
+<div class="scroll"><div class="unit" id="away-unit"><canvas id="away"></canvas><div class="win" id="away-win"></div></div></div>
+<div class="readout" id="away-out"></div>
+<h4>The Pocket Camp: backdrop at 60%, no sky</h4>
+<div class="slider">room <input type="range" id="pocket-room" min="112" max="304" step="1" value="176"><span id="pocket-room-v"></span></div>
+<div class="scroll"><div class="unit"><canvas id="pocket"></canvas></div></div>
+<div class="readout" id="pocket-out"></div>
+
+<div id="switcher"><button id="prev" title="Previous look (←)">‹</button><span id="switch-label"></span><button id="next" title="Next look (→)">›</button></div>
+
+<script>
+const PAL = {
+  K: "#0b0a12", S: "#e8b890", s: "#b98465", W: "#fff3c4", Y: "#ffe9a0", G: "#ffd14a", O: "#f0a21c",
+  R: "#c9481c", B: "#5a3a24", b: "#3a2518", T: "#8c8796", t: "#5d5966", L: "#70e370", P: "#f2b8d0",
+  Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8", N: "#ece8d8", A: "#c89a5a", a: "#8f6a3a", r: "#5a1620",
+};
+const SIT = ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...", "..KCCDDCCK..", ".KCCCDDCCCK.", ".KSCCDDCCSK.", ".KKCCCCCCKK.", "..KDDKKDDK..", "..KKK..KKK.."];
+const BED = ["....KKKK..........", "...KCCCCKKKKKKKKK.", "..KCSSSSKDDDDDDDDK", "..KSKKSSKDCDDDCDDK", "..KSSSSsKDDDDDDDDK", "...KKKKKKKKKKKKKK."];
+const GRAVE = ["..TTTT..", ".TTTTTt.", "TTttttTt", "TTTTTTTt", "TTttttTt", "TTTTTTTt", "TTTTTTTt", "ttttttt."];
+const FLOWER = [".P.", "PGP", ".P.", ".L."];
+const SPARK = ["..W..", ".WGW.", "WGYGW", ".WGW.", "..W.."];
+const FIRE = [
+  [".....R.....", "....RR.....", "....ROR..R.", "...ROOR.RR.", ".R.ROOORRR.", ".RRROGGORR.", ".RROOGGOOR.", "RROOGYYGOOR", "ROOGGYYGGOR", "ROGGYYYYGOR", ".ROGYYWYGO.", "..ROGGGGO.."],
+  [".........R.", "..R..R.....", "..RR.RR....", ".RORROR..R.", ".ROORROR.R.", ".ROOOOORRR.", ".ROGGOOGOR.", "RROGYGOGOOR", "ROOGYYGGGOR", "ROGGYYYYGOR", ".ROGYWYYGO.", "..ROGGGGO.."],
+  ["...R.......", "...RR...R..", "..RORR..R..", "..ROOR.RR..", ".RROOORRO..", ".ROOGOOROR.", ".ROGGGOOOR.", "RROGGYGGOOR", "ROOGYYYGGOR", "ROGGYYYYGOR", ".ROGYYWYGO.", "..ROGGGGO.."],
+];
+const LOGS = ["..BB.......BB..", ".BBBBb...bBBBB.", "bbBBBBBBBBBBBbb", "..bbbbbbbbbbb.."];
+const SEAT = ["BBBBBBBBBBBBBB", "bbbbbbbbbbbbbb", "bbbbbbbbbbbbbb"];
+const SLEEP = [["ZZZ", ".Z.", "Z..", "ZZZ"], ["ZZZZ", "..Z.", ".Z..", "ZZZZ"], ["ZZZZZ", "...Z.", "..Z..", ".Z...", "ZZZZZ"]];
+function outlined(rows) {
+  const w = Math.max(...rows.map((r) => r.length)) + 2, h = rows.length + 2;
+  const at = (x, y) => { const r = rows[y - 1]; const c = r && r[x - 1]; return c && c !== "." ? c : null; };
+  const out = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) {
+      const own = at(x, y);
+      if (own) { line += own; continue; }
+      let near = false;
+      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (at(x + i, y + j)) near = true;
+      line += near ? "K" : ".";
+    }
+    out.push(line);
+  }
+  return out;
+}
+const HAT_PAL = { x: "#1d1b26", X: "#34303f", q: "#55506a", g: "#2c5a33", h: "#468a46", i: "#6db35e", v: "#2c1d4f", V: "#45307e", u: "#6f55b5" };
+const HATS = {
+  wizard: { brow: 4, rows: ["......vv..", ".....uV...", "...vuVVv..", "..vuVGVVv.", "vvuuVVVVvv"] },
+  horns: { brow: 3, rows: ["N........N", "N..TZZT..N", "NNTZZTTTNN", ".tTTTTTTt."] },
+  straw: { brow: 4, rows: ["....GYYG....", "...GYWYYGO..", "...RRRRRR...", ".OGYYYYYYGO.", "aOGGGGGGGGOa"] },
+  cap: { brow: 4, rows: [".........R", "...hhh..RO", "..hiihhRO.", ".ghhhhhRhg", "gggggggggg"] },
+  tophat: { brow: 4, rows: ["..XXXXXX..", "..XqXXXx..", "..XqXXXx..", "..rrrrrr..", "xXXXXXXXXx"] },
+  circlet: { brow: 1, rows: ["....YG....", ".GOGFfGOG."] },
+};
+const PET_PAL = { g: "#2c5a33", h: "#468a46", i: "#9bd47a", c: "#b8501c" };
+const PETS = {
+  cat: { sit: [".....T..T", ".....TTTT", "t....YTYT", "t....TPTT", ".t..TTTTT", ".tTTTTTNT", "..TTTTTNT", "..TtTtTTT"],
+    asleep: [".......T.T", "...TTTTTTT", "..TtTTTtTt", ".TTTtTTTTP", "tTTTTtTTTT", ".ttttttttt"] },
+  dog: { sit: ["....AAAA..", "...aAAKAAA", "...aAAAANK", "a..aAAAN..", "a..AAANN..", ".AAAAANN..", ".AAAAAAN..", ".AaAAAaA.."],
+    asleep: [".....AAA...", "....aAAaAA.", "..AAaAAaANK", ".aAAAAAAANN", "aAAAAAAANNN"] },
+  owl: { sit: ["bb.....bb", ".bBBBBBb.", "BNNBBBNNB", "NYKNBNKYN", "BNNBOBNNB", "BBBBOBBBB", ".BAbAbAB.", ".BbAbAbB.", "..O...O.."],
+    asleep: [".bBBBBBb.", "BNNBBBNNB", "NbbNBNbbN", "BNNBOBNNB", "BBBBBBBBB", ".BAbAbAB.", "..BBBBB.."] },
+  fox: { sit: ["......R.R..", "......OOO..", "N.....OKOOK", "NO....OONN.", "OO...OOON..", "OO..OOOON..", ".OOOOOOON..", "..ObOObON.."],
+    asleep: [".......R.R.", "....OOOOOO.", "..OOOOOOcOK", ".OOOOOOOONN", "OOOOOOOONNN", "NNNOOOOOOb."] },
+};
+const CANVAS = ["#c2b394", "#958974", "#695f52", "#4a433b"];
+function tent() {
+  const [lit, mid, shade, deep] = CANVAS;
+  const darker = { [lit]: mid, [mid]: shade, [shade]: deep, [deep]: deep };
+  const tone = (u) => (u < -0.6 ? deep : u < -0.12 ? shade : u < 0.08 ? mid : u < 0.78 ? lit : mid);
+  const width = 33, cx = 16;
+  const grid = Array.from({ length: 23 }, () => Array(width).fill(null));
+  const set = (i, y, c) => { grid[y][cx + i] = c; };
+  set(0, 0, PAL.G); set(0, 1, PAL.a);
+  for (let j = 0; j < 9; j++) {
+    const hw = Math.round(1 + j * 1.6);
+    for (let i = -hw; i <= hw; i++) {
+      const u = i / hw;
+      let c = tone(u * 0.9 + 0.05);
+      if (Math.abs(Math.abs(u) - 0.55) < 0.09 && hw > 3) c = darker[c];
+      if (i === 0) c = j % 2 ? PAL.A : PAL.a;
+      set(i, 2 + j, c);
+    }
+  }
+  for (let i = -15; i <= 15; i++) {
+    set(i, 11, i % 2 === 0 ? PAL.A : tone(i / 15));
+    if ((i + 15) % 3 !== 2) set(i, 12, darker[tone(i / 15)]);
+  }
+  const door = [2, 3, 4, 4, 5, 5, 5, 6, 6, 6];
+  for (let j = 0; j < 10; j++) {
+    const y = 13 + j, hw = j < 3 ? 13 : j < 7 ? 14 : 15, d = door[j];
+    for (let i = -hw; i <= hw; i++) {
+      let c = tone(i / hw);
+      if (Math.abs(i) === 10) c = darker[c];
+      if (Math.abs(i) < d) c = j >= 8 ? "#1f1820" : "#120e14";
+      else if (Math.abs(i) === d) c = i > 0 ? lit : mid;
+      else if (Math.abs(i) === d + 1) c = darker[tone(i / hw)];
+      if (i === 0 && j >= 1) c = PAL.B;
+      set(i, y, c);
+    }
+    if (j === 4) { set(-6, y, PAL.A); set(-7, y, PAL.a); set(6, y, PAL.A); set(7, y, PAL.A); }
+  }
+  const out = Array.from({ length: grid.length + 2 }, (_, y) =>
+    Array.from({ length: width + 2 }, (_, x) => (grid[y - 1] && grid[y - 1][x - 1]) || null));
+  const filled = (x, y) => out[y] && out[y][x] && out[y][x] !== PAL.K;
+  for (let y = 0; y < out.length; y++) for (let x = 0; x < width + 2; x++) {
+    if (!out[y][x] && (filled(x - 1, y) || filled(x + 1, y) || filled(x, y - 1) || filled(x, y + 1))) out[y][x] = PAL.K;
+  }
+  return out;
+}
+const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]].map((r) => r.map((v) => (v + 0.5) / 16));
+const rnd = (s) => { const x = Math.sin(s * 127.1) * 43758.5453; return x - Math.floor(x); };
+
+const SNOW = { cap: PAL.N, shade: PAL.Z, far: "#8c8a9e", ground: "#262838", dusk: "#3e4058" };
+const TREE_PAL = { g: "#2c5a33", h: "#468a46", i: "#6db35e", j: "#9bd47a" };
+const PINE = ["....Y....", "...YWY...", "....h....", "...ghi...", "..gRhhi..", "...ghj...", "..gFhhi..", ".gghhhGi.", "..ghhhj..", ".gPhhhhi.", "gghhhRhhj", "....B...."];
+const LIGHTS = ["#ff5a44", "#ffd14a", "#70e370", "#7fc4ee", "#f2b8d0"];
+const TWINKLE = { order: [3, 1, 5, 2, 4, 6], every: 4, flash: 2 };
+function tentSnow(grid) {
+  const out = grid.map((row) => row.map(() => null));
+  for (let x = 0; x < grid[0].length; x++) {
+    for (let y = 3; y <= 13; y++) {
+      const c = grid[y][x];
+      if (c && c !== PAL.K) {
+        out[y][x] = SNOW.cap;
+        if (y < 12) out[y + 1][x] = x % 2 ? SNOW.cap : SNOW.shade;
+        break;
+      }
+    }
+  }
+  return out;
+}
+const TENT_LIGHTS = [[8, -1], [5, -1], [2, -1], [2, 1], [5, 1], [8, 1]].map(([j, side]) => [17 + side * (Math.round(1 + j * 1.6) + 1), 3 + j]);
+const FLAKES = { fewest: 6, most: 10, every: 2, drift: 5, seed: 11, farEvery: 3, fireReach: 6, flameRows: 12 };
+
+const PUMPKIN_PAL = { p: "#cc621a", q: "#8a3c14", u: "#ee8a32", s: "#5a7a2a", v: "#3a5420" };
+const PUMPKIN_GLOW = ["#ffe9a0", "#f0a21c"];
+const PUMPKIN = [".....sv....", "...qpspuu..", ".qqpppppuu.", "qqp1ppp1ppu", "qp111p111pu", "qppppp2pppu", "qp1p1p1p1pu", "qpp21212ppu", ".qqpppppuu.", "..qqpppuu.."];
+const BAT_PAL = { T: "#77708a", t: "#4f4960", e: "#c9481c" };
+const BAT = [["t.....t", "tt.T.tt", ".ttTtt.", "...T..."], ["..tTt..", ".tTeTt.", "tt...tt", "t.....t"]];
+const AUTUMN_FIRE_PAL = { R: "#b8381a", O: "#e8701c", G: "#f6922a", Y: "#ffbe62", W: "#ffe0a4" };
+const LANTERN = ["..s..", ".ccc.", "reeef", "reyef", "ryyyf", "reeef", ".ccc.", "..x.."];
+const LANTERN_PALS = [
+  { c: "#ffd14a", x: "#f0a21c", e: "#d0302a", r: "#7a1a1c", f: "#ff6a4a", y: "#ffb060", s: "#6a4a2e" },
+  { c: "#c9481c", x: "#c9481c", e: "#f0a21c", r: "#8a5a18", f: "#ffd14a", y: "#fff3c4", s: "#6a4a2e" },
+];
+const LANTERNS = { sag: 3, perColumns: 60, fewest: 4, most: 6, fireClear: 14, edge: 4, sway: [0, 0, 1, 1, 0, 0, -1, -1], swayStep: 4, swayLag: 3 };
+const STRING = "#6a4a2e";
+const SPARK_RED = { W: "#ffb08a", G: "#e0482c", Y: "#ff8a5a" };
+const BONFIRE = [
+  ["......R......", "......RR.....", ".....RORR....", "..R..ROOR..R.", "..RR.ROOOR.R.", ".RORRROGORRR.", ".ROORROGGOOR.", ".ROOOOGGGOOR.",
+    "RROGOGGYGGORR", "ROOGGGYYYGOOR", "ROGGYYYYYGGOR", "ROGYYYWYYYGOR", "ROGYYWWWYYGOR", ".ROGYYWYYGOR.", ".ROGYYYYYGOR.", "..ROGGGGGOR..", "...ROOOOOR..."],
+  ["..........R..", "...R......R..", "...RR.R..RR..", "..RORRR..ROR.", "..ROORORRROR.", ".RROOOOORROR.", ".ROOGOOOOGOR.", ".ROGGOGGOGOR.",
+    "RROGGGGYGGORR", "ROOGGYYYGGOOR", "ROGGYYYYYYGOR", "ROGYYWYYYYGOR", "ROGYWWWYYYGOR", ".ROGYYWYYGOR.", ".ROGYYYYYGOR.", "..ROGGGGGOR..", "...ROOOOOR..."],
+  ["....R........", "....RR....R..", "...RORR...RR.", "...ROORR.ROR.", ".R.ROOOR.ROR.", ".RRROGOORROR.", "RROOOGGOOOOR.", "ROOGGGGGGOOR.",
+    "RROGGYGGGGORR", "ROOGYYYYGGOOR", "ROGGYYYYYGGOR", "ROGYYYYWYYGOR", "ROGYYYWWWYGOR", ".ROGYYYWYGOR.", ".ROGYYYYYGOR.", "..ROGGGGGOR..", "...ROOOOOR..."],
+];
+const POLE_PAL = { g: "#2c5a33", h: "#468a46", i: "#6db35e" };
+const MIDSUMMER_POLE = [".......Y.......", "......hih......", ".....h.h.i.....", "....h..h..i....", "...h...h...i...", "..h....h....i..", ".h.....h.....i.",
+  "ghhihhiPhihhihi", ".hg....h....gi.", "h..W...i...P..i", "g..h...h...h..i", ".hg....h....gi.", ".......h.......", "......gh.......", ".......h.......",
+  ".......hi......", ".......h.......", ".......h.......", "......gh.......", ".......h.......", ".......hi......", ".......h.......", ".......h.......", "......ghi......"];
+const FIREFLY = { on: "#d8f070", dim: "#6a8a30" };
+
+// DAY-BEGIN
+// Tonight: the backdrop as scripts/camp-art.mjs draws it today.
+const NIGHT = {
+  label: "Tonight", sky: ["#070a1e", "#0a0d26", "#0e1030", "#141335", "#1c1636"], hills: "#0e0f26", pines: "#090a18",
+  snow: { ground: SNOW.ground, dusk: SNOW.dusk, far: SNOW.far },
+};
+// Day looks: the sky top to horizon (dithered), clouds (c, s its underside), a haze over the hills, the hills and
+// their lit crest, pines (pinesLit their right edge), the grass far to near, the fire's glow on it (weakest first)
+// and how far it reaches (1 is the night's), and the snow's ground, dusk edge and far edge. The far edge is darker than
+// the snow by day: a lighter one reads as a rail along the horizon, as it did in winter's prototype.
+const LOOKS = {
+  A: {
+    label: "A · Clear", note: "a plain blue day, a few clouds",
+    sky: ["#3b62a8", "#4a74b6", "#5c86c2", "#7299cc", "#8fb0d8"], clouds: { c: "#eef0f4", s: "#c4cede" },
+    hills: "#6a7f9a", crest: "#7d92aa", pines: "#2f4a3a",
+    ground: ["#4f6b3a", "#3e5730"], glow: ["#6a6a34", "#86743a"], glowReach: 0.5,
+    snow: { ground: "#d4dae4", dusk: "#b4bece", far: "#9aa6b8" },
+  },
+  B: {
+    label: "B · Muted", note: "grey-blue and low contrast, a haze over the hills",
+    sky: ["#4a5878", "#55647f", "#606f88", "#6e7b92", "#7f8a9e"], haze: "#8a93a4",
+    hills: "#4d5a6a", crest: "#5a6676", pines: "#26332e",
+    ground: ["#3c4632", "#313a2a"], glow: ["#4e4630", "#625232"], glowReach: 0.55,
+    snow: { ground: "#a8aebb", dusk: "#8f96a6", far: "#7e8698" },
+  },
+  C: {
+    label: "C · Storybook", note: "bright and saturated, big clouds, lit pines",
+    sky: ["#5b8fd8", "#6c9ee0", "#80ade6", "#96bdec", "#b0cff2"], clouds: { c: "#ffffff", s: "#d6e2f2" }, bigClouds: true,
+    hills: "#6f9866", crest: "#86ac74", pines: "#2e5a3c", pinesLit: "#3f7048",
+    ground: ["#6a9a48", "#5a8a3c"], glow: ["#8a9a40", "#a89a48"], glowReach: 0.45,
+    snow: { ground: "#e8ecf2", dusk: "#cfd7e4", far: "#b4c0d0" },
+  },
+  D: {
+    label: "D · Dim", note: "day, kept close to the dark window; the fire still shows",
+    sky: ["#1e2c50", "#24345a", "#2c3e64", "#36486e", "#425478"],
+    hills: "#1f2b44", crest: "#2a3854", pines: "#141c2a",
+    ground: ["#1e2620", "#181e1a"], glow: ["#2e2418", "#45301a", "#5a3c1a"], glowReach: 0.7,
+    snow: { ground: "#5a6278", dusk: "#4a5268", far: "#3e4660" },
+  },
+};
+const CLOUDS = [
+  ["....cccc.....", "..ccccccccc..", ".cccccccccccc", "..sssssssss.."],
+  ["..ccc...", ".cccccc.", "cccccccc", ".ssssss."],
+  ["......cccc..........", "...cccccccccc..ccc..", ".cccccccccccccccccc.", "cccccccccccccccccccc", ".ssssssssssssssssss."],
+];
+// [x in the 384-wide art, y from its top, shape]; the fire is on x 192. y 12 is the band's top row.
+const CLOUD_SPOTS = [[38, 14, 0], [112, 18, 1], [226, 13, 0], [298, 17, 1], [350, 14, 1], [150, 13, 1]];
+const BIG_CLOUD_SPOTS = [[30, 13, 2], [120, 17, 0], [236, 12, 2], [318, 16, 0]];
+
+// Suns: light sources, not outlined. W the disc, Y its rim, G rays, h the halo.
+const SUN_PAL = { W: "#fff3c4", Y: "#ffe9a0", G: "#ffd14a", h: "#f6e8b0" };
+const SUNS = {
+  A: { label: "A · Rayed", every: 12, frames: [
+    ["....G....", ".G..G..G.", "...YYY...", "..YWWWY..", "GGYWWWYGG", "..YWWWY..", "...YYY...", ".G..G..G.", "....G...."],
+    [".........", "....G....", "..GYYYG..", "..YWWWY..", ".GYWWWYG.", "..YWWWY..", "..GYYYG..", "....G....", "........."],
+  ] },
+  B: { label: "B · Disc and halo", frames: [
+    ["..h.h.h..", ".h.....h.", "h..YYY..h", "..YWWWY..", "h.YWWWY.h", "..YWWWY..", "h..YYY..h", ".h.....h.", "..h.h.h.."],
+  ] },
+  C: { label: "C · Small disc", frames: [[".YYY.", "YWWWY", "YWWWY", "YWWWY", ".YYY."]] },
+};
+// Moons: M lit, m its shaded rim, c craters, d the dark side.
+const MOON_PAL = { M: "#d8d4c4", m: "#a8a494", c: "#bcb8a8", d: "#262a48" };
+const MOONS = {
+  A: { label: "A · Today's crescent", rows: ["..MMMM", ".MMM..", "MMM...", "MMM...", "MMM...", ".MMM..", "..MMMM"] },
+  B: { label: "B · Full", rows: ["..MMM..", ".MMMMm.", "MMcMMMm", "MMMMcMm", "McMMMMm", ".MMMmm.", "..mmm.."] },
+  C: { label: "C · Half, dark side showing", rows: ["..dMM..", ".ddMMM.", "dddMMMM", "dddMcMm", "dddMMMm", ".ddMMm.", "..dmm.."] },
+};
+const STAR_TONES = { dim: "#4a4c6e", mid: "#7d7f9e", bright: "#fff3c4", arm: "#9a98b8" };
+const STARS = {
+  A: { label: "A · Pixels, fading" },
+  B: { label: "B · Pixels, a small cross at their brightest" },
+};
+// Where a star sits: [fraction of the band's width, row]. The first n are used, skipping any by the moon or a lantern.
+const STAR_SPOTS = [[0.17, 33], [0.41, 37], [0.69, 32], [0.94, 36], [0.06, 31], [0.29, 35], [0.58, 34], [0.82, 38]];
+// The sky's rows: names and hats reach row 26 and the tent's top is row 29, so the sun and moon sit in rows 30 to 38.
+const SKY_ROW = 30, SKY_ROWS = 9;
+const PLACES = { fire: "above the fire", left: "top left", right: "top right" };
+function placeCentre(at, cols, fire) { return at === "fire" ? fire : at === "left" ? 7 : cols - 8; }
+// DAY-END
+
+const DECOR = { tree: { width: 11, gap: 4, row: 4 }, pumpkin: { width: 13, gap: 4, row: 3 }, pole: { width: 15, gap: 4, row: 4 } };
+const SEASON_DECOR = { winter: ["tree"], autumn: ["pumpkin"], midsummer: ["pole"] };
+const SEASON_PIECES = {
+  winter: ["snow", "flakes", "lights", "tree"], autumn: ["autumnFire", "bats", "pumpkin"],
+  lunar: ["lanterns", "firework"], midsummer: ["bonfire", "pole", "fireflies"],
+};
+const NIGHT_ONLY = { bats: true, firework: true, fireflies: true };
+const LAYOUT = { fire: 9, seated: 12, asleep: 18, grave: 8, graveGap: 2, gap: 4, margin: 2, tent: 36, pet: 13, petGap: 1,
+  pocketColumns: 112, pocketMaxColumns: 304, pocketStep: 32, pocketRows: 34, awayColumns: 120, awayBand: 146, minColumns: 128, maxColumns: 375 };
+const ROW = { seat: 3, seated: 4, asleep: 3, grave: 3, flower: 2, logs: 3, fire: 5, tent: 5, pet: 3, ember: 16 };
+const NAMES_REACH = 26;
+const BURST = { reach: 9, every: 11, ways: [[-1, 1], [1, 1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1]] };
+const FPS = 6, BAND_ROWS = 40;
+
+const rgbCache = new Map();
+function rgb(c) { let v = rgbCache.get(c); if (!v) { const n = parseInt(c.slice(1), 16); v = [n >> 16, (n >> 8) & 255, n & 255]; rgbCache.set(c, v); } return v; }
+function rgbaImage(w, h) { return { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }; }
+function rgbaSet(img, x, y, c) {
+  if (x < 0 || y < 0 || x >= img.width || y >= img.height || !c) return;
+  const [r, g, b] = rgb(c), at = (y * img.width + x) * 4;
+  img.data[at] = r; img.data[at + 1] = g; img.data[at + 2] = b; img.data[at + 3] = 255;
+}
+function art(rows, pal) { return rows.map((row) => [...row].map((ch) => (ch === "." ? null : ch === "K" ? PAL.K : pal[ch] || null))); }
+function dot(img, col, row, c) { rgbaSet(img, Math.round(col), img.height - 1 - Math.round(row), c); }
+function stamp(img, grid, x, row, mirror) {
+  const h = grid.length;
+  for (let y = 0; y < h; y++) {
+    const line = grid[y];
+    for (let i = 0; i < line.length; i++) {
+      if (!line[i]) continue;
+      dot(img, mirror ? x + line.length - 1 - i : x + i, row + h - 1 - y, line[i]);
+    }
+  }
+}
+const TENT = tent();
+const TENT_SNOW = tentSnow(TENT);
+
+const CLASS = { WARRIOR: "#c69b6d", MAGE: "#3fc7eb", DRUID: "#ff7c0a", PALADIN: "#f48cba", WARLOCK: "#8788ee", HUNTER: "#aad372", ROGUE: "#fff468", PRIEST: "#ffffff", SHAMAN: "#0070dd" };
+const shade = (c, k) => "#" + rgb(c).map((v) => Math.round(v * k).toString(16).padStart(2, "0")).join("");
+const spriteCache = new Map();
+function sprite(key, make) { let s = spriteCache.get(key); if (!s) { s = make(); spriteCache.set(key, s); } return s; }
+function figureArt(rows, cls, bed) {
+  const k = bed ? 0.55 : 1;
+  return sprite(rows === BED ? "bed" + cls : "sit" + cls, () => art(rows, { ...PAL, C: shade(CLASS[cls], k), D: shade(CLASS[cls], 0.62 * k) }));
+}
+const P = (rows, pal = PAL, key = "") => sprite(key + rows.join("|"), () => art(rows, pal));
+const hatArt = (key) => sprite("hat" + key, () => art(outlined(HATS[key].rows), { ...PAL, ...HAT_PAL }));
+const petArt = (key, asleep) => sprite("pet" + key + asleep, () => art(outlined(PETS[key][asleep ? "asleep" : "sit"]), { ...PAL, ...PET_PAL }));
+const pumpkinArt = (k) => sprite("pumpkin" + k, () => art(outlined(PUMPKIN), { ...PAL, ...PUMPKIN_PAL, 1: PUMPKIN_GLOW[k], 2: PUMPKIN_GLOW[1 - k] }));
+const treeArt = () => sprite("tree", () => art(outlined(PINE), { ...PAL, ...TREE_PAL }));
+const poleArt = () => sprite("pole", () => art(MIDSUMMER_POLE, { ...PAL, ...POLE_PAL }));
+const lanternArt = (i) => sprite("lantern" + i, () => art(LANTERN, LANTERN_PALS[i]));
+const sunArt = (key, k) => sprite("sun" + key + k, () => art(SUNS[key].frames[k], SUN_PAL));
+const moonArt = (key) => sprite("moon" + key, () => art(MOONS[key].rows, MOON_PAL));
+const sparkArt = (red) => sprite("spark" + red, () => art(SPARK, red ? SPARK_RED : PAL));
+
+// Backdrops: tonight's is scripts/camp-art.mjs's; a day look swaps the colours, adds clouds or haze, lights the
+// hills' crest and paints grass with a weaker glow round the fire. Winter puts each look's snow on the ground.
+const BACK_W = 384, BACK_H = 52, FILE_W = 512, FILE_H = 64, HORIZON_ROW = 12;
+function backdrop(look) {
+  const L = look || NIGHT, night = !look;
+  const img = rgbaImage(FILE_W, FILE_H);
+  const ox = (FILE_W - BACK_W) / 2, oy = FILE_H - BACK_H;
+  const W = BACK_W, H = BACK_H;
+  const put = (x, y, color) => rgbaSet(img, ox + x, oy + y, color);
+  const rect = (x, y, w, h, color) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(x + i, y + j, color); };
+  const cx = W / 2, horizon = H - 13;
+  const sky = L.sky;
+  for (let y = 0; y < oy; y++) for (let x = 0; x < FILE_W; x++) rgbaSet(img, x, y, sky[0]);
+  for (let y = 0; y < horizon; y++) for (let x = 0; x < W; x++) {
+    const f = (y / horizon) * (sky.length - 1), i = Math.floor(f), d = f - i;
+    put(x, y, sky[Math.min(sky.length - 1, i + (d > BAYER[y % 4][x % 4] ? 1 : 0))]);
+  }
+  if (night) {
+    for (let i = 0; i < W * 0.28; i++) {
+      const x = Math.floor(rnd(i + 1) * W), y = Math.floor(rnd(i + 50) * (horizon - 8));
+      put(x, y, rnd(i + 9) > 0.8 ? "#fff3c4" : rnd(i + 3) > 0.5 ? "#7d7f9e" : "#4a4c6e");
+    }
+    for (const [dx, dy, w] of [[2, 0, 4], [1, 1, 3], [0, 2, 3], [0, 3, 3], [0, 4, 3], [1, 5, 3], [2, 6, 4]]) {
+      rect(Math.floor(W * 0.83) + dx, 4 + dy, w, 1, "#d8d4c4");
+    }
+  }
+  if (L.clouds) {
+    for (const [x, y, k] of L.bigClouds ? BIG_CLOUD_SPOTS : CLOUD_SPOTS) {
+      CLOUDS[k].forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") put(x + i, y + j, L.clouds[ch]); }));
+    }
+  }
+  if (L.haze) {
+    for (let y = horizon - 13; y < horizon; y++) for (let x = 0; x < W; x++) {
+      const k = (y - (horizon - 13)) / 13 * 0.6;
+      if (BAYER[y % 4][x % 4] < k) put(x, y, L.haze);
+    }
+  }
+  for (let x = 0; x < W; x++) {
+    const h = 7 + Math.round(3 * Math.sin(x * 0.05) + 2 * Math.sin(x * 0.13 + 1));
+    rect(x, horizon - h, 1, h, L.hills);
+    if (L.crest) put(x, horizon - h, L.crest);
+  }
+  const pine = (x, h) => {
+    for (let y = 0; y < h; y++) {
+      const w = Math.floor(((y % 5) + y * 0.55) * 0.62) + 1;
+      rect(x - w, horizon - h + y, w * 2 + 1, 1, L.pines);
+      if (L.pinesLit && w > 1) put(x + w, horizon - h + y, L.pinesLit);
+    }
+    rect(x, horizon, 1, 2, L.pines);
+  };
+  for (let i = 0; i < W / 9; i++) {
+    const x = Math.floor(i * 9 + rnd(i + 20) * 7), far = Math.abs(x - cx) < 30;
+    if (far && rnd(i) > 0.3) continue;
+    pine(x, 12 + Math.floor(rnd(i + 70) * (far ? 5 : 11)));
+  }
+  for (let y = horizon; y < H; y++) for (let x = 0; x < W; x++) {
+    const dx = (x - cx) / 52, dy = (y - (H - 5)) / 9, d = Math.sqrt(dx * dx + dy * dy), b = BAYER[y % 4][x % 4];
+    if (night) {
+      const glow = ["#141019", "#201619", "#35231a", "#573518", "#7a4c18"];
+      const v = Math.max(0, 1 - d) * (glow.length - 1), i = Math.floor(v);
+      put(x, y, glow[Math.min(glow.length - 1, i + (v - i > b ? 1 : 0))]);
+      continue;
+    }
+    const f = (y - horizon) / (H - horizon - 1);
+    let c = L.ground[f > b ? 1 : 0];
+    const g = 1 - d / L.glowReach;
+    if (g > 0) {
+      const v = g * L.glow.length, i = Math.floor(v), k = i + (v - i > b ? 1 : 0);
+      if (k > 0) c = L.glow[Math.min(L.glow.length - 1, k - 1)];
+    }
+    put(x, y, c);
+  }
+  return img;
+}
+function withSnow(back, snow, day) {
+  const img = { width: back.width, height: back.height, data: Uint8ClampedArray.from(back.data) };
+  const fire = FILE_W / 2;
+  const clear = (x, row) => {
+    const dx = (x - fire) / 52, dy = (row - 4) / 9;
+    return Math.min(1, Math.max(0, (Math.sqrt(dx * dx + dy * dy) - 0.55) / 0.45));
+  };
+  const lit = (x, y) => img.data[(y * img.width + x) * 4 + 3] > 0;
+  for (let x = 0; x < img.width; x++) {
+    const bayer = (y) => BAYER[y % 4][x % 4];
+    const top = FILE_H - 1 - HORIZON_ROW;
+    if (lit(x, top) && bayer(top) < clear(x, HORIZON_ROW) * (day ? 0.5 : 1)) rgbaSet(img, x, top, snow.far);
+    for (let row = 0; row < HORIZON_ROW - (day ? 0 : 1); row++) {
+      const y = FILE_H - 1 - row, k = clear(x, row);
+      if (!lit(x, y) || k <= 0 || bayer(y) >= k) continue;
+      rgbaSet(img, x, y, row >= HORIZON_ROW - 3 && bayer(y) < k - 0.5 ? snow.dusk : snow.ground);
+    }
+  }
+  return img;
+}
+const backdropCache = new Map();
+function backdropFor(phase, look, winter) {
+  const key = [phase, look, winter].join(":");
+  let img = backdropCache.get(key);
+  if (!img) {
+    const L = phase === "day" ? LOOKS[look] : null;
+    img = backdrop(L);
+    if (winter) img = withSnow(img, (L || NIGHT).snow, !!L);
+    backdropCache.set(key, img);
+  }
+  return img;
+}
+const POCKET_W = 112, POCKET_H = 34;
+function pocketMask(width) {
+  const round = 4, fade = 0.22, middle = 20, bottom = 0.86, half = POCKET_W / 2;
+  return (i, j) => {
+    const end = Math.min(i + 0.5, width - i - 0.5);
+    const u = Math.max(0, 1 - end / half), y = j + 0.5;
+    const v = y < middle ? (middle - y) / middle : (y - middle) / (POCKET_H - middle) * bottom;
+    const d = Math.pow(Math.pow(u, round) + Math.pow(v, round), 1 / round);
+    return (1 - d) / fade > BAYER[j % 4][i % 4];
+  };
+}
+
+function placeOn(side, figure, graveCount, pet, gap) {
+  const petRoom = pet ? LAYOUT.petGap + LAYOUT.pet : 0;
+  const width = figure + petRoom + graveCount * (LAYOUT.graveGap + LAYOUT.grave);
+  const start = side.used === 0 ? LAYOUT.fire : side.used + (gap ?? LAYOUT.gap);
+  if (start + width > side.limit) return null;
+  side.used = start + width;
+  const x = side.sign > 0 ? start : -start - figure;
+  const petX = !pet ? null : side.sign > 0 ? x + figure + LAYOUT.petGap : x - LAYOUT.petGap - LAYOUT.pet;
+  const graveXs = [];
+  for (let i = 0; i < graveCount; i++) {
+    const offset = figure + petRoom + i * (LAYOUT.graveGap + LAYOUT.grave) + LAYOUT.graveGap;
+    graveXs.push(side.sign > 0 ? x + offset : x - offset + figure - LAYOUT.grave);
+  }
+  return { x, petX, graveXs };
+}
+const roomier = (l, r) => (r.used < l.used ? [r, l] : [l, r]);
+function arrange(cast, columns, opts, petted) {
+  const leftEdge = Math.floor(columns / 2), rightEdge = columns - leftEdge;
+  const left = { sign: -1, used: 0, limit: leftEdge - LAYOUT.margin };
+  const right = { sign: 1, used: 0, limit: rightEdge - LAYOUT.margin };
+  const view = { columns, actors: [], graves: [], more: 0, decor: [] };
+  const withPets = [];
+  for (const m of cast) {
+    if (opts.onlineOnly && m.pose === "asleep") continue;
+    const figure = m.pose === "asleep" ? LAYOUT.asleep : LAYOUT.seated;
+    const graves = opts.onlineOnly ? 0 : m.graves || 0;
+    let spot = null;
+    const [first, second] = roomier(left, right);
+    for (const count of [graves, 0]) {
+      for (const tried of [first, second]) {
+        if (spot) break;
+        const got = placeOn(tried, figure, count, petted.has(m.id));
+        if (got) spot = { ...got, side: tried.sign };
+      }
+      if (spot) break;
+    }
+    if (!spot) { view.more++; continue; }
+    if (m.pet) withPets.push(m.id);
+    view.actors.push({ m, x: spot.x, petX: spot.petX, side: spot.side, width: figure });
+    spot.graveXs.forEach((gx, i) => view.graves.push({ x: gx, flower: i === 0 && m.flower }));
+  }
+  if (opts.tent) {
+    const [side] = roomier(left, right);
+    const got = placeOn(side, LAYOUT.tent, 0);
+    if (got) view.tent = { x: got.x, side: side.sign };
+  }
+  if (!opts.tent || view.tent) {
+    for (const key of opts.decor || []) {
+      const [side] = roomier(left, right);
+      const got = placeOn(side, DECOR[key].width, 0, null, DECOR[key].gap);
+      if (got) view.decor.push({ key, x: got.x, side: side.sign });
+    }
+  }
+  return [view, withPets];
+}
+const seats = (v) => [v.more, v.tent ? "tent" : "", ...v.actors.map((a) => a.m.id), v.graves.length].join(" ");
+function campView(cast, columns, opts) {
+  const [base, withPets] = arrange(cast, columns, opts, new Set());
+  for (let n = withPets.length; n > 0; n--) {
+    const [v] = arrange(cast, columns, opts, new Set(withPets.slice(0, n)));
+    if (seats(v) === seats(base)) return v;
+  }
+  return base;
+}
+function pocketView(cast, room, decor) {
+  const max = Math.max(LAYOUT.pocketColumns, Math.min(LAYOUT.pocketMaxColumns, room));
+  let cols = LAYOUT.pocketColumns;
+  while (campView(cast, cols, { onlineOnly: true }).more && cols + LAYOUT.pocketStep <= max) cols += LAYOUT.pocketStep;
+  return campView(cast, cols, { onlineOnly: true, decor });
+}
+
+let tick = 0;
+const nowAt = { bats: -1000, firework: -1000 };
+function since(range, seed, extra) {
+  let start = 30 + Math.floor(rnd(seed) * range[0]), k = 0, last = -1e9;
+  while (start <= tick) { last = start; k++; start += range[0] + Math.floor(rnd(seed + k * 1.7) * (range[1] - range[0])); }
+  return { ago: Math.min(tick - last, tick - extra), next: start - tick, k };
+}
+function on(s, piece) {
+  if (!(SEASON_PIECES[s.season] || []).includes(piece)) return false;
+  return !(s.phase === "day" && NIGHT_ONLY[piece] && s.nightOnly === "hide");
+}
+
+function fireFrame(s) {
+  const k = tick % 3;
+  if (on(s, "bonfire")) return { grid: P(BONFIRE[k], PAL, "bonfire"), x: -6 };
+  if (on(s, "autumnFire")) return { grid: P(FIRE[k], AUTUMN_FIRE_PAL, "autumn"), x: -5 };
+  return { grid: P(FIRE[k]), x: -5 };
+}
+function drawEmbers(img, fire) {
+  for (let i = 1; i <= 3; i++) {
+    const life = Math.floor((tick * 0.7 + (i - 1) * 5) % 14);
+    const ex = Math.floor(Math.sin((i - 1) * 2 + tick * 0.35) * 3 + (i - 2) * 2 + 0.5);
+    dot(img, fire + ex, ROW.ember + life, life < 7 ? PAL.G : PAL.R);
+  }
+}
+function flakeCount(columns) {
+  const wider = (FLAKES.most - FLAKES.fewest) * (columns - LAYOUT.minColumns) / (LAYOUT.maxColumns - LAYOUT.minColumns);
+  return Math.max(FLAKES.fewest, Math.min(FLAKES.most, FLAKES.fewest + Math.floor(wider)));
+}
+function drawFlakes(img, cols, rows, fire) {
+  const step = Math.floor(tick / FLAKES.every);
+  for (let i = 1; i <= flakeCount(cols); i++) {
+    const column = Math.floor(rnd(FLAKES.seed + i * 7.3) * cols) + Math.floor((step + i * 3) / FLAKES.drift);
+    const x = column % cols;
+    const row = rows - 1 - (Math.floor(rnd(FLAKES.seed + i * 3.1 + 40) * rows) + step) % rows;
+    const onFire = Math.abs(x - fire) <= FLAKES.fireReach && row >= ROW.logs && row <= ROW.fire + FLAKES.flameRows;
+    if (!onFire) dot(img, x, row, i % FLAKES.farEvery === 0 ? SNOW.far : SNOW.cap);
+  }
+}
+function drawBats(img, cols, rows, seed) {
+  const t = since([120, 240], seed, nowAt.bats);
+  const p = t.ago;
+  const two = rnd(seed + t.k * 3.3) > 0.5 || t.ago === tick - nowAt.bats;
+  const rightward = t.k % 2 === 0;
+  const flock = two ? [[0, 0], [4, -3]] : [[0, 0]];
+  for (const [late, drop] of flock) {
+    const q = (p - late) / 24;
+    if (q < 0 || q > 1) continue;
+    const span = cols + 16, x = rightward ? -8 + q * span : cols + 8 - q * span;
+    const row = rows - 6 + drop + Math.round(Math.sin(q * Math.PI * 4) * 1.2);
+    stamp(img, P(BAT[(p - late) % 2], BAT_PAL, "bat"), Math.round(x) - 3, row, !rightward);
+  }
+  return t.next;
+}
+const FIREWORK = { every: [180, 360], rocket: 6, from: 18, lowest: 20, headroom: 11, edge: 3 };
+function fireworkZone(rows, fire) {
+  const high = Math.max(FIREWORK.lowest, rows - FIREWORK.headroom);
+  const reach = Math.min(BURST.reach, rows - FIREWORK.edge - high);
+  return { high, reach, c0: fire - reach - 2, c1: fire + reach + 2, r0: high - reach - 2, r1: high + reach + 2 };
+}
+function drawFirework(img, rows, fire, seed) {
+  const t = since(FIREWORK.every, seed + 9, nowAt.firework);
+  const { high, reach } = fireworkZone(rows, fire);
+  const p = t.ago;
+  if (p < FIREWORK.rocket) {
+    const y = FIREWORK.from + Math.round((high - FIREWORK.from) * (p + 1) / FIREWORK.rocket);
+    dot(img, fire, y, PAL.W); dot(img, fire, y - 1, PAL.O);
+  } else if (p - FIREWORK.rocket < BURST.every) {
+    const q = (p - FIREWORK.rocket) / BURST.every, r = Math.floor(q * reach);
+    BURST.ways.forEach(([dx, dy], i) => {
+      const x = fire + dx * r, y = high + dy * r;
+      if (q < 0.6) stamp(img, sparkArt(i % 2 === 1), x - 2, y - 2);
+      else dot(img, x, y, i % 2 ? PAL.R : PAL.G);
+    });
+  }
+  return t.next;
+}
+function stringRow(c, cols, rows) {
+  const u = (c - cols / 2) / (cols / 2);
+  return rows - 1 - Math.floor(LANTERNS.sag * (1 - u * u) + 0.5);
+}
+function spread(list, from, to, count) {
+  const step = (to - from) / count;
+  for (let i = 1; i <= count; i++) list.push(Math.floor(from + (i - 0.5) * step + 0.5));
+}
+function lanternPlan(cols, rows, fire) {
+  if (rows - 1 - LANTERNS.sag - LANTERN.length <= NAMES_REACH) return [];
+  const count = Math.max(LANTERNS.fewest, Math.min(LANTERNS.most, Math.floor(cols / LANTERNS.perColumns + 0.5)));
+  const list = [], left = Math.ceil(count / 2);
+  spread(list, LANTERNS.edge, fire - LANTERNS.fireClear, left);
+  spread(list, fire + LANTERNS.fireClear, cols - LANTERNS.edge, count - left);
+  return list.map((c) => ({ c, c0: c - 4, c1: c + 4, r0: stringRow(c, cols, rows) - LANTERN.length, r1: stringRow(c, cols, rows) }));
+}
+function drawLanterns(img, cols, rows, plan) {
+  if (!plan.length) return;
+  for (let c = 0; c < cols; c++) dot(img, c, stringRow(c, cols, rows), STRING);
+  plan.forEach((l, i) => {
+    const sway = LANTERNS.sway[Math.floor((tick + (i + 1) * LANTERNS.swayLag) / LANTERNS.swayStep) % LANTERNS.sway.length];
+    stamp(img, lanternArt(i % 2), l.c - 2 + sway, l.r0);
+  });
+}
+const inBox = (b, c, r) => c >= b.c0 && c <= b.c1 && r >= b.r0 && r <= b.r1;
+const overlaps = (a, b) => a.c0 <= b.c1 && b.c0 <= a.c1 && a.r0 <= b.r1 && b.r0 <= a.r1;
+function drawFireflies(img, cols, rows, fire, boxes, seed) {
+  for (let i = 0; i < 8; i++) {
+    const bc = rnd(seed + i * 5.1) * cols, br = 4 + rnd(seed + i * 2.7) * (rows - 12);
+    const c = Math.round(bc + Math.sin(tick * 0.045 + i * 1.9) * 7);
+    const r = Math.round(br + Math.sin(tick * 0.06 + i * 2.3) * 3);
+    if (c < 1 || c > cols - 2 || r < 1 || r > rows - 2) continue;
+    if (Math.abs(c - fire) <= 7 && r <= ROW.fire + 20) continue;
+    if (boxes.some((b) => inBox(b, c, r))) continue;
+    const every = 20 + (i % 4) * 5, phase = (tick + Math.floor(rnd(seed + i) * every)) % every;
+    if (phase < 14) dot(img, c, r, phase === 0 || phase === 13 ? FIREFLY.dim : FIREFLY.on);
+  }
+}
+function skyBox(at, w, h, cols, fire) {
+  const c0 = placeCentre(at, cols, fire) - Math.floor(w / 2), r0 = SKY_ROW + Math.floor((SKY_ROWS - h) / 2);
+  return { c0, c1: c0 + w - 1, r0, r1: r0 + h - 1 };
+}
+function starLevel(i) {
+  const period = 30 + (i * 11) % 19, p = (tick + Math.floor(rnd(i + 3) * period)) % period;
+  return 1 - Math.abs(2 * p / period - 1);
+}
+function drawSky(img, cols, rows, fire, s, lanterns, boxes) {
+  const hits = [], zone = on(s, "firework") ? fireworkZone(rows, fire) : null;
+  let what, box;
+  if (s.phase === "day") {
+    const sun = SUNS[s.sun], k = sun.frames.length > 1 ? Math.floor(tick / sun.every) % sun.frames.length : 0;
+    const g = sunArt(s.sun, k);
+    box = skyBox(s.sunAt, g[0].length, g.length, cols, fire);
+    stamp(img, g, box.c0, box.r0);
+    what = "sun";
+  } else {
+    const g = moonArt(s.moon);
+    box = skyBox(s.moonAt, g[0].length, g.length, cols, fire);
+    const near = { c0: box.c0 - 3, c1: box.c1 + 3, r0: box.r0 - 2, r1: box.r1 + 2 };
+    let drawn = 0;
+    for (let i = 0; i < STAR_SPOTS.length && drawn < +s.starCount; i++) {
+      const c = Math.round(STAR_SPOTS[i][0] * (cols - 1)), r = STAR_SPOTS[i][1];
+      if (r > rows - 2 || inBox(near, c, r) || lanterns.some((l) => inBox(l, c, r))) continue;
+      drawn++;
+      const v = starLevel(i);
+      if (s.stars === "B" && v > 0.86) {
+        for (const [dc, dr] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) dot(img, c + dc, r + dr, STAR_TONES.arm);
+      }
+      dot(img, c, r, v < 0.35 ? STAR_TONES.dim : v < 0.72 ? STAR_TONES.mid : STAR_TONES.bright);
+    }
+    stamp(img, g, box.c0, box.r0);
+    what = "moon";
+  }
+  if (lanterns.some((l) => overlaps(l, box))) hits.push("a lantern");
+  if (zone && overlaps(zone, box)) hits.push("the firework's burst");
+  if (boxes.some((b) => overlaps(b, box))) hits.push("a name");
+  if (box.c0 < 1 || box.c1 > cols - 2) hits.push("the edge");
+  return { what, box, hits };
+}
+function drawDecor(img, view, fire) {
+  for (const d of view.decor) {
+    const dec = DECOR[d.key];
+    const g = d.key === "pumpkin" ? pumpkinArt(tick % 2) : d.key === "tree" ? treeArt() : poleArt();
+    stamp(img, g, fire + d.x + Math.floor((dec.width - g[0].length) / 2), dec.row, d.side > 0);
+  }
+}
+function drawTent(img, view, fire, s) {
+  if (!view.tent) return;
+  const mirror = view.tent.side > 0, x = fire + view.tent.x + Math.floor((LAYOUT.tent - TENT[0].length) / 2);
+  stamp(img, TENT, x, ROW.tent, mirror);
+  if (on(s, "snow")) stamp(img, TENT_SNOW, x, ROW.tent, mirror);
+  if (on(s, "lights")) {
+    const flashing = TWINKLE.order[Math.floor(tick / TWINKLE.every) % TENT_LIGHTS.length];
+    TENT_LIGHTS.forEach(([lx, ly], i) => {
+      const lit = i + 1 === flashing && tick % TWINKLE.every < TWINKLE.flash;
+      dot(img, x + (mirror ? TENT[0].length - 1 - lx : lx), ROW.tent + TENT.length - 1 - ly, lit ? PAL.W : LIGHTS[i % LIGHTS.length]);
+    });
+  }
+}
+function drawActor(img, a, fire, labels, s) {
+  const m = a.m, x = fire + a.x;
+  if (a.petX != null && m.pet) {
+    const g = petArt(m.pet, m.pose === "asleep"), mirror = a.petX > a.x;
+    stamp(img, g, mirror ? fire + a.petX : fire + a.petX + LAYOUT.pet - g[0].length, ROW.pet, mirror);
+  }
+  let top;
+  if (m.pose === "asleep") {
+    stamp(img, figureArt(BED, m.cls, true), x, ROW.asleep);
+    if (on(s, "snow")) stamp(img, P(["ZNNNNNNZ"], PAL, "bedSnow"), x + 9, ROW.asleep + BED.length - 1);
+    const shown = Math.floor(tick / 4) % 5, n = shown === 4 ? 0 : Math.min(shown + 1, 3);
+    const Zs = [{ x: 7, row: 0 }, { x: 12, row: 3 }, { x: 6, row: 5 }];
+    for (let i = 0; i < n; i++) stamp(img, P(SLEEP[i]), x + Zs[i].x, ROW.asleep + BED.length + Zs[i].row);
+    top = ROW.asleep + BED.length;
+  } else {
+    stamp(img, P(SEAT), x - 1, ROW.seat);
+    stamp(img, figureArt(SIT, m.cls), x, ROW.seated);
+    top = ROW.seated + SIT.length;
+    if (m.hat) {
+      const g = hatArt(m.hat), h = g.length;
+      const row = ROW.seated + SIT.length - 2 + HATS[m.hat].brow + 2 - h;
+      stamp(img, g, x + 6 - g[0].length / 2, row);
+      top = Math.max(top, row + h);
+    }
+  }
+  labels.push({ text: m.id, color: CLASS[m.cls], col: x + a.width / 2, row: top + 1 });
+}
+function scene(view, cols, rows, s, opts) {
+  const fire = Math.floor(cols / 2), unit = opts.unit;
+  const img = rgbaImage(cols, rows), labels = [], info = {};
+  const seed = opts.seed || 1;
+  const lanterns = on(s, "lanterns") ? lanternPlan(cols, rows, fire) : [];
+  const preLabels = [];
+  for (const a of view.actors) drawActor(rgbaImage(1, 1), a, fire, preLabels, s);
+  const textRows = Math.ceil(11 / unit);
+  const boxes = preLabels.map((l) => {
+    const half = Math.ceil(l.text.length * 5.2 / unit / 2) + 1;
+    return { c0: l.col - half, c1: l.col + half, r0: l.row - 10, r1: l.row + textRows };
+  });
+  if (opts.sky !== false) info.sky = drawSky(img, cols, rows, fire, s, lanterns, boxes);
+  if (on(s, "flakes")) drawFlakes(img, cols, rows, fire);
+  if (on(s, "bats")) info.batsNext = drawBats(img, cols, rows, seed);
+  if (on(s, "firework")) info.fireworkNext = drawFirework(img, rows, fire, seed);
+  drawTent(img, view, fire, s);
+  drawDecor(img, view, fire);
+  stamp(img, P(LOGS), fire - 7, ROW.logs);
+  const flame = fireFrame(s);
+  stamp(img, flame.grid, fire + flame.x, ROW.fire);
+  drawEmbers(img, fire);
+  for (const g of view.graves) {
+    stamp(img, P(GRAVE), fire + g.x, ROW.grave);
+    if (g.flower) stamp(img, P(FLOWER), fire + g.x + 2, ROW.flower);
+  }
+  for (const a of view.actors) drawActor(img, a, fire, labels, s);
+  drawLanterns(img, cols, rows, lanterns);
+  info.lanterns = on(s, "lanterns") ? lanterns.length > 0 : null;
+  if (on(s, "fireflies")) drawFireflies(img, cols, rows, fire, boxes, seed);
+  return { img, labels: opts.names ? labels : [], cols, rows, fire, info };
+}
+function backLayer(kind, cols, rows, fire, back) {
+  const img = rgbaImage(cols, rows);
+  const mask = kind === "pocket" ? pocketMask(cols) : null;
+  const top = back.data.subarray(0, 4);
+  for (let y = 0; y < rows; y++) {
+    const fy = FILE_H - rows + y;
+    for (let x = 0; x < cols; x++) {
+      const fx = FILE_W / 2 - fire + x;
+      if (mask && !mask(x, y - (rows - POCKET_H))) continue;
+      if (fy < 0) { img.data.set(top, (y * cols + x) * 4); continue; }
+      const at = (fy * FILE_W + fx) * 4;
+      img.data.set(back.data.subarray(at, at + 4), (y * cols + x) * 4);
+    }
+  }
+  return img;
+}
+const backCache = new Map();
+function toCanvas(img) {
+  const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+  c.getContext("2d").putImageData(new ImageData(img.data, img.width, img.height), 0, 0);
+  return c;
+}
+const scratch = document.createElement("canvas");
+function paint(canvas, sc, unit, back, alpha) {
+  const z = unit * pick.scale;
+  if (canvas.width !== sc.cols * z || canvas.height !== sc.rows * z) { canvas.width = sc.cols * z; canvas.height = sc.rows * z; }
+  const g = canvas.getContext("2d");
+  g.imageSmoothingEnabled = false;
+  g.clearRect(0, 0, canvas.width, canvas.height);
+  g.globalAlpha = alpha ?? 1; g.drawImage(back, 0, 0, canvas.width, canvas.height); g.globalAlpha = 1;
+  scratch.width = sc.cols; scratch.height = sc.rows;
+  scratch.getContext("2d").putImageData(new ImageData(sc.img.data, sc.cols, sc.rows), 0, 0);
+  g.drawImage(scratch, 0, 0, canvas.width, canvas.height);
+  g.font = `${11 * pick.scale}px "Arial Narrow", "Archivo Narrow", sans-serif`;
+  g.textAlign = "center"; g.textBaseline = "bottom";
+  for (const l of sc.labels) {
+    const x = l.col * z, y = canvas.height - l.row * z;
+    g.fillStyle = "rgba(0,0,0,.9)"; g.fillText(l.text, x + pick.scale, y + pick.scale);
+    g.fillStyle = l.color; g.fillText(l.text, x, y);
+  }
+}
+const WORLD = {
+  bright: "linear-gradient(180deg,#9cb6d6 0%,#c9d8e6 45%,#dfe7ea 46%,#c3cdd2 70%,#8e9a8a 100%)",
+  dark: "linear-gradient(180deg,#1b2433 0%,#28323f 45%,#3a3a33 46%,#2b2a24 100%)",
+};
+function render(canvas, kind, view, cols, rows, s, opts = {}) {
+  const unit = kind === "pocket" ? 2 : opts.unit || 3;
+  const sc = scene(view, cols, rows, s, { ...opts, unit, sky: kind !== "pocket" });
+  const bkey = [kind, cols, rows, s.phase, s.look, s.season === "winter"].join(":");
+  let back = backCache.get(bkey);
+  if (!back) {
+    back = toCanvas(backLayer(kind, cols, rows, sc.fire, backdropFor(s.phase, s.look, s.season === "winter")));
+    backCache.set(bkey, back);
+  }
+  paint(canvas, sc, unit, back, kind === "pocket" ? 0.6 : 1);
+  if (kind === "pocket") canvas.style.background = WORLD[opts.world || pick.world];
+  return sc;
+}
+
+const FEED = [
+  ["Brann", "WARRIOR", "reached level 38", "2h"], ["Ilsa", "PALADIN", "finished The Deadmines", "5h"],
+  ["Kesh", "ROGUE", "died to a raptor in the Barrens", "yesterday"], ["Mira", "PRIEST", "put up a Spare: Linen Cloth ×20", "yesterday"],
+];
+function fillWindow(win, lit, sc) {
+  const z = pick.scale, w = sc.cols * 3 * z, fx = (sc.fire + 0.5) * 3 * z;
+  win.style.width = w + "px";
+  win.style.fontSize = 13 * z + "px";
+  win.style.padding = `${6 * z}px ${14 * z}px`;
+  const key = [lit, w, z].join(":");
+  if (win.dataset.key === key) return;
+  win.dataset.key = key;
+  const o = "240,162,28";
+  win.style.background = lit
+    ? `radial-gradient(${w * 0.3}px ${16 * z}px at ${fx}px 0, rgba(${o},.30), rgba(${o},0)),` +
+      `radial-gradient(${w * 0.415}px ${300 * z}px at ${fx}px 0, rgba(${o},.16), rgba(${o},0)),` +
+      `linear-gradient(to top, rgba(4,3,8,.55), rgba(4,3,8,0) ${110 * z}px), #0e0d14`
+    : "#0e0d14";
+  win.innerHTML = FEED.map(([n, cls, t, when]) =>
+    `<div class="r" style="padding:${6 * z}px 0"><span><span style="color:${CLASS[cls]}">${n}</span> ${t}</span><span>${when}</span></div>`).join("");
+}
+
+const bandCast = [
+  { id: "You", cls: "MAGE", hat: "wizard", pet: "cat", pose: "seated" },
+  { id: "Brann", cls: "WARRIOR", hat: "horns", pose: "seated", graves: 1, flower: true },
+  { id: "Ilsa", cls: "PALADIN", hat: "circlet", pet: "owl", pose: "seated" },
+  { id: "Mira", cls: "PRIEST", hat: "tophat", pose: "seated" },
+  { id: "Kesh", cls: "ROGUE", pet: "fox", pose: "seated", graves: 1 },
+  { id: "Fenn", cls: "DRUID", hat: "cap", pet: "dog", pose: "asleep" },
+  { id: "Thistle", cls: "HUNTER", hat: "straw", pose: "asleep" },
+];
+const smallCast = bandCast.slice(0, 4).concat([bandCast[5]]);
+const pocketCast = [
+  { id: "You", cls: "MAGE", hat: "wizard", pet: "cat", pose: "seated" },
+  { id: "Ilsa", cls: "PALADIN", hat: "circlet", pose: "seated" },
+  { id: "Kesh", cls: "ROGUE", pet: "fox", pose: "seated" },
+];
+
+const query = new URLSearchParams(location.search);
+const pick = { look: "A", sun: "A", sunAt: "right", moon: "B", moonAt: "right", stars: "A", starCount: "4",
+  season: "none", phase: "day", nightOnly: "hide", world: "bright", scale: 1 };
+for (const k of Object.keys(pick)) if (query.has(k)) pick[k] = typeof pick[k] === "number" ? +query.get(k) : query.get(k);
+if (query.has("variant")) pick.look = query.get("variant");
+let flipOffset = 0;
+function currentPhase() {
+  if (pick.phase !== "flip") return pick.phase;
+  return Math.floor((tick + flipOffset) / (10 * FPS)) % 2 ? "night" : "day";
+}
+const state = (over = {}) => ({ ...pick, phase: currentPhase(), ...over });
+
+const draws = [];
+const visible = new WeakSet();
+const watch = new IntersectionObserver((entries) => {
+  for (const e of entries) e.isIntersecting ? visible.add(e.target) : visible.delete(e.target);
+}, { rootMargin: "200px" });
+function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html) e.innerHTML = html; return e; }
+function readout(sc, view) {
+  const parts = [], i = sc.info;
+  if (i.sky) {
+    const where = PLACES[i.sky.what === "sun" ? view.s.sunAt : view.s.moonAt];
+    parts.push(`${i.sky.what} ${where}: ` + (i.sky.hits.length ? `<b class="bad">runs into ${i.sky.hits.join(", ")}</b>` : "<b>clear</b>"));
+  }
+  if (i.lanterns != null) parts.push(i.lanterns ? "lanterns <b>hung</b>" : "lanterns <b>dropped</b>");
+  if (i.batsNext != null) parts.push(`next bats in <b>${Math.ceil(i.batsNext / FPS)} s</b>`);
+  if (i.fireworkNext != null) parts.push(`next firework in <b>${Math.ceil(i.fireworkNext / FPS)} s</b>`);
+  return parts.join(" · ");
+}
+function addScene(parent, tag, kind, makeView, rows, makeState, opts = {}) {
+  if (tag) parent.append(el("div", "tag", tag));
+  const wrap = el("div", "scroll"), unit = el("div", "unit"), c = document.createElement("canvas");
+  unit.append(c); wrap.append(unit); parent.append(wrap);
+  const win = opts.window ? el("div", "win") : null;
+  if (win) unit.append(win);
+  const out = el("div", "readout"); parent.append(out);
+  watch.observe(wrap);
+  draws.push(() => {
+    if (!visible.has(wrap)) return;
+    const s = makeState(), v = makeView(s);
+    const sc = render(c, kind, v.view, v.cols, rows, s, opts);
+    if (win) fillWindow(win, opts.window === "lit", sc);
+    out.innerHTML = readout(sc, { s });
+  });
+}
+function addPockets(parent, makeState, room = 304) {
+  parent.append(el("div", "tag", "the Pocket Camp over a bright and a dark world, 2 online with spare width"));
+  const row = el("div", "pockets"); parent.append(row);
+  for (const world of ["bright", "dark"]) {
+    const c = document.createElement("canvas"); row.append(c);
+    watch.observe(c);
+    draws.push(() => {
+      if (!visible.has(c)) return;
+      const s = makeState(), view = pocketView(pocketCast.slice(0, 2), room, SEASON_DECOR[s.season]);
+      render(c, "pocket", view, view.columns, LAYOUT.pocketRows, s, { world, seed: 5 });
+    });
+  }
+}
+const band = (cols, decor) => () => ({ view: campView(bandCast, cols, { tent: true, decor }), cols });
+const bandFor = (cols) => (s) => band(cols, SEASON_DECOR[s.season])();
+const awayFor = (s) => ({ view: campView(smallCast, LAYOUT.awayColumns, { decor: SEASON_DECOR[s.season] }), cols: LAYOUT.awayBand });
+function looksBlock(parent, label, makeState, withNarrow) {
+  const box = el("div", "variant"); box.append(el("div", "name", label)); parent.append(box);
+  addScene(box, "the panel's band, 375 columns, the window under it", "band", bandFor(375), BAND_ROWS, makeState, { names: true, seed: 3, window: "lit" });
+  if (withNarrow) addScene(box, "the narrowest band, 128 columns", "band", bandFor(128), BAND_ROWS, makeState, { names: true, seed: 3, window: "lit" });
+  addScene(box, "While you were away", "band", awayFor, BAND_ROWS, makeState, { names: true, seed: 4, window: "unlit" });
+  addPockets(box, makeState);
+}
+const lookKeys = Object.keys(LOOKS);
+
+const looks = document.getElementById("looks");
+looksBlock(looks, "Tonight <small>today's night scene, with the moon and stars from the bar</small>", () => state({ phase: "night", season: "none" }), false);
+for (const k of lookKeys) looksBlock(looks, `${LOOKS[k].label} <small>${LOOKS[k].note}</small>`, () => state({ phase: "day", look: k, season: "none" }), true);
+
+const winter = document.getElementById("winter");
+const winterBlock = (label, makeState) => {
+  const box = el("div", "variant"); box.append(el("div", "name", label)); winter.append(box);
+  addScene(box, "the panel's band, 375 columns", "band", bandFor(375), BAND_ROWS, makeState, { names: true, seed: 3, window: "lit" });
+  addPockets(box, makeState);
+};
+winterBlock("Tonight in winter <small>today's</small>", () => state({ phase: "night", season: "winter" }));
+for (const k of lookKeys) winterBlock(`${LOOKS[k].label} in winter`, () => state({ phase: "day", look: k, season: "winter" }));
+
+const sunClose = document.getElementById("sun-close");
+for (const sk of Object.keys(SUNS)) {
+  sunClose.append(el("h4", "", SUNS[sk].label));
+  const row = el("div", "row"); sunClose.append(row);
+  for (const lk of lookKeys) {
+    const cell = el("div", "cell"), c = document.createElement("canvas");
+    cell.append(c, el("div", "tag", LOOKS[lk].label)); row.append(cell);
+    watch.observe(c);
+    draws.push(() => {
+      if (!visible.has(c)) return;
+      render(c, "band", { actors: [], graves: [], decor: [] }, 40, BAND_ROWS, state({ phase: "day", look: lk, sun: sk, sunAt: "fire", season: "none" }), { unit: 4 });
+    });
+  }
+}
+const sunBands = document.getElementById("sun-bands");
+for (const sk of Object.keys(SUNS)) {
+  const box = el("div", "variant"); box.append(el("div", "name", SUNS[sk].label)); sunBands.append(box);
+  addScene(box, "", "band", bandFor(375), BAND_ROWS, () => state({ phase: "day", sun: sk }), { names: true, seed: 3 });
+}
+
+const moonClose = document.getElementById("moon-close");
+for (const mk of Object.keys(MOONS)) {
+  const cell = el("div", "cell"), c = document.createElement("canvas");
+  cell.append(el("div", "name", MOONS[mk].label), c); moonClose.append(cell);
+  watch.observe(c);
+  draws.push(() => {
+    if (!visible.has(c)) return;
+    render(c, "band", { actors: [], graves: [], decor: [] }, 40, BAND_ROWS, state({ phase: "night", moon: mk, moonAt: "fire", season: "none", starCount: "0" }), { unit: 4 });
+  });
+}
+const moonBands = document.getElementById("moon-bands");
+for (const mk of Object.keys(MOONS)) {
+  const box = el("div", "variant"); box.append(el("div", "name", MOONS[mk].label)); moonBands.append(box);
+  addScene(box, "", "band", bandFor(375), BAND_ROWS, () => state({ phase: "night", moon: mk }), { names: true, seed: 3 });
+}
+const starBands = document.getElementById("star-bands");
+for (const sk of Object.keys(STARS)) for (const n of ["4", "8"]) {
+  const box = el("div", "variant"); box.append(el("div", "name", `Stars ${STARS[sk].label}, ${n} of them`)); starBands.append(box);
+  addScene(box, "", "band", bandFor(375), BAND_ROWS, () => state({ phase: "night", stars: sk, starCount: n }), { names: true, seed: 3 });
+}
+
+const places = document.getElementById("places");
+for (const at of Object.keys(PLACES)) {
+  const box = el("div", "variant"); box.append(el("div", "name", `${PLACES[at][0].toUpperCase()}${PLACES[at].slice(1)}`)); places.append(box);
+  for (const phase of ["day", "night"]) {
+    const over = { phase, season: "lunar", sunAt: at, moonAt: at };
+    addScene(box, `${phase === "day" ? "by day" : "by night"}, the narrowest band, 128 columns`, "band", bandFor(128), BAND_ROWS, () => state(over), { names: true, seed: 3 });
+    addScene(box, `${phase === "day" ? "by day" : "by night"}, While you were away`, "band", awayFor, BAND_ROWS, () => state(over), { names: true, seed: 4 });
+    addScene(box, `${phase === "day" ? "by day" : "by night"}, the widest band, 375 columns`, "band", bandFor(375), BAND_ROWS, () => state(over), { names: true, seed: 3 });
+  }
+}
+
+function drawTogether() {
+  const s = state(), decor = SEASON_DECOR[s.season];
+  const cols = +document.getElementById("band-cols").value;
+  document.getElementById("band-cols-v").textContent = cols;
+  const v = campView(bandCast, cols, { tent: true, decor });
+  const sc = render(document.getElementById("band"), "band", v, cols, BAND_ROWS, s, { names: true, seed: 3 });
+  fillWindow(document.getElementById("band-win"), true, sc);
+  document.getElementById("band-out").innerHTML = `<b>${s.phase}</b> · <b>${cols}</b> columns · ` + readout(sc, { s });
+  const a = awayFor(s);
+  const away = render(document.getElementById("away"), "band", a.view, a.cols, BAND_ROWS, s, { names: true, seed: 4 });
+  fillWindow(document.getElementById("away-win"), false, away);
+  document.getElementById("away-out").innerHTML = readout(away, { s });
+  const room = +document.getElementById("pocket-room").value;
+  document.getElementById("pocket-room-v").textContent = room;
+  const pv = pocketView(pocketCast, room, decor);
+  render(document.getElementById("pocket"), "pocket", pv, pv.columns, LAYOUT.pocketRows, s, { seed: 5 });
+  document.getElementById("pocket-out").innerHTML = `<b>${pv.columns}</b> columns · over a ${pick.world} world`;
+}
+
+function draw() { for (const d of draws) d(); drawTogether(); }
+function saveUrl() {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(pick)) q.set(k, v);
+  history.replaceState(null, "", "?" + q);
+}
+function setPick(key, value) { pick[key] = value; saveUrl(); toggles(); draw(); }
+function toggles() {
+  const bar = document.getElementById("toggles"); bar.innerHTML = "";
+  const group = (label, choices, key) => {
+    const g = el("span", "group"); g.append(label);
+    for (const [v, t] of choices) {
+      const b = el("button", pick[key] === v ? "on" : "", t);
+      b.onclick = () => setPick(key, v);
+      g.append(b);
+    }
+    bar.append(g);
+  };
+  const keys = (obj) => Object.keys(obj).map((k) => [k, k]);
+  const places = Object.entries(PLACES).map(([k]) => [k, k]);
+  group("Scale ", [[1, "1x"], [2, "2x"]], "scale");
+  group("Phase (§6) ", [["day", "day"], ["night", "night"], ["flip", "flip 10 s"]], "phase");
+  group("Sun ", keys(SUNS), "sun");
+  group("at ", places, "sunAt");
+  group("Moon ", keys(MOONS), "moon");
+  group("at ", places, "moonAt");
+  group("Stars ", keys(STARS), "stars");
+  group("× ", [["4", "4"], ["8", "8"]], "starCount");
+  group("Season (§3, §4, §6) ", [["none", "none"], ["winter", "winter"], ["autumn", "autumn"], ["lunar", "lunar"], ["midsummer", "midsummer"]], "season");
+  group("Bats, firework, fireflies by day ", [["hide", "hidden"], ["show", "shown"]], "nightOnly");
+  group("World ", [["bright", "bright"], ["dark", "dark"]], "world");
+  const now = el("span", "group");
+  const flip = el("button", "", "Flip now"); flip.onclick = () => { flipOffset += 10 * FPS - ((tick + flipOffset) % (10 * FPS)); draw(); };
+  const bats = el("button", "", "Bats now"); bats.onclick = () => { nowAt.bats = tick; };
+  const fw = el("button", "", "Firework now"); fw.onclick = () => { nowAt.firework = tick; };
+  now.append(flip, bats, fw); bar.append(now);
+  document.getElementById("switch-label").textContent = `Look ${LOOKS[pick.look].label}`;
+}
+function cycle(by) {
+  const i = lookKeys.indexOf(pick.look);
+  setPick("look", lookKeys[(i + by + lookKeys.length) % lookKeys.length]);
+}
+document.getElementById("prev").onclick = () => cycle(-1);
+document.getElementById("next").onclick = () => cycle(1);
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest("input, textarea, [contenteditable]")) return;
+  if (e.key === "ArrowLeft") cycle(-1);
+  if (e.key === "ArrowRight") cycle(1);
+});
+document.getElementById("band-cols").oninput = drawTogether;
+document.getElementById("pocket-room").oninput = drawTogether;
+if (!LOOKS[pick.look]) pick.look = "A";
+toggles();
+requestAnimationFrame(draw);
+setInterval(() => { tick++; draw(); }, 1000 / FPS);
+</script>
+</body>
+</html>
