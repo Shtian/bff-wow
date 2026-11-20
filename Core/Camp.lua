@@ -55,6 +55,10 @@ local function within(today, season)
   return today >= from or today <= to
 end
 
+function Camp.isSeason(key)
+  return SEASON[key] ~= nil
+end
+
 function Camp.season(now, utcOffset)
   local today = dayOf({ ns.Text.monthDay(now, utcOffset or 0) })
   for _, season in ipairs(Camp.SEASONS) do

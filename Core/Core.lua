@@ -615,9 +615,7 @@ function Core:season()
 end
 
 function Core:forceSeason(key)
-  local known = key == "off" or key == "auto"
-  for _, season in ipairs(Core.SEASONS) do known = known or season.key == key end
-  if not known then return false end
+  if not (key == "off" or key == "auto" or ns.Camp.isSeason(key)) then return false end
   if key == "off" then
     self.forcedSeason = false
   elseif key == "auto" then

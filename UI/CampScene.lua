@@ -30,7 +30,7 @@ local ROW = {
   seat = 3, seated = 4, hop = 6, standing = 3, asleep = 3, grave = 3, flower = 2,
   logs = 3, fire = 5, tent = 5, ember = 16, crate = 1, cup = 19, pet = 3,
 }
-local FLAKES = { fewest = 6, most = 10, every = 2, drift = 5, seed = 11, far = 3, fireReach = 6, flameRows = 12 }
+local FLAKES = { fewest = 6, most = 10, every = 2, drift = 5, seed = 11, farEvery = 3, fireReach = 6, flameRows = 12 }
 local TWINKLE = { order = { 3, 1, 5, 2, 4, 6 }, every = 4, flash = 2 }
 local SEASON_ART = {
   winter = { snow = true, flakes = true, lights = Sheet.winter },
@@ -38,6 +38,10 @@ local SEASON_ART = {
 local DECOR = {
   tree = { sprite = "treePine", row = 4, width = LAYOUT.tree },
 }
+
+local function seasonArt(view)
+  return SEASON_ART[view.season] or {}
+end
 local PET_IDLE = { every = 24, spread = 25, ticks = 3, seed = 7 }
 local PET_HOP_LATE = 1
 local CRATE_X = -1
@@ -639,7 +643,7 @@ local function drawActor(scene, parts, actor, f)
     put(scene, parts.cloth, x, ROW.asleep)
     put(scene, parts.skin, x, ROW.asleep)
     local bed = ROW.asleep + Sheet.sprites.asleep[4]
-    if (SEASON_ART[scene.view.season] or {}).snow then
+    if seasonArt(scene.view).snow then
       setSprite(parts.snow, "bedSnow", scene.unit)
       put(scene, parts.snow, x + Sheet.winter.bedSnow, bed - 1)
     end
@@ -746,7 +750,7 @@ local function drawFlakes(scene, f, falling)
     local row = rows - 1 - (math.floor(noise(FLAKES.seed + i * 3.1 + 40) * rows) + step) % rows
     local onFire = math.abs(x) <= FLAKES.fireReach and row >= ROW.logs and row <= ROW.fire + FLAKES.flameRows
     if i <= count and not onFire then
-      setSprite(flake, i % FLAKES.far == 0 and "snowflakeFar" or "snowflake", scene.unit)
+      setSprite(flake, i % FLAKES.farEvery == 0 and "snowflakeFar" or "snowflake", scene.unit)
       put(scene, flake, x, row)
     else
       flake:Hide()
@@ -780,7 +784,7 @@ local function drawTentSeason(scene, f, art)
 end
 
 local function drawSeason(scene, f)
-  local art = SEASON_ART[scene.view.season] or {}
+  local art = seasonArt(scene.view)
   drawFlakes(scene, f, art.flakes)
   drawTentSeason(scene, f, art)
   scene.decorParts.used = 0
