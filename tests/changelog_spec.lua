@@ -11,6 +11,13 @@ local TEXT = [[
 
   Its glow spills under the band, and now and then an ember drifts down.
 - *(patch)* Fixed `/bff report` on **Forever**.
+- *(patch)*
+  Internal: the panel's tabs moved into their own modules. Nothing you see changes.
+
+## 2.2.1
+<sub>2026-11-14</sub>
+
+- *(patch)* Internal: Core was split in two.
 
 ## 2.0.0
 <sub>2026-11-12</sub>
@@ -33,10 +40,9 @@ describe("Changelog", function()
   describe("parse", function()
     it("reads each release, newest first, with its date as the game shows it", function()
       local releases = Changelog.parse(TEXT)
-      assert.are.equal(3, #releases)
-      assert.are.same({ "2.3.0", "2.0.0", "1.6.1" }, { releases[1].version, releases[2].version, releases[3].version })
+      assert.are.equal(4, #releases)
       assert.are.equal("15 Nov", releases[1].date)
-      assert.are.equal("2 Nov", releases[3].date)
+      assert.are.equal("2 Nov", releases[4].date)
     end)
 
     it("takes an entry's first paragraph as its title and the rest as its detail", function()
@@ -54,7 +60,7 @@ describe("Changelog", function()
     end)
 
     it("splits a one-paragraph entry after its first sentence", function()
-      local entry = Changelog.parse(TEXT)[2].entries[1]
+      local entry = Changelog.parse(TEXT)[3].entries[1]
       assert.are.equal("major", entry.kind)
       assert.are.equal("BFF now splits long messages into chunks itself.", entry.title)
       assert.are.equal("Friends on an older BFF are still seen.", entry.detail)
@@ -62,9 +68,18 @@ describe("Changelog", function()
 
     it("keeps a one-sentence entry whole", function()
       assert.are.same({ kind = "patch", title = "BFF stops whispering friends it can't reach." },
-        Changelog.parse(TEXT)[2].entries[2])
+        Changelog.parse(TEXT)[3].entries[2])
       assert.are.same({ kind = "patch", title = "One line only, with no full stop" },
-        Changelog.parse(TEXT)[3].entries[1])
+        Changelog.parse(TEXT)[4].entries[1])
+    end)
+
+    it("marks an internal change and drops the mark from its title", function()
+      local releases = Changelog.parse(TEXT)
+      assert.are.same({ kind = "patch", title = "The panel's tabs moved into their own modules.",
+        detail = "Nothing you see changes.", internal = true }, releases[1].entries[3])
+      assert.are.same({ "2.3.0", "2.2.1", "2.0.0", "1.6.1" },
+        { releases[1].version, releases[2].version, releases[3].version, releases[4].version })
+      assert.is_true(releases[2].entries[1].internal)
     end)
 
     it("reads nothing from no text", function()

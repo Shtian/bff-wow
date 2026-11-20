@@ -174,6 +174,50 @@ describe("What's new", function()
     assert.are.equal("Older updates are on BFF's CurseForge page.", ann.core:whatsNew().older)
   end)
 
+  describe("with internal changes", function()
+    local INTERNAL = "## 2.4.0\n<sub>2026-11-20</sub>\n\n- *(patch)*\n  Internal: Core was split in two.\n\n"
+      .. "## 2.3.1\n<sub>2026-11-18</sub>\n\n- *(patch)* Internal: the tabs moved.\n- *(patch)* A fix.\n\n"
+
+    local function updated(changesSeen)
+      local ann = client(net, "Ann", "v2.4.0", { changesSeen = changesSeen })
+      ann.changelog = INTERNAL .. TEXT
+      return ann:login()
+    end
+
+    it("leaves them out, and a release with nothing else", function()
+      local ann = updated("2.3.0")
+      ann.core:openWhatsNew()
+      local view = ann.core:whatsNew()
+      assert.are.equal("1 change since 2.3.0", view.line)
+      assert.are.same({ "2.3.1*", "2.3.0", "2.2.0", "2.1.0", "2.0.0" }, newFlags(view))
+      assert.are.same({ { kind = "patch", kindName = "Small change or fix", title = "A fix." } },
+        view.releases[1].entries)
+    end)
+
+    it("has nothing new after an update with only internal changes", function()
+      local ann = updated("2.3.1")
+      assert.is_false(ann.core:hasNewChanges())
+      assert.are.equal("You're on 2.4.0, from 20 Nov", ann.core:whatsNew().line)
+    end)
+
+    it("marks the release before the one installed when What's new is new to the saved data", function()
+      local ann = client(net, "Ann", "v2.4.0", { memberId = "ann-id" })
+      ann.changelog = INTERNAL .. TEXT
+      ann:login()
+      assert.is_false(ann.core:hasNewChanges())
+    end)
+
+    it("still shows a big change", function()
+      local ann = client(net, "Ann", "v2.4.0", { changesSeen = "2.3.0" })
+      ann.changelog = "## 2.4.0\n<sub>2026-11-20</sub>\n\n- *(major)* Internal: the protocol changed.\n\n" .. TEXT
+      ann:login()
+      ann.core:openWhatsNew()
+      local view = ann.core:whatsNew()
+      assert.are.equal("The protocol changed.", view.releases[1].entries[1].title)
+      assert.is_truthy(view.updateNotice)
+    end)
+  end)
+
   describe("with a major release new", function()
     it("asks you to make sure your friends update, naming those on an older BFF", function()
       local ann = client(net, "Ann", "v2.3.0", { changesSeen = "1.6.2" }):login()

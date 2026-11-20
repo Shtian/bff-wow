@@ -38,6 +38,8 @@ local function entry(kind, paragraphs)
     if text ~= "" then texts[#texts + 1] = text end
   end
   if #texts == 0 then return nil end
+  local internal = texts[1]:find("^Internal:") ~= nil
+  if internal then texts[1] = texts[1]:gsub("^Internal:%s*(%l?)", string.upper) end
   local title, detail = texts[1], nil
   if #texts > 1 then
     detail = table.concat(texts, " ", 2)
@@ -45,7 +47,7 @@ local function entry(kind, paragraphs)
     local first, rest = title:match("^(.-[%.!?])%s+(%u.*)$")
     if first then title, detail = first, rest end
   end
-  return { kind = kind, title = title, detail = detail }
+  return { kind = kind, title = title, detail = detail, internal = internal or nil }
 end
 
 function Changelog.parse(text)

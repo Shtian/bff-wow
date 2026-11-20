@@ -7,7 +7,7 @@ A World of Warcraft: Forever addon that keeps a group of friends connected when 
 - **Architecture:** see `docs/design/code-structure.md` (modules, the link port, sync rules) and `docs/adr/`. `docs/design/architecture.html` is the pre-build draft and is out of date: there is no Sync, Store, Transport, PING, HELLO or WANT.
 - **Checks:** `scripts/check.sh` runs luacheck, the comment check and busted (extra args go to busted). CI runs the same.
 - **No comments:** don't write comments in Lua. If code needs one, rename or reshape the code instead. The only exception is a `-- WoW: …` fact about the game client, Lua 5.1 or `Libs/`. `scripts/check.sh` fails on any other comment, so CI does too. See `CODING_STANDARDS.md`, "Comments".
-- **Releases:** a change to shipped files (`changedFilePatterns` in `.bumpy/_config.json`) needs a bumpy bump file in `.bumpy/`. Use the `add-change` skill. A protocol bump is `major`. See `docs/design/settings-and-release.md`.
+- **Releases:** a change to shipped files (`changedFilePatterns` in `.bumpy/_config.json`) needs a bumpy bump file in `.bumpy/`. Use the `add-change` skill. A protocol bump is `major`. Players read entries in game (What's new): start a change they won't notice with "Internal:" so What's new leaves it out, and give a part they will notice its own bump file. Don't use `$changelog: false`: it hides the change from CHANGELOG.md too. See `docs/design/settings-and-release.md`.
 
 ## Agent skills
 
