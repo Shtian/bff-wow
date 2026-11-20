@@ -50,10 +50,10 @@ local FIREFLIES = { count = 8, seed = 23, low = 4, high = 8, drift = 7, rise = 3
   every = 20, spread = 5, lit = 14 }
 local NAME_ROWS = 4
 local NIGHT_ONLY = { bats = true, fireworks = true, fireflies = true }
-local SKY = { column = 7, row = 30, rows = 9, sunEvery = 12, stars = 4, near = { 3, 2 },
+local SKY = { column = 7, row = 30, rows = 9, sunEvery = 12, stars = 4, moonClear = { 3, 2 },
   spots = { { 0.17, 33 }, { 0.41, 37 }, { 0.69, 32 }, { 0.94, 36 }, { 0.06, 31 }, { 0.29, 35 }, { 0.58, 34 },
     { 0.82, 38 } },
-  twinkle = { shortest = 30, spread = 19, step = 11, seed = 3, dim = 0.35, mid = 0.72 } }
+  twinkle = { shortest = 30, spread = 19, step = 11, seed = 3, dimBelow = 0.35, midBelow = 0.72 } }
 
 local function seasonArt(view)
   local art = SEASON_ART[view.season]
@@ -998,31 +998,36 @@ local function starTone(i, f)
   local period = t.shortest + (i * t.step) % t.spread
   local p = (f + math.floor(noise(i + t.seed) * period)) % period
   local level = 1 - math.abs(2 * p / period - 1)
-  if level < t.dim then return "starDim" end
-  if level < t.mid then return "starMid" end
+  if level < t.dimBelow then return "starDim" end
+  if level < t.midBelow then return "starMid" end
   return "glint"
+end
+
+local function hideStars(scene, from)
+  for i = from, #scene.stars do scene.stars[i]:Hide() end
 end
 
 local function drawStars(scene, f, moon)
   local columns, rows = scene.view.columns, rowsOf(scene)
-  local near = { left = moon.left - SKY.near[1], right = moon.right + SKY.near[1], bottom = moon.bottom - SKY.near[2],
-    top = moon.top + SKY.near[2] }
+  local clear = SKY.moonClear
+  local near = { left = moon.left - clear[1], right = moon.right + clear[1], bottom = moon.bottom - clear[2],
+    top = moon.top + clear[2] }
   local lanterns = lanternBoxes(scene)
   local drawn = 0
   for i, spot in ipairs(SKY.spots) do
     local column, row = math.floor(spot[1] * (columns - 1) + 0.5), spot[2]
-    local clear = drawn < SKY.stars and row <= rows - 2 and not inBox(near, column, row)
+    local open = drawn < SKY.stars and row <= rows - 2 and not inBox(near, column, row)
     for _, box in ipairs(lanterns) do
-      if clear and inBox(box, column, row) then clear = false end
+      if open and inBox(box, column, row) then open = false end
     end
-    if clear then
+    if open then
       drawn = drawn + 1
       local star = scene.stars[drawn]
       setSprite(star, starTone(i - 1, f), scene.unit)
       put(scene, star, column - scene.fire, row)
     end
   end
-  for i = drawn + 1, #scene.stars do scene.stars[i]:Hide() end
+  hideStars(scene, drawn + 1)
 end
 
 local function drawSky(scene, f)
@@ -1031,7 +1036,7 @@ local function drawSky(scene, f)
   local box = name and skyBox(name)
   if not box or box.top > rowsOf(scene) - 1 then
     scene.skyLight:Hide()
-    for _, star in ipairs(scene.stars) do star:Hide() end
+    hideStars(scene, 1)
     return
   end
   setSprite(scene.skyLight, name, scene.unit)
@@ -1039,7 +1044,7 @@ local function drawSky(scene, f)
   if phase == "night" then
     drawStars(scene, f, box)
   else
-    for _, star in ipairs(scene.stars) do star:Hide() end
+    hideStars(scene, 1)
   end
 end
 
@@ -1192,7 +1197,7 @@ function CampScene.new(parent, options)
     gains = options.gains,
     names = options.names ~= false,
     backdropArt = options.backdrop or Sheet.backdrop,
-    skyLights = options.backdrop == nil,
+    skyLights = not options.backdrop,
     target = options.target or CampScene.BAND_TARGET,
     crisp = options.crisp ~= false,
     hops = {},
@@ -1259,7 +1264,7 @@ function CampScene.new(parent, options)
   band.scene = scene
   local sky = band:CreateTexture(nil, "BACKGROUND", nil, 0)
   sky:SetAllPoints()
-  sky:SetShown(options.backdrop == nil)
+  sky:SetShown(scene.skyLights)
   scene.sky = sky
 
   scene.art = CreateFrame("Frame", nil, band)
@@ -1276,8 +1281,8 @@ function CampScene.new(parent, options)
   scene.stars = {}
   for i = 1, SKY.stars do scene.stars[i] = texture(scene.art, "BACKGROUND", 2) end
   scene.flakes = {}
-  for i = 1, FLAKES.most do scene.flakes[i] = texture(scene.art, "BACKGROUND", 2) end
-  scene.bats = { texture(scene.art, "BACKGROUND", 2), texture(scene.art, "BACKGROUND", 2) }
+  for i = 1, FLAKES.most do scene.flakes[i] = texture(scene.art, "BACKGROUND", 3) end
+  scene.bats = { texture(scene.art, "BACKGROUND", 3), texture(scene.art, "BACKGROUND", 3) }
   scene.rocket = { texture(scene.art, "BORDER", 3), texture(scene.art, "BORDER", 3) }
   scene.fireworkSparks = {}
   for i = 1, #BURST.ways do scene.fireworkSparks[i] = texture(scene.art, "BORDER", 3) end

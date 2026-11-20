@@ -276,8 +276,7 @@ function Snapshot.doing()
   }
 end
 
--- WoW: C_DateAndTime.IsDayTime and DIEL_CYCLE_CHANGED are Forever's, the minimap's sun and moon;
--- elsewhere GetGameTime's realm time is the fallback.
+-- WoW: C_DateAndTime.IsDayTime and DIEL_CYCLE_CHANGED are Forever's, behind its minimap's sun and moon.
 function Snapshot.daylight()
   if C_DateAndTime and C_DateAndTime.IsDayTime then return C_DateAndTime.IsDayTime() end
   return nil, GetGameTime()
