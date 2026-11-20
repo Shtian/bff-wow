@@ -583,15 +583,6 @@ local function awaySummary(self)
   self.listener("changed")
 end
 
-local function offerTip(self)
-  local tip = self:tip()
-  local offered = self.db.tipsOffered
-  if not tip or (offered and offered[tip.key]) then return end
-  self.db.tipsOffered = offered or {}
-  self.db.tipsOffered[tip.key] = true
-  self.listener("tip", tip)
-end
-
 local function audience(self)
   local talking = self.gossip.open == true and not (self.db.crew and self.db.crew.leaving)
   local others = 0
@@ -629,7 +620,6 @@ function Core:tick()
     self.listener("changed")
   end
   if self.db.crew then self.spareLife:tick() end
-  offerTip(self)
   self.pocket:tick()
   checkOnline(self)
 end
@@ -1067,7 +1057,7 @@ local SETTINGS = {
   {
     key = "pocketCamp", section = POCKET_CAMP, kind = "toggle",
     label = "Show the Pocket Camp",
-    saved = onFlag("pocketCamp"),
+    saved = offFlag("pocketCampOff"),
   },
   {
     key = "pocketCampOpacity", section = POCKET_CAMP, kind = "percent",
@@ -1123,23 +1113,6 @@ local function settingFor(key)
   return setting
 end
 
-local TIPS = {
-  {
-    key = "pocketCamp", setting = "pocketCamp", needs = "camp",
-    title = "New: the Pocket Camp",
-    text = "Keep your Crew on screen. The Pocket Camp shows the fire and who's by it while you play. "
-      .. "You can turn it on or off any time in Settings.",
-  },
-}
-
-local TIP = {}
-for _, tip in ipairs(TIPS) do TIP[tip.key] = tip end
-
-local function answerTip(self, tip)
-  self.db.tipsAnswered = self.db.tipsAnswered or {}
-  self.db.tipsAnswered[tip.key] = true
-end
-
 local ON_CHANGE = {
   paused = function(self, paused) self.gossip:setPaused(paused) end,
 }
@@ -1156,38 +1129,7 @@ function Core:setSetting(key, value)
   if (saved.same or rawequal)(before, after) then return end
   local onChange = ON_CHANGE[key]
   if onChange then onChange(self, after) end
-  for _, tip in ipairs(TIPS) do
-    if tip.setting == key and after == true then answerTip(self, tip) end
-  end
   self.listener("settingChanged", key, after)
-end
-
-function Core:tip()
-  if not self.db.crew then return nil end
-  local answered = self.db.tipsAnswered or {}
-  for _, tip in ipairs(TIPS) do
-    if not answered[tip.key] and not self:setting(tip.setting) and (not tip.needs or self:setting(tip.needs)) then
-      return { key = tip.key, title = tip.title, text = tip.text, accept = "Turn on", dismiss = "No thanks" }
-    end
-  end
-  return nil
-end
-
-function Core:acceptTip(key)
-  local tip = TIP[key]
-  if not tip then return false end
-  answerTip(self, tip)
-  self:setSetting(tip.setting, true)
-  self.listener("changed")
-  return true
-end
-
-function Core:dismissTip(key)
-  local tip = TIP[key]
-  if not tip then return false end
-  answerTip(self, tip)
-  self.listener("changed")
-  return true
 end
 
 function Core:settings()

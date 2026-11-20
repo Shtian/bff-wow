@@ -22,7 +22,6 @@ local function crew(names)
   local code = clients[1]:join()
   for i = 2, #clients do clients[i]:join(code) end
   net:run(40)
-  clients[1].core:setSetting("pocketCamp", true)
   return net, clients, ns
 end
 
@@ -69,21 +68,30 @@ local function untilFishing(net, viewer, client, within)
 end
 
 describe("The Pocket Camp", function()
-  it("is off by default, and nil while it or the Camp is off, or outside a Crew", function()
+  it("is on by default, and nil while it or the Camp is off, or outside a Crew", function()
     local ns = load()
     local net = ns.FakeNet.new()
     local a = net:add("Ann"):login()
-    a.core:setSetting("pocketCamp", true)
+    assert.is_true(a.core:setting("pocketCamp"))
     assert.is_nil(a.core:pocketCamp())
-    a.core:setSetting("pocketCamp", false)
     a:join()
     net:run(5)
-    assert.is_false(a.core:setting("pocketCamp"))
+    assert.is_table(a.core:pocketCamp())
+    a.core:setSetting("pocketCamp", false)
     assert.is_nil(a.core:pocketCamp())
     a.core:setSetting("pocketCamp", true)
     assert.is_table(a.core:pocketCamp())
     a.core:setSetting("camp", false)
     assert.is_nil(a.core:pocketCamp())
+  end)
+
+  it("reads as on whatever an opt-in save held, Turn on or No thanks", function()
+    local ns = load()
+    local net = ns.FakeNet.new()
+    local on = net:add("Ann", { db = { pocketCamp = true, tipsAnswered = { pocketCamp = true } } }):login()
+    local declined = net:add("Bob", { db = { tipsAnswered = { pocketCamp = true }, tipsOffered = { pocketCamp = true } } }):login()
+    assert.is_true(on.core:setting("pocketCamp"))
+    assert.is_true(declined.core:setting("pocketCamp"))
   end)
 
   it("shows the fire and exactly the online Members, you first: no older sleepers, graves or tent", function()
@@ -191,7 +199,6 @@ describe("The Pocket Camp", function()
       local a = net:add("Ann", { db = saved }):login()
       a:join()
       net:run(5)
-      a.core:setSetting("pocketCamp", true)
       return a.core:pocketCamp().inCombat
     end
     assert.equal("stay", inCombat({}))
@@ -301,7 +308,6 @@ describe("The Pocket Camp", function()
     assert.is_nil(actorFor(view, c).onAlt)
     assert.same({ "You: by the fire", "Bob (on alt): by the fire", "Cy: by the fire" }, view.tooltip.lines)
 
-    b.core:setSetting("pocketCamp", true)
     view = b.core:pocketCamp()
     assert.is_true(actorFor(view, b).onAlt)
     assert.equal("You (on alt): by the fire", view.tooltip.lines[1])
@@ -350,7 +356,6 @@ describe("The Pocket Camp", function()
       local b = net:add("Bob", { character = character("Bob", { lastName = "Stone" }) }):login()
       b:join(a:join())
       net:run(40)
-      a.core:setSetting("pocketCamp", true)
       local menu = actorFor(a.core:pocketCamp(), b).menu
       assert.equal("Bob Stone", menu.fullName)
     end)
@@ -640,7 +645,6 @@ describe("Arrivals and bedrolls", function()
     a:logout()
     net:run(5)
     a:login()
-    a.core:setSetting("pocketCamp", true)
     net:run(3 * 60)
     assert.same({}, arrivals(a, clients))
 
@@ -804,117 +808,6 @@ describe("Arrivals and bedrolls", function()
       return types
     end
     assert.same(sentBy(false), sentBy(true))
-  end)
-end)
-
-describe("Tips", function()
-  local TEXT = "Keep your Crew on screen. The Pocket Camp shows the fire and who's by it while you play. "
-    .. "You can turn it on or off any time in Settings."
-
-  local function inCrew()
-    local ns = load()
-    local net = ns.FakeNet.new()
-    local a = net:add("Ann"):login()
-    a:join()
-    net:run(5)
-    return a, net
-  end
-
-  it("offers the Pocket Camp once, worded, with its two buttons", function()
-    local a = inCrew()
-    assert.same({ key = "pocketCamp", title = "New: the Pocket Camp", text = TEXT, accept = "Turn on",
-      dismiss = "No thanks" }, a.core:tip())
-  end)
-
-  it("offers it in a window once on the account, the first time there is one", function()
-    local net = load().FakeNet.new()
-    local a = net:add("Ann"):login()
-    net:run(5)
-    assert.equal(0, a:count("tip"))
-    a:join()
-    net:run(5)
-    assert.equal(1, a:count("tip"))
-    local offered
-    for _, event in ipairs(a.events) do
-      if event[1] == "tip" then offered = event[2] end
-    end
-    assert.same(a.core:tip(), offered)
-    a:reload()
-    net:run(5)
-    a:logout()
-    a:login()
-    net:run(5)
-    assert.equal(1, a:count("tip"))
-    assert.equal("pocketCamp", a.core:tip().key)
-  end)
-
-  it("offers nothing once the Pocket Camp is already on", function()
-    local net = load().FakeNet.new()
-    local a = net:add("Ann"):login()
-    a.core:setSetting("pocketCamp", true)
-    a:join()
-    net:run(5)
-    assert.equal(0, a:count("tip"))
-  end)
-
-  it("shows no Tip outside a Crew", function()
-    local a = load().FakeNet.new():add("Ann"):login()
-    assert.is_nil(a.core:tip())
-  end)
-
-  it("Turn on enables the Pocket Camp, and the Tip never shows again on the account", function()
-    local a = inCrew()
-    a.events = {}
-    assert.is_true(a.core:acceptTip("pocketCamp"))
-    assert.is_true(a.core:setting("pocketCamp"))
-    assert.is_table(a.core:pocketCamp())
-    assert.same({ "settingChanged", "pocketCamp", true }, a.events[1])
-    assert.equal(1, a:count("changed"))
-    assert.is_nil(a.core:tip())
-    a.core:setSetting("pocketCamp", false)
-    a:reload()
-    assert.is_nil(a.core:tip())
-    a:logout()
-    a.character = { guid = "Player-0-Annalt", name = "Annalt", classFilename = "MAGE",
-      level = 3, xp = 0, maxXp = 1000, zone = "Elwynn Forest", deaths = 0 }
-    a:login()
-    assert.is_nil(a.core:tip())
-  end)
-
-  it("No thanks only answers it", function()
-    local a = inCrew()
-    a.events = {}
-    assert.is_true(a.core:dismissTip("pocketCamp"))
-    assert.is_false(a.core:setting("pocketCamp"))
-    assert.is_nil(a.core:pocketCamp())
-    assert.equal(1, a:count("changed"))
-    assert.equal(0, a:count("settingChanged"))
-    assert.is_nil(a.core:tip())
-    a:reload()
-    assert.is_nil(a.core:tip())
-  end)
-
-  it("never shows once the Pocket Camp was turned on in Settings", function()
-    local a = inCrew()
-    a.core:setSetting("pocketCamp", true)
-    assert.is_nil(a.core:tip())
-    a.core:setSetting("pocketCamp", false)
-    assert.is_nil(a.core:tip())
-  end)
-
-  it("waits while the Camp is off, since the Pocket Camp can't show then", function()
-    local a = inCrew()
-    a.core:setSetting("camp", false)
-    assert.is_nil(a.core:tip())
-    a.core:setSetting("camp", true)
-    assert.equal("pocketCamp", a.core:tip().key)
-  end)
-
-  it("refuses a Tip it doesn't have", function()
-    local a = inCrew()
-    assert.is_false(a.core:acceptTip("nope"))
-    assert.is_false(a.core:dismissTip("nope"))
-    assert.equal("pocketCamp", a.core:tip().key)
   end)
 end)
 
@@ -1177,7 +1070,6 @@ describe("The Spares crate", function()
     local b = net:add("Bob", { character = character("Bob", { level = 20 }) }):login()
     b:join(a:join())
     net:run(40)
-    a.core:setSetting("pocketCamp", true)
     a.core:setChatLines(false)
     a.core:setToasts(false)
     return net, a, b
@@ -1282,7 +1174,6 @@ describe("The trophy cup", function()
     local b = net:add("Bob", { character = character("Bob", start and start.Bob) }):login()
     b:join(a:join())
     net:run(40)
-    a.core:setSetting("pocketCamp", true)
     return net, a, b
   end
 
@@ -1505,7 +1396,6 @@ describe("How long a Member has been at it", function()
     b.core:doing({ resting = true })
     net:run(5 * 60)
     a:reload()
-    a.core:setSetting("pocketCamp", true)
     for _ = 1, 3 * 60 do
       if poseOf(a, b) == "resting" then break end
       net:step()

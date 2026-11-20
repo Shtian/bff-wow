@@ -93,7 +93,7 @@ local SETTINGS = {
   { key = "dayNight", default = true, other = false },
   { key = "mapPins", default = true, other = false },
   { key = "mapPinSize", default = "medium", other = "large" },
-  { key = "pocketCamp", default = false, other = true },
+  { key = "pocketCamp", default = true, other = false },
   { key = "pocketCampOpacity", default = 60, other = 25 },
   { key = "pocketCampLocked", default = false, other = true },
   { key = "pocketCampCombat", default = "stay", other = "fade" },

@@ -32,7 +32,7 @@ A **Settings** view inside the BFF panel, drawn by `UI/SettingsTab.lua` in the p
 | **Toasts** | Show toasts for live events | on | `docs/design/toasts.md` |
 | | Sound, with a Play button | Friend online | `docs/design/toasts.md` |
 | | Where toasts appear, with a Move button | | `docs/design/toasts.md` |
-| **Pocket Camp** | Show the Pocket Camp | off | #161, `docs/design/pocket-camp.md` |
+| **Pocket Camp** | Show the Pocket Camp | on | #161, `docs/design/pocket-camp.md` |
 | | Backdrop opacity, a slider from 0% to 100% | 60% | `docs/design/pocket-camp.md` |
 | | Lock its position and size | off | `docs/design/pocket-camp.md` |
 | | In combat: Stay, Fade or Hide | Stay | #211, `docs/design/pocket-camp.md` |
@@ -67,7 +67,7 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `dayNight` | `dayNightOff = true`, or nil while on |
   | `mapPins` | `mapPinsOff = true`, or nil while on |
   | `mapPinSize` | `"small"` or `"large"`, or nil for medium (anything else reads as medium) |
-  | `pocketCamp` | `pocketCamp = true`, or nil while off |
+  | `pocketCamp` | `pocketCampOff = true`, or nil while on (a `pocketCamp = true` from when it was opt-in is ignored) |
   | `pocketCampOpacity` | `pocketCampOpacity`, a whole percentage from 0 to 100; nil for the default 60 |
   | `pocketCampLocked` | `pocketCampLocked = true`, or nil while off |
   | `pocketCampCombat` | Hide: `pocketCampCombatHide = true`, as Hide in combat was saved, so a save from before reads as Hide; Fade: `pocketCampCombatFades = true`; nil for both while Stay |
@@ -97,8 +97,6 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
 Display name and Look aren't in the list: they're part of your Member record and spread to the Crew.
 
 The panel's size and position (`panelPlace`, #109) is saved through Core, not the game's window-layout cache, which is applied before the panel is created. `setPanelPlace(width, height, left, top)` saves where a move or resize left it, `resetPanelPlace()` goes back to the default, and `panelPlace(screenWidth, screenHeight)` says where it opens on this screen: shrunk to fit and moved onto it, with nil `left` and `top` for centred. The grip in the panel's bottom right corner resizes it (double-click resets), and the Settings page has its Reset under Notifications and display, greyed out while the panel is at its default.
-
-Answered **Tips** (`docs/design/pocket-camp.md`) are saved beside the settings, as `tipsAnswered = { [key] = true }`, account-wide, and those already offered in a window as `tipsOffered`. There is no control to show them again.
 
 Core also decides where each Live event goes: `feedEntry`, `reaction` and `spare` carry `outlets = { chat, toast }` from the chat-line and toast settings, and App shows them as told. With both off nothing is announced or marked seen, so they wait for While you were away.
 

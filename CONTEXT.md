@@ -95,10 +95,6 @@ _Avoid_: Dot, blip, marker
 The panel's view of what changed in BFF itself, release by release, opened from the version under the sidebar. Changes since the Member last looked are marked with the Unread dot, and While you were away says once that BFF updated.
 _Avoid_: Changelog (in the UI), release notes, patch notes
 
-**Tip**:
-A one-time offer of a feature that's off by default, with a button to turn it on and one to dismiss it: a small window the first time, and a card at the top of the panel until it's answered. Once answered, it never shows again on any Character of the account.
-_Avoid_: Toast (for a Tip), notice, announcement, what's new
-
 **Play times**:
 The hours of the week a Member usually plays, from the last 4 weeks of their own client's counting, across all their Characters. A Member **usually plays** an hour they played at least 10 minutes in, in at least 2 of those weeks.
 _Avoid_: Schedule, availability, activity

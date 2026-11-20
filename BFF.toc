@@ -62,7 +62,6 @@ UI/Firelight.lua
 UI/ScrollView.lua
 UI/CharacterTooltip.lua
 UI/PocketCamp.lua
-UI/TipDialog.lua
 UI/RosterTab.lua
 UI/FeedTab.lua
 UI/TrophiesTab.lua

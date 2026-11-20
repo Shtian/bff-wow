@@ -759,7 +759,6 @@ describe("Seasons", function()
   it("come on camp(), the Pocket Camp and While you were away, from Core's utcOffset", function()
     local net, clients = crew({ "Ann", "Bob" }, { Ann = { utcOffset = HOUR } }, { clock = DEC_1_2026 - HOUR - 60 })
     local a, b = clients[1], clients[2]
-    a.core:setSetting("pocketCamp", true)
     assert.is_nil(a.core:camp(COLUMNS).season)
     assert.is_nil(a.core:pocketCamp().season)
     skip(net, 60)
@@ -783,7 +782,6 @@ describe("Seasons", function()
   it("are nil with Seasonal decorations off, or the Camp off", function()
     local _, clients = crew({ "Ann", "Bob" }, nil, { clock = DEC_1_2026 + DAY })
     local a = clients[1]
-    a.core:setSetting("pocketCamp", true)
     assert.is_true(a.core:setting("seasons"))
     a.core:setSetting("seasons", false)
     local view = a.core:camp(375)
@@ -816,7 +814,6 @@ describe("Seasons", function()
     local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal", "Ivy" }
     local net, clients = crew(names, nil, { clock = SEP_1_2026 })
     local a = clients[1]
-    a.core:setSetting("pocketCamp", true)
     local expected = { winter = "tree", autumn = "pumpkin", midsummer = "pole" }
     for _, season in ipairs(seasons) do
       assert.same(expected[season.key] and { expected[season.key] } or {}, season.decor, season.key)
@@ -857,7 +854,6 @@ describe("Seasons", function()
       local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal", "Ivy" }
       local net, clients = crew(names, nil, { clock = DEC_1_2026 })
       local a = clients[1]
-      a.core:setSetting("pocketCamp", true)
       local crowded = a.core:pocketCamp()
       assert.is_nil(crowded.decor)
       a.core:forceSeason("off")
@@ -892,7 +888,6 @@ describe("Day and night", function()
   it("come on camp(), the Pocket Camp and While you were away", function()
     local net, clients = crew({ "Ann", "Bob" }, { Ann = { daylight = { isDay = true } } })
     local a, b = clients[1], clients[2]
-    a.core:setSetting("pocketCamp", true)
     assert.equal("day", a.core:camp(COLUMNS).phase)
     assert.equal("day", a.core:pocketCamp().phase)
     assert.equal("night", b.core:camp(COLUMNS).phase)
@@ -926,7 +921,6 @@ describe("Day and night", function()
   it("are nil with Day and night off, or the Camp off", function()
     local _, clients = crew({ "Ann" }, { Ann = { daylight = { isDay = true } } })
     local a = clients[1]
-    a.core:setSetting("pocketCamp", true)
     assert.is_true(a.core:setting("dayNight"))
     a.core:setSetting("dayNight", false)
     assert.is_nil(a.core:camp(COLUMNS).phase)
