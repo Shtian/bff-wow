@@ -14,17 +14,32 @@ local function plural(count, word)
   return ("%d %s%s"):format(count, word, count == 1 and "" or "s")
 end
 
+local function forPlayers(release)
+  local entries = {}
+  for _, entry in ipairs(release.entries) do
+    if not entry.internal or entry.kind == "major" then entries[#entries + 1] = entry end
+  end
+  return { version = release.version, date = release.date, entries = entries }
+end
+
 function WhatsNew.new(db, version, text, fresh)
   local self = setmetatable({ db = db, version = Changelog.version(version), releases = {} }, WhatsNew)
   if not self.version then return self end
+  local installed = {}
   for _, release in ipairs(Changelog.parse(text)) do
-    if not Changelog.newer(release.version, self.version) then self.releases[#self.releases + 1] = release end
+    if not Changelog.newer(release.version, self.version) then
+      installed[#installed + 1] = release
+      local shown = forPlayers(release)
+      if #shown.entries > 0 then self.releases[#self.releases + 1] = shown end
+    end
   end
   if #self.releases == 0 then return self end
+  self.date = installed[1].date
+  self.oldest = installed[#installed].version
   if fresh then
     db.changesSeen = self.version
   elseif not Changelog.version(db.changesSeen) then
-    local previous = self.releases[2]
+    local previous = installed[2]
     db.changesSeen = previous and previous.version or self.version
   end
   return self
@@ -127,9 +142,10 @@ function WhatsNew:view(rows, versionOf)
     if major then view.updateNotice = updateNotice(major, rows, versionOf) end
   else
     view.title = "What's new in BFF"
-    view.line = ("You're on %s, from %s"):format(self.version, self.releases[1].date)
+    view.line = ("You're on %s, from %s"):format(self.version, self.date)
   end
-  if #self.releases > WhatsNew.SHOWN then
+  local lastShown = view.releases[#view.releases]
+  if Changelog.newer(lastShown.version, self.oldest) then
     view.older = missedOut > 0 and ("%s you missed %s shown here. %s"):format(plural(missedOut, "older update"),
       missedOut == 1 and "isn't" or "aren't", OLDER) or OLDER
   end

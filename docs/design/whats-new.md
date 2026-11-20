@@ -10,7 +10,11 @@ The version label carries the Unread dot while there are changes you haven't see
 
 - **Bump files** are written for players: a short title (one sentence, at most about 70 characters), a blank line, then a paragraph of detail (`docs/design/settings-and-release.md`). Bumpy keeps the paragraphs in `CHANGELOG.md`, its first line indented under `- *(kind)*` and the rest with it.
 - **The release build** writes the newest 8 releases of `CHANGELOG.md` into `ChangelogText.lua` as a Lua string (`scripts/changelog-text.sh`, run by `scripts/package.sh` before the packager copies the working tree). The checkout's copy is empty and is put back after the build, so it's never committed with text. A checkout has no What's new: its version is only a label.
-- **Changelog** (`Core/Changelog.lua`) parses it: a release per `## X.Y.Z` heading with its `<sub>` date ("13 Nov"), an entry per bullet with its kind (major, minor, patch). The first paragraph is the title and the rest the detail. An older entry written as one paragraph splits after its first sentence. Code spans and bold lose their marks.
+- **Changelog** (`Core/Changelog.lua`) parses it: a release per `## X.Y.Z` heading with its `<sub>` date ("13 Nov"), an entry per bullet with its kind (major, minor, patch). The first paragraph is the title and the rest the detail. An older entry written as one paragraph splits after its first sentence. Code spans and bold lose their marks. An entry starting "Internal:" is marked internal, without the word in its title.
+
+## Internal changes
+
+What's new shows only what players notice. It leaves out internal entries, and a release with nothing else, as if it weren't there: it isn't new, isn't counted and has no section. A big change always shows, internal or not, since the whole Crew has to update for it. The version you're on still dates "You're on …", and saved data from before What's new still starts with the release before the one installed seen. `CHANGELOG.md`, the GitHub release and Discord keep internal entries.
 
 ## What's seen
 

@@ -105,6 +105,8 @@ EOF
 
 ## Advanced: omitting an entry from the changelog
 
+**In BFF, don't use this.** Start the body with "Internal:" instead, so What's new in the game leaves it out and `CHANGELOG.md` keeps it. See `docs/design/settings-and-release.md`.
+
 If a change needs a version bump but shouldn't appear in the changelog (internal refactor, dependency tidy-up, etc.), add the `$changelog: false` reserved key. The bump still applies and cascades normally, but this file's body is omitted from the changelog and release notes — write the body anyway as a note for reviewers:
 
 ```bash
