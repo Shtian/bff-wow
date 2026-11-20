@@ -470,6 +470,84 @@ const TENT_LIGHTS = [[8, -1], [5, -1], [2, -1], [2, 1], [5, 1], [8, 1]].map(([j,
   return [TENT_CX + side * (hw + 1), 3 + j];
 });
 
+// Autumn, the lunar new year and Midsummer (docs/design/camp.md, Seasons),
+// from the prototype (prototypes/camp-seasons.html on PR #261's branch).
+// Autumn: a carved pumpkin by the fire, outlined and lit on the right like
+// the tree, its face glowing (1 bright, 2 dim, swapped on the other
+// flicker frame); bats crossing the sky in two wing frames, not outlined;
+// the fire's frames tinted a touch more orange.
+const PUMPKIN_PAL = { p: "#cc621a", q: "#8a3c14", u: "#ee8a32", s: "#5a7a2a", v: "#3a5420" };
+const PUMPKIN_GLOW = ["#ffe9a0", "#f0a21c"];
+const PUMPKIN = [
+  ".....sv....",
+  "...qpspuu..",
+  ".qqpppppuu.",
+  "qqp1ppp1ppu",
+  "qp111p111pu",
+  "qppppp2pppu",
+  "qp1p1p1p1pu",
+  "qpp21212ppu",
+  ".qqpppppuu.",
+  "..qqpppuu..",
+];
+const pumpkin = (k) => paint(outlined(PUMPKIN), { ...PAL, ...PUMPKIN_PAL, 1: PUMPKIN_GLOW[k], 2: PUMPKIN_GLOW[1 - k] });
+const BAT_PAL = { T: "#77708a", t: "#4f4960", e: "#c9481c" };
+const BAT = [
+  ["t.....t", "tt.T.tt", ".ttTtt.", "...T..."],
+  ["..tTt..", ".tTeTt.", "tt...tt", "t.....t"],
+];
+const AUTUMN_FIRE_PAL = { R: "#b8381a", O: "#e8701c", G: "#f6922a", Y: "#ffbe62", W: "#ffe0a4" };
+// The lunar new year: red and gold paper lanterns on a string (one pixel
+// of the string's colour, stretched), and the max-level burst's spark in
+// red for the firework, beside the gold one it already has.
+const LANTERN = ["..s..", ".ccc.", "reeef", "reyef", "ryyyf", "reeef", ".ccc.", "..x.."];
+const LANTERN_PALS = {
+  lanternRed: { c: "#ffd14a", x: "#f0a21c", e: "#d0302a", r: "#7a1a1c", f: "#ff6a4a", y: "#ffb060", s: "#6a4a2e" },
+  lanternGold: { c: "#c9481c", x: "#c9481c", e: "#f0a21c", r: "#8a5a18", f: "#ffd14a", y: "#fff3c4", s: "#6a4a2e" },
+};
+const LANTERN_STRING = "#6a4a2e";
+const SPARK_RED = { K: PAL.K, W: "#ffb08a", G: "#e0482c", Y: "#ff8a5a" };
+// Midsummer: a bonfire, new frames wider and taller than the fire's in its
+// palette; the Midsummer pole, a leafy mast with a crossbar, two arms from
+// the top to its ends and a wreath hung from each, not outlined (an outline
+// fills the triangle in), lit on the right; and fireflies, lit and dim.
+const BONFIRE = [
+  ["......R......", "......RR.....", ".....RORR....", "..R..ROOR..R.", "..RR.ROOOR.R.", ".RORRROGORRR.", ".ROORROGGOOR.", ".ROOOOGGGOOR.",
+    "RROGOGGYGGORR", "ROOGGGYYYGOOR", "ROGGYYYYYGGOR", "ROGYYYWYYYGOR", "ROGYYWWWYYGOR", ".ROGYYWYYGOR.", ".ROGYYYYYGOR.", "..ROGGGGGOR..", "...ROOOOOR..."],
+  ["..........R..", "...R......R..", "...RR.R..RR..", "..RORRR..ROR.", "..ROORORRROR.", ".RROOOOORROR.", ".ROOGOOOOGOR.", ".ROGGOGGOGOR.",
+    "RROGGGGYGGORR", "ROOGGYYYGGOOR", "ROGGYYYYYYGOR", "ROGYYWYYYYGOR", "ROGYWWWYYYGOR", ".ROGYYWYYGOR.", ".ROGYYYYYGOR.", "..ROGGGGGOR..", "...ROOOOOR..."],
+  ["....R........", "....RR....R..", "...RORR...RR.", "...ROORR.ROR.", ".R.ROOOR.ROR.", ".RRROGOORROR.", "RROOOGGOOOOR.", "ROOGGGGGGOOR.",
+    "RROGGYGGGGORR", "ROOGYYYYGGOOR", "ROGGYYYYYGGOR", "ROGYYYYWYYGOR", "ROGYYYWWWYGOR", ".ROGYYYWYGOR.", ".ROGYYYYYGOR.", "..ROGGGGGOR..", "...ROOOOOR..."],
+];
+const POLE_PAL = { g: "#2c5a33", h: "#468a46", i: "#6db35e" };
+const MIDSUMMER_POLE = [
+  ".......Y.......",
+  "......hih......",
+  ".....h.h.i.....",
+  "....h..h..i....",
+  "...h...h...i...",
+  "..h....h....i..",
+  ".h.....h.....i.",
+  "ghhihhiPhihhihi",
+  ".hg....h....gi.",
+  "h..W...i...P..i",
+  "g..h...h...h..i",
+  ".hg....h....gi.",
+  ".......h.......",
+  "......gh.......",
+  ".......h.......",
+  ".......hi......",
+  ".......h.......",
+  ".......h.......",
+  "......gh.......",
+  ".......h.......",
+  ".......hi......",
+  ".......h.......",
+  ".......h.......",
+  "......ghi......",
+];
+const FIREFLY = { on: "#d8f070", dim: "#6a8a30" };
+
 // Shapeshift forms (docs/design/pocket-camp.md), from the prototype
 // (prototypes/shapeshift-sprites.html on PR #217's branch): fill-only grids facing right, the
 // way a figure left of the fire faces it, outlined like the tools. Each
@@ -595,6 +673,15 @@ const SPRITES = [
   ["treePine", paint(outlined(PINE), { ...PAL, ...TREE_PAL })],
   ["snowflake", paint(["N"], { N: SNOW.cap })], ["snowflakeFar", paint(["N"], { N: SNOW.far })],
   ...LIGHTS.map((color, i) => [`light${i + 1}`, paint(["L"], { L: color })]),
+  ["pumpkin1", pumpkin(0)], ["pumpkin2", pumpkin(1)],
+  ["bat1", paint(BAT[0], BAT_PAL)], ["bat2", paint(BAT[1], BAT_PAL)],
+  ["fireAutumn1", paint(FIRE[0], AUTUMN_FIRE_PAL)], ["fireAutumn2", paint(FIRE[1], AUTUMN_FIRE_PAL)],
+  ["fireAutumn3", paint(FIRE[2], AUTUMN_FIRE_PAL)],
+  ...Object.entries(LANTERN_PALS).map(([name, palette]) => [name, paint(LANTERN, palette)]),
+  ["lanternString", paint(["s"], { s: LANTERN_STRING })], ["sparkRed", paint(SPARK, SPARK_RED)],
+  ["bonfire1", skin(BONFIRE[0])], ["bonfire2", skin(BONFIRE[1])], ["bonfire3", skin(BONFIRE[2])],
+  ["midsummerPole", paint(MIDSUMMER_POLE, { ...PAL, ...POLE_PAL })],
+  ["firefly", paint(["F"], { F: FIREFLY.on })], ["fireflyDim", paint(["F"], { F: FIREFLY.dim })],
   ["rod", skin(ROD)], ["star", skin(STAR)], ["fish", skin(FISH)],
   ["smoke1", skin(SMOKE[0])], ["smoke2", skin(SMOKE[1])], ["skeleton", skin(SKELETON)],
   ["flare1", paint(flare(FIRE[0]), FLARE_PAL)], ["flare2", paint(flare(FIRE[1]), FLARE_PAL)],

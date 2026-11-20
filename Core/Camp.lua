@@ -31,15 +31,22 @@ local LAYOUT = {
   pet = 13,
   petGap = 1,
   tree = 11,
-  treeGap = 4,
+  pumpkin = 13,
+  pole = 15,
+  decorGap = 4,
 }
 Camp.LAYOUT = LAYOUT
 
 local DECOR = {
-  tree = { width = LAYOUT.tree, gap = LAYOUT.treeGap },
+  tree = { width = LAYOUT.tree, gap = LAYOUT.decorGap },
+  pumpkin = { width = LAYOUT.pumpkin, gap = LAYOUT.decorGap },
+  pole = { width = LAYOUT.pole, gap = LAYOUT.decorGap },
 }
 
 Camp.SEASONS = {
+  { key = "lunar", from = { 1, 22 }, to = { 2, 12 }, decor = {} },
+  { key = "midsummer", from = { 6, 20 }, to = { 7, 5 }, decor = { "pole" } },
+  { key = "autumn", from = { 10, 18 }, to = { 11, 1 }, decor = { "pumpkin" } },
   { key = "winter", from = { 12, 1 }, to = { 1, 2 }, decor = { "tree" } },
 }
 local SEASON = {}
