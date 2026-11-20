@@ -19,6 +19,7 @@ Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
 Core.DUNGEONS = ns.Together.DUNGEONS
 Core.TOGETHER_LAYOUT = ns.Together.LAYOUT
 Core.CAMP_LAYOUT = ns.Camp.LAYOUT
+Core.SEASONS = ns.Camp.SEASONS
 Core.HATS = ns.Look.HATS
 Core.PETS = ns.Look.PETS
 Core.FINAL_BOSSES = ns.Clears.FINAL_BOSSES
@@ -285,7 +286,7 @@ local function pocketView(self)
   for id, since in pairs(self.bedrolls) do
     if now - since < BEDROLL_FOR then bedrolls[id] = since end
   end
-  local shown = { alts = self:setting("pocketCampAlts") }
+  local shown = { alts = self:setting("pocketCampAlts"), season = self:season() }
   return ns.Camp.pocket(rows, self.log:since(now - ns.Camp.RECENT), now, doing, bedrolls,
     self:setting("pocketCampColumns"), ns.Camp.grouped(rows, self.party), shown)
 end
@@ -607,10 +608,32 @@ function Core:mapPins()
   return pins
 end
 
+function Core:season()
+  if not (self:setting("camp") and self:setting("seasons")) then return nil end
+  if self.forcedSeason ~= nil then return self.forcedSeason or nil end
+  return ns.Camp.season(self.now(), self.utcOffset)
+end
+
+function Core:forceSeason(key)
+  local known = key == "off" or key == "auto"
+  for _, season in ipairs(Core.SEASONS) do known = known or season.key == key end
+  if not known then return false end
+  if key == "off" then
+    self.forcedSeason = false
+  elseif key == "auto" then
+    self.forcedSeason = nil
+  else
+    self.forcedSeason = key
+  end
+  self.listener("changed")
+  return true
+end
+
 function Core:camp(columns)
   if not self:setting("camp") then return nil end
   local now = self.now()
-  return ns.Camp.view(ns.Roster.rows(self.ledger, now), self.log:since(now - ns.Camp.RECENT), now, columns)
+  return ns.Camp.view(ns.Roster.rows(self.ledger, now), self.log:since(now - ns.Camp.RECENT), now, columns,
+    { season = self:season() })
 end
 
 function Core:pocketCamp()
@@ -703,7 +726,7 @@ local function awaySummary(self)
   if self:setting("camp") then
     local now = self.now()
     summary.camp, summary.intro = ns.Camp.away(ns.Roster.rows(self.ledger, now),
-      self.log:since(now - ns.Camp.RECENT), now, summary)
+      self.log:since(now - ns.Camp.RECENT), now, summary, self:season())
   end
   self.listener("awaySummary", summary)
   self.listener("changed")
@@ -1155,6 +1178,11 @@ local SETTINGS = {
     key = "camp", section = NOTIFICATIONS, kind = "toggle",
     label = "Show the Camp",
     saved = offFlag("campOff"),
+  },
+  {
+    key = "seasons", section = NOTIFICATIONS, kind = "toggle", needs = "camp",
+    label = "Seasonal decorations",
+    saved = offFlag("seasonsOff"),
   },
   {
     key = "mapPins", section = NOTIFICATIONS, kind = "toggle",

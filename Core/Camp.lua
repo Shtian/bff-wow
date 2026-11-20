@@ -30,8 +30,38 @@ local LAYOUT = {
   doorwayGap = 3,
   pet = 13,
   petGap = 1,
+  tree = 11,
+  treeGap = 4,
 }
 Camp.LAYOUT = LAYOUT
+
+local DECOR = {
+  tree = { width = LAYOUT.tree, gap = LAYOUT.treeGap },
+}
+
+Camp.SEASONS = {
+  { key = "winter", from = { 12, 15 }, to = { 1, 2 }, decor = { "tree" } },
+}
+local SEASON = {}
+for _, season in ipairs(Camp.SEASONS) do SEASON[season.key] = season end
+
+local function dayOf(monthDay)
+  return monthDay[1] * 100 + monthDay[2]
+end
+
+local function within(today, season)
+  local from, to = dayOf(season.from), dayOf(season.to)
+  if from <= to then return from <= today and today <= to end
+  return today >= from or today <= to
+end
+
+function Camp.season(now, utcOffset)
+  local today = dayOf({ ns.Text.monthDay(now, utcOffset or 0) })
+  for _, season in ipairs(Camp.SEASONS) do
+    if within(today, season) then return season.key end
+  end
+  return nil
+end
 
 Camp.RECENT = DAY
 local MEMBER_GRAVES = 2
@@ -229,6 +259,16 @@ local function arrange(rows, entries, now, columns, options, petted)
     local side = roomier(left, right)
     local x = placeOn(side, LAYOUT.tent, 0)
     if x then view.tent = { x = x } end
+  end
+  local season = SEASON[options.season]
+  view.season = season and season.key
+  local decor = season and (options.tent == false or view.tent) and season.decor or {}
+  for _, key in ipairs(decor) do
+    local x = placeOn(roomier(left, right), DECOR[key].width, 0, nil, nil, nil, DECOR[key].gap)
+    if x then
+      view.decor = view.decor or {}
+      view.decor[#view.decor + 1] = { key = key, x = x }
+    end
   end
   labelRoom(view.actors, leftEdge, rightEdge)
   for _, actor in ipairs(view.actors) do actor.side = nil end
@@ -429,7 +469,7 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
   end
   rows = seatingOrder(rows, group, seatKey)
   local options = {
-    tent = false, onlineOnly = true, moreText = "+%d", sleepers = bedrolls,
+    tent = false, onlineOnly = true, moreText = "+%d", sleepers = bedrolls, season = shown.season,
     room = function(row)
       if poses[row.memberId] == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
       local form = forms[row.memberId]
@@ -522,8 +562,8 @@ function Camp.header(summary, on)
   return ("%d of %d online"):format(summary.online, summary.members)
 end
 
-function Camp.away(rows, entries, now, summary)
-  local view = Camp.view(rows, entries, now, LAYOUT.awayColumns, { tent = false })
+function Camp.away(rows, entries, now, summary, season)
+  local view = Camp.view(rows, entries, now, LAYOUT.awayColumns, { tent = false, season = season })
   local byMember = {}
   for _, member in ipairs(summary.members) do byMember[member.memberId] = member end
   for _, actor in ipairs(view.actors) do

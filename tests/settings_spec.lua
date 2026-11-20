@@ -89,6 +89,7 @@ local SETTINGS = {
   { key = "toasts", default = true, other = false },
   { key = "minimap", default = true, other = false },
   { key = "camp", default = true, other = false },
+  { key = "seasons", default = true, other = false },
   { key = "mapPins", default = true, other = false },
   { key = "mapPinSize", default = "medium", other = "large" },
   { key = "pocketCamp", default = false, other = true },
@@ -119,7 +120,7 @@ describe("Settings list", function()
     for _, section in ipairs(core:settings()) do
       for _, setting in ipairs(section.settings) do keys[#keys + 1] = setting.key end
     end
-    assert.same({ "paused", "chatLines", "awayPopup", "minimap", "camp", "mapPins", "mapPinSize", "panelPlace", "toasts",
+    assert.same({ "paused", "chatLines", "awayPopup", "minimap", "camp", "seasons", "mapPins", "mapPinSize", "panelPlace", "toasts",
       "toastSound", "toastPosition", "pocketCamp", "pocketCampOpacity", "pocketCampLocked", "pocketCampCombat",
       "pocketCampCombatFade", "pocketCampAlts", "pocketCampSpares" }, keys)
   end)
@@ -143,6 +144,14 @@ describe("Settings list", function()
     assert.equal("sound", sections[3].settings[2].kind)
     assert.equal("position", sections[3].settings[3].kind)
     assert.same({ "Where toasts appear", "Move" }, { sections[3].settings[3].label, sections[3].settings[3].button })
+  end)
+
+  it("offers Seasonal decorations next to Show the Camp, needing it", function()
+    local core = newCore()
+    local list = core:settings()[2].settings
+    assert.equal("camp", list[4].key)
+    assert.same({ key = "seasons", kind = "toggle", label = "Seasonal decorations", value = true, needs = "camp" },
+      list[5])
   end)
 
   it("offers map pin sizes as choices, needing the map setting, and keeps only a known size", function()

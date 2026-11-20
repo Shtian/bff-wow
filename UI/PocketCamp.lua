@@ -327,7 +327,7 @@ function PocketCamp.refresh()
 end
 
 function PocketCamp.settingChanged(key)
-  if key == "camp" or key:find("^pocketCamp") then PocketCamp.refresh() end
+  if key == "camp" or key == "seasons" or key:find("^pocketCamp") then PocketCamp.refresh() end
 end
 
 function PocketCamp.animate(animation)

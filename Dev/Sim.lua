@@ -1148,6 +1148,15 @@ SlashCmdList.BFFDEV = function(input)
   local rest = (input or ""):match("^%s*%S*%s*(.-)%s*$")
   if command == "encounters" then return showEncounters(rest) end
   if command == "rares" then return showRares(rest) end
+  if command == "season" then
+    if not ns.core:forceSeason(rest) then
+      local keys = {}
+      for _, season in ipairs(ns.Core.SEASONS) do keys[#keys + 1] = season.key end
+      return print(("BFF dev: /bffdev season <%s|off|auto>"):format(table.concat(keys, "|")))
+    end
+    print(("BFF dev: season %s (now %s)."):format(rest, tostring(ns.core:season() or "none")))
+    return
+  end
   if command == "rare" then
     local name, rare = Sim.rare(ns.core)
     print(name and ("BFF dev: %s slays %s."):format(name, rare) or ("BFF dev: no Rare kill (%s)."):format(rare))

@@ -12,9 +12,9 @@ local function character(name, extra)
   return c
 end
 
-local function crew(names, options)
+local function crew(names, options, netOptions)
   local ns = load()
-  local net = ns.FakeNet.new()
+  local net = ns.FakeNet.new(netOptions)
   local clients = {}
   for i, name in ipairs(names) do
     local o = options and options[name] or {}
@@ -179,9 +179,14 @@ describe("The Camp", function()
     clients[6]:logout()
     net:run(5)
     local a = clients[1]
-    local sawTent, sawNoTent, sawPets = false, false, false
+    local sawTent, sawNoTent, sawPets, sawTree, sawNoTree = false, false, false, false, false
     for columns = 128, 375 do
+      a.core:forceSeason("off")
+      local plain = a.core:camp(columns)
+      a.core:forceSeason("winter")
       local view = a.core:camp(columns)
+      assert.same(spans(plain), spans(view), ("the tree moved someone at %d"):format(columns))
+      assert.same({ plain.tent, plain.more }, { view.tent, view.more }, ("the tree took the tent's room at %d"):format(columns))
       local list = spans(view)
       for _, actor in ipairs(view.actors) do sawPets = sawPets or actor.pet ~= nil end
       if view.tent then
@@ -190,6 +195,12 @@ describe("The Camp", function()
       else
         sawNoTent = true
       end
+      for _, piece in ipairs(view.decor or {}) do
+        assert.equal("tree", piece.key)
+        assert.is_truthy(view.tent, ("a tree without the tent at %d"):format(columns))
+        list[#list + 1] = { piece.x, piece.x + layout.tree }
+      end
+      if view.decor then sawTree = true else sawNoTree = true end
       local left, right = -math.floor(columns / 2), columns - math.floor(columns / 2)
       for i, span in ipairs(list) do
         assert.is_true(span[1] >= left and span[2] <= right, ("out of the band at %d"):format(columns))
@@ -213,6 +224,8 @@ describe("The Camp", function()
     assert.is_true(sawTent)
     assert.is_true(sawNoTent)
     assert.is_true(sawPets)
+    assert.is_true(sawTree)
+    assert.is_true(sawNoTree)
   end)
 
   describe("graves", function()
@@ -662,5 +675,142 @@ describe("Pets", function()
     assert.is_nil(newer.pet)
     assert.is_nil(a:rowFor({ memberId = "badpet" }).pet)
     assert.is_nil(actorFor(a.core:camp(COLUMNS), { memberId = "newer" }).pet)
+  end)
+end)
+
+describe("Seasons", function()
+  local DEC_15_2026 = 1797292800
+  local JAN_3_2027 = 1798934400
+  local JUL_1_2026 = 1782864000
+  local HOUR = 60 * 60
+
+  it("are yearly windows of real dates that never overlap", function()
+    local ns = load()
+    local lengths = { 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
+    local keys = {}
+    for _, season in ipairs(ns.Core.SEASONS) do
+      assert.is_nil(keys[season.key], season.key)
+      keys[season.key] = true
+      for _, date in ipairs({ season.from, season.to }) do
+        assert.is_true(date[1] >= 1 and date[1] <= 12 and date[2] >= 1 and date[2] <= lengths[date[1]], season.key)
+      end
+    end
+    for month = 1, 12 do
+      for day = 1, lengths[month] do
+        local today, found = month * 100 + day, 0
+        for _, season in ipairs(ns.Core.SEASONS) do
+          local from, to = season.from[1] * 100 + season.from[2], season.to[1] * 100 + season.to[2]
+          local within = from <= to and (from <= today and today <= to) or from > to and (today >= from or today <= to)
+          if within then found = found + 1 end
+        end
+        assert.is_true(found <= 1, ("%d/%d is in %d seasons"):format(day, month, found))
+      end
+    end
+  end)
+
+  it("puts winter from 15 Dec to 2 Jan in your local date, across the new year", function()
+    local season = load().Camp.season
+    assert.is_nil(season(DEC_15_2026 - 1, 0))
+    assert.equal("winter", season(DEC_15_2026, 0))
+    assert.equal("winter", season(DEC_15_2026 + 17 * DAY - 1, 0))
+    assert.equal("winter", season(DEC_15_2026 + 17 * DAY, 0))
+    assert.equal("winter", season(JAN_3_2027 - 1, 0))
+    assert.is_nil(season(JAN_3_2027, 0))
+    assert.is_nil(season(JUL_1_2026, 0))
+    assert.equal("winter", season(DEC_15_2026 - HOUR, HOUR))
+    assert.is_nil(season(DEC_15_2026 + HOUR - 1, -HOUR))
+    assert.is_nil(season(JAN_3_2027 - HOUR, HOUR))
+    assert.equal("winter", season(JAN_3_2027 + HOUR - 1, -HOUR))
+  end)
+
+  it("come on camp(), the Pocket Camp and While you were away, from Core's utcOffset", function()
+    local net, clients = crew({ "Ann", "Bob" }, { Ann = { utcOffset = HOUR } }, { clock = DEC_15_2026 - HOUR - 60 })
+    local a, b = clients[1], clients[2]
+    a.core:setSetting("pocketCamp", true)
+    assert.is_nil(a.core:camp(COLUMNS).season)
+    assert.is_nil(a.core:pocketCamp().season)
+    skip(net, 60)
+    assert.equal("winter", a.core:camp(COLUMNS).season)
+    assert.equal("winter", a.core:pocketCamp().season)
+    assert.is_nil(b.core:camp(COLUMNS).season)
+    a:logout()
+    net:run(5)
+    b:play({ level = 11 })
+    net:run(15)
+    a.events = {}
+    a:login()
+    net:run(40)
+    local summary
+    for _, event in ipairs(a.events) do
+      if event[1] == "awaySummary" then summary = event[2] end
+    end
+    assert.equal("winter", summary.camp.season)
+  end)
+
+  it("are nil with Seasonal decorations off, or the Camp off", function()
+    local _, clients = crew({ "Ann", "Bob" }, nil, { clock = DEC_15_2026 + DAY })
+    local a = clients[1]
+    a.core:setSetting("pocketCamp", true)
+    assert.is_true(a.core:setting("seasons"))
+    a.core:setSetting("seasons", false)
+    local view = a.core:camp(375)
+    assert.same({ nil, nil }, { view.season, view.decor })
+    assert.is_nil(a.core:pocketCamp().season)
+    a.core:forceSeason("winter")
+    assert.is_nil(a.core:camp(375).season)
+    a.core:setSetting("seasons", true)
+    a.core:setSetting("camp", false)
+    assert.is_nil(a.core:season())
+  end)
+
+  it("can be forced for a dev check, off or back to the date, and refuse an unknown key", function()
+    local _, clients = crew({ "Ann" }, nil, { clock = JUL_1_2026 })
+    local a = clients[1]
+    assert.is_nil(a.core:camp(COLUMNS).season)
+    local before = a:count("changed")
+    assert.is_true(a.core:forceSeason("winter"))
+    assert.equal(before + 1, a:count("changed"))
+    assert.equal("winter", a.core:camp(COLUMNS).season)
+    assert.is_true(a.core:forceSeason("off"))
+    assert.is_nil(a.core:camp(COLUMNS).season)
+    assert.is_false(a.core:forceSeason("spring"))
+    assert.is_nil(a.core:camp(COLUMNS).season)
+    assert.is_true(a.core:forceSeason("auto"))
+    assert.is_nil(a.core:camp(COLUMNS).season)
+  end)
+
+  describe("winter's tree", function()
+    it("stands after everyone and the tent, on the side with more room left", function()
+      local _, clients = crew({ "Ann", "Bob", "Cid" }, nil, { clock = DEC_15_2026 })
+      local view = clients[1].core:camp(375)
+      assert.equal(1, #view.decor)
+      local tree, tent = view.decor[1], view.tent
+      assert.is_true((tree.x < 0) ~= (tent.x < 0))
+      for _, actor in ipairs(view.actors) do
+        if (actor.x < 0) == (tree.x < 0) then
+          assert.is_true(math.abs(tree.x) > math.abs(actor.x), actor.label)
+        end
+      end
+    end)
+
+    it("is in the Pocket Camp only when it has spare width, and never widens it", function()
+      local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal", "Ivy" }
+      local net, clients = crew(names, nil, { clock = DEC_15_2026 })
+      local a = clients[1]
+      a.core:setSetting("pocketCamp", true)
+      local crowded = a.core:pocketCamp()
+      assert.is_nil(crowded.decor)
+      a.core:forceSeason("off")
+      assert.equal(a.core:pocketCamp().columns, crowded.columns)
+      for i = 3, #names do clients[i]:logout() end
+      net:run(5)
+      skip(net, 10 * 60)
+      a.core:forceSeason("auto")
+      local roomy = a.core:pocketCamp()
+      assert.equal(layout.pocketColumns, roomy.columns)
+      assert.equal("tree", roomy.decor[1].key)
+      local half = layout.pocketColumns / 2
+      assert.is_true(roomy.decor[1].x >= -half and roomy.decor[1].x + layout.tree <= half)
+    end)
   end)
 end)

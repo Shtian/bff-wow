@@ -25,6 +25,7 @@ A **Settings** view inside the BFF panel, drawn by `UI/SettingsTab.lua` in the p
 | | Show While you were away on login | on | #14 |
 | | Show minimap button | on | #7 |
 | | Show the Camp | on | #127, `docs/design/camp.md` |
+| | Seasonal decorations (greyed out while the Camp is off) | on | #243, `docs/design/camp.md` (Seasons) |
 | | Show your Crew on the world map | on | `docs/design/code-structure.md` (`mapPins()`, Where) |
 | | Map pin size: Small, Medium or Large (greyed out while the map pins are off) | Medium | `docs/design/code-structure.md` (`mapPins()`) |
 | | BFF window size and position, with a Reset button | | #109 |
@@ -62,6 +63,7 @@ Every local setting is an entry in one ordered list in `Core/Core.lua` (#85): it
   | `awayPopup` | `awayPopupOff = true`, or nil while on |
   | `minimap` | `hide = true` inside the minimap table LibDBIcon reads, or nil while on |
   | `camp` | `campOff = true`, or nil while on |
+  | `seasons` | `seasonsOff = true`, or nil while on |
   | `mapPins` | `mapPinsOff = true`, or nil while on |
   | `mapPinSize` | `"small"` or `"large"`, or nil for medium (anything else reads as medium) |
   | `pocketCamp` | `pocketCamp = true`, or nil while off |
