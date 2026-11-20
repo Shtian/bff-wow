@@ -406,7 +406,7 @@ const sparkArt = (red) => sprite("spark" + red, () => art(SPARK, red ? SPARK_RED
 // Backdrops: tonight's is scripts/camp-art.mjs's; a day look swaps the colours, adds clouds or haze, lights the
 // hills' crest and paints grass with a weaker glow round the fire. Winter puts each look's snow on the ground.
 const BACK_W = 384, BACK_H = 52, FILE_W = 512, FILE_H = 64, HORIZON_ROW = 12;
-function backdrop(look, trees, winter) {
+function backdrop(look, trees, winter, nightTrees) {
   const L = look || NIGHT, night = !look;
   const img = rgbaImage(FILE_W, FILE_H);
   const ox = (FILE_W - BACK_W) / 2, oy = FILE_H - BACK_H;
@@ -446,8 +446,8 @@ function backdrop(look, trees, winter) {
     rect(x, horizon - h, 1, h, L.hills);
     if (L.crest) put(x, horizon - h, L.crest);
   }
-  if (!night && trees === "detailed") {
-    const T = treePal(L);
+  if (night ? nightTrees === "subtle" : trees === "detailed") {
+    const T = night ? NIGHT_TREES : treePal(L);
     const b = (x, y) => BAYER[(y + 64) % 4][(x + 64) % 4];
     for (let x = 2, i = 0; x < W; x += 3 + Math.floor(rnd(i + 300) * 3), i++) {
       const h = 3 + Math.floor(rnd(i + 310) * 4), base = horizon - hill(x) + 2;
@@ -458,7 +458,8 @@ function backdrop(look, trees, winter) {
     }
     const detailedPine = (x, h, seed) => {
       const top = horizon - h, tier = 4 + Math.floor(rnd(seed) * 2);
-      put(x, top - 1, winter ? L.snow.ground : T.mid);
+      put(x, top - 1, winter ? T.snowLit : T.mid);
+      const warmth = T.warm ? Math.max(0, 1 - Math.abs(x - cx) / 80) : 0, toFire = Math.sign(cx - x);
       let aboveL = 0, aboveR = 0;
       for (let y = 0; y < h; y++) {
         const inTier = y % tier, row = top + y;
@@ -472,8 +473,9 @@ function backdrop(look, trees, winter) {
           else if (u < -0.25 && (-u - 0.25) / 0.75 > d * 0.8) c = T.deep;
           if (inTier <= 1 && y > 2 && Math.abs(k) < w - 1 && !(u > 0.5 && d < 0.4)) c = T.deep;
           if (inTier === tier - 1 && k === wr && w > 1) c = T.tip;
+          if (warmth && Math.sign(k) === toFire && Math.abs(u) > 0.45 && y > h * 0.35 && d < warmth * 0.9) c = T.warm;
           const exposed = y === 0 || k < -aboveL || k > aboveR;
-          if (winter && exposed && d < 0.8) c = k >= 0 ? L.snow.ground : L.snow.dusk;
+          if (winter && exposed && d < 0.8) c = k >= 0 ? T.snowLit : T.snowShade;
           put(x + k, row, c);
         }
         aboveL = wl; aboveR = wr;
@@ -530,8 +532,14 @@ const mix = (a, b, t) => "#" + rgb(a).map((v, i) => Math.round(v + (rgb(b)[i] - 
 function treePal(L) {
   const far = mix(L.pines, L.hills, 0.55);
   return { mid: L.pines, deep: mix(L.pines, "#0b0a12", 0.42), lit: L.pinesLit || mix(L.pines, "#e8f0a0", 0.2),
-    tip: mix(L.pines, "#f0f4c0", 0.38), far, farLit: mix(far, L.crest || L.hills, 0.6), trunk: mix("#3a2518", L.hills, 0.2) };
+    tip: mix(L.pines, "#f0f4c0", 0.38), far, farLit: mix(far, L.crest || L.hills, 0.6), trunk: mix("#3a2518", L.hills, 0.2),
+    snowLit: L.snow.ground, snowShade: L.snow.dusk };
 }
+// Subtle night pines: today's silhouette colour, a darker shadow side and under each tier, a faint cool rim of
+// moonlight on the right, the fire's warmth on the lower branches facing it (fading out 80 columns away), and a
+// far tree line barely lighter than the hills. In winter the shoulders take the night snow's tones.
+const NIGHT_TREES = { mid: "#090a18", deep: "#05060e", lit: "#11142c", tip: "#181c38", far: "#0c0d22", farLit: "#101230",
+  trunk: "#120c10", warm: "#2c1b17", snowLit: "#3e4058", snowShade: "#262838" };
 function withSnow(back, snow, day) {
   const img = { width: back.width, height: back.height, data: Uint8ClampedArray.from(back.data) };
   const fire = FILE_W / 2;
@@ -553,12 +561,12 @@ function withSnow(back, snow, day) {
   return img;
 }
 const backdropCache = new Map();
-function backdropFor(phase, look, winter, trees) {
-  const key = [phase, look, winter, trees].join(":");
+function backdropFor(phase, look, winter, trees, nightTrees) {
+  const key = [phase, look, winter, trees, nightTrees].join(":");
   let img = backdropCache.get(key);
   if (!img) {
     const L = phase === "day" ? LOOKS[look] : null;
-    img = backdrop(L, trees, winter);
+    img = backdrop(L, trees, winter, nightTrees);
     if (winter) img = withSnow(img, (L || NIGHT).snow, !!L);
     backdropCache.set(key, img);
   }
@@ -930,10 +938,10 @@ const WORLD = {
 function render(canvas, kind, view, cols, rows, s, opts = {}) {
   const unit = kind === "pocket" ? 2 : opts.unit || 3;
   const sc = scene(view, cols, rows, s, { ...opts, unit, sky: kind !== "pocket" });
-  const bkey = [kind, cols, rows, s.phase, s.look, s.season === "winter", s.trees].join(":");
+  const bkey = [kind, cols, rows, s.phase, s.look, s.season === "winter", s.trees, s.nightTrees].join(":");
   let back = backCache.get(bkey);
   if (!back) {
-    back = toCanvas(backLayer(kind, cols, rows, sc.fire, backdropFor(s.phase, s.look, s.season === "winter", s.trees)));
+    back = toCanvas(backLayer(kind, cols, rows, sc.fire, backdropFor(s.phase, s.look, s.season === "winter", s.trees, s.nightTrees)));
     backCache.set(bkey, back);
   }
   paint(canvas, sc, unit, back, kind === "pocket" ? 0.6 : 1);
@@ -981,7 +989,7 @@ const pocketCast = [
 
 const query = new URLSearchParams(location.search);
 const pick = { look: "A", sun: "A", sunAt: "right", moon: "B", moonAt: "right", stars: "A", starCount: "4",
-  season: "none", phase: "day", trees: "detailed", nightOnly: "hide", world: "bright", scale: 1 };
+  season: "none", phase: "day", trees: "detailed", nightTrees: "subtle", nightOnly: "hide", world: "bright", scale: 1 };
 for (const k of Object.keys(pick)) if (query.has(k)) pick[k] = typeof pick[k] === "number" ? +query.get(k) : query.get(k);
 if (query.has("variant")) pick.look = query.get("variant");
 let flipOffset = 0;
@@ -1162,6 +1170,7 @@ function toggles() {
   group("Stars ", keys(STARS), "stars");
   group("× ", [["4", "4"], ["8", "8"]], "starCount");
   group("Day trees ", [["detailed", "detailed"], ["flat", "flat (before)"]], "trees");
+  group("Night trees ", [["subtle", "subtle"], ["flat", "flat (today)"]], "nightTrees");
   group("Season (§3, §4, §6) ", [["none", "none"], ["winter", "winter"], ["autumn", "autumn"], ["lunar", "lunar"], ["midsummer", "midsummer"]], "season");
   group("Bats, firework, fireflies by day ", [["hide", "hidden"], ["show", "shown"]], "nightOnly");
   group("World ", [["bright", "bright"], ["dark", "dark"]], "world");
