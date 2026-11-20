@@ -406,7 +406,7 @@ const sparkArt = (red) => sprite("spark" + red, () => art(SPARK, red ? SPARK_RED
 // Backdrops: tonight's is scripts/camp-art.mjs's; a day look swaps the colours, adds clouds or haze, lights the
 // hills' crest and paints grass with a weaker glow round the fire. Winter puts each look's snow on the ground.
 const BACK_W = 384, BACK_H = 52, FILE_W = 512, FILE_H = 64, HORIZON_ROW = 12;
-function backdrop(look) {
+function backdrop(look, trees, winter) {
   const L = look || NIGHT, night = !look;
   const img = rgbaImage(FILE_W, FILE_H);
   const ox = (FILE_W - BACK_W) / 2, oy = FILE_H - BACK_H;
@@ -440,11 +440,55 @@ function backdrop(look) {
       if (BAYER[y % 4][x % 4] < k) put(x, y, L.haze);
     }
   }
+  const hill = (x) => 7 + Math.round(3 * Math.sin(x * 0.05) + 2 * Math.sin(x * 0.13 + 1));
   for (let x = 0; x < W; x++) {
-    const h = 7 + Math.round(3 * Math.sin(x * 0.05) + 2 * Math.sin(x * 0.13 + 1));
+    const h = hill(x);
     rect(x, horizon - h, 1, h, L.hills);
     if (L.crest) put(x, horizon - h, L.crest);
   }
+  if (!night && trees === "detailed") {
+    const T = treePal(L);
+    const b = (x, y) => BAYER[(y + 64) % 4][(x + 64) % 4];
+    for (let x = 2, i = 0; x < W; x += 3 + Math.floor(rnd(i + 300) * 3), i++) {
+      const h = 3 + Math.floor(rnd(i + 310) * 4), base = horizon - hill(x) + 2;
+      for (let y = 0; y < h; y++) {
+        const w = Math.floor((y + 1) * 0.6);
+        for (let k = -w; k <= w; k++) put(x + k, base - h + y, k > 0 && b(x + k, y) < 0.6 ? T.farLit : T.far);
+      }
+    }
+    const detailedPine = (x, h, seed) => {
+      const top = horizon - h, tier = 4 + Math.floor(rnd(seed) * 2);
+      put(x, top - 1, winter ? L.snow.ground : T.mid);
+      let aboveL = 0, aboveR = 0;
+      for (let y = 0; y < h; y++) {
+        const inTier = y % tier, row = top + y;
+        const w = Math.floor((inTier + y * 0.55) * 0.62) + 1;
+        const wl = w - (inTier === tier - 1 || rnd(seed + y * 1.3) > 0.7 ? 0 : 1);
+        const wr = w - (inTier === tier - 1 || rnd(seed + y * 2.1) > 0.75 ? 0 : 1);
+        for (let k = -wl; k <= wr; k++) {
+          const u = k / Math.max(1, w), d = b(x + k, row);
+          let c = T.mid;
+          if (u > 0.3 && (u - 0.3) / 0.7 > d * 0.85) c = T.lit;
+          else if (u < -0.25 && (-u - 0.25) / 0.75 > d * 0.8) c = T.deep;
+          if (inTier <= 1 && y > 2 && Math.abs(k) < w - 1 && !(u > 0.5 && d < 0.4)) c = T.deep;
+          if (inTier === tier - 1 && k === wr && w > 1) c = T.tip;
+          const exposed = y === 0 || k < -aboveL || k > aboveR;
+          if (winter && exposed && d < 0.8) c = k >= 0 ? L.snow.ground : L.snow.dusk;
+          put(x + k, row, c);
+        }
+        aboveL = wl; aboveR = wr;
+        if (inTier === tier - 1 && w > 2 && rnd(seed + y * 3.7) > 0.5) put(x - wl - 1, row + 1, T.deep);
+      }
+      rect(x, horizon - 1, 1, 3, T.trunk);
+    };
+    for (let i = 0; i < W / 9; i++) {
+      const x = Math.floor(i * 9 + rnd(i + 20) * 7), far = Math.abs(x - cx) < 30;
+      if (far && rnd(i) > 0.3) continue;
+      detailedPine(x, 12 + Math.floor(rnd(i + 70) * (far ? 5 : 11)), i * 13.7 + 5);
+    }
+  } else drawFlatPines();
+  return paintGround();
+  function drawFlatPines() {
   const pine = (x, h) => {
     for (let y = 0; y < h; y++) {
       const w = Math.floor(((y % 5) + y * 0.55) * 0.62) + 1;
@@ -458,6 +502,8 @@ function backdrop(look) {
     if (far && rnd(i) > 0.3) continue;
     pine(x, 12 + Math.floor(rnd(i + 70) * (far ? 5 : 11)));
   }
+  }
+  function paintGround() {
   for (let y = horizon; y < H; y++) for (let x = 0; x < W; x++) {
     const dx = (x - cx) / 52, dy = (y - (H - 5)) / 9, d = Math.sqrt(dx * dx + dy * dy), b = BAYER[y % 4][x % 4];
     if (night) {
@@ -476,6 +522,15 @@ function backdrop(look) {
     put(x, y, c);
   }
   return img;
+  }
+}
+const mix = (a, b, t) => "#" + rgb(a).map((v, i) => Math.round(v + (rgb(b)[i] - v) * t).toString(16).padStart(2, "0")).join("");
+// Detailed day pines: shadow side, lit side (the sun's, from the right), a dark band under each tier, a lit tip on
+// each tier's right, a trunk, and a hazier far tree line along the hills' crest.
+function treePal(L) {
+  const far = mix(L.pines, L.hills, 0.55);
+  return { mid: L.pines, deep: mix(L.pines, "#0b0a12", 0.42), lit: L.pinesLit || mix(L.pines, "#e8f0a0", 0.2),
+    tip: mix(L.pines, "#f0f4c0", 0.38), far, farLit: mix(far, L.crest || L.hills, 0.6), trunk: mix("#3a2518", L.hills, 0.2) };
 }
 function withSnow(back, snow, day) {
   const img = { width: back.width, height: back.height, data: Uint8ClampedArray.from(back.data) };
@@ -488,7 +543,7 @@ function withSnow(back, snow, day) {
   for (let x = 0; x < img.width; x++) {
     const bayer = (y) => BAYER[y % 4][x % 4];
     const top = FILE_H - 1 - HORIZON_ROW;
-    if (lit(x, top) && bayer(top) < clear(x, HORIZON_ROW) * (day ? 0.5 : 1)) rgbaSet(img, x, top, snow.far);
+    if (lit(x, top) && bayer(top) < clear(x, HORIZON_ROW) * (day ? 0 : 1)) rgbaSet(img, x, top, snow.far);
     for (let row = 0; row < HORIZON_ROW - (day ? 0 : 1); row++) {
       const y = FILE_H - 1 - row, k = clear(x, row);
       if (!lit(x, y) || k <= 0 || bayer(y) >= k) continue;
@@ -498,12 +553,12 @@ function withSnow(back, snow, day) {
   return img;
 }
 const backdropCache = new Map();
-function backdropFor(phase, look, winter) {
-  const key = [phase, look, winter].join(":");
+function backdropFor(phase, look, winter, trees) {
+  const key = [phase, look, winter, trees].join(":");
   let img = backdropCache.get(key);
   if (!img) {
     const L = phase === "day" ? LOOKS[look] : null;
-    img = backdrop(L);
+    img = backdrop(L, trees, winter);
     if (winter) img = withSnow(img, (L || NIGHT).snow, !!L);
     backdropCache.set(key, img);
   }
@@ -875,10 +930,10 @@ const WORLD = {
 function render(canvas, kind, view, cols, rows, s, opts = {}) {
   const unit = kind === "pocket" ? 2 : opts.unit || 3;
   const sc = scene(view, cols, rows, s, { ...opts, unit, sky: kind !== "pocket" });
-  const bkey = [kind, cols, rows, s.phase, s.look, s.season === "winter"].join(":");
+  const bkey = [kind, cols, rows, s.phase, s.look, s.season === "winter", s.trees].join(":");
   let back = backCache.get(bkey);
   if (!back) {
-    back = toCanvas(backLayer(kind, cols, rows, sc.fire, backdropFor(s.phase, s.look, s.season === "winter")));
+    back = toCanvas(backLayer(kind, cols, rows, sc.fire, backdropFor(s.phase, s.look, s.season === "winter", s.trees)));
     backCache.set(bkey, back);
   }
   paint(canvas, sc, unit, back, kind === "pocket" ? 0.6 : 1);
@@ -926,7 +981,7 @@ const pocketCast = [
 
 const query = new URLSearchParams(location.search);
 const pick = { look: "A", sun: "A", sunAt: "right", moon: "B", moonAt: "right", stars: "A", starCount: "4",
-  season: "none", phase: "day", nightOnly: "hide", world: "bright", scale: 1 };
+  season: "none", phase: "day", trees: "detailed", nightOnly: "hide", world: "bright", scale: 1 };
 for (const k of Object.keys(pick)) if (query.has(k)) pick[k] = typeof pick[k] === "number" ? +query.get(k) : query.get(k);
 if (query.has("variant")) pick.look = query.get("variant");
 let flipOffset = 0;
@@ -1106,6 +1161,7 @@ function toggles() {
   group("at ", places, "moonAt");
   group("Stars ", keys(STARS), "stars");
   group("× ", [["4", "4"], ["8", "8"]], "starCount");
+  group("Day trees ", [["detailed", "detailed"], ["flat", "flat (before)"]], "trees");
   group("Season (§3, §4, §6) ", [["none", "none"], ["winter", "winter"], ["autumn", "autumn"], ["lunar", "lunar"], ["midsummer", "midsummer"]], "season");
   group("Bats, firework, fireflies by day ", [["hide", "hidden"], ["show", "shown"]], "nightOnly");
   group("World ", [["bright", "bright"], ["dark", "dark"]], "world");
