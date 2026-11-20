@@ -245,10 +245,6 @@ local function drawAlt(alt, row, data)
   alt:Show()
 end
 
-local function hideAll(lines, from)
-  for i = from, #lines do lines[i]:Hide() end
-end
-
 local function place(line, y)
   line:ClearAllPoints()
   line:SetPoint("TOPLEFT", view.content, "TOPLEFT", 0, y)
@@ -412,9 +408,7 @@ function RosterTab.draw(thePage)
   end
   view.alone:SetShown(crew.alone)
   local footerHeight = drawFooter(crew, counts)
-  view:ClearAllPoints()
-  view:SetPoint("TOPLEFT")
-  view:SetPoint("BOTTOMRIGHT", -6, footerHeight)
+  view:Between(0, footerHeight)
   drawSection(counts.spares)
   section:Hide()
 
@@ -456,9 +450,9 @@ function RosterTab.draw(thePage)
       y = y - ALONE_CARD_PAD - view.alone:Layout(page.listWidth) - ALONE_CARD_PAD
     end
   end
-  hideAll(rowFrames, rowCount + 1)
-  hideAll(altFrames, altCount + 1)
-  hideAll(laterSections, later + 1)
+  Skin.hideFrom(rowFrames, rowCount + 1)
+  Skin.hideFrom(altFrames, altCount + 1)
+  Skin.hideFrom(laterSections, later + 1)
 
   view:Fit(-y + 6)
 end

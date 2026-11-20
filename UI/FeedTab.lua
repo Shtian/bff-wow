@@ -32,10 +32,6 @@ local function createView(page)
   view.empty = ns.EmptyState.new(view)
 end
 
-local function hideAll(lines, from)
-  for i = from, #lines do lines[i]:Hide() end
-end
-
 local function createDay()
   local day = CreateFrame("Frame", nil, view.content)
   day:SetHeight(DAY_HEIGHT)
@@ -159,8 +155,8 @@ function FeedTab.draw(page)
       y = y - FEED_ENTRY
     end
   end
-  hideAll(view.days, dayCount + 1)
-  hideAll(view.entries, entryCount + 1)
+  Skin.hideFrom(view.days, dayCount + 1)
+  Skin.hideFrom(view.entries, entryCount + 1)
   if entryCount == 0 then
     view.empty:Set(ns.EmptyState.view(EMPTY, not core:setting("camp")))
     view.empty:Place(view, page.listWidth, page.height)

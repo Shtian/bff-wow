@@ -27,7 +27,6 @@ local RECENT_ICON = 16
 local RECENT_LABEL = 14
 local RECENT_SHORT = 300
 local RECENT_NARROW = 400
-local SCROLLBAR = 6
 local EMPTY_PAD = 18
 local UNCAUGHT_ALPHA = 0.45
 local QUESTION_MARK = "Interface\\Icons\\INV_Misc_QuestionMark"
@@ -38,10 +37,6 @@ local core
 local group = "where"
 local show = "all"
 local sectionFrames, tileFrames, recentRows = {}, {}, {}
-
-local function hideFrom(list, from)
-  for i = from, #list do list[i]:Hide() end
-end
 
 local function item(itemId, fallback)
   local name, icon, quality = Skin.item(itemId)
@@ -299,7 +294,7 @@ local function drawSummary(data, width)
     tick:SetPoint("CENTER", view.track, "LEFT", math.floor(inner * at), 0)
     tick:Show()
   end
-  hideFrom(view.ticks, #data.ticks + 1)
+  Skin.hideFrom(view.ticks, #data.ticks + 1)
   view.next:ClearAllPoints()
   view.next:SetPoint("TOPLEFT", INSET, barY - BAR - 5)
   view.next:SetText(data.next)
@@ -313,7 +308,7 @@ local function drawRecent(data, width, height)
   local shown = math.min(max, #data.recent)
   if shown == 0 then
     view.recent:Hide()
-    hideFrom(recentRows, 1)
+    Skin.hideFrom(recentRows, 1)
     return 0
   end
   view.recent.label:SetText(data.recentTitle)
@@ -342,7 +337,7 @@ local function drawRecent(data, width, height)
     row.when:SetText(width >= RECENT_NARROW and r.when or r.first.since)
     row:Show()
   end
-  hideFrom(recentRows, shown + 1)
+  Skin.hideFrom(recentRows, shown + 1)
   local stripHeight = 7 + RECENT_LABEL + shown * RECENT_ROW + 6
   view.recent:SetHeight(stripHeight)
   view.recent:Show()
@@ -422,8 +417,8 @@ local function drawSections(data, width)
     frame:Show()
     y = y - height
   end
-  hideFrom(sectionFrames, #data.sections + 1)
-  hideFrom(tileFrames, tiles + 1)
+  Skin.hideFrom(sectionFrames, #data.sections + 1)
+  Skin.hideFrom(tileFrames, tiles + 1)
   return -y + 6
 end
 
@@ -436,9 +431,7 @@ function CatchesTab.draw(thePage)
 
   local top = drawSummary(data, width)
   local bottom = drawRecent(data, width, height)
-  view.scroller:ClearAllPoints()
-  view.scroller:SetPoint("TOPLEFT", 0, -top)
-  view.scroller:SetPoint("BOTTOMRIGHT", -SCROLLBAR, bottom)
+  view.scroller:Between(top, bottom)
   view.content:SetWidth(page.listWidth)
   view.scroller:Fit(drawSections(data, page.listWidth))
 

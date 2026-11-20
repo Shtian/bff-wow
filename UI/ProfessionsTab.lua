@@ -33,10 +33,6 @@ function ProfessionsTab.sortLike(order)
   rosterOrder = order
 end
 
-local function hideAll(lines, from)
-  for i = from, #lines do lines[i]:Hide() end
-end
-
 local function showTooltip(owner)
   if not owner.tooltip then return end
   GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
@@ -82,9 +78,7 @@ local function createView()
   view.divider:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4])
   view.divider:SetWidth(1)
   view.list = page:scrollView()
-  view.list:ClearAllPoints()
-  view.list:SetPoint("TOPLEFT", 0, -HEAD)
-  view.list:SetPoint("BOTTOMRIGHT", -6, 0)
+  view.list:Between(HEAD, 0)
   view.columnWash = Skin.fill(view.list.content, Skin.HOVER, "BORDER")
   view.columnWash:Hide()
   view.rows = {}
@@ -241,7 +235,7 @@ function ProfessionsTab.draw(thePage)
     icon:SetAlpha(p.had and 1 or 0.55)
     icon:Show()
   end
-  hideAll(view.icons, #data.professions + 1)
+  Skin.hideFrom(view.icons, #data.professions + 1)
   local sorted
   for i, p in ipairs(data.professions) do
     if p.skillLine == sortBy then sorted = i end
@@ -284,11 +278,11 @@ function ProfessionsTab.draw(thePage)
         tile:Hide()
       end
     end
-    hideAll(row.tiles, #data.professions + 1)
+    Skin.hideFrom(row.tiles, #data.professions + 1)
     row:Show()
     y = y - ROW
   end
-  hideAll(view.rows, #members + 1)
+  Skin.hideFrom(view.rows, #members + 1)
 
   view.divider:ClearAllPoints()
   view.divider:SetShown(dividerX ~= nil)

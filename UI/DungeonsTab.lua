@@ -85,10 +85,6 @@ local function colored(text, color)
   return Skin.hex(color) .. text .. "|r"
 end
 
-local function hideFrom(list, from)
-  for i = from, #list do list[i]:Hide() end
-end
-
 local measurers = {}
 local function measure(text, font)
   local label = measurers[font]
@@ -293,7 +289,7 @@ local function dashes(frame, width, height)
     dash(0, y, 1, h)
     dash(width - 1, y, 1, h)
   end
-  hideFrom(frame.dashes, count + 1)
+  Skin.hideFrom(frame.dashes, count + 1)
 end
 
 local function lightOtherLabels(group)
@@ -694,7 +690,7 @@ local function drawAxis(data)
     at(texture, decade.left, 0, decade.right - decade.left, trackHeight)
     texture:Show()
   end
-  hideFrom(decadeTextures, #data.decades + 1)
+  Skin.hideFrom(decadeTextures, #data.decades + 1)
 
   local y = axisY()
   at(view.axis, 0, y, data.width, AXIS)
@@ -731,8 +727,8 @@ local function drawAxis(data)
       label:Show()
     end
   end
-  hideFrom(tickTextures, #data.ticks + 1)
-  hideFrom(numberLabels, numbers + 1)
+  Skin.hideFrom(tickTextures, #data.ticks + 1)
+  Skin.hideFrom(numberLabels, numbers + 1)
 end
 
 local function createDotFrame()
@@ -879,10 +875,10 @@ local function drawGroups(data)
       label:Hide()
     end
   end
-  hideFrom(dotFrames, lit and 1 or #data.groups + 1)
-  hideFrom(headFrames, lit and #data.groups + 1 or 1)
-  hideFrom(labelFrames, #data.groups + 1)
-  hideFrom(stemTextures, stems + 1)
+  Skin.hideFrom(dotFrames, lit and 1 or #data.groups + 1)
+  Skin.hideFrom(headFrames, lit and #data.groups + 1 or 1)
+  Skin.hideFrom(labelFrames, #data.groups + 1)
+  Skin.hideFrom(stemTextures, stems + 1)
 end
 
 local function showRange(frame)
@@ -972,7 +968,7 @@ local function drawBar(frame, bar)
   if attunement then
     dashes(frame.plate, bar.range, BAR)
   elseif frame.plate.dashes then
-    hideFrom(frame.plate.dashes, 1)
+    Skin.hideFrom(frame.plate.dashes, 1)
   end
   for _, edge in ipairs(frame.outline) do edge:SetShown(bar.shared) end
   frame:SetAlpha(bar.faded and FADED or 1)
@@ -1008,7 +1004,7 @@ local function drawBar(frame, bar)
     anchor = dot
     width = width + (i == 1 and 6 or 2) + 6
   end
-  hideFrom(frame.dots, #bar.dots + 1)
+  Skin.hideFrom(frame.dots, #bar.dots + 1)
   frame.more:SetShown(bar.moreDots > 0)
   if bar.moreDots > 0 then
     frame.more:ClearAllPoints()
@@ -1028,7 +1024,7 @@ local function drawDungeons(data)
     frame.index = i
     drawBar(frame, bar)
   end
-  hideFrom(barFrames, #data.bars + 1)
+  Skin.hideFrom(barFrames, #data.bars + 1)
 end
 
 local function stripTexture(list, i, layer)
@@ -1064,7 +1060,7 @@ local function drawOverview(data)
       column:SetSize(math.max(1, width), height)
     end
   end
-  hideFrom(overviewColumns, columns + 1)
+  Skin.hideFrom(overviewColumns, columns + 1)
   local first = cell(1)
   local last, lastWidth = cell(#density.levels)
   view.stripBase:ClearAllPoints()
@@ -1083,7 +1079,7 @@ local function drawOverview(data)
       foot:SetVertexColor(r, g, b, group.online and 1 or FOOT_OFFLINE)
     end
   end
-  hideFrom(overviewTicks, feet + 1)
+  Skin.hideFrom(overviewTicks, feet + 1)
   view.stripYou:ClearAllPoints()
   view.stripYou:SetPoint("CENTER", view.strip, "LEFT", data.you * scale, 0)
 end

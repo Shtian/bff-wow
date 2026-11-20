@@ -40,10 +40,6 @@ StaticPopupDialogs.BFF_GIVE_SPARE = {
   hideOnEscape = true,
 }
 
-local function hideAll(lines, from)
-  for i = from, #lines do lines[i]:Hide() end
-end
-
 local function place(line, y)
   line:ClearAllPoints()
   line:SetPoint("TOPLEFT", view.content, "TOPLEFT", 0, y)
@@ -294,9 +290,9 @@ function SparesTab.draw(thePage)
   list(spares.yours, true)
   addNote(HOW)
 
-  hideAll(view.headings, headings + 1)
-  hideAll(view.rows, rows + 1)
-  hideAll(view.notes, notes + 1)
+  Skin.hideFrom(view.headings, headings + 1)
+  Skin.hideFrom(view.rows, rows + 1)
+  Skin.hideFrom(view.notes, notes + 1)
   view:Fit(-y + 6)
   if spares.unseen > 0 then core:sparesSeen() end
 end

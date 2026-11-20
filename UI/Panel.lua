@@ -6,7 +6,6 @@ ns.Panel = Panel
 local Skin = ns.Skin
 
 local SIDEBAR = 124
-local SCROLLBAR = 6
 local GRIP = 12
 local HEADER = Skin.HEADER_HEIGHT
 local NAV_HEIGHT = 30
@@ -44,7 +43,7 @@ local TABS = {
   { key = "professions", label = "Professions", module = ns.ProfessionsTab },
   { key = "dungeons", label = "Dungeons", module = ns.DungeonsTab },
   { key = "catches", label = "Catches", module = ns.CatchesTab },
-  { key = "settings", label = "Settings", module = ns.SettingsTab, nav = "foot" },
+  { key = "settings", label = "Settings", module = ns.SettingsTab, nav = "foot", withoutCrew = true },
   { key = "whatsnew", module = ns.WhatsNewTab, nav = "version" },
 }
 
@@ -145,7 +144,10 @@ local function drawNav()
   local height = math.min(NAV_HEIGHT, math.floor((sidebarHeight - NAV_TOP - NAV_BOTTOM) / #nav.buttons))
   for _, entry in ipairs(TABS) do
     local button = nav[entry.key]
-    if entry.nav ~= "version" then
+    if entry.nav == "version" then
+      button.selected:SetShown(tab == entry.key)
+      Skin.color(button.label, tab == entry.key and TEXT or DIM)
+    else
       setSelected(button, tab == entry.key)
       button:SetHeight(height)
     end
@@ -155,8 +157,6 @@ local function drawNav()
       button.badge:SetShown(count > 0 and tab ~= entry.key)
     end
   end
-  nav.version.selected:SetShown(tab == "whatsnew")
-  Skin.color(nav.version.label, tab == "whatsnew" and TEXT or DIM)
   nav.version.dot:SetShown(core:hasNewChanges())
   nav.version:EnableMouse(core:whatsNew() ~= nil)
 end
@@ -164,8 +164,6 @@ end
 local function scrollView(page)
   if not page.view then
     page.view = ns.ScrollView.new(page.frame, page.listWidth)
-    page.view:SetPoint("TOPLEFT")
-    page.view:SetPoint("BOTTOMRIGHT", -SCROLLBAR, 0)
   end
   return page.view
 end
@@ -202,7 +200,7 @@ end
 local function drawTab(entry, inCrew)
   local page = pageFor(entry)
   page.width = frame:GetWidth() - (inCrew and SIDEBAR + 1 or 2)
-  page.listWidth = page.width - SCROLLBAR
+  page.listWidth = page.width - ns.ScrollView.GUTTER
   page.height = frame:GetHeight() - HEADER - campHeight - tipHeight - 1
   page.campShown = camp:IsShown()
   page.frame:Show()
@@ -283,7 +281,7 @@ local function create()
   frame:SetScript("OnHide", function()
     if frame.sizing or frame.moving then savePlace() end
     if shown then leave(shown, true) end
-    if tab == "settings" and not core:crew() then tab = "roster" end
+    if shown and shown.withoutCrew and not core:crew() then tab = TABS[1].key end
   end)
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
@@ -461,12 +459,8 @@ function Panel.refresh()
   if not frame or not frame:IsShown() then return end
   local crew = core:crew()
   layout(crew ~= nil)
-  local entry
-  if crew then
-    entry = tabNamed(tab) or TABS[1]
-  elseif tab == "settings" then
-    entry = tabNamed(tab)
-  end
+  local entry = tabNamed(tab) or TABS[1]
+  if not crew and not entry.withoutCrew then entry = nil end
   switchTo(entry)
   if not entry then return showSetup() end
   hideSetup()

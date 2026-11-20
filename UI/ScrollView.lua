@@ -3,6 +3,8 @@ local _, ns = ...
 local ScrollView = {}
 ns.ScrollView = ScrollView
 
+ScrollView.GUTTER = 6
+
 local STEP = 40
 local THUMB_MIN = 24
 local THUMB_OUT = 4
@@ -30,6 +32,12 @@ local function scroll(view, delta)
   placeThumb(view)
 end
 
+local function between(view, top, bottom)
+  view:ClearAllPoints()
+  view:SetPoint("TOPLEFT", 0, -(top or 0))
+  view:SetPoint("BOTTOMRIGHT", -ScrollView.GUTTER, bottom or 0)
+end
+
 local function fit(view, height)
   view.content:SetHeight(math.max(height, 1))
   placeThumb(view)
@@ -50,5 +58,7 @@ function ScrollView.new(parent, width)
   view.thumb:SetColorTexture(1, 1, 1, 0.18)
   view.thumb:SetWidth(3)
   view.Fit = fit
+  view.Between = between
+  view:Between()
   return view
 end
