@@ -16,9 +16,9 @@ local function showTooltip(tooltip)
   if not core:crew() then
     tooltip:AddLine("Not in a Crew. Click to start or join one.", 1, 1, 1)
   else
-    local summary = core:summary()
-    tooltip:AddLine(("%d of %d online · %d can play with you now"):format(summary.online,
-      summary.members, summary.canPlay), 1, 1, 1)
+    local counts = core:rosterCounts()
+    tooltip:AddLine(("%d of %d online · %d can play with you now"):format(counts.online,
+      counts.members, counts.canPlay), 1, 1, 1)
     local unseen = core:unseen()
     if not core:isAwayPopupOn() and unseen > 0 then
       tooltip:AddLine(("%d new in Feed"):format(unseen), 1, 0.82, 0)
@@ -76,7 +76,7 @@ function Minimap.refresh()
   if not icons then return end
   showButton(core:isMinimapShown())
   if not badge then return end
-  local online = core:crew() and core:summary().online or 0
+  local online = core:crew() and core:rosterCounts().online or 0
   badge:SetText(online)
   badge:SetShown(online > 0)
 end

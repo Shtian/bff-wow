@@ -1,7 +1,7 @@
 local _, ns = ...
 
-local GoalsTab = {}
-ns.GoalsTab = GoalsTab
+local TrophiesTab = {}
+ns.TrophiesTab = TrophiesTab
 
 local Skin = ns.Skin
 
@@ -43,9 +43,9 @@ local TRACK_GAP = 12
 local SMALL_BUTTON = 20
 local EMPTY_PAD = 10
 
-local EMPTY_UNSETTLED = { art = "goals", title = "Counting up the Crew",
+local EMPTY_UNSETTLED = { art = "trophies", title = "Counting up the Crew",
   text = "Goals the Crew has already reached show here once everyone's records are in." }
-local EMPTY_NONE = { art = "goals", title = "The shelf is bare",
+local EMPTY_NONE = { art = "trophies", title = "The shelf is bare",
   text = "Every goal the Crew reaches, dungeon it clears and Rare it slays puts a medal here." }
 
 local view
@@ -549,7 +549,7 @@ local function drawCabinet(trophies, width)
   return y
 end
 
-function GoalsTab.draw(scrollView, theCore, width, onChange)
+function TrophiesTab.draw(scrollView, theCore, width, onChange)
   view, core, redraw = scrollView, theCore, onChange
   local trophies = core:trophies()
   if trophies.count == 0 then cabinetOpen = false end
@@ -571,12 +571,12 @@ function GoalsTab.draw(scrollView, theCore, width, onChange)
   unveiled = true
 end
 
-function GoalsTab.hidden()
+function TrophiesTab.hidden()
   stopUnveil()
   unveiled = false
 end
 
-function GoalsTab.leave()
-  GoalsTab.hidden()
+function TrophiesTab.leave()
+  TrophiesTab.hidden()
   cabinetOpen = false
 end

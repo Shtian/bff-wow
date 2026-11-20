@@ -184,12 +184,12 @@ describe("What's new", function()
       cat:join(code)
       net:run(60)
       ann.core:openWhatsNew()
-      local friends = ann.core:whatsNew().friends
-      assert.are.equal("2.0.0", friends.version)
-      assert.are.same({ { name = "Bob", classFilename = "MAGE", version = "1.6.2" } }, friends.behind)
-      assert.is_false(friends.everyone)
-      assert.are.equal("Since 2.0.0, friends on an older BFF see an \"out of date\" notice and stop seeing you until"
-        .. " they update.", friends.text)
+      local notice = ann.core:whatsNew().updateNotice
+      assert.are.equal("2.0.0", notice.version)
+      assert.are.same({ { name = "Bob", classFilename = "MAGE", version = "1.6.2" } }, notice.behind)
+      assert.is_false(notice.everyone)
+      assert.are.equal("Since 2.0.0, Members on an older BFF see an \"out of date\" notice and stop seeing you until"
+        .. " they update.", notice.text)
     end)
 
     it("says when everyone in the Crew is up to date", function()
@@ -198,10 +198,10 @@ describe("What's new", function()
       bob:join(ann:join())
       net:run(60)
       ann.core:openWhatsNew()
-      local friends = ann.core:whatsNew().friends
-      assert.are.same({}, friends.behind)
-      assert.is_true(friends.everyone)
-      assert.are.equal("Everyone in your Crew is on 2.0.0 or later.", friends.who)
+      local notice = ann.core:whatsNew().updateNotice
+      assert.are.same({}, notice.behind)
+      assert.is_true(notice.everyone)
+      assert.are.equal("Everyone in your Crew is on 2.0.0 or later.", notice.who)
     end)
 
     it("doesn't vouch for friends whose version it doesn't know", function()
@@ -210,10 +210,10 @@ describe("What's new", function()
       bob:join(ann:join())
       net:run(60)
       ann.core:openWhatsNew()
-      local friends = ann.core:whatsNew().friends
-      assert.are.same({}, friends.behind)
-      assert.is_false(friends.everyone)
-      assert.is_nil(friends.who)
+      local notice = ann.core:whatsNew().updateNotice
+      assert.are.same({}, notice.behind)
+      assert.is_false(notice.everyone)
+      assert.is_nil(notice.who)
     end)
 
     it("doesn't vouch for a Crew of one", function()
@@ -221,14 +221,14 @@ describe("What's new", function()
       ann:join()
       net:run(60)
       ann.core:openWhatsNew()
-      assert.is_false(ann.core:whatsNew().friends.everyone)
-      assert.is_nil(ann.core:whatsNew().friends.who)
+      assert.is_false(ann.core:whatsNew().updateNotice.everyone)
+      assert.is_nil(ann.core:whatsNew().updateNotice.who)
     end)
 
     it("isn't asked once the major release was seen", function()
       local ann = client(net, "Ann", "v2.3.0", { changesSeen = "2.0.0" }):login()
       ann.core:openWhatsNew()
-      assert.is_nil(ann.core:whatsNew().friends)
+      assert.is_nil(ann.core:whatsNew().updateNotice)
     end)
   end)
 
@@ -259,7 +259,7 @@ describe("What's new", function()
 
     it("says so when the update holds a major release", function()
       local ann = crewAfterUpdate("1.6.2")
-      assert.are.same({ "The panel is lit by the Camp's fire", "Make sure your friends update too" },
+      assert.are.same({ "The panel is lit by the Camp's fire", "Make sure the whole Crew updates too" },
         events(ann, "awaySummary")[1].update.lines)
     end)
 
@@ -308,7 +308,7 @@ describe("What's new", function()
       bob:reload()
       net:run(60)
       ann.core:openWhatsNew()
-      assert.is_true(ann.core:whatsNew().friends.everyone)
+      assert.is_true(ann.core:whatsNew().updateNotice.everyone)
     end)
 
     it("has no What's new and tells friends no version", function()
@@ -319,7 +319,7 @@ describe("What's new", function()
       assert.is_nil(ann.core:whatsNew())
       assert.is_false(ann.core:hasNewChanges())
       bob.core:openWhatsNew()
-      assert.is_false(bob.core:whatsNew().friends.everyone)
+      assert.is_false(bob.core:whatsNew().updateNotice.everyone)
     end)
 
     it("has no What's new without a changelog", function()

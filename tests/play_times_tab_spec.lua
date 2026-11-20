@@ -40,7 +40,7 @@ local function dataSince(net, ns, from, name)
   return count
 end
 
-describe("The When tab", function()
+describe("The Play times tab", function()
   it("shows how many Members usually play each hour, from records synced across the Crew", function()
     local net, clients = crew({ "Ann", "Bob", "Cleo" })
     local a, b = clients[1], clients[2]

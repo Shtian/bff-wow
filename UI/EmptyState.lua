@@ -21,7 +21,7 @@ local PLACE_INSET = 12
 local ALONE = {
   art = "alone",
   title = "Your Crew hasn't arrived yet",
-  text = "Give your friends the Crew code. They join with /bff join, and show up here once one of them is online.",
+  text = "Share your Crew code. Members join with /bff join, and show up here once one of them is online.",
 }
 local JOINED = {
   art = "alone",

@@ -329,7 +329,7 @@ function commands.roster()
 end
 
 function commands.trophies()
-  ns.Panel.show("goals")
+  ns.Panel.show("trophies")
 end
 
 function ns.sayPosted(id, result)
@@ -347,7 +347,7 @@ function commands.spares(rest)
 end
 
 function commands.playtimes()
-  ns.Panel.showWhen(nil)
+  ns.Panel.showPlayTimes(nil)
 end
 
 function commands.professions()
@@ -359,7 +359,7 @@ function commands.catches()
 end
 
 function commands.dungeons()
-  ns.Panel.show("together")
+  ns.Panel.show("dungeons")
 end
 
 function commands.whatsnew()

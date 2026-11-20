@@ -35,7 +35,7 @@ local SCROLL_STEP = 40
 local TITLE = "Best Friends in Forever"
 local FEED_EMPTY = { art = "feed", title = "Quiet by the fire",
   text = "Dings, deaths, new Characters and Crew wins land here, and wait for you while you're away." }
-local WHEN_EMPTY_TITLE = "Too soon to tell"
+local PLAY_TIMES_EMPTY_TITLE = "Too soon to tell"
 local SPARES_EMPTY = { art = "spares", title = "The crate is empty",
   text = "Got something your Crew could use? Drop it on the slot below." }
 local PROFESSIONS_EMPTY = { art = "professions", title = "No trades yet",
@@ -44,11 +44,11 @@ local ALONE_CARD_PAD = 16
 local SETUP_WIDTH = 320
 local SETUP_COLUMN = 150
 local SETUP_COLUMNS_Y = -72
-local WHEN_CELL = 11
-local WHEN_ROW = 18
-local WHEN_DAYS = 30
-local WHEN_TOP = -INSET - SMALL_BUTTON - 8 - 36
-local WHEN_BELOW = 74
+local PLAY_TIMES_CELL = 11
+local PLAY_TIMES_ROW = 18
+local PLAY_TIMES_DAYS = 30
+local PLAY_TIMES_TOP = -INSET - SMALL_BUTTON - 8 - 36
+local PLAY_TIMES_BELOW = 74
 local DAY_NAMES = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" }
 local SPARE_ROW = 44
 local SPARE_ICON = 28
@@ -90,17 +90,17 @@ local nav
 local section
 local rosterView
 local feedView
-local goalsView
+local trophiesView
 local whatsNewView
 local settingsView
-local whenView
+local playTimesView
 local sparesView
 local professionsView
 local footer
 local rowFrames = {}
 local altFrames = {}
 local tab = "roster"
-local whenMember
+local playTimesMember
 local order = "online"
 local expanded = {}
 
@@ -208,7 +208,7 @@ local function showMenu(owner)
       root:CreateButton("Whisper", function() ns.Actions.whisper(character.fullName) end):SetEnabled(character.playing)
       root:CreateButton("Invite", function() ns.Actions.invite(character.fullName) end):SetEnabled(character.playing)
       local name = row.displayName or character.name
-      root:CreateButton(("When does %s play?"):format(name), function() Panel.showWhen(row.memberId) end)
+      root:CreateButton(("When does %s play?"):format(name), function() Panel.showPlayTimes(row.memberId) end)
       root:CreateButton(("Remove %s..."):format(name), function()
         StaticPopup_Show("BFF_REMOVE_MEMBER", name, nil, row.memberId)
       end)
@@ -502,26 +502,26 @@ local function createNav()
   nav.feed:SetPoint("TOPRIGHT", nav.roster, "BOTTOMRIGHT")
   nav.feed.badge = Skin.badge(nav.feed, "tiny", { 0.1, 0.08, 0 }, GOLD)
   nav.feed.badge:SetPoint("RIGHT", -10, 0)
-  nav.goals = navButton("Trophies", open("goals"))
-  nav.goals:SetPoint("TOPLEFT", nav.feed, "BOTTOMLEFT")
-  nav.goals:SetPoint("TOPRIGHT", nav.feed, "BOTTOMRIGHT")
-  nav.when = navButton("Play Times", open("when"))
-  nav.when:SetPoint("TOPLEFT", nav.goals, "BOTTOMLEFT")
-  nav.when:SetPoint("TOPRIGHT", nav.goals, "BOTTOMRIGHT")
-  nav.spares = navButton("Spare Items", open("spares"))
-  nav.spares:SetPoint("TOPLEFT", nav.when, "BOTTOMLEFT")
-  nav.spares:SetPoint("TOPRIGHT", nav.when, "BOTTOMRIGHT")
+  nav.trophies = navButton("Trophies", open("trophies"))
+  nav.trophies:SetPoint("TOPLEFT", nav.feed, "BOTTOMLEFT")
+  nav.trophies:SetPoint("TOPRIGHT", nav.feed, "BOTTOMRIGHT")
+  nav.playTimes = navButton("Play Times", open("playtimes"))
+  nav.playTimes:SetPoint("TOPLEFT", nav.trophies, "BOTTOMLEFT")
+  nav.playTimes:SetPoint("TOPRIGHT", nav.trophies, "BOTTOMRIGHT")
+  nav.spares = navButton("Spares", open("spares"))
+  nav.spares:SetPoint("TOPLEFT", nav.playTimes, "BOTTOMLEFT")
+  nav.spares:SetPoint("TOPRIGHT", nav.playTimes, "BOTTOMRIGHT")
   nav.spares.badge = Skin.badge(nav.spares, "tiny", { 0.1, 0.08, 0 }, GOLD)
   nav.spares.badge:SetPoint("RIGHT", -10, 0)
   nav.professions = navButton("Professions", open("professions"))
   nav.professions:SetPoint("TOPLEFT", nav.spares, "BOTTOMLEFT")
   nav.professions:SetPoint("TOPRIGHT", nav.spares, "BOTTOMRIGHT")
-  nav.together = navButton("Dungeons", open("together"))
-  nav.together:SetPoint("TOPLEFT", nav.professions, "BOTTOMLEFT")
-  nav.together:SetPoint("TOPRIGHT", nav.professions, "BOTTOMRIGHT")
+  nav.dungeons = navButton("Dungeons", open("dungeons"))
+  nav.dungeons:SetPoint("TOPLEFT", nav.professions, "BOTTOMLEFT")
+  nav.dungeons:SetPoint("TOPRIGHT", nav.professions, "BOTTOMRIGHT")
   nav.catches = navButton("Catches", open("catches"))
-  nav.catches:SetPoint("TOPLEFT", nav.together, "BOTTOMLEFT")
-  nav.catches:SetPoint("TOPRIGHT", nav.together, "BOTTOMRIGHT")
+  nav.catches:SetPoint("TOPLEFT", nav.dungeons, "BOTTOMLEFT")
+  nav.catches:SetPoint("TOPRIGHT", nav.dungeons, "BOTTOMRIGHT")
   nav.settings = navButton("Settings", open("settings"))
   nav.settings:SetPoint("BOTTOMLEFT", 0, NAV_BOTTOM)
   nav.settings:SetPoint("BOTTOMRIGHT", 0, NAV_BOTTOM)
@@ -549,11 +549,11 @@ local function drawNav(unseen, sparesUnseen)
   if not nav then createNav() end
   setSelected(nav.roster, tab == "roster")
   setSelected(nav.feed, tab == "feed")
-  setSelected(nav.goals, tab == "goals")
-  setSelected(nav.when, tab == "when")
+  setSelected(nav.trophies, tab == "trophies")
+  setSelected(nav.playTimes, tab == "playtimes")
   setSelected(nav.spares, tab == "spares")
   setSelected(nav.professions, tab == "professions")
-  setSelected(nav.together, tab == "together")
+  setSelected(nav.dungeons, tab == "dungeons")
   setSelected(nav.catches, tab == "catches")
   setSelected(nav.settings, tab == "settings")
   nav.version.selected:SetShown(tab == "whatsnew")
@@ -562,7 +562,7 @@ local function drawNav(unseen, sparesUnseen)
   nav.version:EnableMouse(core:whatsNew() ~= nil)
   local sidebarHeight = frame:GetHeight() - HEADER - campHeight - tipHeight - 1
   local height = math.min(NAV_HEIGHT, math.floor((sidebarHeight - NAV_TOP - NAV_BOTTOM) / NAV_ROWS))
-  for _, button in ipairs({ nav.roster, nav.feed, nav.goals, nav.when, nav.spares, nav.professions, nav.together,
+  for _, button in ipairs({ nav.roster, nav.feed, nav.trophies, nav.playTimes, nav.spares, nav.professions, nav.dungeons,
     nav.catches, nav.settings }) do
     button:SetHeight(height)
   end
@@ -762,15 +762,15 @@ local function drawFeed(feed)
   updateThumb(feedView)
 end
 
-local function drawGoals()
-  if not goalsView then
-    goalsView = createScrollView()
-    goalsView:SetPoint("TOPLEFT")
-    goalsView:SetPoint("BOTTOMRIGHT", -6, 0)
+local function drawTrophies()
+  if not trophiesView then
+    trophiesView = createScrollView()
+    trophiesView:SetPoint("TOPLEFT")
+    trophiesView:SetPoint("BOTTOMRIGHT", -6, 0)
   end
-  ns.GoalsTab.draw(goalsView, core, listWidth(), Panel.refresh)
-  goalsView:Show()
-  updateThumb(goalsView)
+  ns.TrophiesTab.draw(trophiesView, core, listWidth(), Panel.refresh)
+  trophiesView:Show()
+  updateThumb(trophiesView)
 end
 
 local function drawSettings(inCrew)
@@ -799,17 +799,17 @@ local function drawWhatsNew()
   updateThumb(whatsNewView)
 end
 
-local function showWhenMenu(owner)
+local function showPlayTimesMenu(owner)
   MenuUtil.CreateContextMenu(owner, function(_, root)
     root:CreateTitle("Show")
-    root:CreateRadio("The Crew", function() return whenMember == nil end, function()
-      whenMember = nil
+    root:CreateRadio("The Crew", function() return playTimesMember == nil end, function()
+      playTimesMember = nil
       Panel.refresh()
     end)
     for _, row in ipairs(core:rows("name")) do
       local label = row.own and "You" or row.displayName or row.name
-      root:CreateRadio(label, function() return whenMember == row.memberId end, function()
-        whenMember = row.memberId
+      root:CreateRadio(label, function() return playTimesMember == row.memberId end, function()
+        playTimesMember = row.memberId
         Panel.refresh()
       end)
     end
@@ -825,7 +825,7 @@ local function shadeCell(cell, value, max)
 end
 
 local function showCellTooltip(cell)
-  local view = whenView.data
+  local view = playTimesView.data
   if not view then return end
   local value = view.grid[cell.day][cell.hour]
   GameTooltip:SetOwner(cell, "ANCHOR_RIGHT")
@@ -840,129 +840,129 @@ local function showCellTooltip(cell)
   GameTooltip:Show()
 end
 
-local function createWhenView()
-  whenView = CreateFrame("Frame", nil, frame.content)
-  whenView:SetAllPoints()
+local function createPlayTimesView()
+  playTimesView = CreateFrame("Frame", nil, frame.content)
+  playTimesView:SetAllPoints()
 
-  whenView.pick = CreateFrame("Button", nil, whenView)
-  whenView.pick:SetHeight(SMALL_BUTTON)
-  whenView.pick:SetPoint("TOPLEFT", INSET, -INSET)
-  Skin.fill(whenView.pick, Skin.SECONDARY)
-  Skin.border(whenView.pick, Skin.BORDER)
-  Skin.fill(whenView.pick, Skin.HOVER, "HIGHLIGHT")
-  whenView.pick.label = Skin.label(whenView.pick, "small", TEXT)
-  whenView.pick.iconRoom = Skin.leadIcon(whenView.pick, "filter", TEXT)
-  whenView.pick:SetScript("OnClick", showWhenMenu)
+  playTimesView.pick = CreateFrame("Button", nil, playTimesView)
+  playTimesView.pick:SetHeight(SMALL_BUTTON)
+  playTimesView.pick:SetPoint("TOPLEFT", INSET, -INSET)
+  Skin.fill(playTimesView.pick, Skin.SECONDARY)
+  Skin.border(playTimesView.pick, Skin.BORDER)
+  Skin.fill(playTimesView.pick, Skin.HOVER, "HIGHLIGHT")
+  playTimesView.pick.label = Skin.label(playTimesView.pick, "small", TEXT)
+  playTimesView.pick.iconRoom = Skin.leadIcon(playTimesView.pick, "filter", TEXT)
+  playTimesView.pick:SetScript("OnClick", showPlayTimesMenu)
 
-  whenView.intro = Skin.label(whenView, "small", MUTED)
-  whenView.intro:SetPoint("TOPLEFT", whenView.pick, "BOTTOMLEFT", 0, -8)
-  whenView.intro:SetWordWrap(true)
-  whenView.intro:SetJustifyH("LEFT")
+  playTimesView.intro = Skin.label(playTimesView, "small", MUTED)
+  playTimesView.intro:SetPoint("TOPLEFT", playTimesView.pick, "BOTTOMLEFT", 0, -8)
+  playTimesView.intro:SetWordWrap(true)
+  playTimesView.intro:SetJustifyH("LEFT")
 
-  whenView.hours = {}
+  playTimesView.hours = {}
   for hour = 0, 21, 3 do
-    local label = Skin.label(whenView, "tiny", DIM)
+    local label = Skin.label(playTimesView, "tiny", DIM)
     label:SetText(("%02d"):format(hour))
     label.hour = hour
-    whenView.hours[#whenView.hours + 1] = label
+    playTimesView.hours[#playTimesView.hours + 1] = label
   end
-  whenView.days = {}
-  whenView.cells = {}
+  playTimesView.days = {}
+  playTimesView.cells = {}
   for day = 1, 7 do
-    local label = Skin.label(whenView, "small", MUTED)
+    local label = Skin.label(playTimesView, "small", MUTED)
     label:SetText(DAY_NAMES[day])
-    whenView.days[day] = label
+    playTimesView.days[day] = label
     for hour = 1, 24 do
-      local cell = CreateFrame("Frame", nil, whenView)
+      local cell = CreateFrame("Frame", nil, playTimesView)
       cell.texture = cell:CreateTexture(nil, "ARTWORK")
       cell.texture:SetAllPoints()
       cell.day, cell.hour = day, hour
       cell:EnableMouse(true)
       cell:SetScript("OnEnter", showCellTooltip)
       cell:SetScript("OnLeave", hideTooltip)
-      whenView.cells[#whenView.cells + 1] = cell
+      playTimesView.cells[#playTimesView.cells + 1] = cell
     end
   end
 
-  whenView.legendLow = Skin.label(whenView, "tiny", DIM)
-  whenView.legend = {}
-  local anchor = whenView.legendLow
+  playTimesView.legendLow = Skin.label(playTimesView, "tiny", DIM)
+  playTimesView.legend = {}
+  local anchor = playTimesView.legendLow
   for i = 1, 4 do
-    local swatch = whenView:CreateTexture(nil, "ARTWORK")
-    swatch:SetSize(WHEN_CELL - 1, WHEN_ROW - 2)
+    local swatch = playTimesView:CreateTexture(nil, "ARTWORK")
+    swatch:SetSize(PLAY_TIMES_CELL - 1, PLAY_TIMES_ROW - 2)
     swatch:SetPoint("LEFT", anchor, "RIGHT", i == 1 and 6 or 1, 0)
-    whenView.legend[i] = { texture = swatch }
+    playTimesView.legend[i] = { texture = swatch }
     anchor = swatch
   end
-  whenView.legendHigh = Skin.label(whenView, "tiny", DIM)
-  whenView.legendHigh:SetPoint("LEFT", anchor, "RIGHT", 6, 0)
+  playTimesView.legendHigh = Skin.label(playTimesView, "tiny", DIM)
+  playTimesView.legendHigh:SetPoint("LEFT", anchor, "RIGHT", 6, 0)
 
-  whenView.note = Skin.label(whenView, "small", MUTED)
-  whenView.note:SetWordWrap(true)
-  whenView.note:SetJustifyH("LEFT")
+  playTimesView.note = Skin.label(playTimesView, "small", MUTED)
+  playTimesView.note:SetWordWrap(true)
+  playTimesView.note:SetJustifyH("LEFT")
 
-  whenView.grid = { whenView.intro, whenView.legendLow, whenView.legendHigh, whenView.note }
-  for _, list in ipairs({ whenView.hours, whenView.days, whenView.cells }) do
-    for _, item in ipairs(list) do whenView.grid[#whenView.grid + 1] = item end
+  playTimesView.grid = { playTimesView.intro, playTimesView.legendLow, playTimesView.legendHigh, playTimesView.note }
+  for _, list in ipairs({ playTimesView.hours, playTimesView.days, playTimesView.cells }) do
+    for _, item in ipairs(list) do playTimesView.grid[#playTimesView.grid + 1] = item end
   end
-  for _, swatch in ipairs(whenView.legend) do whenView.grid[#whenView.grid + 1] = swatch.texture end
-  whenView.empty = ns.EmptyState.new(whenView)
+  for _, swatch in ipairs(playTimesView.legend) do playTimesView.grid[#playTimesView.grid + 1] = swatch.texture end
+  playTimesView.empty = ns.EmptyState.new(playTimesView)
 end
 
 local function placeWhenGrid()
-  local cellWidth = math.max(WHEN_CELL, math.floor((contentWidth() - 2 * INSET - WHEN_DAYS) / 24))
-  local rowHeight = math.max(WHEN_ROW, math.floor((contentHeight() + WHEN_TOP - WHEN_BELOW) / 7))
-  for _, label in ipairs(whenView.hours) do
-    label:SetPoint("BOTTOMLEFT", whenView, "TOPLEFT", INSET + WHEN_DAYS + label.hour * cellWidth, WHEN_TOP + 2)
+  local cellWidth = math.max(PLAY_TIMES_CELL, math.floor((contentWidth() - 2 * INSET - PLAY_TIMES_DAYS) / 24))
+  local rowHeight = math.max(PLAY_TIMES_ROW, math.floor((contentHeight() + PLAY_TIMES_TOP - PLAY_TIMES_BELOW) / 7))
+  for _, label in ipairs(playTimesView.hours) do
+    label:SetPoint("BOTTOMLEFT", playTimesView, "TOPLEFT", INSET + PLAY_TIMES_DAYS + label.hour * cellWidth, PLAY_TIMES_TOP + 2)
   end
-  for day, label in ipairs(whenView.days) do
-    label:SetPoint("LEFT", whenView, "TOPLEFT", INSET, WHEN_TOP - (day - 1) * rowHeight + 1 - math.floor(rowHeight / 2))
+  for day, label in ipairs(playTimesView.days) do
+    label:SetPoint("LEFT", playTimesView, "TOPLEFT", INSET, PLAY_TIMES_TOP - (day - 1) * rowHeight + 1 - math.floor(rowHeight / 2))
   end
-  for _, cell in ipairs(whenView.cells) do
+  for _, cell in ipairs(playTimesView.cells) do
     cell:SetSize(cellWidth - 1, rowHeight - 2)
-    cell:SetPoint("TOPLEFT", INSET + WHEN_DAYS + (cell.hour - 1) * cellWidth, WHEN_TOP - (cell.day - 1) * rowHeight)
+    cell:SetPoint("TOPLEFT", INSET + PLAY_TIMES_DAYS + (cell.hour - 1) * cellWidth, PLAY_TIMES_TOP - (cell.day - 1) * rowHeight)
   end
-  local below = WHEN_TOP - 7 * rowHeight - 10
-  whenView.legendLow:SetPoint("TOPLEFT", INSET + WHEN_DAYS, below)
-  whenView.note:SetPoint("TOPLEFT", INSET, below - 24)
+  local below = PLAY_TIMES_TOP - 7 * rowHeight - 10
+  playTimesView.legendLow:SetPoint("TOPLEFT", INSET + PLAY_TIMES_DAYS, below)
+  playTimesView.note:SetPoint("TOPLEFT", INSET, below - 24)
 end
 
-local function drawWhen()
-  if not whenView then createWhenView() end
-  local view = whenMember and core:playTimes(whenMember)
+local function drawPlayTimes()
+  if not playTimesView then createPlayTimesView() end
+  local view = playTimesMember and core:playTimes(playTimesMember)
   if not view then
-    whenMember = nil
+    playTimesMember = nil
     view = core:playTimes()
   end
-  whenView.data = view
-  whenView.pick.label:SetText("Show: " .. view.title)
-  whenView.pick:SetWidth(whenView.pick.label:GetStringWidth() + whenView.pick.iconRoom + 16)
-  whenView.intro:SetWidth(contentWidth() - 2 * INSET)
-  whenView.intro:SetText(view.intro)
-  whenView.note:SetWidth(contentWidth() - 2 * INSET)
-  whenView.note:SetText(view.note or "")
+  playTimesView.data = view
+  playTimesView.pick.label:SetText("Show: " .. view.title)
+  playTimesView.pick:SetWidth(playTimesView.pick.label:GetStringWidth() + playTimesView.pick.iconRoom + 16)
+  playTimesView.intro:SetWidth(contentWidth() - 2 * INSET)
+  playTimesView.intro:SetText(view.intro)
+  playTimesView.note:SetWidth(contentWidth() - 2 * INSET)
+  playTimesView.note:SetText(view.note or "")
   placeWhenGrid()
-  for _, cell in ipairs(whenView.cells) do
+  for _, cell in ipairs(playTimesView.cells) do
     shadeCell(cell, view.grid[cell.day][cell.hour], view.max)
   end
-  whenView.legendLow:SetText(view.memberId and "0" or "None")
-  whenView.legendHigh:SetText(view.memberId and ("%d weeks"):format(view.weeks) or "Everyone")
-  for i, swatch in ipairs(whenView.legend) do
+  playTimesView.legendLow:SetText(view.memberId and "0" or "None")
+  playTimesView.legendHigh:SetText(view.memberId and ("%d weeks"):format(view.weeks) or "Everyone")
+  for i, swatch in ipairs(playTimesView.legend) do
     shadeCell(swatch, i - 1, 3)
   end
-  if GameTooltip:GetOwner() and GameTooltip:GetOwner():GetParent() == whenView then
+  if GameTooltip:GetOwner() and GameTooltip:GetOwner():GetParent() == playTimesView then
     showCellTooltip(GameTooltip:GetOwner())
   end
   local empty = view.empty and not view.memberId
-  for _, item in ipairs(whenView.grid) do item:SetShown(not empty) end
+  for _, item in ipairs(playTimesView.grid) do item:SetShown(not empty) end
   if empty then
-    whenView.empty:Set(emptyState({ art = "when", title = WHEN_EMPTY_TITLE, text = view.note }))
+    playTimesView.empty:Set(emptyState({ art = "playTimes", title = PLAY_TIMES_EMPTY_TITLE, text = view.note }))
     local top = INSET + SMALL_BUTTON
-    whenView.empty:Place(whenView, contentWidth(), contentHeight() - top, top)
+    playTimesView.empty:Place(playTimesView, contentWidth(), contentHeight() - top, top)
   else
-    whenView.empty:Hide()
+    playTimesView.empty:Hide()
   end
-  whenView:Show()
+  playTimesView:Show()
 end
 
 local getItemIcon = C_Item and C_Item.GetItemIconByID or GetItemIcon
@@ -1579,8 +1579,8 @@ local function create()
   frame:SetScript("OnHide", function()
     if frame.sizing or frame.moving then savePlace() end
     core:leaveFeed()
-    core:leaveGoals()
-    ns.GoalsTab.hidden()
+    core:leaveTrophies()
+    ns.TrophiesTab.hidden()
     core:leaveWhatsNew()
     ns.WhatsNewTab.leave()
     ns.SettingsTab.leave()
@@ -1806,7 +1806,7 @@ local function createFooter()
   end)
 end
 
-local function drawFooter(crew, summary)
+local function drawFooter(crew, counts)
   if not footer then createFooter() end
   local removed = #core:removed()
   footer.removed.text:SetText(removed > 0 and ("Removed: %d"):format(removed) or "")
@@ -1818,7 +1818,7 @@ local function drawFooter(crew, summary)
   else
     footer.hidden:SetPoint("BOTTOMRIGHT", -INSET, CODE_LINE)
   end
-  footer.hidden:SetText(summary.hidden > 0 and ("Hidden: %d (unseen %dd)"):format(summary.hidden,
+  footer.hidden:SetText(counts.hidden > 0 and ("Hidden: %d (unseen %dd)"):format(counts.hidden,
     ns.Core.HIDE_AFTER_DAYS) or "")
 
   footer.code.crewCode = crew.code
@@ -1842,9 +1842,9 @@ local function hideViewsBut(name)
     if footer then footer:Hide() end
   end
   if name ~= "feed" and feedView then feedView:Hide() end
-  if name ~= "goals" then
-    if goalsView then goalsView:Hide() end
-    ns.GoalsTab.leave()
+  if name ~= "trophies" then
+    if trophiesView then trophiesView:Hide() end
+    ns.TrophiesTab.leave()
   end
   if name ~= "whatsnew" then
     if whatsNewView then whatsNewView:Hide() end
@@ -1854,25 +1854,25 @@ local function hideViewsBut(name)
     if settingsView then settingsView:Hide() end
     ns.SettingsTab.leave()
   end
-  if name ~= "when" and whenView then whenView:Hide() end
+  if name ~= "playtimes" and playTimesView then playTimesView:Hide() end
   if name ~= "spares" and sparesView then sparesView:Hide() end
   if name ~= "professions" and professionsView then professionsView:Hide() end
-  if name ~= "together" then ns.TogetherTab.hide() end
+  if name ~= "dungeons" then ns.DungeonsTab.hide() end
   if name ~= "catches" then ns.CatchesTab.hide() end
 end
 
-local function drawRoster(crew, summary)
+local function drawRoster(crew, counts)
   if not rosterView then
     rosterView = createScrollView()
     rosterView.alone = ns.EmptyState.new(rosterView.content)
   end
   rosterView.alone:SetShown(crew.alone)
-  local footerHeight = drawFooter(crew, summary)
+  local footerHeight = drawFooter(crew, counts)
   rosterView:ClearAllPoints()
   rosterView:SetPoint("TOPLEFT")
   rosterView:SetPoint("BOTTOMRIGHT", -6, footerHeight)
   rosterView:Show()
-  drawSection(summary.spares)
+  drawSection(counts.spares)
   section:Hide()
 
   local y = -6
@@ -1937,33 +1937,33 @@ function Panel.refresh()
   end
   if setup then setup:Hide() end
   if tab == "feed" then core:openFeed() else core:leaveFeed() end
-  if tab == "goals" then core:openGoals() else core:leaveGoals() end
+  if tab == "trophies" then core:openTrophies() else core:leaveTrophies() end
   if tab == "whatsnew" then core:openWhatsNew() else core:leaveWhatsNew() end
 
-  local summary = core:summary()
-  frame.headerRight:SetText(summary.header)
+  local counts = core:rosterCounts()
+  frame.headerRight:SetText(counts.header)
   drawNav(core:unseen(), core:unseenSpares())
   hideViewsBut(tab)
   if tab == "feed" then
     drawFeed(core:feed())
-  elseif tab == "goals" then
-    drawGoals()
+  elseif tab == "trophies" then
+    drawTrophies()
   elseif tab == "whatsnew" then
     drawWhatsNew()
-  elseif tab == "when" then
-    drawWhen()
+  elseif tab == "playtimes" then
+    drawPlayTimes()
   elseif tab == "spares" then
     drawSpares()
   elseif tab == "professions" then
     drawProfessions()
-  elseif tab == "together" then
-    ns.TogetherTab.draw(frame.content, core, camp:IsShown())
+  elseif tab == "dungeons" then
+    ns.DungeonsTab.draw(frame.content, core, camp:IsShown())
   elseif tab == "catches" then
     ns.CatchesTab.draw(frame.content, core)
   elseif tab == "settings" then
     drawSettings(true)
   else
-    drawRoster(crew, summary)
+    drawRoster(crew, counts)
   end
 end
 
@@ -2000,9 +2000,9 @@ function Panel.hide()
   if frame then frame:Hide() end
 end
 
-function Panel.showWhen(memberId)
-  whenMember = memberId
-  Panel.show("when")
+function Panel.showPlayTimes(memberId)
+  playTimesMember = memberId
+  Panel.show("playtimes")
 end
 
 function Panel.start(theCore)

@@ -1,7 +1,7 @@
 local _, ns = ...
 
-local TogetherTab = {}
-ns.TogetherTab = TogetherTab
+local DungeonsTab = {}
+ns.DungeonsTab = DungeonsTab
 
 local Skin = ns.Skin
 
@@ -100,7 +100,7 @@ local function measure(text, font)
 end
 
 local function layout()
-  return ns.Core.TOGETHER_LAYOUT
+  return ns.Core.DUNGEONS_LAYOUT
 end
 
 local function rows()
@@ -188,11 +188,11 @@ local function dungeonTooltip(owner)
 end
 
 local function redraw()
-  if view then TogetherTab.draw(view:GetParent(), core, lit) end
+  if view then DungeonsTab.draw(view:GetParent(), core, lit) end
 end
 
 local function pick(memberIds, add)
-  selected = ns.Core.selectTogether(selected, memberIds, add)
+  selected = ns.Core.selectDungeons(selected, memberIds, add)
   redraw()
 end
 
@@ -206,7 +206,7 @@ local function scrollTo(x)
   local scroller = view.scroller
   local range = math.max(0, view.track:GetWidth() - scroller:GetWidth())
   scroller:SetHorizontalScroll(math.min(range, math.max(0, x)))
-  TogetherTab.scrolled()
+  DungeonsTab.scrolled()
 end
 
 local function cursorX()
@@ -431,7 +431,7 @@ local function createMenu(show)
   menu:SetScript("OnShow", function(self) self:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
   menu:SetScript("OnHide", function(self)
     self:UnregisterEvent("GLOBAL_MOUSE_DOWN")
-    TogetherTab.escapeKeys()
+    DungeonsTab.escapeKeys()
   end)
   menu:SetScript("OnEvent", function(self)
     if not self:IsMouseOver() and not view.showButton:IsMouseOver() then self:Hide() end
@@ -450,7 +450,7 @@ end
 local function toggleMenu()
   if not view.menu then return end
   view.menu:SetShown(not view.menu:IsShown())
-  TogetherTab.escapeKeys()
+  DungeonsTab.escapeKeys()
 end
 
 -- WoW: SetPropagateKeyboardInput is protected in combat, so a frame that
@@ -469,7 +469,7 @@ local function createEscapeKeys()
     else
       clearSelection()
     end
-    TogetherTab.escapeKeys()
+    DungeonsTab.escapeKeys()
   end)
   -- WoW: let go of the keyboard before combat locks it in.
   keys:RegisterEvent("PLAYER_REGEN_DISABLED")
@@ -479,13 +479,13 @@ local function createEscapeKeys()
       self:SetPropagateKeyboardInput(true)
       self:EnableKeyboard(false)
     else
-      TogetherTab.escapeKeys()
+      DungeonsTab.escapeKeys()
     end
   end)
   return keys
 end
 
-function TogetherTab.escapeKeys()
+function DungeonsTab.escapeKeys()
   if not view or InCombatLockdown() then return end
   local active = view:IsVisible() and ((view.menu and view.menu:IsShown()) or #selected > 0)
   view.escapeKeys:SetPropagateKeyboardInput(true)
@@ -572,9 +572,9 @@ local function createView(parent)
   passDrag(view.scroller)
   view.scroller.onClick = clearSelection
   view.scroller:SetScript("OnUpdate", function()
-    TogetherTab.glided()
-    TogetherTab.idle()
-    TogetherTab.hovered()
+    DungeonsTab.glided()
+    DungeonsTab.idle()
+    DungeonsTab.hovered()
     if not view.dragFrom then return end
     if not IsMouseButtonDown("LeftButton") then
       stopDrag()
@@ -660,7 +660,7 @@ local function createView(parent)
   view.escapeKeys = createEscapeKeys()
   view:SetScript("OnHide", function()
     if view.menu then view.menu:Hide() end
-    TogetherTab.escapeKeys()
+    DungeonsTab.escapeKeys()
   end)
 end
 
@@ -1086,7 +1086,7 @@ local function drawOverview(data)
   view.stripYou:SetPoint("CENTER", view.strip, "LEFT", data.you * scale, 0)
 end
 
-function TogetherTab.glided()
+function DungeonsTab.glided()
   local start = view.glide
   if not start or not view.data then return end
   local t = math.min(1, (GetTime() - start) / GLIDE_TIME)
@@ -1095,7 +1095,7 @@ function TogetherTab.glided()
   if t >= 1 then view.glide = nil end
 end
 
-function TogetherTab.idle()
+function DungeonsTab.idle()
   if not lit then return end
   local now = GetTime()
   for _, pin in ipairs(headFrames) do
@@ -1110,7 +1110,7 @@ function TogetherTab.idle()
   end
 end
 
-function TogetherTab.hovered()
+function DungeonsTab.hovered()
   local data = view.data
   local dragging = view.pressFrom and math.abs(cursorX() - view.pressFrom) >= CLICK_SLOP
   if not data or dragging or not view.scroller:IsMouseOver() then
@@ -1141,7 +1141,7 @@ function TogetherTab.hovered()
   view.guideTag:Show()
 end
 
-function TogetherTab.scrolled()
+function DungeonsTab.scrolled()
   if not view or not view.data then return end
   local data = view.data
   local left = view.scroller:GetHorizontalScroll()
@@ -1171,13 +1171,13 @@ function TogetherTab.scrolled()
   view.empty:SetShown(empty)
 end
 
-function TogetherTab.draw(parent, theCore, campOn)
+function DungeonsTab.draw(parent, theCore, campOn)
   core = theCore
   lit = campOn and true or false
   if not view then createView(parent) end
   local opening = not view:IsVisible()
   view:Show()
-  local data = core:together(measure, selected)
+  local data = core:dungeons(measure, selected)
   view.data = data
   view.guideTag.level = nil
   view.rangeShade:Hide()
@@ -1229,11 +1229,11 @@ function TogetherTab.draw(parent, theCore, campOn)
     scrollTo(data.you - view.scroller:GetWidth() / 2 - GLIDE_FROM)
     view.glide = GetTime()
   else
-    TogetherTab.scrolled()
+    DungeonsTab.scrolled()
   end
-  TogetherTab.escapeKeys()
+  DungeonsTab.escapeKeys()
 end
 
-function TogetherTab.hide()
+function DungeonsTab.hide()
   if view then view:Hide() end
 end

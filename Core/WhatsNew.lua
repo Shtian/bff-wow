@@ -78,7 +78,7 @@ function WhatsNew:leave()
   self.visit = nil
 end
 
-local function friends(release, rows, versionOf)
+local function updateNotice(release, rows, versionOf)
   local behind, known, others = {}, 0, 0
   for _, row in ipairs(rows) do
     if not row.own then
@@ -95,7 +95,7 @@ local function friends(release, rows, versionOf)
   local everyone = others > 0 and known == others and #behind == 0
   return {
     version = release.version, behind = behind, everyone = everyone,
-    text = ("Since %s, friends on an older BFF see an \"out of date\" notice and stop seeing you until they update.")
+    text = ("Since %s, Members on an older BFF see an \"out of date\" notice and stop seeing you until they update.")
       :format(release.version),
     who = everyone and ("Everyone in your Crew is on %s or later."):format(release.version) or nil,
   }
@@ -124,7 +124,7 @@ function WhatsNew:view(rows, versionOf)
     view.line = plural(countChanges(visit.list), "change") .. " since " .. tostring(visit.since)
     if missedOut > 0 then view.line = view.line .. (" · the last %d updates are below"):format(WhatsNew.SHOWN) end
     local major = majorOf(visit.list)
-    if major then view.friends = friends(major, rows, versionOf) end
+    if major then view.updateNotice = updateNotice(major, rows, versionOf) end
   else
     view.title = "What's new in BFF"
     view.line = ("You're on %s, from %s"):format(self.version, self.releases[1].date)
@@ -141,7 +141,7 @@ function WhatsNew:takeAwayLine()
   if #new == 0 or self.db.changesTold == self.version then return nil end
   self.db.changesTold = self.version
   local lines = { new[1].entries[1].title }
-  if majorOf(new) then lines[2] = "Make sure your friends update too" end
+  if majorOf(new) then lines[2] = "Make sure the whole Crew updates too" end
   local more = countChanges(new) - 1
   return {
     title = "BFF UPDATED TO " .. self.version,

@@ -186,7 +186,7 @@ function Roster.rows(ledger, now, order)
   return rows
 end
 
-function Roster.summary(ledger, now)
+function Roster.counts(ledger, now)
   local _, others, hidden = buildRows(ledger, now)
   local summary = { online = 0, members = #others, canPlay = 0, hidden = hidden }
   for _, row in ipairs(others) do

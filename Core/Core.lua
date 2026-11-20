@@ -16,8 +16,8 @@ local required = {
 Core.CAN_PLAY_LEVELS = ns.Roster.CAN_PLAY
 Core.reactionText = ns.Reactions.text
 Core.HIDE_AFTER_DAYS = ns.Roster.HIDE_AFTER / (24 * 60 * 60)
-Core.DUNGEONS = ns.Together.DUNGEONS
-Core.TOGETHER_LAYOUT = ns.Together.LAYOUT
+Core.DUNGEONS = ns.Dungeons.DUNGEONS
+Core.DUNGEONS_LAYOUT = ns.Dungeons.LAYOUT
 Core.CAMP_LAYOUT = ns.Camp.LAYOUT
 Core.SEASONS = ns.Camp.SEASONS
 Core.HATS = ns.Look.HATS
@@ -130,13 +130,13 @@ function Core.new(deps)
   }, Core)
   local itemLink = type(deps.itemLink) == "function" and deps.itemLink or nil
   local itemLook = type(deps.itemLook) == "function" and deps.itemLook or nil
-  self.log = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin, itemLink, itemLook)
+  self.feedState = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin, itemLink, itemLook)
   self.sessionStart = deps.now()
-  self.trophiesSince = self.log:isSettled() and self.sessionStart or nil
+  self.trophiesSince = self.feedState:isSettled() and self.sessionStart or nil
   self.spareLife = ns.Spares.new({
     db = deps.db,
     ledger = self.ledger,
-    feed = self.log,
+    feed = self.feedState,
     now = deps.now,
     listener = deps.listener,
     initialLogin = self.initialLogin,
@@ -161,7 +161,7 @@ function Core.new(deps)
   self.playTimesDue = true
   self.online = ns.Roster.online(self.ledger, deps.now())
   self.known = knownMembers(self.ledger)
-  self.changes = ns.WhatsNew.new(deps.db, deps.version, deps.changelog, fresh)
+  self.whatsNewState = ns.WhatsNew.new(deps.db, deps.version, deps.changelog, fresh)
   return self
 end
 
@@ -185,7 +185,7 @@ local function updateLink(self)
   elseif self.upSince then
     self.downSince = self.downSince or now
   end
-  if up then self.log:linkUp() else self.log:linkDown() end
+  if up then self.feedState:linkUp() else self.feedState:linkDown() end
   if up then self.crewGoals:linkUp() else self.crewGoals:linkDown() end
   self.gossip:setLink(up)
 end
@@ -195,7 +195,7 @@ local function outlets(self)
 end
 
 local function liveEntry(self, entry)
-  local described = self.log:describe(entry)
+  local described = self.feedState:describe(entry)
   if described.memberId and described.kind ~= "rareFind" and self:setting("camp") then
     for _, row in ipairs(ns.Roster.rows(self.ledger, self.now())) do
       if row.memberId == described.memberId then described.figure, described.hat = row.classFilename, row.hat end
@@ -287,7 +287,7 @@ local function pocketView(self)
     if now - since < BEDROLL_FOR then bedrolls[id] = since end
   end
   local shown = { alts = self:setting("pocketCampAlts"), season = self:season() }
-  return ns.Camp.pocket(rows, self.log:since(now - ns.Camp.RECENT), now, doing, bedrolls,
+  return ns.Camp.pocket(rows, self.feedState:since(now - ns.Camp.RECENT), now, doing, bedrolls,
     self:setting("pocketCampColumns"), ns.Camp.grouped(rows, self.party), shown)
 end
 
@@ -347,29 +347,29 @@ local function animate(self, entries)
 end
 
 local function playReaction(self, item)
-  local played = self:setting("camp") and self.log:campReaction(item)
+  local played = self:setting("camp") and self.feedState:campReaction(item)
   if played then self.listener("campReaction", played) end
 end
 
 local function playReactions(self, attached)
-  if not self.log:isSettled() then return end
+  if not self.feedState:isSettled() then return end
   for _, item in ipairs(attached) do playReaction(self, item) end
 end
 
 local function announce(self, entries, reactions, notices)
-  if not self.log:isSettled() then return end
+  if not self.feedState:isSettled() then return end
   animate(self, entries)
   local to = outlets(self)
   if not (to.chat or to.toast) then return end
   for _, entry in ipairs(entries) do
     if not entry.seen then
-      self.log:markSeen(entry)
+      self.feedState:markSeen(entry)
       self.listener("feedEntry", liveEntry(self, entry), to)
     end
   end
   for _, item in ipairs(reactions or {}) do
-    self.log:markSeen(item.reaction)
-    self.listener("reaction", self.log:news(item), to)
+    self.feedState:markSeen(item.reaction)
+    self.listener("reaction", self.feedState:news(item), to)
   end
   for _, news in ipairs(notices or {}) do
     self.spareLife:markSeen(news)
@@ -380,7 +380,7 @@ end
 local function checkGoals(self, quiet)
   if not self.db.crew then return end
   local reached = self.crewGoals:check(quiet)
-  if #reached > 0 then announce(self, self.log:goalsReached(reached)) end
+  if #reached > 0 then announce(self, self.feedState:goalsReached(reached)) end
 end
 
 local function writePlayTimes(self)
@@ -401,12 +401,12 @@ local function sendOwnNow(self)
 end
 
 function Core:updateOwn(character)
-  local versionChanged = self.changes.version ~= nil and self.ledger:writeOwn({ bff = self.changes.version })
+  local versionChanged = self.whatsNewState.version ~= nil and self.ledger:writeOwn({ bff = self.whatsNewState.version })
   local changed, before = self.ledger:updateOwn(character)
   if versionChanged and not changed then self.gossip:ownChanged("later") end
   sharePlayTimes(self, changed)
   if changed then
-    local entries = self.db.crew and self.log:ownChanged(before, character.guid) or {}
+    local entries = self.db.crew and self.feedState:ownChanged(before, character.guid) or {}
     animate(self, entries)
     local after = self.ledger:own().characters[character.guid]
     startWorking(self, self.ledger:memberId(), before and ns.Professions.practised(before.professions, after.professions))
@@ -499,7 +499,7 @@ function Core:caught(loot)
   local had = ns.Catches.rareHeld(self.ledger:own())
   local changed = self.ledger:changeOwn(function(record) return ns.Catches.add(record, loot, now, character) end)
   if changed then
-    local entries = self.db.crew and self.log:ownCaught(had) or {}
+    local entries = self.db.crew and self.feedState:ownCaught(had) or {}
     startFishing(self, self.ledger:memberId())
     animate(self, entries)
     self.gossip:ownChanged(#entries > 0 and "now" or "later")
@@ -552,20 +552,20 @@ function Core:professions(order, sortBy)
   return ns.Professions.tab(ns.Roster.rows(self.ledger, self.now(), order), sortBy)
 end
 
-function Core:together(measure, selected)
-  return ns.Together.view(ns.Roster.rows(self.ledger, self.now()), measure, {
+function Core:dungeons(measure, selected)
+  return ns.Dungeons.view(ns.Roster.rows(self.ledger, self.now()), measure, {
     selected = selected,
     filters = {
-      offline = self:setting("togetherOffline"),
-      alts = self:setting("togetherAlts"),
-      near = self:setting("togetherNear"),
-      attunements = self:setting("togetherAttunements"),
-      raids = self:setting("togetherRaids"),
+      offline = self:setting("dungeonsOffline"),
+      alts = self:setting("dungeonsAlts"),
+      near = self:setting("dungeonsNear"),
+      attunements = self:setting("dungeonsAttunements"),
+      raids = self:setting("dungeonsRaids"),
     },
   })
 end
 
-Core.selectTogether = ns.Together.select
+Core.selectDungeons = ns.Dungeons.select
 
 local function shownSpot(self, row)
   local record = self.ledger:record(row.memberId)
@@ -630,7 +630,7 @@ end
 function Core:camp(columns)
   if not self:setting("camp") then return nil end
   local now = self.now()
-  return ns.Camp.view(ns.Roster.rows(self.ledger, now), self.log:since(now - ns.Camp.RECENT), now, columns,
+  return ns.Camp.view(ns.Roster.rows(self.ledger, now), self.feedState:since(now - ns.Camp.RECENT), now, columns,
     { season = self:season() })
 end
 
@@ -663,11 +663,11 @@ function Core:pocketCamp()
   return view
 end
 
-function Core:summary()
-  local summary = ns.Roster.summary(self.ledger, self.now())
-  summary.spares = self.spareLife:usableCount()
-  summary.header = ns.Camp.header(summary, self:setting("camp"))
-  return summary
+function Core:rosterCounts()
+  local counts = ns.Roster.counts(self.ledger, self.now())
+  counts.spares = self.spareLife:usableCount()
+  counts.header = ns.Camp.header(counts, self:setting("camp"))
+  return counts
 end
 
 local function onlineChanged(self)
@@ -695,7 +695,7 @@ local function onlineChanged(self)
   end
   self.online = online
   self.known = knownMembers(self.ledger)
-  if self.log:isSettled() and hearsEveryone(self, now) then
+  if self.feedState:isSettled() and hearsEveryone(self, now) then
     for _, id in ipairs(arrived) do animateMember(self, "arrive", id) end
   end
   return differs
@@ -707,14 +707,14 @@ end
 
 local function awaySummary(self)
   if not self:isAwayPopupOn() then
-    self.changes:takeAwayLine()
+    self.whatsNewState:takeAwayLine()
     return
   end
   local view, told = self:catches(), self.db.catchTypesTold
   local newTypesLine = told and ns.Catches.newTypesLine(view, told)
   self.db.catchTypesTold = ns.Catches.markTold(told or {}, view)
-  local summary = self.log:takeSummary(self.spareLife:takeNews(), newTypesLine)
-  local update = self.changes:takeAwayLine()
+  local summary = self.feedState:takeSummary(self.spareLife:takeNews(), newTypesLine)
+  local update = self.whatsNewState:takeAwayLine()
   if not summary and update then
     summary = { members = {}, goals = {}, spares = {}, professions = {}, catches = {}, noticed = {}, count = 0,
       maxLevel = self.maxLevel }
@@ -724,7 +724,7 @@ local function awaySummary(self)
   if self:setting("camp") then
     local now = self.now()
     summary.camp, summary.intro = ns.Camp.away(ns.Roster.rows(self.ledger, now),
-      self.log:since(now - ns.Camp.RECENT), now, summary, self:season())
+      self.feedState:since(now - ns.Camp.RECENT), now, summary, self:season())
   end
   self.listener("awaySummary", summary)
   self.listener("changed")
@@ -766,7 +766,7 @@ function Core:tick()
   self.gossip:tick()
   shareWhere(self)
   shareDoing(self)
-  if self.log:tick() then
+  if self.feedState:tick() then
     self.trophiesSince = self.now()
     awaySummary(self)
   end
@@ -798,16 +798,16 @@ function Core:trophies()
   return trophies
 end
 
-function Core:openGoals()
+function Core:openTrophies()
   self.crewGoals:open()
 end
 
-function Core:leaveGoals()
+function Core:leaveTrophies()
   self.crewGoals:leave()
 end
 
 function Core:feed()
-  return self.log:view(self.utcOffset)
+  return self.feedState:view(self.utcOffset)
 end
 
 function Core:playTimes(memberId)
@@ -870,12 +870,12 @@ function Core:playTimes(memberId)
 end
 
 function Core:unseen()
-  return self.log:unseen()
+  return self.feedState:unseen()
 end
 
 function Core:react(key)
   local reason, attached
-  key, reason, attached = self.log:react(key)
+  key, reason, attached = self.feedState:react(key)
   if not key then return false, reason end
   self.ledger:addReaction(key)
   self.gossip:ownChanged("now")
@@ -954,28 +954,28 @@ function Core:sparesSeen()
 end
 
 function Core:openFeed()
-  if self.log:open() then self.listener("changed") end
+  if self.feedState:open() then self.listener("changed") end
 end
 
 function Core:leaveFeed()
-  self.log:leave()
+  self.feedState:leave()
 end
 
 function Core:hasNewChanges()
-  return self.changes:hasNew()
+  return self.whatsNewState:hasNew()
 end
 
 function Core:openWhatsNew()
-  if self.changes:open() then self.listener("changed") end
+  if self.whatsNewState:open() then self.listener("changed") end
 end
 
 function Core:leaveWhatsNew()
-  self.changes:leave()
+  self.whatsNewState:leave()
 end
 
 function Core:whatsNew()
   local ledger = self.ledger
-  return self.changes:view(ns.Roster.rows(ledger, self.now()), function(id)
+  return self.whatsNewState:view(ns.Roster.rows(ledger, self.now()), function(id)
     local record = ledger:record(id)
     return record and record.bff
   end)
@@ -1241,7 +1241,7 @@ local SETTINGS = {
   },
   {
     key = "pocketCampAlts", section = POCKET_CAMP_SHOWN, kind = "toggle", needs = "pocketCamp",
-    label = "ALT over a friend playing an alt",
+    label = "ALT over a Member playing an alt",
     saved = offFlag("pocketCampAltsOff"),
   },
   {
@@ -1255,11 +1255,11 @@ local SETTINGS = {
     saved = percent("pocketCampScale", 100, Core.POCKET_CAMP_MIN_SCALE, Core.POCKET_CAMP_MAX_SCALE),
   },
   { key = "pocketCampColumns", kind = "columns", saved = pocketWidth("pocketCampColumns") },
-  { key = "togetherOffline", kind = "toggle", saved = offFlag("offlineOff", "together") },
-  { key = "togetherAlts", kind = "toggle", saved = onFlag("alts", "together") },
-  { key = "togetherNear", kind = "toggle", saved = onFlag("near", "together") },
-  { key = "togetherAttunements", kind = "toggle", saved = offFlag("attunementsOff", "together") },
-  { key = "togetherRaids", kind = "toggle", saved = onFlag("raids", "together") },
+  { key = "dungeonsOffline", kind = "toggle", saved = offFlag("offlineOff", "together") },
+  { key = "dungeonsAlts", kind = "toggle", saved = onFlag("alts", "together") },
+  { key = "dungeonsNear", kind = "toggle", saved = onFlag("near", "together") },
+  { key = "dungeonsAttunements", kind = "toggle", saved = offFlag("attunementsOff", "together") },
+  { key = "dungeonsRaids", kind = "toggle", saved = onFlag("raids", "together") },
   { key = "catchesNames", kind = "toggle", saved = onFlag("names", "catches") },
 }
 
@@ -1495,7 +1495,7 @@ local function enter(self, code, displayName, joining)
   self.crewGoals:clear()
   self.db.catchTypesTold = nil
   self.db.crew = { code = code, joined = joining or nil }
-  if joining then self.log:ownJoined() end
+  if joining then self.feedState:ownJoined() end
   self.listener("crewChanged")
   updateLink(self)
   return self:crew()
@@ -1585,7 +1585,7 @@ function Core:removeMember(id)
   if not self.ledger:remove(id) then return nil, "unknownMember" end
   self.gossip:forget(id)
   self.where:forget(id)
-  self.log:dropMember(id)
+  self.feedState:dropMember(id)
   self.spareLife:memberRemoved()
   self.online[id] = nil
   self.fishing[id] = nil
@@ -1624,7 +1624,7 @@ local function finishLeaving(self)
   self.ledger:forgetOthers()
   self.ledger:clearReactions()
   self.spareLife:clear()
-  self.log:clear()
+  self.feedState:clear()
   self.crewGoals:clear()
   self.db.catchTypesTold = nil
   self.online = {}
@@ -1691,19 +1691,19 @@ local function dataReceived(self, records, from, whispered)
     end
     if kept then
       changed = true
-      self.log:dataMerged()
+      self.feedState:dataMerged()
       self.crewGoals:dataMerged()
-      if before and not record.left and self.log:isSettled()
+      if before and not record.left and self.feedState:isSettled()
         and ns.Catches.total(record) > ns.Catches.total(before) then
         startFishing(self, record.id)
       end
-      if before and not record.left and self.log:isSettled() then
+      if before and not record.left and self.feedState:isSettled() then
         for guid, character in pairs(record.characters) do
           local was = before.characters[guid]
           startWorking(self, record.id, was and ns.Professions.practised(was.professions, character.professions))
         end
       end
-      local entries, reactions, attached = self.log:recordChanged(before, record)
+      local entries, reactions, attached = self.feedState:recordChanged(before, record)
       announce(self, entries, reactions, self.spareLife:recordChanged(before, record))
       playReactions(self, attached)
       if ns.Goals.countedChanged(before, record) then checkGoals(self, true) end
@@ -1759,7 +1759,7 @@ function Core:received(message, from)
     end
     if kept and pocketCampOn(self) then
       changed = true
-      if quest and self.log:isSettled() then animateMember(self, "quest", decoded.from) end
+      if quest and self.feedState:isSettled() then animateMember(self, "quest", decoded.from) end
     end
   elseif decoded.type == "DIGEST" and type(decoded.versions) == "table" then
     local partial = decoded.partial == true

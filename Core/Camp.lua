@@ -326,7 +326,7 @@ local FORM_POSES = { seated = true, fighting = true }
 local GROUP = {}
 
 local RAIDS = {}
-for _, dungeon in ipairs(ns.Together.DUNGEONS) do
+for _, dungeon in ipairs(ns.Dungeons.DUNGEONS) do
   if dungeon.kind == "raid" then RAIDS[dungeon.name] = true end
 end
 

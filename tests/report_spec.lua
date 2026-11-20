@@ -15,7 +15,7 @@ local function report(options)
   ns.syncLog:add("20:30:01 2.000  left the group, or it disbanded")
   ns.core = {
     crew = function() return options.crew ~= false and { code = "X" } or nil end,
-    summary = function() return { members = 2 } end,
+    rosterCounts = function() return { members = 2 } end,
   }
   ns.ChannelLink = { state = function() return options.link or { up = true, peers = 1, instance = "party", lockdown = true } end }
   game.load("UI/Report.lua", ns)

@@ -10,7 +10,7 @@ A dungeon or raid clear has to reach Members who weren't there and weren't onlin
 
 ## Consequences
 
-- The record format grows by `clears`, keyed by the dungeon table's instance names (`Core/Together.lua`). Renaming an instance in the table orphans its clears, so names there are now stable keys. Older clients relay the field untouched, since a record is kept as received.
+- The record format grows by `clears`, keyed by the dungeon table's instance names (`Core/Dungeons.lua`). Renaming an instance in the table orphans its clears, so names there are now stable keys. Older clients relay the field untouched, since a record is kept as received.
 - A clear is bounded: one entry per instance, with at most the Crew's Members in it.
 - Strangers in the party aren't recorded; a Member is matched by Character GUID, else by name.
 - A clear recorded while the link is down (encounters lock addon messages) goes out with the next DATA once it's back up, like any own change.

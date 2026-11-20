@@ -1,7 +1,7 @@
 local _, ns = ...
 
-local Together = {}
-ns.Together = Together
+local Dungeons = {}
+ns.Dungeons = Dungeons
 
 -- WoW: finals are DungeonEncounterIDs, as ENCOUNTER_END's encounterID gives them.
 local DUNGEONS = {
@@ -49,7 +49,7 @@ for i, dungeon in ipairs(DUNGEONS) do
   dungeon.forever = dungeon.forever == true
   dungeon.index = i
 end
-Together.DUNGEONS = DUNGEONS
+Dungeons.DUNGEONS = DUNGEONS
 
 local RAID_LIST = {}
 for _, dungeon in ipairs(DUNGEONS) do
@@ -81,7 +81,7 @@ local LAYOUT = {
   foreverMark = 18,
   online = 10,
 }
-Together.LAYOUT = LAYOUT
+Dungeons.LAYOUT = LAYOUT
 
 local CAN_PLAY = ns.Roster.CAN_PLAY
 
@@ -316,7 +316,7 @@ local function describeDungeon(dungeon, others, yourLevel)
     you = you,
     fits = youFit,
     fitters = {},
-    none = #fitters == 0 and "No friend fits it yet" or nil,
+    none = #fitters == 0 and "No one in the Crew fits it yet" or nil,
   }
   for i, character in ipairs(fitters) do
     local gap = math.abs(character.level - yourLevel)
@@ -441,14 +441,14 @@ local function showMenu(filters)
   return {
     label = "Show",
     sections = {
-      { title = "FRIENDS", options = {
-        option("togetherOffline", "offline", "Offline friends"),
-        option("togetherAlts", "alts", "Alts"),
+      { title = "CREW", options = {
+        option("dungeonsOffline", "offline", "Offline Members"),
+        option("dungeonsAlts", "alts", "Alts"),
       } },
       { title = "DUNGEONS", options = {
-        option("togetherNear", "near", ("Only near your level (±%d)"):format(NEAR)),
-        option("togetherAttunements", "attunements", "Attunements"),
-        option("togetherRaids", "raids", "Raids"),
+        option("dungeonsNear", "near", ("Only near your level (±%d)"):format(NEAR)),
+        option("dungeonsAttunements", "attunements", "Attunements"),
+        option("dungeonsRaids", "raids", "Raids"),
       } },
     },
     key = {
@@ -457,10 +457,10 @@ local function showMenu(filters)
         { kind = "fits", text = "Fits your level" },
         { kind = "attunement", text = "Attunement" },
         { kind = "forever", text = "New in WoW: Forever" },
-        { kind = "fitters", text = "Friends who fit it" },
+        { kind = "fitters", text = "Members who fit it" },
       },
     },
-    help = "Drag or scroll to move along the levels. Click a friend to see where you fit together.",
+    help = "Drag or scroll to move along the levels. Click a Member to see where you fit together.",
   }
 end
 
@@ -543,7 +543,7 @@ local function link(groups, bars)
   end
 end
 
-function Together.select(selected, memberIds, add)
+function Dungeons.select(selected, memberIds, add)
   local result = {}
   for i, id in ipairs(selected) do result[i] = id end
   if #memberIds == 0 then return result end
@@ -567,7 +567,7 @@ function Together.select(selected, memberIds, add)
   return result
 end
 
-function Together.view(rows, measure, options)
+function Dungeons.view(rows, measure, options)
   local own = rows[1]
   if not own or not own.own then return nil end
   measure = measure or estimate
@@ -625,7 +625,7 @@ function Together.view(rows, measure, options)
     empty = filters.near and {
       text = "No dungeons shown at these levels",
       action = "Show all levels",
-      setting = "togetherNear",
+      setting = "dungeonsNear",
       spans = emptySpans(bars, width),
     } or nil,
     width = width,

@@ -26,7 +26,7 @@ They live in the owner's record, in an optional `spares` list. Each one has shor
 
 ### Posting one
 
-The Spare Items tab has a **drop slot** above your own list (#74, after the research in #65 and #67, `docs/research/bag-items.md`). Dropping a bag item on it offers that item, and so does clicking it while holding one: on retail a click with an item held arrives as either `OnReceiveDrag` or `OnClick`, so both do the same. BFF reads the item's location from `C_Cursor.GetCursorItem()` and always calls `ClearCursor()`, so the item goes back to its bag slot whether it was taken or refused. It works with any bag addon that puts items on the cursor, and in combat, instances and encounters. While messaging is locked down the post waits and goes out when the lockdown lifts, like any other record change.
+The Spares tab has a **drop slot** above your own list (#74, after the research in #65 and #67, `docs/research/bag-items.md`). Dropping a bag item on it offers that item, and so does clicking it while holding one: on retail a click with an item held arrives as either `OnReceiveDrag` or `OnClick`, so both do the same. BFF reads the item's location from `C_Cursor.GetCursorItem()` and always calls `ClearCursor()`, so the item goes back to its bag slot whether it was taken or refused. It works with any bag addon that puts items on the cursor, and in combat, instances and encounters. While messaging is locked down the post waits and goes out when the lockdown lifts, like any other record change.
 
 `/bff spares add`, then shift-click the item into the chat box, still works. It offers the first item in the bags with the same trimmed item string, and refuses the item if there isn't one.
 
@@ -86,8 +86,8 @@ Spare notices go through the same settings and seen-marking as Reactions: a chat
 - Claims that don't win, expiry and withdrawal are silent. So is a winner moving up because the owner Removed the one ahead, or a Claim expiring.
 - The first sight of a Member (joining, reinstalling) is a silent baseline, the same rule as Feed entries.
 - In While you were away they show in a **Spares** section, with the Gives that were made meanwhile.
-- With chat lines and toasts both off, they stay unseen. Opening the Spare Items tab marks them seen, and its sidebar button shows how many are unseen.
-- Clicking a notice's toast opens the Spare Items tab.
+- With chat lines and toasts both off, they stay unseen. Opening the Spares tab marks them seen, and its sidebar button shows how many are unseen.
+- Clicking a notice's toast opens the Spares tab.
 
 The owner's client remembers the winner it last told of per Spare, so a reload doesn't tell it again.
 
@@ -102,7 +102,7 @@ A Give makes a **gave** Feed entry for the owner: "Ana gave Bob [Cruel Barb]", "
 
 ## The panel
 
-### Spare Items tab
+### Spares tab
 
 A sidebar tab under Play Times, opened by `/bff spares`, within the panel's fixed height and scrolling:
 

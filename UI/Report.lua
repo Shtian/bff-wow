@@ -27,7 +27,7 @@ function Report.text()
     ("Game %s (build %s) · interface %s · WoW: Forever: %s"):format(
       tostring(gameVersion), tostring(build), tostring(interface), yesNo(forever)),
     ("Crew: %s · other Members known: %d · peers in the channel: %d"):format(
-      yesNo(crew), crew and ns.core:summary().members or 0, link.peers),
+      yesNo(crew), crew and ns.core:rosterCounts().members or 0, link.peers),
     "Link: " .. (link.up and "up" or ("down (%s)"):format(link.reason or "not started")),
     ("In an instance: %s · chat messaging lockdown: %s"):format(
       link.instance or "no", yesNo(link.lockdown)),

@@ -30,7 +30,7 @@ How sure each answer is:
 
 In a dev checkout (`Dev/` is loaded), every `ENCOUNTER_END` is printed in chat and saved in `BFF_DB.devEncounters` (the newest 200): the five payload values, which of them were secret, `GetInstanceInfo()` (name, instance type, difficulty, instance ID and the rest), the group's GUIDs and names, and what BFF made of it ("clears The Deadmines", or why not: `unknown`, `wipe`, `notInstance`, `unreadable`). `/bffdev encounters` shows the last five; `/bffdev encounters clear` empties the log. The log is written to `WTF/Account/<account>/SavedVariables/BFF.lua` on `/reload` or logout.
 
-After a run, fill in the tables below from the saved log, and add each final boss's ID to `finals` in `Core/Together.lua`'s dungeon table.
+After a run, fill in the tables below from the saved log, and add each final boss's ID to `finals` in `Core/Dungeons.lua`'s dungeon table.
 
 ## Findings
 
@@ -45,7 +45,7 @@ After a run, fill in the tables below from the saved log, and add each final bos
 
 ## Final bosses
 
-Names match `Core/Together.lua`'s dungeon table. "Classic final boss" is classic's last boss (**expected**); Forever's new instances have no expectation. The encounter IDs in `finals` today are **datamined** from Forever's `DungeonEncounter` table ([wago.tools](https://wago.tools/db2/DungeonEncounter), build 1.60.1.70755, the `wowf` product), the three classic raids' matching classic's. Where there are several (one per difficulty or season, a wing, a side, or two bosses in no fixed order), `finals` lists all of them and any one clears the instance; a run narrows that down. Not in the table yet, so still unknown: Excavation Site (probably Relic Guardian, 3482), City of Dalaran (probably Shade of the Archmage, 3303), Blackmaw Hold, The Drowned City, Krol'dok Stronghold, Alcaz Prison, Shaper's Terrace, The Barrow Deeps and Hyjal Summit.
+Names match `Core/Dungeons.lua`'s dungeon table. "Classic final boss" is classic's last boss (**expected**); Forever's new instances have no expectation. The encounter IDs in `finals` today are **datamined** from Forever's `DungeonEncounter` table ([wago.tools](https://wago.tools/db2/DungeonEncounter), build 1.60.1.70755, the `wowf` product), the three classic raids' matching classic's. Where there are several (one per difficulty or season, a wing, a side, or two bosses in no fixed order), `finals` lists all of them and any one clears the instance; a run narrows that down. Not in the table yet, so still unknown: Excavation Site (probably Relic Guardian, 3482), City of Dalaran (probably Shade of the Archmage, 3303), Blackmaw Hold, The Drowned City, Krol'dok Stronghold, Alcaz Prison, Shaper's Terrace, The Barrow Deeps and Hyjal Summit.
 
 | Instance | Kind | Classic final boss | Encounter ID |
 |---|---|---|---|
