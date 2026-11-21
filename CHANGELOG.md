@@ -37,6 +37,15 @@
 
 
 
+
+## 2.16.1
+<sub>2026-11-21</sub>
+
+- *(patch)*
+  More of Forever's new dungeons now count as Clears.
+
+  Clearing Excavation Site, City of Dalaran, The Drowned City, Krol'dok Stronghold, Alcaz Prison, Blackmaw Hold or Shaper's Terrace now adds a trophy to your Crew's cabinet.
+
 ## 2.16.0
 <sub>2026-11-21</sub>
 
