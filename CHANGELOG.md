@@ -35,6 +35,12 @@
 
 
 
+
+## 2.15.2
+<sub>2026-11-21</sub>
+
+- *(patch)* Fixed an error on an empty Trophies or Play times tab.
+
 ## 2.15.1
 <sub>2026-11-21</sub>
 
