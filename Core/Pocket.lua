@@ -7,6 +7,7 @@ ns.Pocket = Pocket
 local SPELL_FOR = 60
 local BEDROLL_FOR = 10 * 60
 local TROPHY_CUP_FOR = 60 * 60
+local LANTERNS = 1
 
 local ANIMATED = { ding = true, maxLevel = true, death = true, rareFind = true, goal = true }
 
@@ -24,6 +25,8 @@ function Pocket.new(deps)
     season = deps.season,
     phase = deps.phase,
     spot = deps.spot,
+    saved = deps.saved,
+    walkIn = deps.walkIn,
     trophiesSince = deps.feed:isSettled() and deps.now() or nil,
     fishing = {},
     working = {},
@@ -142,9 +145,14 @@ local function pocketView(self)
   for id, since in pairs(self.bedrolls) do
     if now - since < BEDROLL_FOR then bedrolls[id] = since end
   end
-  local shown = { alts = self.setting("pocketCampAlts"), season = self.season(), phase = self.phase() }
-  return ns.Camp.pocket(rows, self.feed:since(now - ns.Camp.RECENT), now, doing, bedrolls,
+  local saved = self.saved()
+  local shown = { alts = self.setting("pocketCampAlts"), season = self.season(), phase = self.phase(),
+    lanterns = saved and LANTERNS }
+  local view = ns.Camp.pocket(rows, self.feed:since(now - ns.Camp.RECENT), now, doing, bedrolls,
     self.setting("pocketCampColumns"), ns.Camp.grouped(rows, self.party), shown)
+  view.saved = view.lanterns and saved or nil
+  view.walkIn = self.walkIn(view, rows)
+  return view
 end
 
 local function expire(self)

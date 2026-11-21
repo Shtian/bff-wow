@@ -106,6 +106,49 @@ local function shownSpot(self, row)
   return nil
 end
 
+local LANTERNS = 2
+local SAVED_TITLE = "Saved for your Crew"
+local SAVED_WAITING = "They sit here once you hear from one of them."
+local SAVED_HINT = "Click to invite in chat. Right-click for the code."
+local INVITE = "Join my Crew in BFF: /bff join %s"
+
+local function savedSeats(self)
+  local crew = self.db.crew
+  if not crew or crew.leaving or self.ledger:knowsOthers() then return nil end
+  if crew.joined then return { tooltip = { title = SAVED_TITLE, lines = { SAVED_WAITING } } } end
+  return {
+    code = crew.code,
+    invite = INVITE:format(crew.code),
+    tooltip = {
+      title = SAVED_TITLE,
+      lines = { "Crew code: " .. crew.code, "Friends join with /bff join " .. crew.code },
+      hint = SAVED_HINT,
+    },
+  }
+end
+
+local function ownRowOf(rows)
+  for _, row in ipairs(rows) do
+    if row.own then return { row } end
+  end
+  return {}
+end
+
+local function walkInOf(self, view, rows, arrangeAlone)
+  local id = self.db.crew and self.db.crew.walkIn
+  if not id then return nil end
+  return ns.Camp.walkIn(view, id, arrangeAlone and arrangeAlone(ownRowOf(rows)))
+end
+
+local function noteWalkIn(self)
+  for id, record in self.ledger:records() do
+    if id ~= self.ledger:memberId() and not record.left then
+      self.db.crew.walkIn = id
+      return
+    end
+  end
+end
+
 function Core.new(deps)
   for name, kind in pairs(required) do
     if type(deps[name]) ~= kind then
@@ -164,6 +207,8 @@ function Core.new(deps)
     season = function() return self:season() end,
     phase = function() return self:phase() end,
     spot = function(row) return shownSpot(self, row) end,
+    saved = function() return savedSeats(self) end,
+    walkIn = function(view, rows) return walkInOf(self, view, rows) end,
   })
   local Gossip = type(deps.gossip) == "table" and deps.gossip or ns.Gossip
   self.gossip = Gossip.new(self.ledger, deps.now, deps.random, function(message, to)
@@ -502,8 +547,19 @@ end
 function Core:camp(columns)
   if not self:setting("camp") then return nil end
   local now = self.now()
-  return ns.Camp.view(ns.Roster.rows(self.ledger, now), self.feedState:since(now - ns.Camp.RECENT), now, columns,
-    { season = self:season(), phase = self:phase() })
+  local saved = savedSeats(self)
+  local function arrange(rows, entries, lanterns)
+    return ns.Camp.view(rows, entries, now, columns, { season = self:season(), phase = self:phase(), lanterns = lanterns })
+  end
+  local rows = ns.Roster.rows(self.ledger, now)
+  local view = arrange(rows, self.feedState:since(now - ns.Camp.RECENT), saved and LANTERNS)
+  view.saved = view.lanterns and saved or nil
+  view.walkIn = walkInOf(self, view, rows, function(own) return arrange(own, {}, LANTERNS) end)
+  return view
+end
+
+function Core:walkedIn()
+  if self.db.crew then self.db.crew.walkIn = nil end
 end
 
 function Core:pocketCamp()
@@ -577,7 +633,8 @@ local function awaySummary(self)
   if self:setting("camp") then
     local now = self.now()
     summary.camp, summary.intro = ns.Camp.away(ns.Roster.rows(self.ledger, now),
-      self.feedState:since(now - ns.Camp.RECENT), now, summary, self:season(), self:phase())
+      self.feedState:since(now - ns.Camp.RECENT), now, summary,
+      { season = self:season(), phase = self:phase(), lanterns = savedSeats(self) and LANTERNS })
   end
   self.listener("awaySummary", summary)
   self.listener("changed")
@@ -1472,6 +1529,7 @@ end
 
 local function dataReceived(self, records, from, whispered)
   local changed = false
+  local alone = self.db.crew ~= nil and not self.ledger:knowsOthers()
   for _, record in ipairs(records) do
     local kept, before = self.ledger:merge(record, from)
     if self.trace then
@@ -1493,6 +1551,7 @@ local function dataReceived(self, records, from, whispered)
     end
   end
   if changed then
+    if alone then noteWalkIn(self) end
     checkGoals(self)
     tellNewerBff(self)
     local told = self.db.catchTypesTold
