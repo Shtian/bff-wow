@@ -577,9 +577,16 @@ local function drawCheer(scene, parts, actor, top, played)
   end
 end
 
+local function petComingBack(scene, actor)
+  local back = actor.you and scene.petBack and GetTime() - scene.petBack
+  if not back or back >= HOP_FOR then return nil end
+  return back < 0 and "napping" or "hopping"
+end
+
 local function drawPet(scene, parts, actor, f, hidden)
   local pet = actor.pet and Sheet.pets[actor.pet.key]
-  if not pet or hidden then
+  local back = petComingBack(scene, actor)
+  if not pet or hidden or back == "napping" then
     parts.pet:Hide()
     return
   end
@@ -590,7 +597,8 @@ local function drawPet(scene, parts, actor, f, hidden)
   local mirrored = actor.pet.x > actor.x
   local width = Sheet.sprites[name][3]
   local x = mirrored and actor.pet.x or actor.pet.x + LAYOUT.pet - width
-  local lift = not asleep and celebrating(scene, actor, f, PET_HOP_LATE) and ROW.hop - ROW.seated or 0
+  local hops = back == "hopping" or not asleep and celebrating(scene, actor, f, PET_HOP_LATE)
+  local lift = hops and ROW.hop - ROW.seated or 0
   setSprite(parts.pet, name, scene.unit, mirrored)
   put(scene, parts.pet, x, ROW.pet + lift)
 end
@@ -798,7 +806,7 @@ end
 
 local function drawLanternSeats(scene)
   scene.lanternSeatParts.used = 0
-  for _, seat in ipairs(scene.view.lanterns or {}) do
+  for _, seat in ipairs(scene.view.lanternSeats or {}) do
     local parts = take(scene.lanternSeatParts)
     parts.puff:Hide()
     drawLanternSeat(scene, parts, seat, 1)
@@ -808,13 +816,13 @@ local function drawLanternSeats(scene)
   for i = #scene.smokes, 1, -1 do
     local smoke = scene.smokes[i]
     local played = now - smoke.start
-    if played >= SMOKE_FOR then
+    if played >= (smoke.puff and SMOKE_FOR or 0) then
       table.remove(scene.smokes, i)
     else
       local parts = take(scene.lanternSeatParts)
       if parts.hit then parts.hit:Hide() end
       local rising = played >= 0 and played / SMOKE_FOR
-      drawLanternSeat(scene, parts, smoke, rising and 1 - rising or 1)
+      drawLanternSeat(scene, parts, rising and { x = smoke.x } or smoke, rising and 1 - rising or 1)
       if rising then
         setSprite(parts.puff, rising < 0.5 and "smoke1" or "smoke2", scene.unit)
         put(scene, parts.puff, lanternLog(smoke.x) + SMOKE_SEAT.puff,
@@ -1438,9 +1446,11 @@ function CampScene.new(parent, options)
     if not arrival or scene.walkedIn == arrival.memberId then return end
     scene.walkedIn = arrival.memberId
     band:Animate("arrive", arrival.memberId)
-    local start = GetTime() + SMOKE_SEAT.after
-    for i, x in ipairs(arrival.smoke) do
-      scene.smokes[#scene.smokes + 1] = { x = x, start = start + (i - 1) * SMOKE_SEAT.every }
+    local landed = GetTime() + SMOKE_SEAT.after
+    scene.petBack = landed
+    for i, seat in ipairs(arrival.seats) do
+      scene.smokes[#scene.smokes + 1] = { x = seat.x, pet = seat.pet, puff = i > 1,
+        start = landed + math.max(0, i - 2) * SMOKE_SEAT.every }
     end
   end
 
@@ -1520,7 +1530,7 @@ function CampScene.new(parent, options)
   function band:LanternAt(x)
     if not scene.view or not scene.unit then return nil end
     local at = x / scene.unit - scene.fire
-    for _, seat in ipairs(scene.view.lanterns or {}) do
+    for _, seat in ipairs(scene.view.lanternSeats or {}) do
       if at >= seat.x and at < seat.x + LAYOUT.lantern then return seat end
     end
     return nil

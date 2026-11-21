@@ -147,10 +147,10 @@ local function pocketView(self)
   end
   local saved = self.saved()
   local shown = { alts = self.setting("pocketCampAlts"), season = self.season(), phase = self.phase(),
-    lanterns = saved and LANTERNS }
+    lanternCount = saved and LANTERNS }
   local view = ns.Camp.pocket(rows, self.feed:since(now - ns.Camp.RECENT), now, doing, bedrolls,
     self.setting("pocketCampColumns"), ns.Camp.grouped(rows, self.party), shown)
-  view.saved = view.lanterns and saved or nil
+  view.saved = view.lanternSeats and saved or nil
   view.walkIn = self.walkIn(view, rows)
   return view
 end

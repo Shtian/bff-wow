@@ -22,9 +22,9 @@ camp(columns) -> nil, or {
   more = 2, moreText = "+2 more", -- Members that didn't fit; nil when all did
   season = "winter" | "autumn" | "lunar" | "midsummer" | nil, -- see Seasons
   decor = { { key = "tree" | "pumpkin" | "pole", x } } | nil, -- the season's pieces that fit
-  lanterns = { { x, pet = "fox" | nil } } | nil, -- lantern seats while you're alone (below)
+  lanternSeats = { { x, pet = "fox" | nil } } | nil, -- lantern seats while you're alone (below)
   saved = { tooltip = { title, lines, hint }, code, invite } | nil, -- what the lantern seats say and do
-  walkIn = { memberId, smoke = { x } } | nil, -- the first friend's walk-in, still to play
+  walkIn = { memberId, seats = { { x, pet } } } | nil, -- the first friend's walk-in, still to play
 }
 ```
 
@@ -51,7 +51,7 @@ Answers [Camp: lantern seats while you're alone in the Crew](https://github.com/
 - **Founder:** `saved` has the Crew `code` and the `invite` line, "Join my Crew in BFF: /bff join <code>". The tooltip shows the code and how to join. A click opens the chat box with the invite filled in, for the player to send where they like (`ChatFrameUtil.OpenChat`, or `ChatFrame_OpenChat`). A right-click opens the Roster with the code box focused and highlighted for Ctrl+C.
 - **Joined, waiting** (`crew.joined`): the same seats, the tooltip "Saved for your Crew. They sit here once you hear from one of them.", and no code or invite.
 - **Pet:** your pet naps on a seat, the one on your side when there is one, instead of sitting beside you. It's back beside you once a friend arrives.
-- **Arrival:** when the first other Member's record merges while you were alone, Core saves `crew.walkIn` (that Member's id). The next Camp that shows with that Member in it carries `walkIn`. The band plays the arrival walk (`arrive`) to their seat, and the other saved seats go up in smoke after it (`smoke`, the seats' x in the alone layout, less the one the friend takes). An offline friend lies down in a bedroll after the walk. UI calls `core:walkedIn()` once it has drawn it, so it plays once, even across a `/reload` or login.
+- **Arrival:** when the first other Member's record merges while you were alone, Core saves `crew.walkIn` (that Member's id). The first in the batch's order wins. The next Camp that shows with that Member in it carries `walkIn`, with `seats`: the lantern seats as they stood while you were alone (none from the Pocket Camp's, whose one seat the friend takes). The band plays the arrival walk (`arrive`) to the first seat, which stays lit until they land. Then the other seats go up in smoke, one after another, and your pet leaves the seat it napped on and hops back beside you. An offline friend lies down in a bedroll after the walk. UI calls `core:walkedIn()` once it has drawn it, so it plays once, even across a `/reload` or login.
 - **No new traffic:** no messages, sends or record fields. The invite is the player's own chat line.
 
 `tests/lantern_seats_spec.lua` checks the seats, their place and the header, the founder's and the joined Member's wording, the pet on your side, the walk-in (online and offline, kept across a reload, played once, never for a later Member), the Pocket Camp's one seat, and none with the Camp off or while leaving.

@@ -140,9 +140,11 @@ local function walkInOf(self, view, rows, arrangeAlone)
   return ns.Camp.walkIn(view, id, arrangeAlone and arrangeAlone(ownRowOf(rows)))
 end
 
-local function noteWalkIn(self)
-  for id, record in self.ledger:records() do
-    if id ~= self.ledger:memberId() and not record.left then
+local function noteWalkIn(self, records)
+  for _, record in ipairs(records) do
+    local id = type(record) == "table" and record.id
+    local known = id and id ~= self.ledger:memberId() and self.ledger:record(id)
+    if known and not known.left then
       self.db.crew.walkIn = id
       return
     end
@@ -548,12 +550,13 @@ function Core:camp(columns)
   if not self:setting("camp") then return nil end
   local now = self.now()
   local saved = savedSeats(self)
-  local function arrange(rows, entries, lanterns)
-    return ns.Camp.view(rows, entries, now, columns, { season = self:season(), phase = self:phase(), lanterns = lanterns })
+  local function arrange(rows, entries, lanternCount)
+    return ns.Camp.view(rows, entries, now, columns, { season = self:season(), phase = self:phase(),
+      lanternCount = lanternCount })
   end
   local rows = ns.Roster.rows(self.ledger, now)
   local view = arrange(rows, self.feedState:since(now - ns.Camp.RECENT), saved and LANTERNS)
-  view.saved = view.lanterns and saved or nil
+  view.saved = view.lanternSeats and saved or nil
   view.walkIn = walkInOf(self, view, rows, function(own) return arrange(own, {}, LANTERNS) end)
   return view
 end
@@ -634,7 +637,7 @@ local function awaySummary(self)
     local now = self.now()
     summary.camp, summary.intro = ns.Camp.away(ns.Roster.rows(self.ledger, now),
       self.feedState:since(now - ns.Camp.RECENT), now, summary,
-      { season = self:season(), phase = self:phase(), lanterns = savedSeats(self) and LANTERNS })
+      { season = self:season(), phase = self:phase(), lanternCount = savedSeats(self) and LANTERNS })
   end
   self.listener("awaySummary", summary)
   self.listener("changed")
@@ -1551,7 +1554,7 @@ local function dataReceived(self, records, from, whispered)
     end
   end
   if changed then
-    if alone then noteWalkIn(self) end
+    if alone then noteWalkIn(self, records) end
     checkGoals(self)
     tellNewerBff(self)
     local told = self.db.catchTypesTold

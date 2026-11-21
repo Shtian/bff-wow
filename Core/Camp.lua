@@ -178,31 +178,33 @@ local function labelRoom(actors, left, right)
   end
 end
 
-local function napper(rows, actors)
-  local you
+local function yourSide(actors)
   for _, actor in ipairs(actors) do
-    if actor.you then you = actor end
-  end
-  for _, row in ipairs(rows) do
-    if row.own and row.pet then return row.pet, you and (you.x < 0 and -1 or 1) end
+    if actor.you then return actor.x < 0 and -1 or 1 end
   end
   return nil
 end
 
-local function lanternSeats(rows, actors, left, right, count)
+local function yourPet(rows, options)
+  for _, row in ipairs(rows) do
+    if row.own and not (options.noPet and options.noPet(row)) then return row.pet end
+  end
+  return nil
+end
+
+local function lanternSeats(rows, actors, left, right, options)
   local list = {}
-  for _ = 1, count or 0 do
+  for _ = 1, options.lanternCount or 0 do
     local side = roomier(left, right)
     local x = placeOn(side, LAYOUT.lantern, 0)
     if x then list[#list + 1] = { x = x, side = side.sign } end
   end
   if not list[1] then return nil end
-  local pet, yourSide = napper(rows, actors)
-  local bed = list[1]
+  local side, bed = yourSide(actors), list[1]
   for _, seat in ipairs(list) do
-    if seat.side == yourSide and bed.side ~= yourSide then bed = seat end
+    if seat.side == side and bed.side ~= side then bed = seat end
   end
-  bed.pet = pet
+  bed.pet = yourPet(rows, options)
   for _, seat in ipairs(list) do seat.side = nil end
   return list
 end
@@ -226,7 +228,7 @@ local function arrange(rows, entries, now, columns, options, petted)
   end
   local withPets = {}
   local function petOf(row)
-    if row.own and options.lanterns then return nil end
+    if row.own and options.lanternCount then return nil end
     if row.pet and not (options.noPet and options.noPet(row)) then return row.pet end
   end
   local placed = {}
@@ -306,7 +308,7 @@ local function arrange(rows, entries, now, columns, options, petted)
   end
   view.more = more > 0 and more or nil
   view.moreText = view.more and (options.moreText or "+%d more"):format(more) or nil
-  view.lanterns = lanternSeats(rows, view.actors, left, right, options.lanterns)
+  view.lanternSeats = lanternSeats(rows, view.actors, left, right, options)
 
   if options.tent ~= false then
     local side = roomier(left, right)
@@ -524,7 +526,7 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
   rows = seatingOrder(rows, group, seatKey)
   local options = {
     tent = false, onlineOnly = true, moreText = "+%d", sleepers = bedrolls, season = shown.season, phase = shown.phase,
-    lanterns = shown.lanterns,
+    lanternCount = shown.lanternCount,
     room = function(row)
       if poses[row.memberId] == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
       local form = forms[row.memberId]
@@ -619,7 +621,7 @@ end
 
 function Camp.away(rows, entries, now, summary, shown)
   local view = Camp.view(rows, entries, now, LAYOUT.awayColumns,
-    { tent = false, season = shown.season, phase = shown.phase, lanterns = shown.lanterns })
+    { tent = false, season = shown.season, phase = shown.phase, lanternCount = shown.lanternCount })
   local byMember = {}
   for _, member in ipairs(summary.members) do byMember[member.memberId] = member end
   for _, actor in ipairs(view.actors) do
@@ -639,11 +641,7 @@ end
 function Camp.walkIn(view, memberId, alone)
   for _, actor in ipairs(view.actors) do
     if actor.memberId == memberId then
-      local smoke = {}
-      for i, seat in ipairs(alone and alone.lanterns or {}) do
-        if i > 1 then smoke[#smoke + 1] = seat.x end
-      end
-      return { memberId = memberId, smoke = smoke }
+      return { memberId = memberId, seats = alone and alone.lanternSeats or {} }
     end
   end
   return nil

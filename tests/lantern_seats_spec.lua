@@ -37,7 +37,7 @@ local layout = load().Core.CAMP_LAYOUT
 local function spans(view)
   local list = {}
   for _, actor in ipairs(view.actors) do list[#list + 1] = { actor.x, actor.x + actor.width } end
-  for _, seat in ipairs(view.lanterns or {}) do list[#list + 1] = { seat.x, seat.x + layout.lantern } end
+  for _, seat in ipairs(view.lanternSeats or {}) do list[#list + 1] = { seat.x, seat.x + layout.lantern } end
   if view.tent then list[#list + 1] = { view.tent.x, view.tent.x + layout.tent } end
   return list
 end
@@ -59,7 +59,7 @@ describe("Lantern seats", function()
   it("saves two seats in the Camp while you're alone, not counted by the fire", function()
     local _, ann, code = founder()
     local view = ann.core:camp(COLUMNS)
-    assert.equal(2, #view.lanterns)
+    assert.equal(2, #view.lanternSeats)
     assert.equal(1, #view.actors)
     assert.is_nil(view.more)
     assertApart(view)
@@ -74,7 +74,7 @@ describe("Lantern seats", function()
   it("places them before the tent, on both sides of the fire", function()
     local _, ann = founder()
     local view = ann.core:camp(COLUMNS)
-    local right, left = view.lanterns[1], view.lanterns[2]
+    local right, left = view.lanternSeats[1], view.lanternSeats[2]
     assert.is_true(right.x > 0)
     assert.is_true(left.x < 0)
     assert.is_table(view.tent)
@@ -88,7 +88,7 @@ describe("Lantern seats", function()
     local you = actorFor(view, ann)
     assert.is_nil(you.pet)
     local napping
-    for _, seat in ipairs(view.lanterns) do
+    for _, seat in ipairs(view.lanternSeats) do
       if seat.pet then napping = seat end
     end
     assert.equal("fox", napping.pet)
@@ -103,7 +103,7 @@ describe("Lantern seats", function()
     bob:join(code)
     net:run(5)
     local view = bob.core:camp(COLUMNS)
-    assert.equal(2, #view.lanterns)
+    assert.equal(2, #view.lanternSeats)
     assert.is_nil(view.saved.code)
     assert.is_nil(view.saved.invite)
     assert.same({ "They sit here once you hear from one of them." }, view.saved.tooltip.lines)
@@ -114,11 +114,12 @@ describe("Lantern seats", function()
     ann.core:setLook({ pet = "fox" })
     local bob = joins(net, "Bob", code)
     local view = ann.core:camp(COLUMNS)
-    assert.is_nil(view.lanterns)
+    assert.is_nil(view.lanternSeats)
     assert.is_nil(view.saved)
     assert.equal("fox", actorFor(view, ann).pet.key)
     assert.equal(bob.memberId, view.walkIn.memberId)
-    assert.equal(1, #view.walkIn.smoke)
+    assert.equal(2, #view.walkIn.seats)
+    assert.equal("fox", view.walkIn.seats[2].pet)
     assert.equal(bob.memberId, ann.core:pocketCamp().walkIn.memberId)
   end)
 
@@ -157,8 +158,8 @@ describe("Lantern seats", function()
     local _, ann = founder()
     ann.core:setLook({ pet = "fox" })
     local view = ann.core:pocketCamp()
-    assert.equal(1, #view.lanterns)
-    assert.equal("fox", view.lanterns[1].pet)
+    assert.equal(1, #view.lanternSeats)
+    assert.equal("fox", view.lanternSeats[1].pet)
     assert.is_nil(actorFor(view, ann).pet)
     assert.is_table(view.saved)
   end)
@@ -170,6 +171,6 @@ describe("Lantern seats", function()
     ann.core:setSetting("camp", true)
     ann.core:leaveCrew()
     local view = ann.core:camp(COLUMNS)
-    assert.is_true(view == nil or view.lanterns == nil)
+    assert.is_true(view == nil or view.lanternSeats == nil)
   end)
 end)
