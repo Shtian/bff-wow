@@ -41,7 +41,7 @@ Core is created with:
 - `itemLink(itemString)` (optional): the game's link for an item string, as `Snapshot.itemLink` reads it, or nil while the item isn't cached. Spare texts say "an item" until then (`docs/design/spares.md`).
 - `itemLook(itemId)` (optional): how the game shows an item, as `Skin.itemLook` reads it: `{ text, icon, edge }`, the name in its quality colour, the icon and the quality colour, each nil while it isn't cached. Rare finds use the English name until then (`docs/design/feed.md`).
 - `findItem(itemGuid)` (optional): where a posted item is now, as `Bags.findItem` reads it: whether it's in the bags or bank (nil if the game can't say), and whether it's equipped.
-- `finalBosses` (optional): encounter ID to instance name, the kills that are Clears. Defaults to `Core.FINAL_BOSSES`, from the dungeon table's `finals`; tests and the dev sim pass their own while Forever's IDs aren't known.
+- `finalBosses` (optional): encounter ID to instance name, the kills that are Clears. Defaults to `Core.FINAL_BOSSES`, from the dungeon table's `finals`; tests and the dev sim pass their own, since the datamined IDs are unconfirmed.
 - `version` (optional): the .toc's Version (`v2.3.0`; a checkout's `dev` counts as none). It goes into the own record as `bff`, and What's new reads changes up to it.
 - `changelog` (optional): the newest releases of `CHANGELOG.md`, as `ChangelogText.lua` carries them in a release build (nil in a checkout), for What's new (`docs/design/whats-new.md`).
 - `gossip` (optional): the Gossip module to use. Only FakeNet passes one, for a client that syncs like an older BFF (`tests/fixtures/legacy_gossip.lua`).
