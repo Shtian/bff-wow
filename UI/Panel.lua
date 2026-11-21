@@ -300,7 +300,7 @@ local function create()
   Skin.round(frame.header, frame.onlineDot)
   frame.onlineDot:SetPoint("RIGHT", frame.headerRight, "LEFT", -5, 0)
 
-  camp = ns.CampScene.new(frame)
+  camp = ns.CampScene.new(frame, { lanternHits = true })
   camp:SetPoint("TOPLEFT", 1, -HEADER)
   camp:SetPoint("TOPRIGHT", -1, -HEADER)
   Skin.edge(camp, "BOTTOM", Skin.LINE, "OVERLAY")
@@ -327,6 +327,7 @@ local function drawCamp(inCrew)
   end
   camp:SetHeight(math.max(campHeight, 1))
   camp:Draw(view)
+  if view and view.walkIn then core:walkedIn() end
   firelight:Place(camp, campHeight > 0 and frame:GetHeight() - HEADER - campHeight or nil)
 end
 

@@ -33,6 +33,7 @@ pocketCamp() -> nil, or {
     { x, width, instance = "The Deadmines", raid = true | nil },
   },
   more = 2, moreText = "+2", -- online Members that didn't fit; nil when all did
+  lanterns, saved, walkIn, -- one lantern seat while you're alone, and the first friend's walk-in (docs/design/camp.md, Lantern seats)
   season = "winter" | "autumn" | "lunar" | "midsummer" | nil, decor = { { key = "tree" | "pumpkin" | "pole", x } } | nil, -- a season's decorations, its piece only in spare width (docs/design/camp.md, Seasons)
   phase = "day" | "night" | nil, -- the game's day or night; nil with Day and night or the Camp off (docs/design/camp.md, Day and night)
   tooltip = { title = "Pocket Camp", lines = { "You: by the fire", "Bob (on alt): in The Deadmines · 25m", "Cy: asleep · 4m" }, hint },

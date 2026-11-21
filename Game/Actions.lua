@@ -10,6 +10,11 @@ function Actions.whisper(fullName)
   if sendTell then sendTell(fullName) end
 end
 
+function Actions.openChat(text)
+  local openChat = ChatFrameUtil and ChatFrameUtil.OpenChat or ChatFrame_OpenChat
+  if openChat then openChat(text) end
+end
+
 function Actions.invite(fullName)
   if C_PartyInfo and C_PartyInfo.InviteUnit then C_PartyInfo.InviteUnit(fullName) end
 end

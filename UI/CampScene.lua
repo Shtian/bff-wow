@@ -117,6 +117,9 @@ local GHOST = { alpha = 0.6, glow = 0.15, pulseAlpha = 0.7, pulseGlow = 0.25 }
 local PULSE = { every = 9, ticks = 2 }
 local PUFF = { row = 2, solid = 4, fade = 0.5 }
 local LABEL_GAP = 1
+local LANTERN_SEAT = { rightLog = -1, leftLog = 5, rightPost = 9, leftPost = 2, pet = 1,
+  glow = { reach = 12, alpha = 0.35, row = 10, column = 4, mirroredColumn = 2 } }
+local SMOKE_SEAT = { after = WALK_FOR, every = 0.5, puff = 3, row = 4 }
 
 -- WoW: a size that isn't a whole number of screen pixels draws some art
 -- pixels a screen pixel wider than others.
@@ -456,7 +459,7 @@ end
 local function drawArrival(scene, parts, actor, f, played)
   local unit, x = scene.unit, actor.x
   local pose = POSE[actor.pose] or {}
-  if pose.standing or pose.lift then
+  if pose.standing or pose.lift or actor.pose == "asleep" then
     parts.seat:Hide()
   else
     setSprite(parts.seat, "seat", unit)
@@ -595,7 +598,8 @@ end
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
   local top, hatTop
-  local walkedIn = actor.pose ~= "asleep" and playing(scene, "arrive", actor.memberId)
+  local walkedIn = playing(scene, "arrive", actor.memberId)
+  if actor.pose == "asleep" and walkedIn and walkedIn >= WALK_FOR then walkedIn = nil end
   local welcomed = not walkedIn and actor.pose ~= "asleep" and playing(scene, "welcome", actor.memberId) ~= nil
   local dead = actor.pose ~= "asleep" and playing(scene, "death", actor.memberId) ~= nil
   parts.snow:Hide()
@@ -717,6 +721,110 @@ local function drawActor(scene, parts, actor, f)
   else
     parts.spark:Hide()
   end
+end
+
+local function lanternLog(x)
+  return x > 0 and x + LANTERN_SEAT.rightLog or x + LANTERN_SEAT.leftLog
+end
+
+local function drawGlow(scene, parts, x, mirrored, lit)
+  if not lit then
+    parts.glowLow:Hide()
+    parts.glowHigh:Hide()
+    return
+  end
+  local glow = LANTERN_SEAT.glow
+  local centre = x + (mirrored and glow.mirroredColumn or glow.column) + 0.5
+  local width, height = 2 * glow.reach * scene.unit, glow.reach * scene.unit
+  for _, half in ipairs({ parts.glowLow, parts.glowHigh }) do
+    half:SetSize(width, height)
+    half:SetAlpha(glow.alpha)
+    half:ClearAllPoints()
+    half:Show()
+  end
+  local left = (scene.fire + centre - glow.reach) * scene.unit
+  parts.glowLow:SetPoint("TOPLEFT", scene.art, "BOTTOMLEFT", left, glow.row * scene.unit)
+  parts.glowHigh:SetPoint("BOTTOMLEFT", scene.art, "BOTTOMLEFT", left, glow.row * scene.unit)
+end
+
+local function drawLanternSeat(scene, parts, seat, alpha)
+  local unit, right = scene.unit, seat.x > 0
+  local log = lanternLog(seat.x)
+  setSprite(parts.seat, "seat", unit)
+  put(scene, parts.seat, log, ROW.seat)
+  local post = seat.x + (right and LANTERN_SEAT.rightPost or LANTERN_SEAT.leftPost)
+  setSprite(parts.post, "lanternPost", unit, right)
+  put(scene, parts.post, post, ROW.seat)
+  parts.seat:SetAlpha(alpha)
+  parts.post:SetAlpha(alpha)
+  drawGlow(scene, parts, post, right, alpha == 1 and scene.view.phase ~= "day")
+  local pet = seat.pet and Sheet.pets[seat.pet]
+  if pet then
+    setSprite(parts.pet, pet.asleep, unit, not right)
+    put(scene, parts.pet, log + LANTERN_SEAT.pet, ROW.seat + Sheet.sprites.seat[4])
+  else
+    parts.pet:Hide()
+  end
+end
+
+local function lanternHit(scene)
+  local hit = CreateFrame("Button", nil, scene.art)
+  hit:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  hit:SetScript("OnEnter", function(self)
+    local saved = scene.view and scene.view.saved
+    if not saved then return end
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    ns.LanternSeats.addTooltip(saved)
+    GameTooltip:Show()
+  end)
+  hit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  hit:SetScript("OnClick", function(_, button)
+    local saved = scene.view and scene.view.saved
+    if not saved then return end
+    GameTooltip:Hide()
+    ns.LanternSeats.click(saved, button)
+  end)
+  return hit
+end
+
+local function placeHit(scene, parts, seat)
+  if not scene.lanternHits then return end
+  parts.hit = parts.hit or lanternHit(scene)
+  parts.hit:SetSize(LAYOUT.lantern * scene.unit, Sheet.sprites.lanternPost[4] * scene.unit)
+  parts.hit:ClearAllPoints()
+  parts.hit:SetPoint("BOTTOMLEFT", scene.art, "BOTTOMLEFT", (scene.fire + seat.x) * scene.unit, ROW.seat * scene.unit)
+  parts.hit:Show()
+end
+
+local function drawLanternSeats(scene)
+  scene.lanternSeatParts.used = 0
+  for _, seat in ipairs(scene.view.lanterns or {}) do
+    local parts = take(scene.lanternSeatParts)
+    parts.puff:Hide()
+    drawLanternSeat(scene, parts, seat, 1)
+    placeHit(scene, parts, seat)
+  end
+  local now = GetTime()
+  for i = #scene.smokes, 1, -1 do
+    local smoke = scene.smokes[i]
+    local played = now - smoke.start
+    if played >= SMOKE_FOR then
+      table.remove(scene.smokes, i)
+    else
+      local parts = take(scene.lanternSeatParts)
+      if parts.hit then parts.hit:Hide() end
+      local rising = played >= 0 and played / SMOKE_FOR
+      drawLanternSeat(scene, parts, smoke, rising and 1 - rising or 1)
+      if rising then
+        setSprite(parts.puff, rising < 0.5 and "smoke1" or "smoke2", scene.unit)
+        put(scene, parts.puff, lanternLog(smoke.x) + SMOKE_SEAT.puff,
+          ROW.seat + SMOKE_SEAT.row + math.floor(rising * SMOKE.rise))
+      else
+        parts.puff:Hide()
+      end
+    end
+  end
+  hideRest(scene.lanternSeatParts)
 end
 
 local function drawDoorway(scene, parts, doorway)
@@ -1108,6 +1216,8 @@ local function drawFrame(scene, f)
   for _, doorway in ipairs(view.doorways or {}) do drawDoorway(scene, take(scene.doorParts), doorway) end
   hideRest(scene.doorParts)
 
+  drawLanternSeats(scene)
+
   scene.actorParts.used = 0
   scene.clearOf = {}
   for _, actor in ipairs(view.actors) do drawActor(scene, take(scene.actorParts), actor, f) end
@@ -1197,6 +1307,7 @@ function CampScene.new(parent, options)
     gains = options.gains,
     names = options.names ~= false,
     backdropArt = options.backdrop or Sheet.backdrop,
+    lanternHits = options.lanternHits,
     skyLights = not options.backdrop,
     target = options.target or CampScene.BAND_TARGET,
     crisp = options.crisp ~= false,
@@ -1247,6 +1358,26 @@ function CampScene.new(parent, options)
     lanternParts = pool(function()
       return { art = texture(band.art, "BORDER", 3) }
     end),
+    lanternSeatParts = pool(function()
+      local function glow()
+        local t = band.art:CreateTexture(nil, "BORDER", nil, 2)
+        t:SetTexture(Sheet.light.file, "CLAMP", "CLAMP")
+        t:SetBlendMode("ADD")
+        t:Hide()
+        return t
+      end
+      local high = glow()
+      high:SetTexCoord(0, 1, 1, 0)
+      return {
+        glowLow = glow(),
+        glowHigh = high,
+        post = texture(band.art, "ARTWORK", -1),
+        seat = texture(band.art, "ARTWORK", 0),
+        pet = texture(band.art, "ARTWORK", 1),
+        puff = texture(band.art, "OVERLAY", 2),
+      }
+    end),
+    smokes = {},
     clearOf = {},
     nextAt = {},
     graveParts = pool(function()
@@ -1302,6 +1433,17 @@ function CampScene.new(parent, options)
   band:SetScript("OnUpdate", onUpdate)
   band:Hide()
 
+  local function walkIn(view)
+    local arrival = view.walkIn
+    if not arrival or scene.walkedIn == arrival.memberId then return end
+    scene.walkedIn = arrival.memberId
+    band:Animate("arrive", arrival.memberId)
+    local start = GetTime() + SMOKE_SEAT.after
+    for i, x in ipairs(arrival.smoke) do
+      scene.smokes[#scene.smokes + 1] = { x = x, start = start + (i - 1) * SMOKE_SEAT.every }
+    end
+  end
+
   function band:Draw(view)
     scene.view = view
     if not view then
@@ -1309,6 +1451,7 @@ function CampScene.new(parent, options)
       return
     end
     scene.frame = nil
+    walkIn(view)
     scene.horde = UnitFactionGroup ~= nil and UnitFactionGroup("player") == "Horde"
     puffShifts(scene, view)
     local art = scene.backdropArt
@@ -1370,6 +1513,15 @@ function CampScene.new(parent, options)
     local reach = LAYOUT.gap / 2
     for _, actor in ipairs(scene.view.actors) do
       if at >= actor.x - reach and at < actor.x + actor.width + reach then return actor end
+    end
+    return nil
+  end
+
+  function band:LanternAt(x)
+    if not scene.view or not scene.unit then return nil end
+    local at = x / scene.unit - scene.fire
+    for _, seat in ipairs(scene.view.lanterns or {}) do
+      if at >= seat.x and at < seat.x + LAYOUT.lantern then return seat end
     end
     return nil
   end

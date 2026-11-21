@@ -58,6 +58,7 @@ Game/ChannelLink.lua
 UI/Skin.lua
 UI/CampSheet.lua
 UI/CampScene.lua
+UI/LanternSeats.lua
 UI/EmptyState.lua
 UI/Firelight.lua
 UI/ScrollView.lua

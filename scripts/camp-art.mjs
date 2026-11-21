@@ -519,6 +519,10 @@ const LANTERN_PALS = {
   lanternGold: { c: "#c9481c", x: "#c9481c", e: "#f0a21c", r: "#8a5a18", f: "#ffd14a", y: "#fff3c4", s: "#6a4a2e" },
 };
 const LANTERN_STRING = "#6a4a2e";
+// A lantern seat while you're alone in the Crew (#279): a post with an arm
+// reaching toward the fire and the gold lantern hung from it. CampScene
+// draws it beside a seat log, mirrored on the right of the fire.
+const LANTERN_POST = ["BBBBB..", "B...Z..", ...LANTERN.map((row) => "B." + row), "B......", "B......", "B......", "B......"];
 const SPARK_RED = { K: PAL.K, W: "#ffb08a", G: "#e0482c", Y: "#ff8a5a" };
 // Midsummer: a bonfire, new frames wider and taller than the fire's in its
 // palette; the Midsummer pole, a leafy mast with a crossbar, two arms from
@@ -729,6 +733,7 @@ const SPRITES = [
     [petSprite(key, "Idle"), paint(outlined(pet.idle), { ...PAL, ...PET_PAL })],
     [petSprite(key, "Asleep"), paint(outlined(pet.asleep), { ...PAL, ...PET_PAL })],
   ]),
+  ["lanternPost", paint(LANTERN_POST, { ...PAL, ...LANTERN_PALS.lanternGold })],
 ];
 
 function hex(color) {

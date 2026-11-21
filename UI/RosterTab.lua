@@ -398,6 +398,14 @@ local function drawFooter(crew, counts)
   return height
 end
 
+function RosterTab.showCode()
+  ns.Panel.show("roster")
+  local box = view and view.alone:IsShown() and view.alone.code:IsShown() and view.alone.code or footer and footer.code
+  if not box then return end
+  box:SetFocus()
+  box:HighlightText()
+end
+
 function RosterTab.draw(thePage)
   page, core = thePage, thePage.core
   local crew = core:crew()
