@@ -37,6 +37,7 @@ stds.wow = {
     "ChatEdit_InsertLink",
     "ChatFrame_AddMessageEventFilter",
     "ChatFrame_SendTell",
+    "ChatFrame_OpenChat",
     "ChatFrameUtil",
     "ChatThrottleLib",
     "ClearCursor",

@@ -175,9 +175,15 @@ local function overCup()
   return frame.band:CupAt(x - frame:GetLeft(), y - frame:GetBottom())
 end
 
+local function overLantern()
+  local x = cursor()
+  return view and view.saved ~= nil and frame.band:LanternAt(x - frame:GetLeft()) ~= nil
+end
+
 local function pointedAt()
   if overCrate() then return "crate" end
   if overCup() then return "cup" end
+  if overLantern() then return "lantern" end
   local actor = hovered()
   return actor and actor.memberId or false
 end
@@ -189,6 +195,11 @@ local function showTooltip()
   if tooltipFor == "crate" then
     GameTooltip:AddLine(view.sparesTooltip.title)
     GameTooltip:AddLine(view.sparesTooltip.hint, MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:Show()
+    return
+  end
+  if tooltipFor == "lantern" then
+    ns.LanternSeats.addTooltip(view.saved)
     GameTooltip:Show()
     return
   end
@@ -257,7 +268,9 @@ local function create()
   frame:SetScript("OnDragStop", dropped)
   frame:SetScript("OnClick", function(_, button)
     if InCombatLockdown() then return end
-    if button == "RightButton" then
+    if overLantern() and ns.LanternSeats.click(view.saved, button) then
+      hideTooltip()
+    elseif button == "RightButton" then
       showMenu()
     elseif overCrate() then
       ns.Panel.show("spares")
@@ -321,6 +334,7 @@ function PocketCamp.refresh()
     fit(view.scale)
     place()
     frame.band:Draw(view)
+    if view.walkIn then core:walkedIn() end
   end
   frame:Show()
   if GameTooltip:IsOwned(frame) then showTooltip() end

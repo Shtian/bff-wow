@@ -34,6 +34,7 @@ local LAYOUT = {
   pumpkin = 13,
   pole = 15,
   decorGap = 4,
+  lantern = 18,
 }
 Camp.LAYOUT = LAYOUT
 
@@ -177,6 +178,37 @@ local function labelRoom(actors, left, right)
   end
 end
 
+local function yourSide(actors)
+  for _, actor in ipairs(actors) do
+    if actor.you then return actor.x < 0 and -1 or 1 end
+  end
+  return nil
+end
+
+local function yourPet(rows, options)
+  for _, row in ipairs(rows) do
+    if row.own and not (options.noPet and options.noPet(row)) then return row.pet end
+  end
+  return nil
+end
+
+local function lanternSeats(rows, actors, left, right, options)
+  local list = {}
+  for _ = 1, options.lanternCount or 0 do
+    local side = roomier(left, right)
+    local x = placeOn(side, LAYOUT.lantern, 0)
+    if x then list[#list + 1] = { x = x, side = side.sign } end
+  end
+  if not list[1] then return nil end
+  local side, bed = yourSide(actors), list[1]
+  for _, seat in ipairs(list) do
+    if seat.side == side and bed.side ~= side then bed = seat end
+  end
+  bed.pet = yourPet(rows, options)
+  for _, seat in ipairs(list) do seat.side = nil end
+  return list
+end
+
 local function arrange(rows, entries, now, columns, options, petted)
   columns = math.max(1, math.floor(columns))
   local leftEdge = math.floor(columns / 2)
@@ -196,6 +228,7 @@ local function arrange(rows, entries, now, columns, options, petted)
   end
   local withPets = {}
   local function petOf(row)
+    if row.own and options.lanternCount then return nil end
     if row.pet and not (options.noPet and options.noPet(row)) then return row.pet end
   end
   local placed = {}
@@ -275,6 +308,7 @@ local function arrange(rows, entries, now, columns, options, petted)
   end
   view.more = more > 0 and more or nil
   view.moreText = view.more and (options.moreText or "+%d more"):format(more) or nil
+  view.lanternSeats = lanternSeats(rows, view.actors, left, right, options)
 
   if options.tent ~= false then
     local side = roomier(left, right)
@@ -492,6 +526,7 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
   rows = seatingOrder(rows, group, seatKey)
   local options = {
     tent = false, onlineOnly = true, moreText = "+%d", sleepers = bedrolls, season = shown.season, phase = shown.phase,
+    lanternCount = shown.lanternCount,
     room = function(row)
       if poses[row.memberId] == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
       local form = forms[row.memberId]
@@ -584,8 +619,9 @@ function Camp.header(summary, on)
   return ("%d of %d online"):format(summary.online, summary.members)
 end
 
-function Camp.away(rows, entries, now, summary, season, phase)
-  local view = Camp.view(rows, entries, now, LAYOUT.awayColumns, { tent = false, season = season, phase = phase })
+function Camp.away(rows, entries, now, summary, shown)
+  local view = Camp.view(rows, entries, now, LAYOUT.awayColumns,
+    { tent = false, season = shown.season, phase = shown.phase, lanternCount = shown.lanternCount })
   local byMember = {}
   for _, member in ipairs(summary.members) do byMember[member.memberId] = member end
   for _, actor in ipairs(view.actors) do
@@ -600,4 +636,13 @@ function Camp.away(rows, entries, now, summary, season, phase)
   local intro = count == 1 and "The fire kept burning. 1 thing happened in camp."
     or ("The fire kept burning. %d things happened in camp."):format(count)
   return view, intro
+end
+
+function Camp.walkIn(view, memberId, alone)
+  for _, actor in ipairs(view.actors) do
+    if actor.memberId == memberId then
+      return { memberId = memberId, seats = alone and alone.lanternSeats or {} }
+    end
+  end
+  return nil
 end

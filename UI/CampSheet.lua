@@ -155,6 +155,7 @@ ns.CampSheet = {
     petFox = { 42, 267, 13, 10 },
     petFoxIdle = { 57, 267, 13, 10 },
     petFoxAsleep = { 72, 267, 13, 8 },
+    lanternPost = { 87, 267, 7, 14 },
   },
   backdrop = {
     file = "Interface\\AddOns\\BFF\\Media\\CampBackdrop",
