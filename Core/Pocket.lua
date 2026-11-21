@@ -27,6 +27,7 @@ function Pocket.new(deps)
     spot = deps.spot,
     saved = deps.saved,
     walkIn = deps.walkIn,
+    stray = deps.stray,
     trophiesSince = deps.feed:isSettled() and deps.now() or nil,
     fishing = {},
     working = {},
@@ -146,12 +147,14 @@ local function pocketView(self)
     if now - since < BEDROLL_FOR then bedrolls[id] = since end
   end
   local saved = self.saved()
+  local stray = self.stray.rows(rows)
   local shown = { alts = self.setting("pocketCampAlts"), season = self.season(), phase = self.phase(),
     lanternCount = saved and LANTERNS }
   local view = ns.Camp.pocket(rows, self.feed:since(now - ns.Camp.RECENT), now, doing, bedrolls,
     self.setting("pocketCampColumns"), ns.Camp.grouped(rows, self.party), shown)
   view.saved = view.lanternSeats and saved or nil
   view.walkIn = self.walkIn(view, rows)
+  self.stray.mark(view, stray)
   return view
 end
 
@@ -245,6 +248,22 @@ local function sparesTooltip(spares)
   return { title = spares .. " Spare notices", hint = "Click to see them in Spares." }
 end
 
+local function petWatching(view)
+  local seat, you
+  for _, each in ipairs(view.lanternSeats or {}) do
+    if each.pet then seat = each end
+  end
+  for _, actor in ipairs(view.actors) do
+    if actor.you then you = actor end
+  end
+  if not seat then return end
+  if view.trophies then
+    seat.watching, seat.faces = "cup", seat.x < 0 and 1 or -1
+  elseif you and you.pose == "fishing" then
+    seat.watching, seat.faces = "fishing", you.x > 0 and -1 or 1
+  end
+end
+
 function Pocket:view()
   if not self:on() then return nil end
   local setting = self.setting
@@ -264,6 +283,7 @@ function Pocket:view()
   end
   view.trophies = sessionTrophies(self)
   view.trophiesTooltip = view.trophies and trophiesTooltip(view.trophies)
+  petWatching(view)
   for _, actor in ipairs(view.actors) do
     local row = actor.row
     if row and not row.own and actor.pose ~= "asleep" then

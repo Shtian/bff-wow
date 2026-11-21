@@ -140,6 +140,41 @@ local function walkInOf(self, view, rows, arrangeAlone)
   return ns.Camp.walkIn(view, id, arrangeAlone and arrangeAlone(ownRowOf(rows)))
 end
 
+local function aloneByTheFire(self)
+  local crew = self.db.crew
+  return crew ~= nil and not crew.leaving and not self.ledger:knowsOthers() and self:setting("camp")
+end
+
+local function strayWanted(self)
+  local own = self.ledger:own()
+  return aloneByTheFire(self) and own ~= nil and ns.Look.pet(own.look) == nil
+end
+
+local function mourning(self)
+  local own = self.ledger:own()
+  return self.mourning and own ~= nil and ns.Look.pet(own.look) ~= nil
+end
+
+local function strayRows(self, rows)
+  local visit = strayWanted(self) and self.stray:visiting()
+  if not visit then return nil end
+  for _, row in ipairs(rows) do
+    if row.own then row.pet = visit.key end
+  end
+  return visit
+end
+
+local function markStray(view, visit)
+  if not visit then return end
+  local found
+  for _, seat in ipairs(view.lanternSeats or {}) do
+    if seat.pet == visit.key then found = seat end
+  end
+  if not found then return end
+  found.stray = true
+  view.stray = ns.Stray.describe(visit)
+end
+
 local function noteWalkIn(self, records)
   for _, record in ipairs(records) do
     local id = type(record) == "table" and record.id
@@ -211,7 +246,12 @@ function Core.new(deps)
     spot = function(row) return shownSpot(self, row) end,
     saved = function() return savedSeats(self) end,
     walkIn = function(view, rows) return walkInOf(self, view, rows) end,
+    stray = {
+      rows = function(rows) return strayRows(self, rows) end,
+      mark = markStray,
+    },
   })
+  self.stray = ns.Stray.new(deps.db, deps.now, deps.random)
   local Gossip = type(deps.gossip) == "table" and deps.gossip or ns.Gossip
   self.gossip = Gossip.new(self.ledger, deps.now, deps.random, function(message, to)
     sendMessage(self, message, to)
@@ -305,6 +345,23 @@ local function announce(self, entries, reactions, notices)
   end
 end
 
+local PET_NEWS = { ding = "hop", maxLevel = "hop", rareFind = "fish" }
+
+local function petCanCue(self)
+  return aloneByTheFire(self) and self.feedState:isSettled()
+end
+
+local function petNews(self, entries)
+  if not petCanCue(self) then return end
+  for _, entry in ipairs(entries) do
+    if entry.own and entry.kind == "death" then
+      self.mourning = true
+    elseif entry.own and PET_NEWS[entry.kind] then
+      self.listener("petCue", PET_NEWS[entry.kind])
+    end
+  end
+end
+
 local function checkGoals(self, quiet)
   if not self.db.crew then return end
   local reached = self.crewGoals:check(quiet)
@@ -336,6 +393,7 @@ function Core:updateOwn(character)
   if changed then
     local entries = self.db.crew and self.feedState:ownChanged(before, character.guid) or {}
     self.pocket:animate(entries)
+    petNews(self, entries)
     local after = self.ledger:own().characters[character.guid]
     if before then self.pocket:practised(self.ledger:memberId(), before.professions, after.professions) end
     self.gossip:ownChanged(#entries > 0 and "now" or ns.Gossip.urgency(before, character))
@@ -412,6 +470,7 @@ function Core:caught(loot)
     local entries = self.db.crew and self.feedState:ownCaught(had) or {}
     self.pocket:caught(self.ledger:memberId())
     self.pocket:animate(entries)
+    petNews(self, entries)
     self.gossip:ownChanged(#entries > 0 and "now" or "later")
     checkGoals(self)
     self.listener("changed")
@@ -428,7 +487,9 @@ function Core:rareKilled(kill)
     return changed
   end)
   if not changed then return false, reason end
-  self.gossip:ownChanged(ns.Rares.byId(kill.npcId) and "now" or "later")
+  local known = ns.Rares.byId(kill.npcId) ~= nil
+  self.gossip:ownChanged(known and "now" or "later")
+  if known and petCanCue(self) then self.listener("petCue", "star") end
   checkGoals(self)
   self.listener("changed")
   return true
@@ -552,13 +613,30 @@ function Core:camp(columns)
   local saved = savedSeats(self)
   local function arrange(rows, entries, lanternCount)
     return ns.Camp.view(rows, entries, now, columns, { season = self:season(), phase = self:phase(),
-      lanternCount = lanternCount })
+      lanternCount = lanternCount, mourn = lanternCount and mourning(self) })
   end
   local rows = ns.Roster.rows(self.ledger, now)
+  local stray = strayRows(self, rows)
   local view = arrange(rows, self.feedState:since(now - ns.Camp.RECENT), saved and LANTERNS)
   view.saved = view.lanternSeats and saved or nil
   view.walkIn = walkInOf(self, view, rows, function(own) return arrange(own, {}, LANTERNS) end)
+  markStray(view, stray)
   return view
+end
+
+function Core:keepStray()
+  local key, line = self.stray:keep()
+  if not key then return nil end
+  self:setLook({ pet = key })
+  return line
+end
+
+function Core:strayNotNow()
+  if self.stray:notNow() then self.listener("changed") end
+end
+
+function Core:panelClosed()
+  if self.stray:wanderOff() then self.listener("changed") end
 end
 
 function Core:walkedIn()
@@ -635,9 +713,11 @@ local function awaySummary(self)
   summary.update = update
   if self:setting("camp") then
     local now = self.now()
+    local saved = savedSeats(self) ~= nil
     summary.camp, summary.intro = ns.Camp.away(ns.Roster.rows(self.ledger, now),
       self.feedState:since(now - ns.Camp.RECENT), now, summary,
-      { season = self:season(), phase = self:phase(), lanternCount = savedSeats(self) and LANTERNS })
+      { season = self:season(), phase = self:phase(), lanternCount = saved and LANTERNS or nil,
+        mourn = saved and mourning(self) })
   end
   self.listener("awaySummary", summary)
   self.listener("changed")
@@ -680,6 +760,7 @@ function Core:tick()
     self.listener("changed")
   end
   if self.db.crew then self.spareLife:tick() end
+  if self.stray:tick(strayWanted(self), self.doings:fighting()) then self.listener("changed") end
   self.pocket:tick()
   checkOnline(self)
 end

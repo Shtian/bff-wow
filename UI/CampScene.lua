@@ -120,6 +120,8 @@ local LABEL_GAP = 1
 local LANTERN_SEAT = { rightLog = -1, leftLog = 5, rightPost = 9, leftPost = 2, pet = 1,
   glow = { reach = 12, alpha = 0.35, row = 10, column = 4, mirroredColumn = 2 } }
 local SMOKE_SEAT = { after = WALK_FOR, every = 0.5, puff = 3, row = 4 }
+local PET_CUE_FOR = { hop = HOP_FOR, fish = 4, star = 4 }
+local PET_MARK = { x = 3, row = 1 }
 
 -- WoW: a size that isn't a whole number of screen pixels draws some art
 -- pixels a screen pixel wider than others.
@@ -755,8 +757,14 @@ local function drawGlow(scene, parts, x, mirrored, lit)
   parts.glowHigh:SetPoint("BOTTOMLEFT", scene.art, "BOTTOMLEFT", left, glow.row * scene.unit)
 end
 
+local function hidePetMarks(parts)
+  parts.mark:Hide()
+  for _, glint in ipairs(parts.cheer) do glint:Hide() end
+end
+
 local function drawLanternSeat(scene, parts, seat, alpha)
   local unit, right = scene.unit, seat.x > 0
+  hidePetMarks(parts)
   local log = lanternLog(seat.x)
   setSprite(parts.seat, "seat", unit)
   put(scene, parts.seat, log, ROW.seat)
@@ -773,6 +781,128 @@ local function drawLanternSeat(scene, parts, seat, alpha)
   else
     parts.pet:Hide()
   end
+end
+
+local function seatPetSpot(seat)
+  return lanternLog(seat.x) + LANTERN_SEAT.pet, ROW.seat + Sheet.sprites.seat[4]
+end
+
+local function strayWalk(scene)
+  local played = scene.strayWalk and GetTime() - scene.strayWalk
+  return played and played < WALK_FOR and played or nil
+end
+
+local function playingCue(scene)
+  local cue = scene.petCue
+  local played = cue and GetTime() - cue.start
+  if not played or played >= PET_CUE_FOR[cue.kind] then return nil end
+  return cue.kind, played
+end
+
+local function drawStrayWalk(scene, parts, seat, pet, f, played)
+  local fromRight = seat.x > 0
+  local x = seatPetSpot(seat)
+  local edge = fromRight and scene.view.columns - scene.fire or -scene.fire - LAYOUT.pet
+  local name = math.floor(f / WALK_STEP) % 2 == 0 and pet.awake or pet.idle
+  setSprite(parts.pet, name, scene.unit, fromRight)
+  put(scene, parts.pet, math.floor(edge + (x - edge) * played / WALK_FOR + 0.5), ROW.pet)
+end
+
+local function drawPetMark(scene, parts, kind, x, top, f)
+  local sprite = kind == "fish" and "fish" or "star"
+  setSprite(parts.mark, sprite, scene.unit)
+  put(scene, parts.mark, x + PET_MARK.x, markRow(scene, sprite, top + PET_MARK.row + (bounced(f) and 1 or 0)))
+end
+
+local function drawSeatPet(scene, parts, seat, f)
+  local pet = seat.pet and Sheet.pets[seat.pet]
+  if not pet then return end
+  local walking = seat.stray and strayWalk(scene)
+  if walking then
+    drawStrayWalk(scene, parts, seat, pet, f, walking)
+    return
+  end
+  local kind, played = playingCue(scene)
+  if not (kind or seat.watching) then return end
+  local x, row = seatPetSpot(seat)
+  local faces = seat.faces or (seat.x > 0 and -1 or 1)
+  local seed = seat.x * PET_IDLE.seed
+  local every = PET_IDLE.every + seed % PET_IDLE.spread
+  local name = not seat.watching and (f + seed) % every < PET_IDLE.ticks and pet.idle or pet.awake
+  local lift = 0
+  if kind == "hop" then
+    lift = ROW.hop - ROW.seated
+  elseif kind then
+    lift = bounced(f) and 1 or 0
+  end
+  setSprite(parts.pet, name, scene.unit, faces < 0)
+  put(scene, parts.pet, x, row + lift)
+  local top = row + lift + Sheet.sprites[name][4]
+  if kind == "hop" then
+    drawCheer(scene, parts, { x = x }, top, played)
+  elseif kind then
+    drawPetMark(scene, parts, kind, x, top, f)
+  end
+end
+
+local function strayHit(scene)
+  local hit = CreateFrame("Button", nil, scene.art)
+  hit:SetFrameLevel(scene.art:GetFrameLevel() + 5)
+  hit:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  hit:SetScript("OnEnter", function(self)
+    local stray = scene.view and scene.view.stray
+    if not stray then return end
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    ns.StrayPet.addTooltip(stray)
+    GameTooltip:Show()
+  end)
+  hit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  hit:SetScript("OnClick", function(_, button)
+    if not (scene.view and scene.view.stray) then return end
+    GameTooltip:Hide()
+    ns.StrayPet.click(button)
+  end)
+  return hit
+end
+
+local function straySpot(scene)
+  local view = scene.view
+  if not (view and view.stray) or strayWalk(scene) then return nil end
+  for _, seat in ipairs(view.lanternSeats or {}) do
+    if seat.stray then
+      local x, row = seatPetSpot(seat)
+      return x, row
+    end
+  end
+  return nil
+end
+
+local function placeStrayHit(scene)
+  if not scene.lanternHits then return end
+  local x, row = straySpot(scene)
+  if not x then
+    if scene.strayHit then scene.strayHit:Hide() end
+    return
+  end
+  scene.strayHit = scene.strayHit or strayHit(scene)
+  local hit = scene.strayHit
+  hit:SetSize(LAYOUT.pet * scene.unit, Sheet.sprites.lanternPost[4] * scene.unit)
+  hit:ClearAllPoints()
+  hit:SetPoint("BOTTOMLEFT", scene.art, "BOTTOMLEFT", (scene.fire + x) * scene.unit, row * scene.unit)
+  hit:Show()
+end
+
+local function drawMourner(scene)
+  local mourner = scene.view.mourner
+  local pet = mourner and Sheet.pets[mourner.key]
+  if not pet then
+    scene.mourner:Hide()
+    return
+  end
+  local width = Sheet.sprites[pet.asleep][3]
+  local right = mourner.x > 0
+  setSprite(scene.mourner, pet.asleep, scene.unit, not right)
+  put(scene, scene.mourner, right and mourner.x or mourner.x + LAYOUT.pet - width, ROW.pet)
 end
 
 local function lanternHit(scene)
@@ -804,14 +934,17 @@ local function placeHit(scene, parts, seat)
   parts.hit:Show()
 end
 
-local function drawLanternSeats(scene)
+local function drawLanternSeats(scene, f)
   scene.lanternSeatParts.used = 0
   for _, seat in ipairs(scene.view.lanternSeats or {}) do
     local parts = take(scene.lanternSeatParts)
     parts.puff:Hide()
     drawLanternSeat(scene, parts, seat, 1)
+    drawSeatPet(scene, parts, seat, f)
     placeHit(scene, parts, seat)
   end
+  placeStrayHit(scene)
+  drawMourner(scene)
   local now = GetTime()
   for i = #scene.smokes, 1, -1 do
     local smoke = scene.smokes[i]
@@ -1224,7 +1357,7 @@ local function drawFrame(scene, f)
   for _, doorway in ipairs(view.doorways or {}) do drawDoorway(scene, take(scene.doorParts), doorway) end
   hideRest(scene.doorParts)
 
-  drawLanternSeats(scene)
+  drawLanternSeats(scene, f)
 
   scene.actorParts.used = 0
   scene.clearOf = {}
@@ -1383,6 +1516,8 @@ function CampScene.new(parent, options)
         seat = texture(band.art, "ARTWORK", 0),
         pet = texture(band.art, "ARTWORK", 1),
         puff = texture(band.art, "OVERLAY", 2),
+        mark = texture(band.art, "OVERLAY", 1),
+        cheer = {},
       }
     end),
     smokes = {},
@@ -1428,6 +1563,7 @@ function CampScene.new(parent, options)
   scene.fireflies = {}
   for i = 1, FIREFLIES.count do scene.fireflies[i] = texture(scene.art, "ARTWORK", 5) end
   scene.logs = texture(scene.art, "ARTWORK", 0)
+  scene.mourner = texture(scene.art, "ARTWORK", 1)
   scene.flame = texture(scene.art, "ARTWORK", 1)
   scene.crate = texture(scene.art, "ARTWORK", 2)
   scene.crate:Hide()
@@ -1454,6 +1590,13 @@ function CampScene.new(parent, options)
     end
   end
 
+  local function strayCame(view)
+    local stray = view.stray
+    if not stray or scene.strayCame == stray.since then return end
+    scene.strayCame = stray.since
+    scene.strayWalk = GetTime()
+  end
+
   function band:Draw(view)
     scene.view = view
     if not view then
@@ -1462,6 +1605,7 @@ function CampScene.new(parent, options)
     end
     scene.frame = nil
     walkIn(view)
+    strayCame(view)
     scene.horde = UnitFactionGroup ~= nil and UnitFactionGroup("player") == "Horde"
     puffShifts(scene, view)
     local art = scene.backdropArt
@@ -1534,6 +1678,19 @@ function CampScene.new(parent, options)
       if at >= seat.x and at < seat.x + LAYOUT.lantern then return seat end
     end
     return nil
+  end
+
+  function band:StrayAt(x, y)
+    local left, row = straySpot(scene)
+    if not (left and scene.unit) then return false end
+    local at, up = x / scene.unit - scene.fire - left, y / scene.unit - row
+    return at >= 0 and at < LAYOUT.pet and up >= -1 and up < Sheet.sprites.lanternPost[4]
+  end
+
+  function band:PetCue(kind)
+    if not (scene.view and PET_CUE_FOR[kind]) then return end
+    scene.petCue = { kind = kind, start = GetTime() }
+    scene.frame = nil
   end
 
   function band:CrateAt(x, y)

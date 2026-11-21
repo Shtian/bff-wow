@@ -72,7 +72,7 @@ A new Feed entry from another Member, a Reaction to one of your entries, or a Sp
 _Avoid_: Notification, alert, live news
 
 **Camp**:
-The scene of the Crew shown at the top of the panel and in While you were away: every Member the Roster shows around a campfire, seated by it while online and asleep in a bedroll while not, with a Grave for each recent death and a spark over a fresh max level. Another way of showing what the Roster and the Feed already say; it has no data of its own. Respects show in it as a flower on the Grave. It follows the game's day and night: a day sky and the sun by day, a moon and stars by night. While you're alone in your Crew it saves **lantern seats** for your friends, and the first friend you hear from walks in to one.
+The scene of the Crew shown at the top of the panel and in While you were away: every Member the Roster shows around a campfire, seated by it while online and asleep in a bedroll while not, with a Grave for each recent death and a spark over a fresh max level. Another way of showing what the Roster and the Feed already say; it has no data of its own. Respects show in it as a flower on the Grave. It follows the game's day and night: a day sky and the sun by day, a moon and stars by night. While you're alone in your Crew it saves **lantern seats** for your friends, and the first friend you hear from walks in to one. Until then, with no pet, a **stray** may visit and nap on a seat, and a click keeps it as your pet.
 _Avoid_: Scene (when meaning the Camp), campsite, diorama
 
 **Pocket Camp**:

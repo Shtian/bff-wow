@@ -339,6 +339,10 @@ function Away.campReaction(reaction)
   if frame and frame:IsShown() then frame.camp:React(reaction) end
 end
 
+function Away.petCue(kind)
+  if frame and frame:IsShown() then frame.camp:PetCue(kind) end
+end
+
 function Away.show(summary)
   if not frame then create() end
   local top = -Skin.HEADER_HEIGHT

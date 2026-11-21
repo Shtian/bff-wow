@@ -131,6 +131,10 @@ local function onCoreEvent(event, arg, more)
     ns.Panel.campReaction(arg)
     ns.Away.campReaction(arg)
     ns.PocketCamp.campReaction(arg)
+  elseif event == "petCue" then
+    ns.Panel.petCue(arg)
+    ns.Away.petCue(arg)
+    ns.PocketCamp.petCue(arg)
   elseif event == "awaySummary" then
     showAway(arg)
   elseif event == "spareGone" then

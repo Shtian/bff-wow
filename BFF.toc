@@ -43,6 +43,7 @@ Core/Goals.lua
 Core/Where.lua
 Core/Doing.lua
 Core/WhatsNew.lua
+Core/Stray.lua
 Core/Pocket.lua
 Core/Core.lua
 
@@ -59,6 +60,7 @@ UI/Skin.lua
 UI/CampSheet.lua
 UI/CampScene.lua
 UI/LanternSeats.lua
+UI/StrayPet.lua
 UI/EmptyState.lua
 UI/Firelight.lua
 UI/ScrollView.lua
