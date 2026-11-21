@@ -121,7 +121,7 @@ local function savedSeats(self)
     invite = INVITE:format(crew.code),
     tooltip = {
       title = SAVED_TITLE,
-      lines = { "Crew code: " .. crew.code, "Friends join with /bff join " .. crew.code },
+      lines = { "Friends join with /bff join " .. crew.code },
       hint = SAVED_HINT,
     },
   }

@@ -67,7 +67,7 @@ describe("Lantern seats", function()
     assert.equal("Join my Crew in BFF: /bff join " .. code, view.saved.invite)
     assert.equal(code, view.saved.code)
     assert.equal("Saved for your Crew", view.saved.tooltip.title)
-    assert.same({ "Crew code: " .. code, "Friends join with /bff join " .. code }, view.saved.tooltip.lines)
+    assert.same({ "Friends join with /bff join " .. code }, view.saved.tooltip.lines)
     assert.is_string(view.saved.tooltip.hint)
   end)
 
