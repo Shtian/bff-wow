@@ -2,4 +2,6 @@
 "bff": patch
 ---
 
-Clearing any of Forever's new dungeons now counts as a Crew trophy: Excavation Site, City of Dalaran, The Drowned City, Krol'dok Stronghold, Alcaz Prison, Blackmaw Hold and Shaper's Terrace.
+More of Forever's new dungeons now count as Clears.
+
+Clearing Excavation Site, City of Dalaran, The Drowned City, Krol'dok Stronghold, Alcaz Prison, Blackmaw Hold or Shaper's Terrace now adds a trophy to your Crew's cabinet.
