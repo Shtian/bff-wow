@@ -1116,7 +1116,7 @@ const VIGNETTES = {
   },
   // Trophies: a wooden stand with the Pocket Camp's cup missing from it,
   // only its outline in dim brass where it will stand.
-  goals() {
+  trophies() {
     const stand_ = outlined([
       "AAAAAAAAAAAAAAAAAAAa", "aaaaaaaaaaaaaaaaaaaa", ".Aa..............Aa.", ".Aa..............Aa.",
       ".AAAAAAAAAAAAAAAAAa.", ".Aa..............Aa.", ".Aa..............Aa.",
@@ -1129,7 +1129,7 @@ const VIGNETTES = {
   },
   // Play times: an hourglass under a crescent moon, the top bulb still
   // full, a grain falling, a small pile below.
-  when() {
+  playTimes() {
     const glass = (grain) => outlined([
       "AAAAAAAAAAAAa", "aaaaaaaaaaaaa", ".Z.FYGGGGf.t.", ".Z.FYGGGGf.t.", ".Z..FGGGf..t.", ".Z...FGf...t.", ".Z....G....t.",
       grain === 0 ? ".Z...FGf...t." : ".Z...F.f...t.", grain === 1 ? ".Z..F.G.f..t." : ".Z..F...f..t.",
