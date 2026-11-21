@@ -339,8 +339,8 @@ function Away.campReaction(reaction)
   if frame and frame:IsShown() then frame.camp:React(reaction) end
 end
 
-function Away.petReaction(kind)
-  if frame and frame:IsShown() then frame.camp:PetReact(kind) end
+function Away.petCue(kind)
+  if frame and frame:IsShown() then frame.camp:PetCue(kind) end
 end
 
 function Away.show(summary)

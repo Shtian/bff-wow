@@ -10,6 +10,16 @@ Stray.IGNORED_BEFORE_A_BREAK = 3
 Stray.BREAK = 7 * 24 * 60 * 60
 
 local KEPT = "The %s stays. Change it in Settings › You › Look."
+local TITLE = "A stray %s"
+local HINT = "Click to keep it. Right-click: not now."
+
+local function named(key)
+  return ns.Look.petLabel(key):lower()
+end
+
+function Stray.describe(visit)
+  return { key = visit.key, since = visit.since, tooltip = { title = TITLE:format(named(visit.key)), hint = HINT } }
+end
 
 function Stray.new(db, now, random)
   return setmetatable({ db = db, now = now, random = random, loggedIn = now(), came = false, stopped = false },
@@ -40,7 +50,7 @@ local function due(self, fighting)
   return now - self.loggedIn >= Stray.AFTER_LOGIN and not (type(nextAt) == "number" and now < nextAt)
 end
 
-function Stray:ignored()
+function Stray:wanderOff()
   if not self.visit then return false end
   self.visit = nil
   local stray = saved(self)
@@ -55,7 +65,7 @@ function Stray:tick(wanted, fighting)
     return true
   end
   if self.visit then
-    return self.now() - self.visit.since >= Stray.STAYS_FOR and self:ignored()
+    return self.now() - self.visit.since >= Stray.STAYS_FOR and self:wanderOff()
   end
   if not (wanted and due(self, fighting)) then return false end
   local stray = saved(self)
@@ -74,8 +84,7 @@ function Stray:keep()
   local visit = self.visit
   if not visit then return nil end
   self.visit = nil
-  saved(self).ignored = 0
-  return visit.key, KEPT:format(ns.Look.petLabel(visit.key):lower())
+  return visit.key, KEPT:format(named(visit.key))
 end
 
 function Stray:notNow()

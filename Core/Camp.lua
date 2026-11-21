@@ -329,7 +329,7 @@ local function arrange(rows, entries, now, columns, options, petted)
   view.more = more > 0 and more or nil
   view.moreText = view.more and (options.moreText or "+%d more"):format(more) or nil
   view.lanternSeats = lanternSeats(rows, view.actors, left, right, options)
-  view.mourner = options.mourn and mourner(view, leftEdge, rightEdge)
+  view.mourner = options.mourn and mourner(view, leftEdge, rightEdge) or nil
 
   if options.tent ~= false then
     local side = roomier(left, right)

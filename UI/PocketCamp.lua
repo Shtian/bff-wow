@@ -370,8 +370,8 @@ function PocketCamp.campReaction(reaction)
   if frame and frame:IsShown() then frame.band:React(reaction) end
 end
 
-function PocketCamp.petReaction(kind)
-  if frame and frame:IsShown() then frame.band:PetReact(kind) end
+function PocketCamp.petCue(kind)
+  if frame and frame:IsShown() then frame.band:PetCue(kind) end
 end
 
 function PocketCamp.start(theCore)

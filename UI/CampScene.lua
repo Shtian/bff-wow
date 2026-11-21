@@ -120,7 +120,7 @@ local LABEL_GAP = 1
 local LANTERN_SEAT = { rightLog = -1, leftLog = 5, rightPost = 9, leftPost = 2, pet = 1,
   glow = { reach = 12, alpha = 0.35, row = 10, column = 4, mirroredColumn = 2 } }
 local SMOKE_SEAT = { after = WALK_FOR, every = 0.5, puff = 3, row = 4 }
-local PET_REACTION_FOR = { hop = HOP_FOR, fish = 4, star = 4 }
+local PET_CUE_FOR = { hop = HOP_FOR, fish = 4, star = 4 }
 local PET_MARK = { x = 3, row = 1 }
 
 -- WoW: a size that isn't a whole number of screen pixels draws some art
@@ -792,11 +792,11 @@ local function strayWalk(scene)
   return played and played < WALK_FOR and played or nil
 end
 
-local function petReacting(scene)
-  local reaction = scene.petReaction
-  local played = reaction and GetTime() - reaction.start
-  if not played or played >= PET_REACTION_FOR[reaction.kind] then return nil end
-  return reaction.kind, played
+local function playingCue(scene)
+  local cue = scene.petCue
+  local played = cue and GetTime() - cue.start
+  if not played or played >= PET_CUE_FOR[cue.kind] then return nil end
+  return cue.kind, played
 end
 
 local function drawStrayWalk(scene, parts, seat, pet, f, played)
@@ -822,7 +822,7 @@ local function drawSeatPet(scene, parts, seat, f)
     drawStrayWalk(scene, parts, seat, pet, f, walking)
     return
   end
-  local kind, played = petReacting(scene)
+  local kind, played = playingCue(scene)
   if not (kind or seat.watching) then return end
   local x, row = seatPetSpot(seat)
   local faces = seat.faces or (seat.x > 0 and -1 or 1)
@@ -874,7 +874,6 @@ local function straySpot(scene)
       return x, row
     end
   end
-  if view.mourner and view.mourner.stray then return view.mourner.x, ROW.pet end
   return nil
 end
 
@@ -1688,9 +1687,9 @@ function CampScene.new(parent, options)
     return at >= 0 and at < LAYOUT.pet and up >= -1 and up < Sheet.sprites.lanternPost[4]
   end
 
-  function band:PetReact(kind)
-    if not (scene.view and PET_REACTION_FOR[kind]) then return end
-    scene.petReaction = { kind = kind, start = GetTime() }
+  function band:PetCue(kind)
+    if not (scene.view and PET_CUE_FOR[kind]) then return end
+    scene.petCue = { kind = kind, start = GetTime() }
     scene.frame = nil
   end
 

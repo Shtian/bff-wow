@@ -259,7 +259,7 @@ Bindings.xml                         -- key binding to open the panel
 Core/  Core.lua  Where.lua  Doing.lua  WhatsNew.lua  Changelog.lua  Text.lua  Ledger.lua  Gossip.lua  Settle.lua  Reactions.lua  SpareRules.lua  Spares.lua  Feed.lua  Roster.lua  Dungeons.lua  Camp.lua  Stray.lua  Pocket.lua  Clears.lua  Rares.lua  Goals.lua  PlayTimes.lua  Professions.lua  Catches.lua  Look.lua  CrewCode.lua  Codec.lua
 Link/  Presence.lua  Framing.lua     -- pure, like Core/: who can be whispered, and chunks
 Game/  Snapshot.lua  Bags.lua  SyncLog.lua  ChannelLink.lua
-UI/    Skin.lua  CampSheet.lua  CampScene.lua  Firelight.lua  EmptyState.lua  ScrollView.lua  CharacterTooltip.lua  PocketCamp.lua  Panel.lua  Minimap.lua  MapPins.lua  Away.lua  ToastQueue.lua  Toasts.lua  Report.lua  Contact.lua
+UI/    Skin.lua  CampSheet.lua  CampScene.lua  LanternSeats.lua  StrayPet.lua  Firelight.lua  EmptyState.lua  ScrollView.lua  CharacterTooltip.lua  PocketCamp.lua  Panel.lua  Minimap.lua  MapPins.lua  Away.lua  ToastQueue.lua  Toasts.lua  Report.lua  Contact.lua
        RosterTab.lua  FeedTab.lua  TrophiesTab.lua  PlayTimesTab.lua  SparesTab.lua  ProfessionsTab.lua  DungeonsTab.lua  CatchesTab.lua  SettingsTab.lua  WhatsNewTab.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases
 Libs/                                -- fetched, gitignored

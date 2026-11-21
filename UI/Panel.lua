@@ -444,8 +444,8 @@ function Panel.campReaction(reaction)
   if camp and frame:IsShown() then camp:React(reaction) end
 end
 
-function Panel.petReaction(kind)
-  if camp and frame:IsShown() then camp:PetReact(kind) end
+function Panel.petCue(kind)
+  if camp and frame:IsShown() then camp:PetCue(kind) end
 end
 
 function Panel.toggle()

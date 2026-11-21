@@ -64,11 +64,15 @@ local function tellable(self)
   return form, since
 end
 
+function Doing:fighting()
+  return self.facts.combat or self.now() < self.fightingUntil
+end
+
 function Doing:state()
   local facts = self.facts
   local on = {
     flying = facts.flying, auction = facts.auction, vendor = facts.vendor, afk = facts.afk, resting = facts.resting,
-    fighting = facts.combat or self.now() < self.fightingUntil,
+    fighting = self:fighting(),
   }
   for _, state in ipairs(ORDER) do
     if on[state] then return state end
