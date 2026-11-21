@@ -66,9 +66,9 @@ Answers [Camp: the pet as your first Crew mate while you're alone](https://githu
 - **Where:** `camp()` and `pocketCamp()` read your row as having the stray for a pet, so it naps on your lantern seat like your own pet would, and carry `stray`. The seat it naps on has `stray = true`. Lantern seats always fit while you're alone, so it never sits by the fire. Not in While you were away.
 - **Walk-in:** a band that draws a new stray (by `since`) walks it in from the edge on its seat's side, along the ground, in `WALK_FOR`, then it curls up on the seat.
 - **Click:** keeps it: `Core:keepStray()` is `setLook({ pet = key })`, so it goes out like a Settings change, and returns the chat line "The fox stays. Change it in Settings › You › Look." The panel's band has its own hit button over the stray, above the lantern seat's; the Pocket Camp checks the stray before the seat.
-- **Ignored:** it wanders off after 10 minutes (`Stray.STAYS_FOR`) or when the panel closes (`Core:panelClosed()`). Every third ignored stray pushes the next one a week out (`nextAt`).
-- **Right-click:** `Core:strayNotNow()` sends it off and stops strays for the session. It isn't counted as ignored.
-- **Saved:** `db.stray = { last, ignored, nextAt }`, on this client only. No record field is new.
+- **Ignored:** it wanders off after 10 minutes (`Stray.STAYS_FOR`) or when the panel closes (`Core:panelClosed()`). Ignoring strays never stops them: the next session can bring another, since some players may enjoy a random pet turning up now and then. (The issue asked for every third ignored stray to push the next a week out; dropped on review.)
+- **Right-click:** `Core:strayNotNow()` sends it off for the rest of the session.
+- **Saved:** `db.stray = { last }`, on this client only, so the next stray isn't the same pet. No record field is new.
 
 ## The pet while you're alone
 
@@ -80,7 +80,7 @@ Part B of #280. Local animations only: never a Reaction, never sent or saved, ne
 - **Pocket Camp:** while the trophy cup shows, the seat has `watching = "cup"` and `faces` towards the fire; while you're fishing, `watching = "fishing"` and `faces` the way your rod points. The pet sits up awake on the seat facing that way.
 - **Where:** `petCue` goes to the panel's Camp, While you were away and the Pocket Camp, whichever are showing (`band:PetCue`).
 
-`tests/stray_spec.lua` checks when a stray comes and doesn't, keeping, ignoring, Not now, the week's break, leaving once a friend is known, no new record fields, and the pet's reactions, mourning and watching.
+`tests/stray_spec.lua` checks when a stray comes and doesn't, keeping, ignoring (never a break), Not now, leaving once a friend is known, no new record fields, and the pet's reactions, mourning and watching.
 
 ## While you were away
 

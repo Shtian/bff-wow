@@ -121,35 +121,27 @@ describe("A stray", function()
     ann.core:panelClosed()
   end)
 
-  it("stops for the session on Not now, without counting as ignored", function()
+  it("stops for the session on Not now, and comes again next session", function()
     local net, ann = founder()
     untilStray(net, ann)
     ann.core:strayNotNow()
     assert.is_nil(ann.core:camp(COLUMNS).stray)
-    for _ = 1, 2 do
-      ann:reload()
-      untilStray(net, ann)
-      ann.core:panelClosed()
-    end
+    net:run(400)
+    assert.is_nil(ann.core:camp(COLUMNS).stray)
     ann:reload()
     untilStray(net, ann)
   end)
 
-  it("is never the last one, and every third ignored one pushes the next a week out", function()
+  it("is never the last one, and keeps coming however many were ignored", function()
     local net, ann = founder()
     local last
-    for _ = 1, 3 do
+    for _ = 1, 6 do
       local stray = untilStray(net, ann)
       assert.are_not.equal(last, stray.key)
       last = stray.key
       ann.core:panelClosed()
       ann:reload()
     end
-    net:run(400)
-    assert.is_nil(ann.core:camp(COLUMNS).stray)
-    net.clock = net.clock + 7 * 24 * 60 * 60
-    ann:reload()
-    untilStray(net, ann)
   end)
 
   it("leaves as soon as a friend's record is known", function()

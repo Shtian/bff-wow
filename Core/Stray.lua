@@ -6,8 +6,6 @@ ns.Stray = Stray
 
 Stray.AFTER_LOGIN = 3 * 60
 Stray.STAYS_FOR = 10 * 60
-Stray.IGNORED_BEFORE_A_BREAK = 3
-Stray.BREAK = 7 * 24 * 60 * 60
 
 local KEPT = "The %s stays. Change it in Settings › You › Look."
 local TITLE = "A stray %s"
@@ -45,17 +43,12 @@ end
 
 local function due(self, fighting)
   if self.came or self.stopped or fighting then return false end
-  local now = self.now()
-  local nextAt = saved(self).nextAt
-  return now - self.loggedIn >= Stray.AFTER_LOGIN and not (type(nextAt) == "number" and now < nextAt)
+  return self.now() - self.loggedIn >= Stray.AFTER_LOGIN
 end
 
 function Stray:wanderOff()
   if not self.visit then return false end
   self.visit = nil
-  local stray = saved(self)
-  stray.ignored = (type(stray.ignored) == "number" and stray.ignored or 0) + 1
-  if stray.ignored % Stray.IGNORED_BEFORE_A_BREAK == 0 then stray.nextAt = self.now() + Stray.BREAK end
   return true
 end
 
