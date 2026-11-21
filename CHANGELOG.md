@@ -34,6 +34,15 @@
 
 
 
+
+## 2.15.1
+<sub>2026-11-21</sub>
+
+- *(patch)*
+  Deaths in battlegrounds and arenas no longer count.
+
+  They no longer show up in the Feed, the Camp or the Crew deaths goal.
+
 ## 2.15.0
 <sub>2026-11-20</sub>
 
