@@ -336,7 +336,8 @@ function Snapshot.start(core)
     if event == "PLAYER_LEVEL_UP" then
       level = math.max(level, (...))
     elseif event == "PLAYER_DEAD" then
-      BFF_CharacterDB.deaths = BFF_CharacterDB.deaths + 1
+      local _, instanceType = GetInstanceInfo()
+      if ns.Deaths.counts(instanceType) then BFF_CharacterDB.deaths = BFF_CharacterDB.deaths + 1 end
     end
     if PROFESSION_EVENTS[event] then readProfessions() end
     update()
