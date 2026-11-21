@@ -37,6 +37,7 @@ Core/Roster.lua
 Core/Dungeons.lua
 Core/Camp.lua
 Core/Clears.lua
+Core/Deaths.lua
 Core/Rares.lua
 Core/Goals.lua
 Core/Where.lua

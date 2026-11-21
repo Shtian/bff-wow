@@ -13,7 +13,7 @@ Feed entries are worked out by comparing the copy of a record you held with the 
 | Kind | Made when | Text (example) |
 |---|---|---|
 | **ding** | A Character's level went up, but not to max level | "Ana dinged 24" |
-| **death** | A Character's death count went up | "Ana died 3 times" |
+| **death** | A Character's death count went up (deaths in battlegrounds and arenas aren't counted) | "Ana died 3 times" |
 | **new Character** | A known Member's record has a Character GUID it didn't have before | "Ana has a new Character: Jaina (Mage)" |
 | **max level** | A Character's level reached `maxLevel` | "Ana reached max level!" |
 | **joined the Crew** | A Member appears whose `joinedAt` is after yours, or a known Member's left flag goes from set to cleared | "Bob joined the Crew" |

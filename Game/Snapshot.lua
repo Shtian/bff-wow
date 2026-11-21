@@ -335,7 +335,7 @@ function Snapshot.start(core)
   frame:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_LEVEL_UP" then
       level = math.max(level, (...))
-    elseif event == "PLAYER_DEAD" then
+    elseif event == "PLAYER_DEAD" and ns.Deaths.counts(select(2, GetInstanceInfo())) then
       BFF_CharacterDB.deaths = BFF_CharacterDB.deaths + 1
     end
     if PROFESSION_EVENTS[event] then readProfessions() end
