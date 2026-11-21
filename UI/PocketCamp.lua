@@ -175,12 +175,18 @@ local function overCup()
   return frame.band:CupAt(x - frame:GetLeft(), y - frame:GetBottom())
 end
 
+local function overStray()
+  local x, y = cursor()
+  return view and view.stray ~= nil and frame.band:StrayAt(x - frame:GetLeft(), y - frame:GetBottom())
+end
+
 local function overLantern()
   local x = cursor()
   return view and view.saved ~= nil and frame.band:LanternAt(x - frame:GetLeft()) ~= nil
 end
 
 local function pointedAt()
+  if overStray() then return "stray" end
   if overCrate() then return "crate" end
   if overCup() then return "cup" end
   if overLantern() then return "lantern" end
@@ -195,6 +201,11 @@ local function showTooltip()
   if tooltipFor == "crate" then
     GameTooltip:AddLine(view.sparesTooltip.title)
     GameTooltip:AddLine(view.sparesTooltip.hint, MUTED[1], MUTED[2], MUTED[3])
+    GameTooltip:Show()
+    return
+  end
+  if tooltipFor == "stray" then
+    ns.StrayPet.addTooltip(view.stray)
     GameTooltip:Show()
     return
   end
@@ -268,7 +279,10 @@ local function create()
   frame:SetScript("OnDragStop", dropped)
   frame:SetScript("OnClick", function(_, button)
     if InCombatLockdown() then return end
-    if overLantern() and ns.LanternSeats.click(view.saved, button) then
+    if overStray() then
+      ns.StrayPet.click(button)
+      hideTooltip()
+    elseif overLantern() and ns.LanternSeats.click(view.saved, button) then
       hideTooltip()
     elseif button == "RightButton" then
       showMenu()
@@ -354,6 +368,10 @@ end
 
 function PocketCamp.campReaction(reaction)
   if frame and frame:IsShown() then frame.band:React(reaction) end
+end
+
+function PocketCamp.petReaction(kind)
+  if frame and frame:IsShown() then frame.band:PetReact(kind) end
 end
 
 function PocketCamp.start(theCore)

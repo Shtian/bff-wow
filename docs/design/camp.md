@@ -25,6 +25,8 @@ camp(columns) -> nil, or {
   lanternSeats = { { x, pet = "fox" | nil } } | nil, -- lantern seats while you're alone (below)
   saved = { tooltip = { title, lines, hint }, code, invite } | nil, -- what the lantern seats say and do
   walkIn = { memberId, seats = { { x, pet } } } | nil, -- the first friend's walk-in, still to play
+  stray = { key, since, tooltip = { title, hint } } | nil, -- a stray visiting (below); its seat has stray = true
+  mourner = { key, x, stray = true | nil } | nil, -- your pet by your newest Grave while you're alone (below)
 }
 ```
 
@@ -55,6 +57,30 @@ Answers [Camp: lantern seats while you're alone in the Crew](https://github.com/
 - **No new traffic:** no messages, sends or record fields. The invite is the player's own chat line.
 
 `tests/lantern_seats_spec.lua` checks the seats, their place and the header, the founder's and the joined Member's wording, the pet on your side, the walk-in (online and offline, kept across a reload, played once, never for a later Member), the Pocket Camp's one seat, and none with the Camp off or while leaving.
+
+## A stray
+
+Answers [Camp: the pet as your first Crew mate while you're alone](https://github.com/Shtian/bff-wow/issues/280), part A. While you're alone (as for lantern seats), with no pet and the Camp on, a stray may visit: one of `Core.PETS` at random, never the last one. `Core/Stray.lua` keeps the visit.
+
+- **When:** at most once a session, 3 minutes after login (`Stray.AFTER_LOGIN`) or later, never while Doing says you're fighting. Never once a friend's record is known; a stray visiting then goes at once.
+- **Where:** `camp()` and `pocketCamp()` read your row as having the stray for a pet, so it naps on your lantern seat like your own pet would, and carry `stray`. The seat it naps on has `stray = true`. Lantern seats always fit while you're alone, so it never sits by the fire. Not in While you were away.
+- **Walk-in:** a band that draws a new stray (by `since`) walks it in from the edge on its seat's side, along the ground, in `WALK_FOR`, then it curls up on the seat.
+- **Click:** keeps it: `Core:keepStray()` is `setLook({ pet = key })`, so it goes out like a Settings change, and returns the chat line "The fox stays. Change it in Settings › You › Look." The panel's band has its own hit button over the stray, above the lantern seat's; the Pocket Camp checks the stray before the seat.
+- **Ignored:** it wanders off after 10 minutes (`Stray.STAYS_FOR`) or when the panel closes (`Core:panelClosed()`). Every third ignored stray pushes the next one a week out (`nextAt`).
+- **Right-click:** `Core:strayNotNow()` sends it off and stops strays for the session. It isn't counted as ignored.
+- **Saved:** `db.stray = { last, ignored, nextAt }`, on this client only. Keeping one sets `ignored` back to 0. No record field is new.
+
+## The pet while you're alone
+
+Part B of #280. Local animations only: never a Reaction, never sent or saved, never marking anything New. Only once sync has settled, and only while you're alone with the Camp on; once another Member's record is known the pet goes back to hopping along with you.
+
+- **Ding and max level:** Core fires `petReaction` `"hop"`. The pet on your lantern seat wakes, hops 2 rows with the Cheer's gold burst for `HOP_FOR` (0.7 s), once.
+- **Rare find, Rare kill:** `"fish"` for your rare find, `"star"` for a kill of a listed rare (`Rares.byId`). The pet wakes and bounces for 4 s with the fish or the star over its head.
+- **Death:** your own death sets `mourning` for the session (not saved, so a login or `/reload` ends it). `camp()` and While you were away's `camp` then carry `mourner`: your pet leaves its seat and curls up beside your newest Grave, on the side away from the fire, kept inside the band. No flower: the flower means Respects. The Pocket Camp has no Graves, so nothing changes there.
+- **Pocket Camp:** while the trophy cup shows, the seat has `watching = "cup"` and `faces` towards the fire; while you're fishing, `watching = "fishing"` and `faces` the way your rod points. The pet sits up awake on the seat facing that way.
+- **Where:** `petReaction` goes to the panel's Camp, While you were away and the Pocket Camp, whichever are showing (`band:PetReact`).
+
+`tests/stray_spec.lua` checks when a stray comes and doesn't, keeping, ignoring, Not now, the week's break, leaving once a friend is known, no new record fields, and the pet's reactions, mourning and watching.
 
 ## While you were away
 

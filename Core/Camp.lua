@@ -209,6 +209,26 @@ local function lanternSeats(rows, actors, left, right, options)
   return list
 end
 
+local function mourner(view, leftEdge, rightEdge)
+  local you, bed
+  for _, actor in ipairs(view.actors) do
+    if actor.you then you = actor.memberId end
+  end
+  for _, seat in ipairs(view.lanternSeats or {}) do
+    if seat.pet then bed = seat end
+  end
+  local grave
+  for _, each in ipairs(view.graves) do
+    if not grave and each.memberId == you then grave = each end
+  end
+  if not (bed and grave) then return nil end
+  local x = grave.x < 0 and grave.x - LAYOUT.petGap - LAYOUT.pet or grave.x + LAYOUT.grave + LAYOUT.petGap
+  x = math.max(-leftEdge + LAYOUT.margin, math.min(rightEdge - LAYOUT.margin - LAYOUT.pet, x))
+  local key = bed.pet
+  bed.pet = nil
+  return { key = key, x = x }
+end
+
 local function arrange(rows, entries, now, columns, options, petted)
   columns = math.max(1, math.floor(columns))
   local leftEdge = math.floor(columns / 2)
@@ -309,6 +329,7 @@ local function arrange(rows, entries, now, columns, options, petted)
   view.more = more > 0 and more or nil
   view.moreText = view.more and (options.moreText or "+%d more"):format(more) or nil
   view.lanternSeats = lanternSeats(rows, view.actors, left, right, options)
+  view.mourner = options.mourn and mourner(view, leftEdge, rightEdge)
 
   if options.tent ~= false then
     local side = roomier(left, right)
@@ -621,7 +642,7 @@ end
 
 function Camp.away(rows, entries, now, summary, shown)
   local view = Camp.view(rows, entries, now, LAYOUT.awayColumns,
-    { tent = false, season = shown.season, phase = shown.phase, lanternCount = shown.lanternCount })
+    { tent = false, season = shown.season, phase = shown.phase, lanternCount = shown.lanternCount, mourn = shown.mourn })
   local byMember = {}
   for _, member in ipairs(summary.members) do byMember[member.memberId] = member end
   for _, actor in ipairs(view.actors) do

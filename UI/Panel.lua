@@ -276,6 +276,7 @@ local function create()
     if frame.sizing or frame.moving then savePlace() end
     if shown then leave(shown, true) end
     if shown and shown.withoutCrew and not core:crew() then tab = TABS[1].key end
+    core:panelClosed()
   end)
   local sinceRedraw = 0
   frame:SetScript("OnUpdate", function(_, elapsed)
@@ -441,6 +442,10 @@ end
 
 function Panel.campReaction(reaction)
   if camp and frame:IsShown() then camp:React(reaction) end
+end
+
+function Panel.petReaction(kind)
+  if camp and frame:IsShown() then camp:PetReact(kind) end
 end
 
 function Panel.toggle()
