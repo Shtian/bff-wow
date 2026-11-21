@@ -36,6 +36,17 @@
 
 
 
+
+## 2.16.0
+<sub>2026-11-21</sub>
+
+- *(minor)*
+  While you're alone in your Crew, the Camp saves lantern seats for your friends. Hover one for your Crew code, click it to put an invite in chat, or right-click it for the code box. Your pet naps on a seat, and the first friend you hear from walks in to take one.
+- *(minor)*
+  While you're alone in your Crew, your pet reacts to your news: it hops at a ding, holds up a fish or a star for a rare find or kill, and curls up by your grave after a death. In the Pocket Camp it watches the trophy cup and your fishing.
+- *(minor)*
+  While you're alone in your Crew with no pet, a stray may wander into the Camp and nap on a lantern seat. Click it to keep it as your pet, or right-click for "not now".
+
 ## 2.15.2
 <sub>2026-11-21</sub>
 
