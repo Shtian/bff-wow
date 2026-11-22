@@ -18,6 +18,14 @@ local OFFLINE_ALPHA = 0.5
 local core
 local frames = {}
 
+local parking = CreateFrame("Frame", nil, UIParent)
+parking:Hide()
+
+-- WoW: HereBeDragons-Pins drops a released icon onto UIParent, and a map addon that borrows icons can show it there.
+local function keepOffScreen(frame, parent)
+  if parent == UIParent then frame:SetParent(parking) end
+end
+
 local function showTooltip(frame)
   local pin = frame.pin
   if not pin then return end
@@ -51,7 +59,8 @@ local function disc(parent, sublevel, size)
 end
 
 local function createFrame()
-  local frame = CreateFrame("Frame", nil, UIParent)
+  local frame = CreateFrame("Frame", nil, parking)
+  hooksecurefunc(frame, "SetParent", keepOffScreen)
   frame:EnableMouse(true)
   frame.figure = ns.CampScene.figure(frame)
   frame.figure:SetPoint("CENTER")
