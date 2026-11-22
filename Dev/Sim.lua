@@ -513,7 +513,7 @@ function Sim.away(core)
   for i, client in ipairs(members) do
     local wasOffline = not client.core
     if wasOffline then client:login() end
-    AWAY[i](client, i)
+    if AWAY[i] then AWAY[i](client, i) end
     reactToYou(client, core.ledger:memberId())
     if wasOffline then
       C_Timer.After(AWAY_LOGOUT_AFTER, function()
