@@ -8,7 +8,7 @@ A World of Warcraft: Forever addon for friends who don't always play at the same
 
 <table>
 <tr>
-<td colspan="2"><img src="docs/gallery/out/02-pocket.png" alt="A campfire on screen"><br><b>A campfire on screen.</b> The Pocket Camp keeps your online friends with you while you play: each one shown fighting, fishing, crafting or resting, with a gold star for every ding. On by default; turn it off in Settings.</td>
+<td colspan="2"><picture><source srcset="docs/gallery/out/pocket-camp.webp" type="image/webp"><img src="docs/gallery/out/pocket-camp.gif" alt="A campfire on screen"></picture><br><b>A campfire on screen.</b> The Pocket Camp keeps your online friends with you while you play: each one shown fighting, fishing, crafting or resting, with a gold star for every ding. On by default; turn it off in Settings.</td>
 </tr>
 <tr>
 <td width="50%"><img src="docs/gallery/out/01-hero.png" alt="While you were away"><br><b>While you were away.</b> On login, every ding, death and new character your friends had since you last played.</td>

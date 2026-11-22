@@ -24,7 +24,7 @@ A small pixel campfire you can keep on screen while you play, with every friend 
 
 It's on by default; turn it off in Settings if you'd rather not have it.
 
-![A campfire on screen](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/02-pocket.png)
+![A campfire on screen](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/pocket-camp.gif)
 
 ### While you were away
 
