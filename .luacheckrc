@@ -75,6 +75,7 @@ stds.wow = {
     "GetTime",
     "HBD_PINS_WORLDMAP_SHOW_WORLD",
     "HideUIPanel",
+    "hooksecurefunc",
     "InCombatLockdown",
     "IsFlying",
     "IsModifiedClick",
