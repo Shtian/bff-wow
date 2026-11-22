@@ -1,5 +1,3 @@
-![BFF – Best Friends in Forever](https://raw.githubusercontent.com/Shtian/bff-wow/main/docs/gallery/out/00-banner.png)
-
 **Keep up with your friends in WoW: Forever, even when you play at different times.**
 
 BFF is for a small group of friends who don't always play at the same time. It shows everyone's characters, levels and whereabouts, tells you what your friends did while you were away, and can keep a little campfire on screen with every friend who's online. No server, no account, and no shared guild needed.
