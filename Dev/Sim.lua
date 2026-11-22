@@ -1142,6 +1142,29 @@ local function showRares(rest)
   end
 end
 
+local SAMPLE_UPDATES = {
+  [""] = {
+    title = "BFF UPDATED TO 2.16.1",
+    lines = { "More of Forever's new dungeons now count as Clears." },
+  },
+  more = {
+    title = "BFF UPDATED TO 2.16.1",
+    lines = { "More of Forever's new dungeons now count as Clears." },
+    more = "and 2 more changes",
+  },
+  long = {
+    title = "BFF UPDATED TO 2.16.1",
+    lines = { "Clearing any of Forever's new dungeons now counts as a Crew trophy: Excavation Site, City of Dalaran,"
+      .. " The Drowned City, Krol'dok Stronghold, Alcaz Prison, Blackmaw Hold and Shaper's Terrace." },
+    more = "and 4 more changes",
+  },
+  major = {
+    title = "BFF UPDATED TO 3.0.0",
+    lines = { "BFF now talks to your Crew in a new way.", "Make sure the whole Crew updates too" },
+    more = "and 1 more change",
+  },
+}
+
 SlashCmdList.BFFDEV = function(input)
   if not ns.core then return end
   local command, count = (input or ""):match("^%s*(%S*)%s*(%d*)")
@@ -1185,6 +1208,14 @@ SlashCmdList.BFFDEV = function(input)
     local purged = Sim.purge(ns.core)
     print(purged and ("BFF: %d simulated Members marked as left."):format(purged)
       or "BFF: stop the sim first (/bff sim stop).")
+    return
+  end
+  if command == "update" then
+    local sample = SAMPLE_UPDATES[rest]
+    if not sample then
+      return print("BFF dev: /bffdev update [more/long/major]")
+    end
+    ns.core:previewAwayUpdate(sample)
     return
   end
   if command == "toast" then

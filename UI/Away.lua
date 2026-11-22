@@ -10,7 +10,11 @@ local CAMP_WIDTH = 440
 local INSET = 14
 local INTRO = 34
 local HEADINGS = 18
-local BUTTONS = 46
+local BUTTON = 24
+local FOOTER_GAP = 18
+local CHANGE_TOP = 2
+local SUBTEXT_TOP = 4
+local SUBTEXT_GAP = 1
 local ICON = 14
 local ROW = 26
 local SECTION_TOP = 12
@@ -90,13 +94,13 @@ local function create()
   heading("GAINED", -INSET - GAINED_RIGHT)
   heading(SKULL, -INSET - DEATHS_RIGHT)
 
-  local open = Skin.button(frame, "Open Feed", function()
+  frame.open = Skin.button(frame, "Open Feed", function()
     frame:Hide()
-    ns.Panel.show("feed")
+    ns.Panel.show(frame.opens)
   end, true)
-  open:SetPoint("BOTTOMRIGHT", -INSET, INSET)
+  frame.open:SetPoint("BOTTOMRIGHT", -INSET, INSET)
   local dismiss = Skin.button(frame, "Dismiss", function() frame:Hide() end)
-  dismiss:SetPoint("RIGHT", open, "LEFT", -8, 0)
+  dismiss:SetPoint("RIGHT", frame.open, "LEFT", -8, 0)
 end
 
 local function react(button)
@@ -318,21 +322,58 @@ local function drawCheerLines(title, news, pool, y)
   return y - NOTICED_GAP
 end
 
-local function drawUpdate(update, y)
-  frame.whatsNew:SetShown(update ~= nil)
-  if not update then
-    frame.update:Hide()
-    for _, item in ipairs(updateLines) do item:Hide() end
-    return y
-  end
+local function updateLine(index)
+  local item = updateLines[index]
+  if item then return item end
+  item = Skin.label(frame, "text")
+  item:SetWordWrap(true)
+  updateLines[index] = item
+  return item
+end
+
+local function changeTexts(update)
   local texts = {}
-  for i, text in ipairs(update.lines) do texts[i] = text end
-  if update.more then texts[#texts + 1] = hex(Skin.MUTED) .. update.more .. "|r" end
+  for i, text in ipairs(update.lines) do
+    texts[i] = { text = text, font = i == 1 and "text" or "small", color = Skin.TEXT }
+  end
+  if update.more then texts[#texts + 1] = { text = update.more, font = "small", color = Skin.MUTED } end
+  return texts
+end
+
+local function drawUpdate(update, y, updateOnly)
+  frame.update:SetShown(update ~= nil)
+  frame.whatsNew:SetShown(update ~= nil and not updateOnly)
+  local texts = update and changeTexts(update) or {}
+  for i = #texts + 1, #updateLines do updateLines[i]:Hide() end
+  if not update then return y end
+
+  y = y - SECTION_TOP
   frame.update:SetText(update.title)
-  local below = drawSection(frame.update, texts, updateLines, y)
+  frame.update:SetPoint("TOPLEFT", INSET, y)
   frame.whatsNew:ClearAllPoints()
-  frame.whatsNew:SetPoint("RIGHT", frame, "TOPRIGHT", -INSET, y - SECTION_TOP - NOTICED_TITLE / 2 + 2)
-  return below
+  frame.whatsNew:SetPoint("RIGHT", frame, "TOPRIGHT", -INSET, y - NOTICED_TITLE / 2 + 2)
+  y = y - NOTICED_TITLE - CHANGE_TOP
+  for i, entry in ipairs(texts) do
+    if i == 2 then y = y - SUBTEXT_TOP end
+    local item = updateLine(i)
+    item:SetFontObject(Skin.fonts[entry.font])
+    Skin.color(item, entry.color)
+    item:SetWidth(frame:GetWidth() - 2 * INSET)
+    item:SetText(entry.text)
+    item:ClearAllPoints()
+    item:SetPoint("TOPLEFT", INSET, y)
+    item:Show()
+    y = y - item:GetStringHeight() - SUBTEXT_GAP
+  end
+  return y
+end
+
+local function onlyUpdate(summary)
+  if not summary.update or #summary.members > 0 then return false end
+  for _, key in ipairs({ "noticed", "goals", "spares", "professions", "catches" }) do
+    if #(summary[key] or {}) > 0 then return false end
+  end
+  return true
 end
 
 function Away.campReaction(reaction)
@@ -358,7 +399,10 @@ function Away.show(summary)
   y = drawSpares(summary.spares or {}, y)
   y = drawCheerLines(frame.professions, summary.professions or {}, professionLines, y)
   y = drawCheerLines(frame.catches, summary.catches or {}, catchLines, y)
-  y = drawUpdate(summary.update, y)
+  local updateOnly = onlyUpdate(summary)
+  y = drawUpdate(summary.update, y, updateOnly)
+  frame.opens = updateOnly and "whatsnew" or "feed"
+  frame.open:SetText(updateOnly and "What's new" or "Open Feed")
 
   local scoreboard = #summary.members > 0
   frame.intro:SetShown(scoreboard)
@@ -389,6 +433,6 @@ function Away.show(summary)
   end
   for i = index + 1, #rows do rows[i]:Hide() end
 
-  frame:SetHeight(-y + BUTTONS)
+  frame:SetHeight(-y + FOOTER_GAP + BUTTON + INSET)
   frame:Show()
 end
