@@ -1165,6 +1165,14 @@ local SAMPLE_UPDATES = {
   },
 }
 
+local function tellNextAway(core, sample)
+  local whatsNew = core.whatsNewState
+  function whatsNew.takeAwayLine(self)
+    self.takeAwayLine = nil
+    return sample
+  end
+end
+
 SlashCmdList.BFFDEV = function(input)
   if not ns.core then return end
   local command, count = (input or ""):match("^%s*(%S*)%s*(%d*)")
@@ -1211,11 +1219,17 @@ SlashCmdList.BFFDEV = function(input)
     return
   end
   if command == "update" then
-    local sample = SAMPLE_UPDATES[rest]
+    local withNews = rest:match("^news%f[%A]") ~= nil
+    local sample = SAMPLE_UPDATES[withNews and rest:match("^news%s*(.-)$") or rest]
     if not sample then
-      return print("BFF dev: /bffdev update [more/long/major]")
+      return print("BFF dev: /bffdev update [news] [more/long/major]")
     end
-    ns.core:previewAwayUpdate(sample)
+    if not withNews then return ns.core:previewAwayUpdate(sample) end
+    if not Sim.away(ns.core) then
+      return print("BFF dev: start the sim first (Start sim in /bffdev).")
+    end
+    tellNextAway(ns.core, sample)
+    print("BFF dev: you were away; the popup shows the sample update with the news once sync settles (about 10 s).")
     return
   end
   if command == "toast" then
