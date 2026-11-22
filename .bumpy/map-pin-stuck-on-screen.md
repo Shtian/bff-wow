@@ -2,4 +2,6 @@
 "bff": patch
 ---
 
-A Crew member's map pin no longer gets stuck in the middle of the screen after a fight with OpenMap installed.
+Map pins no longer get stuck in the middle of the screen.
+
+With OpenMap installed, a Member's map pin could stay on screen after a fight with the map open, until the map was opened again.

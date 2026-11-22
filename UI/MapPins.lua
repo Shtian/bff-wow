@@ -21,7 +21,7 @@ local frames = {}
 local parking = CreateFrame("Frame", nil, UIParent)
 parking:Hide()
 
--- WoW: HereBeDragons-Pins drops a released icon onto UIParent, and map addons that borrow icons (OpenMap) can show it there, at the centre of the screen.
+-- WoW: HereBeDragons-Pins drops a released icon onto UIParent, and a map addon that borrows icons can show it there.
 local function keepOffScreen(frame, parent)
   if parent == UIParent then frame:SetParent(parking) end
 end
