@@ -8,9 +8,14 @@ local Skin = ns.Skin
 local WIDTH = 400
 local CAMP_WIDTH = 440
 local INSET = 14
-local INTRO = 34
+local INTRO_TOP = 16
+local INTRO = 30
 local HEADINGS = 18
-local BUTTONS = 46
+local BUTTON = 24
+local FOOTER_GAP = 18
+local CHANGE_TOP = 2
+local SUBTEXT_TOP = 4
+local SUBTEXT_GAP = 1
 local ICON = 14
 local ROW = 26
 local SECTION_TOP = 12
@@ -21,6 +26,8 @@ local REACT = 18
 local REACT_GAP = 4
 local REACT_COLUMN = 2 * REACT + REACT_GAP + 8
 local SMALL_BUTTON = 20
+local MORE_ROW_TOP = 8
+local BAND_BOTTOM = 12
 local TALL_ROW = 38
 local LEVEL_X = 136
 local BAR = 90
@@ -76,27 +83,34 @@ local function create()
   frame.professions:SetText("PROFESSIONS")
   frame.catches = Skin.label(frame, "label", Skin.DIM)
   frame.catches:SetText("CATCHES")
+  frame.updateBand = Skin.fill(frame, Skin.RAISED, "BACKGROUND", 2)
+  frame.updateBand.edge = frame:CreateTexture(nil, "BORDER")
+  frame.updateBand.edge:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4] or 1)
+  frame.updateBand.edge:SetHeight(1)
+  frame.updateBand.edge:SetPoint("TOPLEFT", frame.updateBand, "BOTTOMLEFT")
+  frame.updateBand.edge:SetPoint("TOPRIGHT", frame.updateBand, "BOTTOMRIGHT")
   frame.update = Skin.label(frame, "label", Skin.DIM)
+  frame.more = Skin.label(frame, "small", Skin.MUTED)
   frame.whatsNew = Skin.button(frame, "What's new", function()
     frame:Hide()
     ns.Panel.show("whatsnew")
   end)
   frame.whatsNew.label:SetFontObject(Skin.fonts.small)
   frame.whatsNew:SetSize(frame.whatsNew.label:GetStringWidth() + 16, SMALL_BUTTON)
-  frame.intro = Skin.label(frame, "small", Skin.MUTED)
+  frame.intro = Skin.label(frame, "heading", Skin.TEXT)
 
   frame.headings = {}
   heading("LEVEL", INSET + LEVEL_X)
   heading("GAINED", -INSET - GAINED_RIGHT)
   heading(SKULL, -INSET - DEATHS_RIGHT)
 
-  local open = Skin.button(frame, "Open Feed", function()
+  frame.open = Skin.button(frame, "Open Feed", function()
     frame:Hide()
-    ns.Panel.show("feed")
+    ns.Panel.show(frame.opens)
   end, true)
-  open:SetPoint("BOTTOMRIGHT", -INSET, INSET)
+  frame.open:SetPoint("BOTTOMRIGHT", -INSET, INSET)
   local dismiss = Skin.button(frame, "Dismiss", function() frame:Hide() end)
-  dismiss:SetPoint("RIGHT", open, "LEFT", -8, 0)
+  dismiss:SetPoint("RIGHT", frame.open, "LEFT", -8, 0)
 end
 
 local function react(button)
@@ -318,21 +332,92 @@ local function drawCheerLines(title, news, pool, y)
   return y - NOTICED_GAP
 end
 
-local function drawUpdate(update, y)
-  frame.whatsNew:SetShown(update ~= nil)
+local function updateLine(index)
+  local item = updateLines[index]
+  if item then return item end
+  item = Skin.label(frame, "text", Skin.TEXT)
+  item:SetWordWrap(true)
+  updateLines[index] = item
+  return item
+end
+
+local function drawBand(top, bottom)
+  local band = frame.updateBand
+  band:SetShown(top ~= nil)
+  band.edge:SetShown(top ~= nil)
+  if not top then return end
+  band:ClearAllPoints()
+  band:SetPoint("TOPLEFT", 1, top)
+  band:SetPoint("TOPRIGHT", -1, top)
+  band:SetHeight(top - bottom)
+end
+
+local function drawChanges(changes, y)
+  for i = #changes + 1, #updateLines do updateLines[i]:Hide() end
+  for i, text in ipairs(changes) do
+    if i == 2 then y = y - SUBTEXT_TOP end
+    local item = updateLine(i)
+    item:SetFontObject(Skin.fonts[i == 1 and "text" or "small"])
+    item:SetWidth(frame:GetWidth() - 2 * INSET)
+    item:SetText(text)
+    item:ClearAllPoints()
+    item:SetPoint("TOPLEFT", INSET, y)
+    item:Show()
+    y = y - item:GetStringHeight() - SUBTEXT_GAP
+  end
+  return y
+end
+
+local function drawMore(more, y, withButton)
+  frame.more:SetShown(more ~= nil)
+  frame.more:SetText(more or "")
+  frame.more:ClearAllPoints()
+  frame.whatsNew:ClearAllPoints()
+  if not withButton then
+    if not more then return y end
+    frame.more:SetPoint("TOPLEFT", INSET, y - SUBTEXT_TOP)
+    return y - SUBTEXT_TOP - frame.more:GetStringHeight() - SUBTEXT_GAP
+  end
+  y = y - MORE_ROW_TOP
+  frame.whatsNew:SetPoint("TOPRIGHT", -INSET, y)
+  frame.more:SetPoint("LEFT", frame, "TOPLEFT", INSET, y - SMALL_BUTTON / 2)
+  return y - SMALL_BUTTON
+end
+
+local function drawUpdate(update, y, updateOnly)
+  local banded = update ~= nil and not updateOnly
+  frame.update:SetShown(update ~= nil)
+  frame.whatsNew:SetShown(banded)
   if not update then
-    frame.update:Hide()
-    for _, item in ipairs(updateLines) do item:Hide() end
+    drawChanges({}, y)
+    drawMore(nil, y, false)
+    drawBand(nil)
     return y
   end
-  local texts = {}
-  for i, text in ipairs(update.lines) do texts[i] = text end
-  if update.more then texts[#texts + 1] = hex(Skin.MUTED) .. update.more .. "|r" end
+
+  local top = y
+  y = y - SECTION_TOP
+  Skin.color(frame.update, banded and Skin.MUTED or Skin.DIM)
   frame.update:SetText(update.title)
-  local below = drawSection(frame.update, texts, updateLines, y)
-  frame.whatsNew:ClearAllPoints()
-  frame.whatsNew:SetPoint("RIGHT", frame, "TOPRIGHT", -INSET, y - SECTION_TOP - NOTICED_TITLE / 2 + 2)
-  return below
+  frame.update:ClearAllPoints()
+  frame.update:SetPoint("TOPLEFT", INSET, y)
+  y = drawChanges(update.lines, y - NOTICED_TITLE - CHANGE_TOP)
+  y = drawMore(update.more, y, banded)
+  if not banded then
+    drawBand(nil)
+    return y
+  end
+  y = y - BAND_BOTTOM
+  drawBand(top, y)
+  return y
+end
+
+local function onlyUpdate(summary)
+  if not summary.update or #summary.members > 0 then return false end
+  for _, key in ipairs({ "noticed", "goals", "spares", "professions", "catches" }) do
+    if #(summary[key] or {}) > 0 then return false end
+  end
+  return true
 end
 
 function Away.campReaction(reaction)
@@ -353,12 +438,15 @@ function Away.show(summary)
     top = top - height
   end
   frame.camp:Draw(summary.camp)
-  local y = drawNoticed(summary.noticed or {}, top)
+  local updateOnly = onlyUpdate(summary)
+  local y = drawUpdate(summary.update, top, updateOnly)
+  frame.opens = updateOnly and "whatsnew" or "feed"
+  frame.open:SetText(updateOnly and "What's new" or "Open Feed")
+  y = drawNoticed(summary.noticed or {}, y)
   y = drawGoals(summary.goals or {}, y)
   y = drawSpares(summary.spares or {}, y)
   y = drawCheerLines(frame.professions, summary.professions or {}, professionLines, y)
   y = drawCheerLines(frame.catches, summary.catches or {}, catchLines, y)
-  y = drawUpdate(summary.update, y)
 
   local scoreboard = #summary.members > 0
   frame.intro:SetShown(scoreboard)
@@ -366,12 +454,12 @@ function Away.show(summary)
   if scoreboard then
     frame.intro:SetText(summary.intro)
     frame.intro:ClearAllPoints()
-    frame.intro:SetPoint("TOPLEFT", INSET, y - SECTION_TOP)
+    frame.intro:SetPoint("TOPLEFT", INSET, y - INTRO_TOP)
     for _, label in ipairs(frame.headings) do
       label:ClearAllPoints()
-      label:SetPoint(label.x < 0 and "TOPRIGHT" or "TOPLEFT", label.x, y - SECTION_TOP - INTRO)
+      label:SetPoint(label.x < 0 and "TOPRIGHT" or "TOPLEFT", label.x, y - INTRO_TOP - INTRO)
     end
-    y = y - SECTION_TOP - INTRO - HEADINGS
+    y = y - INTRO_TOP - INTRO - HEADINGS
   end
 
   local maxLevel = summary.maxLevel
@@ -389,6 +477,6 @@ function Away.show(summary)
   end
   for i = index + 1, #rows do rows[i]:Hide() end
 
-  frame:SetHeight(-y + BUTTONS)
+  frame:SetHeight(-y + FOOTER_GAP + BUTTON + INSET)
   frame:Show()
 end

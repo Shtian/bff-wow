@@ -22,7 +22,7 @@ What's new shows only what players notice. It leaves out internal entries, and a
 - **A fresh install** (empty saved data) starts with the version installed seen: there's nothing to catch up on.
 - **Saved data from before What's new** starts with the release before the one installed seen, so only that release is new.
 - **A visit:** opening What's new marks every change seen at once. The releases that were new stay marked until the view is left, as the Feed's New entries do, so you can read them.
-- **While you were away** says it once per update (`db.changesTold`), after a login once sync has settled. An update with no other news still opens the popup, with only that section. With the popup turned off, only the dot says it, and the update counts as told: turning the popup back on doesn't bring up an old one.
+- **While you were away** says it once per update (`db.changesTold`), after a login once sync has settled. An update with no other news still opens the popup, with only that section. With the popup turned off, only the dot says it, and the update counts as told: turning the popup back on doesn't bring up an old one. When the update is the popup's only section, its primary button is What's new rather than Open Feed, and the small What's new button by the section label is hidden. `/bffdev update [more/long/major]` (dev checkout only) opens that popup with sample update text, since a dev checkout has no changelog text. `/bffdev update news [more/long/major]` instead does what the console's **Away** button does and puts the sample update in that popup, under the news.
 
 ## The view
 

@@ -695,22 +695,12 @@ local function tellNewerBff(self)
   if line then self.listener("newerBff", line) end
 end
 
-local function awaySummary(self)
-  if not self:isAwayPopupOn() then
-    self.whatsNewState:takeAwayLine()
-    return
-  end
-  local view, told = self:catches(), self.db.catchTypesTold
-  local newTypesLine = told and ns.Catches.newTypesLine(view, told)
-  self.db.catchTypesTold = ns.Catches.markTold(told or {}, view)
-  local summary = self.feedState:takeSummary(self.spareLife:takeNews(), newTypesLine)
-  local update = self.whatsNewState:takeAwayLine()
-  if not summary and update then
-    summary = { members = {}, goals = {}, spares = {}, professions = {}, catches = {}, noticed = {}, count = 0,
-      maxLevel = self.maxLevel }
-  end
-  if not summary then return end
-  summary.update = update
+local function emptySummary(self)
+  return { members = {}, goals = {}, spares = {}, professions = {}, catches = {}, noticed = {}, count = 0,
+    maxLevel = self.maxLevel }
+end
+
+local function sendAway(self, summary)
   if self:setting("camp") then
     local now = self.now()
     local saved = savedSeats(self) ~= nil
@@ -721,6 +711,28 @@ local function awaySummary(self)
   end
   self.listener("awaySummary", summary)
   self.listener("changed")
+end
+
+local function awaySummary(self)
+  if not self:isAwayPopupOn() then
+    self.whatsNewState:takeAwayLine()
+    return
+  end
+  local view, told = self:catches(), self.db.catchTypesTold
+  local newTypesLine = told and ns.Catches.newTypesLine(view, told)
+  self.db.catchTypesTold = ns.Catches.markTold(told or {}, view)
+  local summary = self.feedState:takeSummary(self.spareLife:takeNews(), newTypesLine)
+  local update = self.whatsNewState:takeAwayLine()
+  if not summary and update then summary = emptySummary(self) end
+  if not summary then return end
+  summary.update = update
+  sendAway(self, summary)
+end
+
+function Core:previewAwayUpdate(update)
+  local summary = emptySummary(self)
+  summary.update = update
+  sendAway(self, summary)
 end
 
 local function audience(self)
