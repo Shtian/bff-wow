@@ -25,6 +25,7 @@ local REACT = 18
 local REACT_GAP = 4
 local REACT_COLUMN = 2 * REACT + REACT_GAP + 8
 local SMALL_BUTTON = 20
+local BUTTON_ROW_GAP = 6
 local TALL_ROW = 38
 local LEVEL_X = 136
 local BAR = 90
@@ -348,11 +349,17 @@ local function drawUpdate(update, y, updateOnly)
   if not update then return y end
 
   y = y - SECTION_TOP
+  local titleRow = updateOnly and NOTICED_TITLE or SMALL_BUTTON + BUTTON_ROW_GAP
   frame.update:SetText(update.title)
-  frame.update:SetPoint("TOPLEFT", INSET, y)
+  frame.update:ClearAllPoints()
   frame.whatsNew:ClearAllPoints()
-  frame.whatsNew:SetPoint("RIGHT", frame, "TOPRIGHT", -INSET, y - NOTICED_TITLE / 2 + 2)
-  y = y - NOTICED_TITLE - CHANGE_TOP
+  if updateOnly then
+    frame.update:SetPoint("TOPLEFT", INSET, y)
+  else
+    frame.update:SetPoint("LEFT", frame, "TOPLEFT", INSET, y - titleRow / 2)
+    frame.whatsNew:SetPoint("RIGHT", frame, "TOPRIGHT", -INSET, y - titleRow / 2)
+  end
+  y = y - titleRow - CHANGE_TOP
   for i, entry in ipairs(texts) do
     if i == 2 then y = y - SUBTEXT_TOP end
     local item = updateLine(i)
