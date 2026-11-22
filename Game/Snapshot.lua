@@ -251,11 +251,12 @@ local function askSafely(ask, ...)
   return value
 end
 
-local function form()
+local function form(inCombat)
+  if inCombat then return lastForm end
   local id, secret = askSafely(GetShapeshiftFormID)
   if secret then return lastForm end
   local found = FORM_IDS[id]
-  if not found and C_UnitAuras then
+  if not found and C_UnitAuras and not issecretvalue then
     local aura, auraSecret = askSafely(C_UnitAuras.GetPlayerAuraBySpellID, GHOST_WOLF)
     if auraSecret then return lastForm end
     if aura then found = "wolf" end
@@ -265,14 +266,15 @@ local function form()
 end
 
 function Snapshot.doing()
+  local inCombat = flag(InCombatLockdown)
   return {
-    combat = flag(InCombatLockdown),
+    combat = inCombat,
     vendor = windows.vendor,
     auction = windows.auction,
     afk = flag(UnitIsAFK, "player"),
     resting = flag(IsResting),
     flying = flag(UnitOnTaxi, "player") or flag(IsFlying),
-    form = form(),
+    form = form(inCombat),
   }
 end
 
