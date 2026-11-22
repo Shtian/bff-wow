@@ -8,7 +8,8 @@ local Skin = ns.Skin
 local WIDTH = 400
 local CAMP_WIDTH = 440
 local INSET = 14
-local INTRO = 34
+local INTRO_TOP = 16
+local INTRO = 30
 local HEADINGS = 18
 local BUTTON = 24
 local FOOTER_GAP = 18
@@ -25,7 +26,7 @@ local REACT = 18
 local REACT_GAP = 4
 local REACT_COLUMN = 2 * REACT + REACT_GAP + 8
 local SMALL_BUTTON = 20
-local BUTTON_ROW_GAP = 6
+local MORE_ROW_TOP = 8
 local BAND_BOTTOM = 12
 local TALL_ROW = 38
 local LEVEL_X = 136
@@ -89,13 +90,14 @@ local function create()
   frame.updateBand.edge:SetPoint("TOPLEFT", frame.updateBand, "BOTTOMLEFT")
   frame.updateBand.edge:SetPoint("TOPRIGHT", frame.updateBand, "BOTTOMRIGHT")
   frame.update = Skin.label(frame, "label", Skin.DIM)
+  frame.more = Skin.label(frame, "small", Skin.MUTED)
   frame.whatsNew = Skin.button(frame, "What's new", function()
     frame:Hide()
     ns.Panel.show("whatsnew")
   end)
   frame.whatsNew.label:SetFontObject(Skin.fonts.small)
   frame.whatsNew:SetSize(frame.whatsNew.label:GetStringWidth() + 16, SMALL_BUTTON)
-  frame.intro = Skin.label(frame, "small", Skin.MUTED)
+  frame.intro = Skin.label(frame, "heading", Skin.TEXT)
 
   frame.headings = {}
   heading("LEVEL", INSET + LEVEL_X)
@@ -333,19 +335,10 @@ end
 local function updateLine(index)
   local item = updateLines[index]
   if item then return item end
-  item = Skin.label(frame, "text")
+  item = Skin.label(frame, "text", Skin.TEXT)
   item:SetWordWrap(true)
   updateLines[index] = item
   return item
-end
-
-local function changeTexts(update)
-  local texts = {}
-  for i, text in ipairs(update.lines) do
-    texts[i] = { text = text, font = i == 1 and "text" or "small", color = Skin.TEXT }
-  end
-  if update.more then texts[#texts + 1] = { text = update.more, font = "small", color = Skin.MUTED } end
-  return texts
 end
 
 local function drawBand(top, bottom)
@@ -359,43 +352,57 @@ local function drawBand(top, bottom)
   band:SetHeight(top - bottom)
 end
 
-local function drawUpdate(update, y, updateOnly)
-  frame.update:SetShown(update ~= nil)
-  frame.whatsNew:SetShown(update ~= nil and not updateOnly)
-  local texts = update and changeTexts(update) or {}
-  for i = #texts + 1, #updateLines do updateLines[i]:Hide() end
-  local banded = update ~= nil and not updateOnly
-  if not update then
-    drawBand(nil)
-    return y
-  end
-
-  local top = y
-  Skin.color(frame.update, banded and Skin.MUTED or Skin.DIM)
-  y = y - SECTION_TOP
-  local titleRow = updateOnly and NOTICED_TITLE or SMALL_BUTTON + BUTTON_ROW_GAP
-  frame.update:SetText(update.title)
-  frame.update:ClearAllPoints()
-  frame.whatsNew:ClearAllPoints()
-  if updateOnly then
-    frame.update:SetPoint("TOPLEFT", INSET, y)
-  else
-    frame.update:SetPoint("LEFT", frame, "TOPLEFT", INSET, y - titleRow / 2)
-    frame.whatsNew:SetPoint("RIGHT", frame, "TOPRIGHT", -INSET, y - titleRow / 2)
-  end
-  y = y - titleRow - CHANGE_TOP
-  for i, entry in ipairs(texts) do
+local function drawChanges(changes, y)
+  for i = #changes + 1, #updateLines do updateLines[i]:Hide() end
+  for i, text in ipairs(changes) do
     if i == 2 then y = y - SUBTEXT_TOP end
     local item = updateLine(i)
-    item:SetFontObject(Skin.fonts[entry.font])
-    Skin.color(item, entry.color)
+    item:SetFontObject(Skin.fonts[i == 1 and "text" or "small"])
     item:SetWidth(frame:GetWidth() - 2 * INSET)
-    item:SetText(entry.text)
+    item:SetText(text)
     item:ClearAllPoints()
     item:SetPoint("TOPLEFT", INSET, y)
     item:Show()
     y = y - item:GetStringHeight() - SUBTEXT_GAP
   end
+  return y
+end
+
+local function drawMore(more, y, withButton)
+  frame.more:SetShown(more ~= nil)
+  frame.more:SetText(more or "")
+  frame.more:ClearAllPoints()
+  frame.whatsNew:ClearAllPoints()
+  if not withButton then
+    if not more then return y end
+    frame.more:SetPoint("TOPLEFT", INSET, y - SUBTEXT_TOP)
+    return y - SUBTEXT_TOP - frame.more:GetStringHeight() - SUBTEXT_GAP
+  end
+  y = y - MORE_ROW_TOP
+  frame.whatsNew:SetPoint("TOPRIGHT", -INSET, y)
+  frame.more:SetPoint("LEFT", frame, "TOPLEFT", INSET, y - SMALL_BUTTON / 2)
+  return y - SMALL_BUTTON
+end
+
+local function drawUpdate(update, y, updateOnly)
+  local banded = update ~= nil and not updateOnly
+  frame.update:SetShown(update ~= nil)
+  frame.whatsNew:SetShown(banded)
+  if not update then
+    drawChanges({}, y)
+    drawMore(nil, y, false)
+    drawBand(nil)
+    return y
+  end
+
+  local top = y
+  y = y - SECTION_TOP
+  Skin.color(frame.update, banded and Skin.MUTED or Skin.DIM)
+  frame.update:SetText(update.title)
+  frame.update:ClearAllPoints()
+  frame.update:SetPoint("TOPLEFT", INSET, y)
+  y = drawChanges(update.lines, y - NOTICED_TITLE - CHANGE_TOP)
+  y = drawMore(update.more, y, banded)
   if not banded then
     drawBand(nil)
     return y
@@ -447,12 +454,12 @@ function Away.show(summary)
   if scoreboard then
     frame.intro:SetText(summary.intro)
     frame.intro:ClearAllPoints()
-    frame.intro:SetPoint("TOPLEFT", INSET, y - SECTION_TOP)
+    frame.intro:SetPoint("TOPLEFT", INSET, y - INTRO_TOP)
     for _, label in ipairs(frame.headings) do
       label:ClearAllPoints()
-      label:SetPoint(label.x < 0 and "TOPRIGHT" or "TOPLEFT", label.x, y - SECTION_TOP - INTRO)
+      label:SetPoint(label.x < 0 and "TOPRIGHT" or "TOPLEFT", label.x, y - INTRO_TOP - INTRO)
     end
-    y = y - SECTION_TOP - INTRO - HEADINGS
+    y = y - INTRO_TOP - INTRO - HEADINGS
   end
 
   local maxLevel = summary.maxLevel
