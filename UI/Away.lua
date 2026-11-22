@@ -26,6 +26,7 @@ local REACT_GAP = 4
 local REACT_COLUMN = 2 * REACT + REACT_GAP + 8
 local SMALL_BUTTON = 20
 local BUTTON_ROW_GAP = 6
+local BAND_BOTTOM = 12
 local TALL_ROW = 38
 local LEVEL_X = 136
 local BAR = 90
@@ -81,6 +82,12 @@ local function create()
   frame.professions:SetText("PROFESSIONS")
   frame.catches = Skin.label(frame, "label", Skin.DIM)
   frame.catches:SetText("CATCHES")
+  frame.updateBand = Skin.fill(frame, Skin.RAISED, "BACKGROUND", 2)
+  frame.updateBand.edge = frame:CreateTexture(nil, "BORDER")
+  frame.updateBand.edge:SetColorTexture(Skin.LINE[1], Skin.LINE[2], Skin.LINE[3], Skin.LINE[4] or 1)
+  frame.updateBand.edge:SetHeight(1)
+  frame.updateBand.edge:SetPoint("TOPLEFT", frame.updateBand, "BOTTOMLEFT")
+  frame.updateBand.edge:SetPoint("TOPRIGHT", frame.updateBand, "BOTTOMRIGHT")
   frame.update = Skin.label(frame, "label", Skin.DIM)
   frame.whatsNew = Skin.button(frame, "What's new", function()
     frame:Hide()
@@ -341,13 +348,30 @@ local function changeTexts(update)
   return texts
 end
 
+local function drawBand(top, bottom)
+  local band = frame.updateBand
+  band:SetShown(top ~= nil)
+  band.edge:SetShown(top ~= nil)
+  if not top then return end
+  band:ClearAllPoints()
+  band:SetPoint("TOPLEFT", 1, top)
+  band:SetPoint("TOPRIGHT", -1, top)
+  band:SetHeight(top - bottom)
+end
+
 local function drawUpdate(update, y, updateOnly)
   frame.update:SetShown(update ~= nil)
   frame.whatsNew:SetShown(update ~= nil and not updateOnly)
   local texts = update and changeTexts(update) or {}
   for i = #texts + 1, #updateLines do updateLines[i]:Hide() end
-  if not update then return y end
+  local banded = update ~= nil and not updateOnly
+  if not update then
+    drawBand(nil)
+    return y
+  end
 
+  local top = y
+  Skin.color(frame.update, banded and Skin.MUTED or Skin.DIM)
   y = y - SECTION_TOP
   local titleRow = updateOnly and NOTICED_TITLE or SMALL_BUTTON + BUTTON_ROW_GAP
   frame.update:SetText(update.title)
@@ -372,6 +396,12 @@ local function drawUpdate(update, y, updateOnly)
     item:Show()
     y = y - item:GetStringHeight() - SUBTEXT_GAP
   end
+  if not banded then
+    drawBand(nil)
+    return y
+  end
+  y = y - BAND_BOTTOM
+  drawBand(top, y)
   return y
 end
 
@@ -401,15 +431,15 @@ function Away.show(summary)
     top = top - height
   end
   frame.camp:Draw(summary.camp)
-  local y = drawNoticed(summary.noticed or {}, top)
+  local updateOnly = onlyUpdate(summary)
+  local y = drawUpdate(summary.update, top, updateOnly)
+  frame.opens = updateOnly and "whatsnew" or "feed"
+  frame.open:SetText(updateOnly and "What's new" or "Open Feed")
+  y = drawNoticed(summary.noticed or {}, y)
   y = drawGoals(summary.goals or {}, y)
   y = drawSpares(summary.spares or {}, y)
   y = drawCheerLines(frame.professions, summary.professions or {}, professionLines, y)
   y = drawCheerLines(frame.catches, summary.catches or {}, catchLines, y)
-  local updateOnly = onlyUpdate(summary)
-  y = drawUpdate(summary.update, y, updateOnly)
-  frame.opens = updateOnly and "whatsnew" or "feed"
-  frame.open:SetText(updateOnly and "What's new" or "Open Feed")
 
   local scoreboard = #summary.members > 0
   frame.intro:SetShown(scoreboard)
