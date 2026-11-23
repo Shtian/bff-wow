@@ -40,6 +40,12 @@
 
 
 
+
+## 2.16.4
+<sub>2026-11-23</sub>
+
+- *(patch)* Internal: Gate form and Ghost Wolf aura reads by class, events, and combat
+
 ## 2.16.3
 <sub>2026-11-22</sub>
 
