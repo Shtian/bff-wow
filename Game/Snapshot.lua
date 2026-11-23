@@ -244,20 +244,7 @@ local FORM_CLASSES = { DRUID = true, SHAMAN = true }
 local GHOST_WOLF = 2645
 -- WoW: under Midnight's restrictions the form reads secret in combat.
 local lastForm = nil
-local cachedClass = nil
-local formDirty = true
-local watchingForm = false
-
-local function playerClass()
-  if cachedClass then return cachedClass end
-  if not UnitClass then return nil end
-  local _, classFilename = UnitClass("player")
-  if type(classFilename) == "string" and not (issecretvalue and issecretvalue(classFilename))
-    and classFilename ~= "" then
-    cachedClass = classFilename
-  end
-  return cachedClass
-end
+local playerClass = nil
 
 local function askSafely(ask, ...)
   if not ask then return nil end
@@ -267,20 +254,18 @@ local function askSafely(ask, ...)
 end
 
 local function form(inCombat)
-  local class = playerClass()
-  if not FORM_CLASSES[class] then return nil end
+  playerClass = playerClass or select(2, UnitClass("player"))
+  if not FORM_CLASSES[playerClass] then return nil end
   if inCombat then return lastForm end
-  if watchingForm and not formDirty then return lastForm end
   local id, secret = askSafely(GetShapeshiftFormID)
   if secret then return lastForm end
   local found = FORM_IDS[id]
-  if not found and class == "SHAMAN" and C_UnitAuras then
+  if not found and playerClass == "SHAMAN" and C_UnitAuras then
     local aura, auraSecret = askSafely(C_UnitAuras.GetPlayerAuraBySpellID, GHOST_WOLF)
     if auraSecret then return lastForm end
     if aura then found = "wolf" end
   end
   lastForm = found
-  formDirty = false
   return found
 end
 
@@ -331,29 +316,12 @@ local function watchDoing(core)
   local frame = CreateFrame("Frame")
   for event in pairs(WINDOW_EVENTS) do frame:RegisterEvent(event) end
   frame:RegisterEvent("QUEST_TURNED_IN")
-  local class = playerClass()
-  if FORM_CLASSES[class] then
-    watchingForm = true
-    formDirty = true
-    frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
-    frame:RegisterEvent("PLAYER_REGEN_ENABLED")
-    if class == "SHAMAN" then
-      if frame.RegisterUnitEvent then
-        frame:RegisterUnitEvent("UNIT_AURA", "player")
-      else
-        frame:RegisterEvent("UNIT_AURA")
-      end
-    end
-  end
-  frame:SetScript("OnEvent", function(_, event, unit)
+  frame:SetScript("OnEvent", function(_, event)
     local window = WINDOW_EVENTS[event]
     if window then
       windows[window[1]] = window[2]
     elseif event == "QUEST_TURNED_IN" then
       core:questHandedIn()
-    elseif event == "UPDATE_SHAPESHIFT_FORM" or event == "PLAYER_REGEN_ENABLED"
-      or (event == "UNIT_AURA" and unit == "player") then
-      formDirty = true
     end
   end)
 end
