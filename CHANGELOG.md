@@ -41,6 +41,12 @@
 
 
 
+
+## 2.16.5
+<sub>2026-11-23</sub>
+
+- *(patch)* Internal: Read shapeshift forms on the DOING tick again instead of after form events
+
 ## 2.16.4
 <sub>2026-11-23</sub>
 
