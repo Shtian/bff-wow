@@ -2,4 +2,4 @@
 bff: patch
 ---
 
-Internal: Avoid secret aura and combat-form reads
+Internal: Gate form and Ghost Wolf aura reads by class, events, and combat
