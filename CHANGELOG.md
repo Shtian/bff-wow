@@ -42,6 +42,15 @@
 
 
 
+
+## 2.16.6
+<sub>2026-11-24</sub>
+
+- *(patch)*
+  Internal: Log each Crew channel join attempt and its outcome, and every Crew channel notice, in the sync log, and show the last join failure in /bff report
+- *(patch)*
+  Fixed being stuck on "Leaving the Crew" when BFF can't join its channel (wrong password or too many channels): leaving now finishes straight away, so you can start or join another Crew. The wrong-password message now says to leave the Crew and start a new one
+
 ## 2.16.5
 <sub>2026-11-23</sub>
 
