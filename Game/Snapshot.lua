@@ -8,10 +8,13 @@ local EVENTS = {
   "PLAYER_LEVEL_UP",
   "PLAYER_XP_UPDATE",
   "ZONE_CHANGED_NEW_AREA",
+  "PLAYER_DEAD",
+  "PLAYER_ALIVE",
+  "PLAYER_UNGHOST",
   "PLAYER_MONEY",
   "SKILL_LINES_CHANGED",
 }
-local DEATH_EVENTS = { PLAYER_DEAD = true, PLAYER_ALIVE = true, PLAYER_UNGHOST = true }
+local BACK_TO_LIFE_EVENTS = { PLAYER_ALIVE = true, PLAYER_UNGHOST = true }
 local PROFESSION_EVENTS = { PLAYER_ENTERING_WORLD = true, SKILL_LINES_CHANGED = true }
 
 local level = 0
@@ -329,6 +332,7 @@ end
 function Snapshot.start(core)
   BFF_CharacterDB = BFF_CharacterDB or {}
   BFF_CharacterDB.deaths = BFF_CharacterDB.deaths or 0
+  ns.Deaths.checkAlive(BFF_CharacterDB, UnitIsDeadOrGhost("player"))
 
   local function update()
     local character = read()
@@ -337,14 +341,15 @@ function Snapshot.start(core)
 
   local frame = CreateFrame("Frame")
   for _, event in ipairs(EVENTS) do frame:RegisterEvent(event) end
-  for event in pairs(DEATH_EVENTS) do frame:RegisterEvent(event) end
   readProfessions()
   frame:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_LEVEL_UP" then
       level = math.max(level, (...))
-    elseif DEATH_EVENTS[event] then
+    elseif event == "PLAYER_DEAD" then
       local _, instanceType = GetInstanceInfo()
-      ns.Deaths.record(BFF_CharacterDB, event, UnitIsDeadOrGhost("player"), instanceType)
+      ns.Deaths.died(BFF_CharacterDB, instanceType)
+    elseif BACK_TO_LIFE_EVENTS[event] then
+      ns.Deaths.checkAlive(BFF_CharacterDB, UnitIsDeadOrGhost("player"))
     end
     if PROFESSION_EVENTS[event] then readProfessions() end
     update()
