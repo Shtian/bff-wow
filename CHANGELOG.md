@@ -44,6 +44,15 @@
 
 
 
+
+## 2.17.0
+<sub>2026-11-24</sub>
+
+- *(minor)*
+  When the game breaks your Crew's hidden chat channel, BFF now moves the whole Crew to a new one by itself: no new code, nothing lost. If the game keeps refusing, the Roster says so and offers Report a bug.
+- *(minor)*
+  Leaving a Crew no longer forgets it: join again with the same code and your Crew, Feed, While you were away, reactions, goals and Removed list are all back. Starting or joining a different Crew still starts fresh.
+
 ## 2.16.7
 <sub>2026-11-24</sub>
 
