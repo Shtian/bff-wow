@@ -9,9 +9,12 @@ local EVENTS = {
   "PLAYER_XP_UPDATE",
   "ZONE_CHANGED_NEW_AREA",
   "PLAYER_DEAD",
+  "PLAYER_ALIVE",
+  "PLAYER_UNGHOST",
   "PLAYER_MONEY",
   "SKILL_LINES_CHANGED",
 }
+local BACK_TO_LIFE_EVENTS = { PLAYER_ALIVE = true, PLAYER_UNGHOST = true }
 local PROFESSION_EVENTS = { PLAYER_ENTERING_WORLD = true, SKILL_LINES_CHANGED = true }
 
 local level = 0
@@ -329,6 +332,7 @@ end
 function Snapshot.start(core)
   BFF_CharacterDB = BFF_CharacterDB or {}
   BFF_CharacterDB.deaths = BFF_CharacterDB.deaths or 0
+  ns.Deaths.checkAlive(BFF_CharacterDB, UnitIsDeadOrGhost("player"))
 
   local function update()
     local character = read()
@@ -343,7 +347,9 @@ function Snapshot.start(core)
       level = math.max(level, (...))
     elseif event == "PLAYER_DEAD" then
       local _, instanceType = GetInstanceInfo()
-      if ns.Deaths.counts(instanceType) then BFF_CharacterDB.deaths = BFF_CharacterDB.deaths + 1 end
+      ns.Deaths.died(BFF_CharacterDB, instanceType)
+    elseif BACK_TO_LIFE_EVENTS[event] then
+      ns.Deaths.checkAlive(BFF_CharacterDB, UnitIsDeadOrGhost("player"))
     end
     if PROFESSION_EVENTS[event] then readProfessions() end
     update()
