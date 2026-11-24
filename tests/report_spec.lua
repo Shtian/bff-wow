@@ -4,7 +4,7 @@ local function report(options)
   options = options or {}
   local game = wow()
   local env = game.env
-  env.date = function() return "2026-11-11 20:31:05" end
+  env.date = function(_, at) return at == 1700000000 and "2023-11-14 22:13:20" or "2026-11-11 20:31:05" end
   env.GetBuildInfo = function() return "1.16.0", "65000", "Nov 1 2026", 16001 end
   env.WOW_PROJECT_CAMELOT = 21
   env.WOW_PROJECT_ID = 21
@@ -16,8 +16,12 @@ local function report(options)
   ns.core = {
     crew = function() return options.crew ~= false and { code = "X" } or nil end,
     rosterCounts = function() return { members = 2 } end,
+    joinFailure = function() return options.failure end,
   }
-  ns.ChannelLink = { state = function() return options.link or { up = true, peers = 1, instance = "party", lockdown = true } end }
+  ns.ChannelLink = {
+    FAILURE_REASONS = { wrongPassword = "wrong password", tooManyChannels = "too many channels" },
+    state = function() return options.link or { up = true, peers = 1, instance = "party", lockdown = true } end,
+  }
   game.load("UI/Report.lua", ns)
   return ns.Report.text()
 end
@@ -30,6 +34,7 @@ describe("/bff report", function()
       "Game 1.16.0 (build 65000) · interface 16001 · WoW: Forever: yes",
       "Crew: yes · other Members known: 2 · peers in the channel: 1",
       "Link: up",
+      "Last join failure: none since the last join",
       "In an instance: party · chat messaging lockdown: yes",
       "",
       "Sync log, oldest first (2 lines):",
@@ -42,5 +47,14 @@ describe("/bff report", function()
     local text = report({ crew = false, link = { up = false, reason = "no Crew", peers = 0 } })
     assert.truthy(text:find("Crew: no · other Members known: 0 · peers in the channel: 0", 1, true))
     assert.truthy(text:find("Link: down (no Crew)", 1, true))
+  end)
+
+  it("gives the last join failure, which Core keeps until a join succeeds", function()
+    local text = report({
+      link = { up = false, reason = "wrong password", peers = 0 },
+      failure = { kind = "wrongPassword", at = 1700000000 },
+    })
+    assert.truthy(text:find("Link: down (wrong password)", 1, true))
+    assert.truthy(text:find("Last join failure: wrong password at 2023-11-14 22:13:20", 1, true))
   end)
 end)

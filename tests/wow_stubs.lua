@@ -93,7 +93,10 @@ return function()
     GetTime = function() return game.time end,
     GetChannelName = function(name) return game.channels[name:upper()] or 0 end,
     GetChannelList = function() return end,
-    JoinTemporaryChannel = function(name) game.channels[name:upper()] = 5 end,
+    JoinTemporaryChannel = function(name)
+      game.joins = (game.joins or 0) + 1
+      if not game.refuseJoin then game.channels[name:upper()] = 5 end
+    end,
     LeaveChannelByName = function(name) game.channels[name:upper()] = nil end,
     ListChannelByName = function(name) game.listed[#game.listed + 1] = name end,
     RemoveChatWindowChannel = function() end,

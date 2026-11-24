@@ -14,6 +14,12 @@ local function yesNo(value)
   return value and "yes" or "no"
 end
 
+local function lastJoinFailure()
+  local failure = ns.core:joinFailure()
+  if not failure then return "none since the last join" end
+  return ("%s at %s"):format(ns.ChannelLink.FAILURE_REASONS[failure.kind], date("%Y-%m-%d %H:%M:%S", failure.at))
+end
+
 function Report.text()
   local gameVersion, build, _, interface = GetBuildInfo()
   local forever = WOW_PROJECT_CAMELOT ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CAMELOT
@@ -29,6 +35,7 @@ function Report.text()
     ("Crew: %s · other Members known: %d · peers in the channel: %d"):format(
       yesNo(crew), crew and ns.core:rosterCounts().members or 0, link.peers),
     "Link: " .. (link.up and "up" or ("down (%s)"):format(link.reason or "not started")),
+    "Last join failure: " .. lastJoinFailure(),
     ("In an instance: %s · chat messaging lockdown: %s"):format(
       link.instance or "no", yesNo(link.lockdown)),
     "",
