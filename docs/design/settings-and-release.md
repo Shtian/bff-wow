@@ -111,7 +111,7 @@ Releases and the changelog are managed by [`@varlock/bumpy`](https://github.com/
 - **Bump level:** `major` for a protocol bump (`Codec.PROTOCOL`): a Member who hasn't updated stops seeing those who have, and is told only by one "out of date" line in chat, so the version number has to say that the whole Crew should update together. `minor` for a new feature, `patch` for anything else. A change that older versions still sync with is never `major` on that account.
 - **Which PRs need one:** `changedFilePatterns` covers only shipped files (`*.toc`, `*.lua`, `*.xml`), excluding `tests/`, `Dev/` and `scripts/`, plus `.pkgmeta`, since it pins the libraries that ship. Docs, tests and tooling PRs need none. The patterns can't use `!` exclusions (any one matching pattern counts), so the folders are left out with an extglob.
 - **Repo files:** a minimal root `package.json` (`"name": "bff"`, `"version": "0.0.0"`, `"private": true`, bumpy pinned as a dev dependency) and `.bumpy/_config.json` with the package's `managed`, `publishCommand`, `skipNpmPublish` and `changedFilePatterns`. `"private": true` keeps npm out of it; bumpy skips private packages unless they're marked `managed`, and then runs their custom `publishCommand`.
-- **Versions:** semver, staying `0.x` until v1 is complete. No prerelease channels. `package.json` starts at `0.0.0`, which bumpy treats as never released, and the first bump file is a `minor`, so the first Versioned release PR makes it `0.1.0`.
+- **Versions:** semver, staying `0.x` until v1 is complete. No prerelease versions in git or on GitHub: a beta is a bumpy snapshot that only goes to CurseForge (see Betas). `package.json` starts at `0.0.0`, which bumpy treats as never released, and the first bump file is a `minor`, so the first Versioned release PR makes it `0.1.0`.
 - **Changelog:** bumpy writes `CHANGELOG.md` from the bump files. The release build writes its newest 8 releases into `ChangelogText.lua` for What's new (`scripts/changelog-text.sh`, run by `scripts/package.sh`); the checkout's copy stays empty. It also ships in the zip (`.pkgmeta`: `manual-changelog` with `filename: CHANGELOG.md`, `markup-type: markdown`); the packager's generated changelog isn't used.
 
 ### Flow
@@ -149,6 +149,24 @@ Bumpy owns the tag, the GitHub release and its notes. The BigWigs packager only 
 When `CF_API_KEY` and `CURSEFORGE_PROJECT_ID` are both set, step 2 runs without `-d` and with `-p <project id>`, so the packager also uploads the zip to CurseForge. That happens before step 4, so a failed CurseForge upload stops the publish with the GitHub release still a draft. If either is missing, the script says so and builds only. The packager also uploads to GitHub, WoWInterface and Wago when it finds their tokens, so the script unsets those: bumpy owns the GitHub release, and BFF isn't on the other two.
 
 On CurseForge the file is a `release` (the build tag `v<version>` has no alpha or beta in it). Its changelog is `CHANGELOG.md` (`manual-changelog`), and its game versions come from the `.toc`'s interfaces: Forever (CurseForge's game version type 88568) for `16001`, retail for `120105`. When CurseForge doesn't list the exact version, the packager picks the closest lower one.
+
+### Betas
+
+Actions → **beta** → Run workflow (`.github/workflows/beta.yml`) uploads a beta of the pending release to CurseForge, for Members who want to test it before it's out. It runs the tests, then `bumpy ci release --snapshot beta`: bumpy works out the next version from the pending bump files and runs the `publishCommand` with `<next>-beta-<short sha>` (`2.17.0-beta-a1b2c3d`). Nothing goes to git: no commit, tag, GitHub release or `CHANGELOG.md` entry, and the bump files stay pending for the real release. With no pending bump files it does nothing.
+
+It builds from the branch picked in Run workflow, normally `main`; a feature branch works too, for testing a change before it merges. Only someone with write access can run a workflow, and the workflow's first job fails unless the repo owner started it, since the beta goes to CurseForge under BFF's name.
+
+For a prerelease version `scripts/package.sh`:
+
+- builds with the tag `v2.17.0-beta-a1b2c3d`, so the `.toc`'s version says so and the packager uploads a CurseForge **beta** file (a tag with "beta" in it). The CurseForge app only offers it to players who chose beta files for BFF; everyone else stays on releases.
+- puts the pending entries at the top of the zip's `CHANGELOG.md` (`scripts/pending-changelog.sh`, from `bumpy status --json` so it reads bump files as bumpy does; it leaves out `none` entries, and "Internal:" ones unless they're major, as What's new does), so CurseForge shows what the beta brings. `ChangelogText.lua` is written first, from the released entries only. The checkout's `CHANGELOG.md` is put back afterwards, so the script refuses to run while it has uncommitted changes.
+- uploads to CurseForge only, and fails if `CF_API_KEY` or `CURSEFORGE_PROJECT_ID` isn't set. There's no GitHub release to upload to, so WowUp's GitHub source never sees a beta, and no Discord post.
+
+In game, a beta's version isn't `X.Y.Z`, so `Changelog.version` returns nil for it: What's new is off on a beta, and a beta never writes its version to its own record. That's on purpose: friends on the release never hear "BFF 2.17.0 is out" before it is. The flip side: a beta player isn't told "BFF X is out" in chat either, not even for a hotfix released while they're on the beta, since their own version is nil too. The CurseForge app still offers them the release, and after updating, What's new shows everything since the last release they were on. `tests/newer_bff_spec.lua` and `tests/changelog_spec.lua` pin all of this.
+
+**A beta can't carry a protocol bump** without splitting the Crew: everyone on the release would get the "out of date" notice and stop seeing the beta players, with nothing newer to update to. So the workflow refuses while the pending release is `major` (from `bumpy status --json`), unless it's run with **allow_major** (for testing a protocol change in a Crew of testers).
+
+Running it again on the same commit uploads another file with the same version: bumpy only checks npm for an earlier snapshot.
 
 ### Discord announcement
 
