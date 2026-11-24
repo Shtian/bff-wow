@@ -18,8 +18,12 @@ _Avoid_: Group, guild, party, friends
 The generated code that names a Crew and is the only key to it. Whoever has it can join; a Member is in at most one Crew at a time.
 _Avoid_: Invite code, password, Crew name
 
+**Channel generation**:
+Which of the Crew's hidden channels it is using. Each generation is derived from the Crew code, and generation 0 is the first. When the game breaks the current channel, the Crew moves up one. A generation is never left for a lower one.
+_Avoid_: Channel version, channel index
+
 **Leave (the Crew)**:
-What a Member does to themselves: their record is marked as left, so every other Member stops showing them. Unlike Remove, everyone sees it.
+What a Member does to themselves: their record is marked as left, so every other Member stops showing them. Unlike Remove, everyone sees it. The Crew's data is put away, not forgotten, until the Member starts or joins a different Crew.
 _Avoid_: Quit, unsubscribe
 
 **Display name**:
