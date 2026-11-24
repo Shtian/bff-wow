@@ -114,6 +114,7 @@ stds.wow = {
     "UnitFactionGroup",
     "UnitGUID",
     "UnitIsDead",
+    "UnitIsDeadOrGhost",
     "UnitIsTapDenied",
     "UnitLevel",
     "UnitOnTaxi",
