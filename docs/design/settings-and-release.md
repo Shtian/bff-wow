@@ -152,9 +152,16 @@ On CurseForge the file is a `release` (the build tag `v<version>` has no alpha o
 
 ### Betas
 
-Actions → **beta** → Run workflow (`.github/workflows/beta.yml`) uploads a beta of the pending release to CurseForge, for Members who want to test it before it's out. It runs the tests, then `bumpy ci release --snapshot beta`: bumpy works out the next version from the pending bump files and runs the `publishCommand` with `<next>-beta-<short sha>` (`2.17.0-beta-a1b2c3d`). Nothing goes to git: no commit, tag, GitHub release or `CHANGELOG.md` entry, and the bump files stay pending for the real release. With no pending bump files it does nothing.
+`.github/workflows/beta.yml` uploads a beta of the pending release to CurseForge, for Members who want to test it before it's out. It runs the tests, then `bumpy publish --snapshot beta` (not `ci release`, which on a PR comments npm install instructions): bumpy works out the next version from the pending bump files and runs the `publishCommand` with `<next>-beta-<short sha>` (`2.17.0-beta-a1b2c3d`). Nothing goes to git: no commit, tag, GitHub release or `CHANGELOG.md` entry, and the bump files stay pending for the real release. With no pending bump files it fails, as there's nothing to make a beta of.
 
-It builds from the branch picked in Run workflow, normally `main`; a feature branch works too, for testing a change before it merges. Only someone with write access can run a workflow, and the workflow's first job fails unless the repo owner started it, since the beta goes to CurseForge under BFF's name.
+Two ways to start it:
+
+- **The `beta` label on a PR** uploads a beta of the PR's head commit (not GitHub's merge commit, so the version's sha is one in the PR) It uploads once: the label comes off again however the run went, so adding it again uploads the PR's latest commit. Uploading on every push instead would fill CurseForge with betas. A PR from a fork gets no secrets, so this only works for branches in this repo.
+- **Actions → beta → Run workflow** uploads a beta of the branch picked there, normally `main`. Only this way can allow a major bump (below).
+
+After an upload the run's summary names the version, with a link to CurseForge, and so does a comment on the PR: the labelled one, or the open PR for the branch a Run workflow picked.
+
+Either way the first job fails unless the repo owner started it (added the label, or ran the workflow), since the beta goes to CurseForge under BFF's name. Adding labels and running workflows already needs triage or write access, and the owner is the only collaborator today.
 
 For a prerelease version `scripts/package.sh`:
 
@@ -164,7 +171,7 @@ For a prerelease version `scripts/package.sh`:
 
 In game, a beta's version isn't `X.Y.Z`, so `Changelog.version` returns nil for it: What's new is off on a beta, and a beta never writes its version to its own record. That's on purpose: friends on the release never hear "BFF 2.17.0 is out" before it is. The flip side: a beta player isn't told "BFF X is out" in chat either, not even for a hotfix released while they're on the beta, since their own version is nil too. The CurseForge app still offers them the release, and after updating, What's new shows everything since the last release they were on. `tests/newer_bff_spec.lua` and `tests/changelog_spec.lua` pin all of this.
 
-**A beta can't carry a protocol bump** without splitting the Crew: everyone on the release would get the "out of date" notice and stop seeing the beta players, with nothing newer to update to. So the workflow refuses while the pending release is `major` (from `bumpy status --json`), unless it's run with **allow_major** (for testing a protocol change in a Crew of testers).
+**A beta can't carry a protocol bump** without splitting the Crew: everyone on the release would get the "out of date" notice and stop seeing the beta players, with nothing newer to update to. So the workflow refuses while the pending release is `major` (from `bumpy status --json`), unless it's started with Run workflow and **allow_major** (for testing a protocol change in a Crew of testers).
 
 Running it again on the same commit uploads another file with the same version: bumpy only checks npm for an earlier snapshot.
 

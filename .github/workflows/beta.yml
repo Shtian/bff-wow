@@ -1,14 +1,22 @@
 name: beta
 
-# Actions → beta → Run workflow uploads a beta of the pending release to
-# CurseForge: bumpy's snapshot works out the next version from the pending bump
-# files and runs scripts/package.sh with 2.17.0-beta-<sha>, which the packager
-# uploads as a beta file. Nothing goes to git: no commit, tag, GitHub release
-# or changelog entry, and the bump files stay pending for the real release.
-# It builds from the branch picked in Run workflow, normally main. Only someone
-# with write access can run a workflow, and only the repo owner can run this
-# one. See docs/design/settings-and-release.md, "Betas".
+# Uploads a beta of the pending release to CurseForge: bumpy's snapshot works
+# out the next version from the pending bump files and runs scripts/package.sh
+# with 2.17.0-beta-<sha>, which the packager uploads as a beta file. Nothing
+# goes to git: no commit, tag, GitHub release or changelog entry, and the bump
+# files stay pending for the real release.
+#
+# Two ways to start it:
+# - the "beta" label on a PR: a beta of the PR's head commit, once. The label
+#   comes off again, so adding it again uploads the PR's latest commit.
+# - Actions → beta → Run workflow: a beta of the branch picked there, normally
+#   main. Only this way can allow a major bump.
+#
+# Only the repo owner can upload a beta. See docs/design/settings-and-release.md,
+# "Betas".
 on:
+  pull_request:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       allow_major:
@@ -25,6 +33,7 @@ permissions:
 
 jobs:
   owner:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'beta'
     runs-on: ubuntu-latest
     steps:
       - name: Only the repo owner uploads betas
@@ -42,9 +51,18 @@ jobs:
   beta:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      PR: ${{ github.event.pull_request.number }}
+      GH_TOKEN: ${{ github.token }}
     steps:
+      # A PR's head commit, not GitHub's merge commit, so the version's sha is
+      # one that's in the PR.
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Resolve bumpy version
@@ -52,23 +70,60 @@ jobs:
 
       # A major bump is a protocol bump: everyone on the release would be told
       # they're out of date, with nothing newer to update to on CurseForge.
-      - name: Refuse a major bump
-        if: ${{ !inputs.allow_major }}
+      - name: Read the pending release
+        id: plan
         run: |
           # bumpy status exits 1 when nothing is pending, still printing the plan.
           plan=$(npx -y "@varlock/bumpy@$BUMPY_VERSION" status --json) || jq -e '.bumpFiles == []' <<<"$plan" >/dev/null
-          if jq -e '.releases[] | select(.name == "bff" and .type == "major")' <<<"$plan" >/dev/null; then
-            echo "::error::The pending release is major. A beta of it splits the Crew; run again with allow_major to do it anyway."
+          release=$(jq -c '[.releases[] | select(.name == "bff")][0] // empty' <<<"$plan")
+          if [ -z "$release" ]; then
+            echo "::error::No pending bump files, so there's nothing to make a beta of."
             exit 1
           fi
+          if [ "$(jq -r .type <<<"$release")" = major ] && [ "$ALLOW_MAJOR" != true ]; then
+            echo "::error::The pending release is major. A beta of it splits the Crew; use Run workflow with allow_major to do it anyway."
+            exit 1
+          fi
+          echo "version=$(jq -r .newVersion <<<"$release")-beta-$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+        env:
+          ALLOW_MAJOR: ${{ inputs.allow_major }}
 
       # The packager checks out CurseForge externals with svn.
       - name: Install svn
         run: command -v svn || (sudo apt-get update && sudo apt-get install -y subversion)
 
+      # `publish`, not `ci release`: on a PR, `ci release` comments npm install
+      # instructions, which don't apply to an addon.
       - name: Upload the beta
-        run: npx -y "@varlock/bumpy@$BUMPY_VERSION" ci release --snapshot beta
+        run: npx -y "@varlock/bumpy@$BUMPY_VERSION" publish --snapshot beta
         env:
-          GH_TOKEN: ${{ github.token }}
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+
+      # On the run's page, and on the PR: the labelled one, or the open PR for
+      # the branch a Run workflow picked.
+      - name: Tell the run and the PR
+        run: |
+          body="BFF \`$VERSION\` is on [CurseForge](https://www.curseforge.com/projects/$CURSEFORGE_PROJECT_ID) as a beta file, built from $(git rev-parse --short=7 HEAD)."
+          echo "$body" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$PR" ]; then
+            PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" --state open --json number -q '.[0].number')
+          fi
+          if [ -n "$PR" ]; then
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body Add the \`beta\` label to upload a newer commit."
+          fi
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+
+  # The label means "upload once", so it comes off however the run went.
+  unlabel:
+    if: always() && github.event_name == 'pull_request' && github.event.label.name == 'beta'
+    needs: beta
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - run: gh pr edit "${{ github.event.pull_request.number }}" --repo "$GITHUB_REPOSITORY" --remove-label beta
+        env:
+          GH_TOKEN: ${{ github.token }}
