@@ -35,7 +35,7 @@ local trace
 local target
 local joining = false
 local joined = false
-local failed
+local failure
 local settled = false
 local isUp = false
 local listAsked
@@ -127,7 +127,7 @@ ChannelLink.FAILURE_REASONS = FAILURE_REASONS
 
 local function downReason()
   if not target then return "no Crew" end
-  if failed then return FAILURE_REASONS[failed] end
+  if failure then return FAILURE_REASONS[failure] end
   if not joined then return "not in the channel" end
   if not presence:ready() then return "waiting for the member list" end
   if lockdown() then return "lockdown" end
@@ -179,15 +179,15 @@ local function onJoined(how)
 end
 
 local function fail(kind, outcome)
-  if trace then trace("join failed: " .. outcome) end
+  if trace then trace("join failed: " .. (outcome or FAILURE_REASONS[kind])) end
   joining = false
-  failed = kind
+  failure = kind
   update()
   core:joinFailed(kind)
 end
 
 local function tryJoin()
-  if not target or joined or joining or failed or lockdown() then return end
+  if not target or joined or joining or failure or lockdown() then return end
   if channelIndex(target.channel) then
     -- WoW: channel membership survives a /reload.
     onJoined("already in the Crew channel")
@@ -298,7 +298,7 @@ local tooManyPattern = patternFor(ERR_TOO_MANY_CHAT_CHANNELS)
 
 local function onError(text)
   if joining and tooManyPattern and readable(text) and text:find(tooManyPattern) then
-    fail("tooManyChannels", "too many channels")
+    fail("tooManyChannels")
   end
 end
 
@@ -327,7 +327,7 @@ function events.CHAT_MSG_CHANNEL_NOTICE(kind, arg2, _, arg4, arg5, _, _, arg8, a
   traceChannelNotice(kind, arg2, arg4, arg5, arg8, arg9)
   if not readable(kind) then return end
   if kind == "WRONG_PASSWORD" then
-    if not joined then fail("wrongPassword", "wrong password") end
+    if not joined then fail("wrongPassword") end
   elseif kind == "YOU_LEFT" or kind == "SUSPENDED" then
     joined = false
     update()
@@ -606,7 +606,7 @@ function ChannelLink.setCrew(crew)
   end
   target = crew and { channel = crew.channel, password = crew.password }
   presence:stop()
-  failed = nil
+  failure = nil
   if name then ours[name:upper()] = true end
   update()
   tryJoin()
