@@ -43,6 +43,12 @@
 
 
 
+
+## 2.16.7
+<sub>2026-11-24</sub>
+
+- *(patch)* Dying with a pet out no longer counts as two deaths.
+
 ## 2.16.6
 <sub>2026-11-24</sub>
 
