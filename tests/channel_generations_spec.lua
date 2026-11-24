@@ -30,6 +30,16 @@ local function record(id, version, fields)
   return result
 end
 
+local function sentOwn(ns, deps)
+  for i = #deps.sent, 1, -1 do
+    local decoded = ns.Codec.decode(deps.sent[i])
+    for _, sent in ipairs(type(decoded) == "table" and decoded.records or {}) do
+      if sent.id == decoded.from then return sent end
+    end
+  end
+  return nil
+end
+
 local function receive(ns, core, from, records)
   core:received(ns.Codec.encode({ type = "DATA", from = from, records = records }), from)
 end
@@ -39,12 +49,14 @@ describe("Channel generations", function()
     local ns = load()
     local deps = newDeps()
     local core = ns.Core.new(deps)
+    core:up()
     local crew = core:startCrew("Stian")
     local channel, password = ns.CrewCode.channel(crew.code)
     assert.equal(0, crew.generation)
     assert.equal(channel, crew.channel)
     assert.equal(password, crew.password)
-    assert.is_nil(deps.db.records[deps.db.memberId].generation)
+    assert.is_table(sentOwn(ns, deps))
+    assert.is_nil(sentOwn(ns, deps).generation)
   end)
 
   it("name generation N from the code and N, with the generation 0 password", function()
@@ -74,10 +86,11 @@ describe("Channel generations", function()
     local crew = core:crew()
     assert.equal(1, crew.generation)
     assert.equal(ns.CrewCode.channel(code, 1), crew.channel)
-    assert.equal(1, crew.steps)
+    assert.equal(1, crew.moves)
     assert.equal("moved this session", crew.generationFrom)
     assert.equal(2, countEvents(deps, "crewChanged"))
-    assert.equal(1, db.records[db.memberId].generation)
+    core:tick()
+    assert.equal(1, sentOwn(ns, deps).generation)
 
     local again = ns.Core.new(newDeps(db))
     assert.equal(1, again:crew().generation)
@@ -114,10 +127,43 @@ describe("Channel generations", function()
 
     local deps2 = newDeps(db)
     local nextLogin = ns.Core.new(deps2)
-    assert.equal(0, nextLogin:crew().steps)
+    assert.equal(0, nextLogin:crew().moves)
     assert.is_false(nextLogin:crew().capped)
     nextLogin:channelBroken()
     assert.equal(6, nextLogin:crew().generation)
+  end)
+
+  it("keep counting moves across leaving and rejoining, and say it once across a reload", function()
+    local ns = load()
+    local db = {}
+    local deps = newDeps(db)
+    local core = ns.Core.new(deps)
+    local code = core:startCrew("Stian").code
+    for _ = 1, 5 do core:channelBroken() end
+    core:leaveCrew()
+    core:up()
+    core:joinCrew(code)
+    assert.equal(5, core:crew().moves)
+    core:channelBroken()
+    assert.is_true(core:crew().capped)
+
+    local reloadDeps = newDeps(db)
+    reloadDeps.initialLogin = false
+    local reloaded = ns.Core.new(reloadDeps)
+    reloaded:channelBroken()
+    assert.is_true(reloaded:crew().capped)
+    assert.equal(1, countEvents(deps, "notice", "noChannel"))
+    assert.equal(0, countEvents(reloadDeps, "notice", "noChannel"))
+  end)
+
+  it("finish a leave started once capped, since the link won't come up", function()
+    local deps = newDeps()
+    local core = load().Core.new(deps)
+    core:startCrew("Stian")
+    for _ = 1, 6 do core:channelBroken() end
+    core:leaveCrew()
+    assert.is_nil(core:crew())
+    assert.same({ "notice", "leftCrew" }, deps.events[#deps.events])
   end)
 
   it("finish a waiting leave at the cap, since the link won't come up", function()
@@ -142,9 +188,8 @@ describe("Channel generations", function()
     assert.equal(2, crew.generation)
     assert.equal(ns.CrewCode.channel(code, 2), crew.channel)
     assert.equal("ann's record", crew.generationFrom)
-    assert.equal(0, crew.steps)
+    assert.equal(0, crew.moves)
     assert.equal(2, countEvents(deps, "crewChanged"))
-    assert.equal(2, deps.db.records[deps.db.memberId].generation)
 
     receive(ns, core, "bob", { record("bob", 2000, { generation = 1 }) })
     assert.equal(2, core:crew().generation)

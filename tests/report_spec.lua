@@ -16,7 +16,7 @@ local function report(options)
   ns.core = {
     crew = function()
       if options.crew == false then return nil end
-      return options.crew or { code = "X", generation = 0, generationFrom = "saved", steps = 0 }
+      return options.crew or { code = "X", generation = 0, generationFrom = "saved", moves = 0 }
     end,
     rosterCounts = function() return { members = 2 } end,
     joinFailure = function() return options.failure end,
@@ -63,7 +63,7 @@ describe("/bff report", function()
   end)
 
   it("gives the channel generation, where it came from, and the moves this session", function()
-    local text = report({ crew = { code = "X", generation = 3, generationFrom = "Ann's record", steps = 2 } })
+    local text = report({ crew = { code = "X", generation = 3, generationFrom = "Ann's record", moves = 2 } })
     assert.truthy(text:find("Channel generation: 3 (Ann's record) · moves this session: 2", 1, true))
     assert.truthy(report({ crew = false }):find("Channel generation: none (no Crew)", 1, true))
   end)

@@ -23,7 +23,7 @@ end
 local function channelGeneration(crew)
   if not crew then return "Channel generation: none (no Crew)" end
   return ("Channel generation: %d (%s) · moves this session: %d"):format(
-    crew.generation, crew.generationFrom, crew.steps)
+    crew.generation, crew.generationFrom, crew.moves)
 end
 
 function Report.text()

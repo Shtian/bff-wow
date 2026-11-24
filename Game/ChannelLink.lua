@@ -37,6 +37,7 @@ local joining = false
 local joined = false
 local failure
 local settled = false
+local afterLogin = false
 local isUp = false
 local listAsked
 -- WoW: a member list asked for while a restriction is activating comes back
@@ -213,8 +214,9 @@ end
 
 local function tryJoin()
   if not target or joined or joining or failure or lockdown() then return end
-  if not target.asked and channelIndex(target.channel) then
-    -- WoW: channel membership survives a /reload.
+  if not target.asked and not afterLogin and channelIndex(target.channel) then
+    -- WoW: channel membership survives a /reload. A channel number at login
+    -- isn't proof the server let BFF back in.
     onJoined("already in the Crew channel")
     return
   end
@@ -347,13 +349,13 @@ end
 function events.CHAT_MSG_CHANNEL_NOTICE(kind, arg2, _, arg4, arg5, _, _, arg8, arg9)
   if not isTarget(baseName(arg4, arg9)) then return end
   traceChannelNotice(kind, arg2, arg4, arg5, arg8, arg9)
-  if not readable(kind) or failure then return end
+  if not readable(kind) then return end
   if kind == "WRONG_PASSWORD" then
     if not joined then fail("wrongPassword") end
   elseif kind == "INVALID_NAME" then
-    broken()
+    if not failure then broken() end
   elseif kind == "YOU_CHANGED" then
-    if not joined then onJoined("joined the Crew channel") end
+    if not joined and not failure then onJoined("joined the Crew channel") end
   elseif kind == "YOU_LEFT" or kind == "SUSPENDED" then
     joined = false
     update()
@@ -601,8 +603,9 @@ framing = ns.Framing.new({
 
 strangerFraming = ns.Framing.new({ now = GetTime })
 
-function ChannelLink.start(theCore)
+function ChannelLink.start(theCore, isInitialLogin)
   core = theCore
+  afterLogin = isInitialLogin == true
 
   ChannelLink:RegisterComm(PREFIX, onComm)
   instanceType = currentInstance()

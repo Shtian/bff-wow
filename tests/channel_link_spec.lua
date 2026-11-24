@@ -966,6 +966,20 @@ describe("The channel link", function()
       assert.equal("the game broke the channel", link.state().reason)
     end)
 
+    it("doesn't take a channel number at login as being in the channel, and joins", function()
+      local game = wow()
+      game.channels[CHANNEL] = 5
+      game.joinAnswer = function() return "INVALID_NAME" end
+      local link = game.load("Game/ChannelLink.lua", {}).ChannelLink
+      local core = fakeCore()
+      link.start(core, true)
+      link.setCrew({ channel = CHANNEL, password = "pw" })
+      assert.equal("not in the channel", link.state().reason)
+      game.advance(11)
+      assert.equal(1, game.joins)
+      assert.equal(1, core.count("channelBroken"))
+    end)
+
     it("ignores INVALID_NAME for another channel", function()
       local game, link, core = linked()
       game.fire("CHAT_MSG_CHANNEL_NOTICE", crewNotice("INVALID_NAME", "Friends"))

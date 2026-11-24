@@ -474,13 +474,6 @@ describe("The last join failure", function()
 end)
 
 describe("Leaving and rejoining the same Crew", function()
-  local function copy(value)
-    if type(value) ~= "table" then return value end
-    local result = {}
-    for k, v in pairs(value) do result[k] = copy(v) end
-    return result
-  end
-
   local function crewOfThree()
     local ns = load()
     local net = ns.FakeNet.new()
@@ -498,21 +491,16 @@ describe("Leaving and rejoining the same Crew", function()
     return net, ann, bob, code
   end
 
-  local function crewData(client)
-    local db = client.db
-    local others = {}
-    for id, record in pairs(db.records) do
-      if id ~= db.memberId then others[id] = copy(record) end
+  local function entries(client)
+    local all = {}
+    for _, day in ipairs(client.core:feed().days) do
+      for _, entry in ipairs(day.entries) do
+        local reactors = {}
+        for _, reactor in ipairs(entry.reactors or {}) do reactors[#reactors + 1] = reactor.displayName or reactor.name end
+        all[#all + 1] = { text = entry.text, reactors = reactors }
+      end
     end
-    return {
-      records = others,
-      removed = copy(db.removed),
-      feed = copy(db.feed),
-      feedJoins = copy(db.feedJoins),
-      reached = copy(db.goals.reached),
-      reactions = copy(db.records[db.memberId].reactions),
-      generation = client.core:crew() and client.core:crew().generation,
-    }
+    return all
   end
 
   local function react(client)
@@ -530,39 +518,59 @@ describe("Leaving and rejoining the same Crew", function()
     return names
   end
 
+  local function members(client)
+    local names = {}
+    for _, row in ipairs(client.core:rows("name")) do names[#names + 1] = row.displayName end
+    return names
+  end
+
+  local function reached(client)
+    local result = {}
+    for _, row in ipairs(client.core:goals()) do result[row.track] = row.reached end
+    return result
+  end
+
+  local function contains(list, wanted)
+    for _, item in ipairs(list) do
+      if item.text == wanted.text then
+        assert.same(wanted, item)
+        return
+      end
+    end
+    error("missing feed entry " .. tostring(wanted.text))
+  end
+
   it("keeps the Crew's data out of sight, and brings it all back", function()
-    local net, ann, bob, code = crewOfThree()
+    local net, ann, _, code = crewOfThree()
     assert.is_true(react(ann))
     net:run(5)
-    local before = crewData(ann)
-    assert.is_table(before.records[bob.memberId])
+    local feed, goals = entries(ann), reached(ann)
+    assert.same({ "Ann", "Bob" }, members(ann))
     assert.same({ "Cat" }, removedNames(ann))
-    assert.is_not_nil(next(before.feed))
-    assert.is_table(before.reactions)
-    assert.equal(1, before.generation)
+    assert.is_true(#feed > 0)
+    local reactedTo = false
+    for _, entry in ipairs(feed) do reactedTo = reactedTo or #entry.reactors > 0 end
+    assert.is_true(reactedTo)
+    assert.equal(1, ann.core:crew().generation)
 
     ann.core:leaveCrew()
     net:run(5)
     assert.is_nil(ann.core:crew())
-    assert.equal(1, #ann.core:rows())
-    assert.same({}, ann.core:removed())
-    assert.same({}, ann.db.feed)
-    assert.is_nil(ann.db.records[ann.db.memberId].reactions)
+    assert.same({ "Ann" }, members(ann))
+    assert.same({}, removedNames(ann))
+    assert.same({}, entries(ann))
 
     ann:join(code)
-    local after = crewData(ann)
-    assert.same(before.records, after.records)
+    assert.same({ "Ann", "Bob" }, members(ann))
     assert.same({ "Cat" }, removedNames(ann))
-    assert.same(before.feedJoins, after.feedJoins)
-    assert.same(before.reached, after.reached)
-    assert.same(before.reactions, after.reactions)
-    assert.equal(1, after.generation)
-    assert.is_table(ann:rowFor(bob))
-    for i, entry in ipairs(before.feed) do assert.same(entry, after.feed[i]) end
+    assert.same(goals, reached(ann))
+    assert.equal(1, ann.core:crew().generation)
+    local after = entries(ann)
+    for _, entry in ipairs(feed) do contains(after, entry) end
   end)
 
   it("brings it back after a logout too", function()
-    local net, ann, bob, code = crewOfThree()
+    local net, ann, _, code = crewOfThree()
     ann.core:leaveCrew()
     net:run(5)
     ann:logout()
@@ -570,26 +578,28 @@ describe("Leaving and rejoining the same Crew", function()
     ann:login()
     assert.is_nil(ann.core:crew())
     ann:join(code)
-    assert.is_table(ann:rowFor(bob))
+    assert.same({ "Ann", "Bob" }, members(ann))
     assert.equal(1, ann.core:crew().generation)
   end)
 
   it("wipes it on starting or joining a different Crew", function()
-    local net, ann = crewOfThree()
+    local net, ann, _, code = crewOfThree()
     ann.core:leaveCrew()
     net:run(5)
     ann:join()
-    assert.equal(1, #ann.core:rows())
-    assert.same({}, ann.core:removed())
-    assert.same({}, ann.db.feedJoins)
+    assert.same({ "Ann" }, members(ann))
+    assert.same({}, removedNames(ann))
     assert.equal(0, ann.core:crew().generation)
-    assert.is_nil(ann.db.records[ann.db.memberId].generation)
-    assert.is_nil(ann.db.keptCrew)
 
     ann.core:leaveCrew()
     net:run(5)
     ann:join(withCheck("K3F9A2Q"))
-    assert.equal(1, #ann.core:rows())
-    assert.is_nil(ann.db.keptCrew)
+    assert.same({ "Ann" }, members(ann))
+    ann.core:leaveCrew()
+    net:run(5)
+    ann:join(code)
+    assert.same({ "Ann" }, members(ann))
+    assert.same({}, removedNames(ann))
+    assert.equal(0, ann.core:crew().generation)
   end)
 end)

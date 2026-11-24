@@ -96,6 +96,11 @@ local function knownMembers(ledger)
   return known
 end
 
+local function refreshMembers(self)
+  self.online = ns.Roster.online(self.ledger, self.now())
+  self.known = knownMembers(self.ledger)
+end
+
 local function shownSpot(self, row)
   local record = self.ledger:record(row.memberId)
   local live = record and self.where:spot(row.memberId, row.guid, record.version)
@@ -265,10 +270,9 @@ function Core.new(deps)
   self.gossip:setPaused(self:isPaused())
   self.playTracker = ns.PlayTimes.new(deps.db, deps.now)
   self.playTimesDue = true
-  self.online = ns.Roster.online(self.ledger, deps.now())
-  self.known = knownMembers(self.ledger)
+  refreshMembers(self)
   self.whatsNewState = ns.WhatsNew.new(deps.db, deps.version, deps.changelog, fresh)
-  if self.db.crew and self.initialLogin then self.db.crew.steps = nil end
+  if self.initialLogin or type(self.db.channelMoves) ~= "table" then self.db.channelMoves = { count = 0 } end
   self.generationFrom = "saved"
   self:raiseGeneration(true)
   self.bffVersionOf = function(id)
@@ -1424,7 +1428,7 @@ function Core:crew()
     capped = self.channelCapped == true,
     generation = generation,
     generationFrom = self.generationFrom,
-    steps = saved.steps or 0,
+    moves = self.db.channelMoves.count,
   }
 end
 
@@ -1454,8 +1458,7 @@ local function bringBack(self, code)
   self.ledger:bringBack(kept.ledger)
   self.feedState:bringBack(kept.feed)
   self.crewGoals:bringBack(kept.goals)
-  self.online = ns.Roster.online(self.ledger, self.now())
-  self.known = knownMembers(self.ledger)
+  refreshMembers(self)
   return kept
 end
 
@@ -1470,6 +1473,7 @@ local function enter(self, code, displayName, joining)
   self.generationFrom = "saved"
   self.linkFailed = nil
   self.channelCapped = nil
+  if kept then self:raiseGeneration(true) end
   if joining then self.feedState:ownJoined() end
   self.listener("crewChanged")
   updateLink(self)
@@ -1619,17 +1623,17 @@ function Core:leaveCrew()
   if crew.leaving then return true end
   crew.leaving = true
   self.ledger:writeOwn({ left = true })
-  if self.linkUp or self.linkFailed then finishLeaving(self) else self.listener("changed") end
+  if self.linkUp or self.linkFailed or self.channelCapped then finishLeaving(self) else self.listener("changed") end
   return true
 end
 
-local function moveTo(self, generation, from, why)
-  local crew = self.db.crew
-  crew.generation = generation
+local function moveTo(self, generation, from)
+  self.db.crew.generation = generation
   self.generationFrom = from
   self.channelCapped = nil
   self.ledger:writeOwn({ generation = generation })
-  if self.trace then self.trace(("channel generation %d (%s)"):format(generation, why)) end
+  sendOwnNow(self)
+  if self.trace then self.trace(("channel generation %d (%s)"):format(generation, from)) end
 end
 
 function Core:raiseGeneration(quiet)
@@ -1637,34 +1641,33 @@ function Core:raiseGeneration(quiet)
   if not crew then return false end
   local highest, from = self.ledger:highestGeneration()
   if highest <= (crew.generation or 0) then return false end
-  local source = ("%s's record"):format(self.ledger:record(from).displayName or from)
-  moveTo(self, highest, source, source)
+  moveTo(self, highest, ("%s's record"):format(self.ledger:record(from).displayName or from))
   if not quiet then self.listener("crewChanged") end
   return true
 end
 
-Core.MAX_STEPS = 5
+Core.MAX_MOVES = 5
 
 function Core:channelBroken()
   local crew = self.db.crew
   if not crew then return end
-  local steps = crew.steps or 0
-  if steps >= Core.MAX_STEPS then
-    if self.trace then self.trace(("channel broken, not moving: %d moves this session already"):format(steps)) end
+  local moves = self.db.channelMoves
+  if moves.count >= Core.MAX_MOVES then
+    if self.trace then self.trace(("channel broken, not moving: %d moves this session already"):format(moves.count)) end
     self.channelCapped = true
     if crew.leaving then
       finishLeaving(self)
       return
     end
-    if not self.toldCapped then
-      self.toldCapped = true
+    if not moves.told then
+      moves.told = true
       self.listener("notice", "noChannel")
     end
     self.listener("changed")
     return
   end
-  crew.steps = steps + 1
-  moveTo(self, (crew.generation or 0) + 1, "moved this session", "the game broke the channel")
+  moves.count = moves.count + 1
+  moveTo(self, (crew.generation or 0) + 1, "moved this session")
   self.listener("crewChanged")
 end
 
