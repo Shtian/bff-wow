@@ -42,6 +42,8 @@ function FakeNet.new(options)
     drop = nil,
     fail = nil,
     chunked = nil,
+    channels = options.channels == true,
+    sees = nil,
   }, FakeNet)
 end
 
@@ -95,9 +97,29 @@ local function receive(self, item, client)
   end
 end
 
+local function channelOf(client)
+  local crew = client.core and client.core:crew()
+  return crew and crew.channel
+end
+
+local function hasPeer(self, client, other)
+  if channelOf(client) ~= nil and channelOf(client) == channelOf(other) then return true end
+  return client.vouched[other.name] == true or (self.sees ~= nil and self.sees(client.name, other.name))
+end
+
+local function reaches(self, item, client)
+  if not self.channels or item.gone then return true end
+  local from = item.from
+  if not hasPeer(self, from, client) then return false end
+  if hasPeer(self, client, from) then return true end
+  if not client.core:fromKnownMember(item.message) then return false end
+  client.vouched[from.name] = true
+  return true
+end
+
 local function deliver(self, item)
   for _, client in ipairs(self.clients) do
-    if isListening(client) then
+    if isListening(client) and reaches(self, item, client) then
       if item.gone then
         if client ~= item.from then client.core:gone(item.gone) end
       elseif item.to == nil or characterName(client) == item.to then
@@ -111,8 +133,11 @@ local function deliver(self, item)
   end
 end
 
+local relinkMoved
+
 function FakeNet:step(time)
   self.clock = time or self.clock + 1
+  for _, client in ipairs(self.clients) do relinkMoved(client) end
   local queue = self.queue
   self.queue = {}
   for _, item in ipairs(queue) do deliver(self, item) end
@@ -146,6 +171,7 @@ function FakeNet:add(name, options)
       level = 10, xp = 0, maxXp = 1000, zone = "Elwynn Forest", deaths = 0,
     },
     events = {},
+    vouched = {},
     linkUp = false,
     ticks = true,
   }, Client)
@@ -155,7 +181,7 @@ function FakeNet:add(name, options)
 end
 
 function FakeNet:attach(core, name)
-  local client = setmetatable({ net = self, name = name or "you", core = core, linkUp = true }, Client)
+  local client = setmetatable({ net = self, name = name or "you", core = core, linkUp = true, vouched = {} }, Client)
   client.framing = newFraming(client)
   self.clients[#self.clients + 1] = client
   return client
@@ -182,7 +208,10 @@ local function newCore(client, initialLogin)
       end,
     },
     gossip = client.gossip,
-    listener = function(...) client.events[#client.events + 1] = { ... } end,
+    listener = function(event, ...)
+      client.events[#client.events + 1] = { event, ... }
+      if event == "crewChanged" and net.channels then client.moved = true end
+    end,
     initialLogin = initialLogin,
     maxLevel = net.maxLevel,
     utcOffset = client.utcOffset,
@@ -210,6 +239,18 @@ local function bringUp(client)
   if client.locked or not client.core or not client.core:crew() then return end
   client.linkUp = true
   client.core:up()
+end
+
+function relinkMoved(client)
+  if not client.moved then return end
+  client.moved = nil
+  client.vouched = {}
+  if not client.core then return end
+  if client.linkUp then
+    client.linkUp = false
+    client.core:down()
+  end
+  bringUp(client)
 end
 
 function Client:login()
@@ -272,6 +313,7 @@ function Client:join(code)
   else
     code = assert(self.core:startCrew(self.name)).code
   end
+  self.moved = nil
   bringUp(self)
   return code
 end

@@ -14,6 +14,8 @@ local GAP_ACTION = 10
 local GAP_HINT = 4
 local CODE_WIDTH = 128
 local CODE_HEIGHT = 24
+local ACTION_WIDTH = 110
+local ACTION_HEIGHT = 24
 local HINT = "Ctrl+C to copy"
 local PLACE_AT = 0.4
 local PLACE_INSET = 12
@@ -22,6 +24,12 @@ local ALONE = {
   art = "alone",
   title = "Your Crew hasn't arrived yet",
   text = "Share your Crew code. Members join with /bff join, and show up here once one of them is online.",
+}
+local CAPPED = {
+  art = "alone",
+  title = "The game won't let BFF into any channel for your Crew",
+  text = "Try again later.",
+  action = { label = "Report a bug", onClick = function() ns.Contact.show() end },
 }
 local JOINED = {
   art = "alone",
@@ -34,9 +42,9 @@ function EmptyState.view(own, still)
 end
 
 function EmptyState.alone(crew, still)
-  local from = crew.joined and JOINED or ALONE
+  local from = crew.capped and CAPPED or crew.joined and JOINED or ALONE
   return { art = from.art, title = from.title, text = from.text, code = from == ALONE and crew.code or nil,
-    still = still }
+    action = from.action, still = still }
 end
 
 local function showCell(self, index)
@@ -63,6 +71,11 @@ local function set(self, state)
   self.code:SetShown(state.code ~= nil)
   self.hint:SetShown(state.code ~= nil)
   if state.code then self.code:SetText(state.code) end
+  self.action:SetShown(state.action ~= nil)
+  if state.action then
+    self.action:SetText(state.action.label)
+    self.action:SetScript("OnClick", state.action.onClick)
+  end
 end
 
 local function layout(self, width)
@@ -78,6 +91,7 @@ local function layout(self, width)
   if self.code:IsShown() then
     height = height + GAP_ACTION + CODE_HEIGHT + GAP_HINT + self.hint:GetStringHeight()
   end
+  if self.action:IsShown() then height = height + GAP_ACTION + ACTION_HEIGHT end
   height = math.ceil(height)
   self:SetSize(width, height)
   return height
@@ -123,6 +137,11 @@ function EmptyState.new(parent)
   self.hint = Skin.label(self, "tiny", Skin.DIM)
   self.hint:SetPoint("TOP", self.code, "BOTTOM", 0, -GAP_HINT)
   self.hint:SetText(HINT)
+
+  self.action = Skin.button(self, "")
+  self.action:SetSize(ACTION_WIDTH, ACTION_HEIGHT)
+  self.action:SetPoint("TOP", self.text, "BOTTOM", 0, -GAP_ACTION)
+  self.action:Hide()
 
   self.Set, self.Layout, self.Place = set, layout, place
   return self

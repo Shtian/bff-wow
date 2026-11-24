@@ -96,6 +96,11 @@ local function knownMembers(ledger)
   return known
 end
 
+local function refreshMembers(self)
+  self.online = ns.Roster.online(self.ledger, self.now())
+  self.known = knownMembers(self.ledger)
+end
+
 local function shownSpot(self, row)
   local record = self.ledger:record(row.memberId)
   local live = record and self.where:spot(row.memberId, row.guid, record.version)
@@ -265,9 +270,11 @@ function Core.new(deps)
   self.gossip:setPaused(self:isPaused())
   self.playTracker = ns.PlayTimes.new(deps.db, deps.now)
   self.playTimesDue = true
-  self.online = ns.Roster.online(self.ledger, deps.now())
-  self.known = knownMembers(self.ledger)
+  refreshMembers(self)
   self.whatsNewState = ns.WhatsNew.new(deps.db, deps.version, deps.changelog, fresh)
+  if self.initialLogin or type(self.db.channelMoves) ~= "table" then self.db.channelMoves = { count = 0 } end
+  self.generationFrom = "saved"
+  self:raiseGeneration(true)
   self.bffVersionOf = function(id)
     local record = self.ledger:record(id)
     return record and record.bff
@@ -1391,14 +1398,19 @@ local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
 local PAUSED = "You appear offline: the others don't see you. Change it in Settings."
 local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
 
+local CAPPED = "The game won't let BFF into any channel for your Crew. Try again later."
+
 function Core:crew()
   local saved = self.db.crew
   if not saved then return nil end
-  local channel, password = ns.CrewCode.channel(saved.code)
+  local generation = saved.generation or 0
+  local channel, password = ns.CrewCode.channel(saved.code, generation)
   local alone = not self.ledger:knowsOthers()
   local status, waiting
   if saved.leaving then
     status = LEAVING
+  elseif self.channelCapped then
+    status, waiting = CAPPED, alone or nil
   elseif self:isPaused() then
     status = PAUSED
   elseif alone then
@@ -1413,6 +1425,10 @@ function Core:crew()
     joined = saved.joined == true,
     status = status,
     waiting = waiting,
+    capped = self.channelCapped == true,
+    generation = generation,
+    generationFrom = self.generationFrom,
+    moves = self.db.channelMoves.count,
   }
 end
 
@@ -1435,13 +1451,29 @@ local function nameOrCurrent(self, displayName)
   return validName(displayName)
 end
 
+local function bringBack(self, code)
+  local kept = self.db.keptCrew
+  self.db.keptCrew = nil
+  if type(kept) ~= "table" or kept.code ~= code then return nil end
+  self.ledger:bringBack(kept.ledger)
+  self.feedState:bringBack(kept.feed)
+  self.crewGoals:bringBack(kept.goals)
+  refreshMembers(self)
+  return kept
+end
+
 local function enter(self, code, displayName, joining)
-  self.ledger:writeOwn({ displayName = displayName, left = false, joinedAt = self.now() })
-  sendOwnNow(self)
   self.crewGoals:clear()
   self.db.catchTypesTold = nil
-  self.db.crew = { code = code, joined = joining or nil }
+  local kept = bringBack(self, code)
+  local generation = kept and kept.generation or nil
+  self.ledger:writeOwn({ displayName = displayName, left = false, joinedAt = self.now(), generation = generation or false })
+  sendOwnNow(self)
+  self.db.crew = { code = code, joined = joining or nil, generation = generation }
+  self.generationFrom = "saved"
   self.linkFailed = nil
+  self.channelCapped = nil
+  if kept then self:raiseGeneration(true) end
   if joining then self.feedState:ownJoined() end
   self.listener("crewChanged")
   updateLink(self)
@@ -1563,15 +1595,20 @@ function Core:removed()
 end
 
 local function finishLeaving(self)
+  local crew = self.db.crew
   self.db.crew = nil
   self.linkFailed = nil
+  self.channelCapped = nil
   updateLink(self)
   if self.linkUp then self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } }) end
-  self.ledger:forgetOthers()
-  self.ledger:clearReactions()
   self.spareLife:clear()
-  self.feedState:clear()
-  self.crewGoals:clear()
+  self.db.keptCrew = {
+    code = crew.code,
+    generation = crew.generation,
+    ledger = self.ledger:putAway(),
+    feed = self.feedState:putAway(),
+    goals = self.crewGoals:putAway(),
+  }
   self.db.catchTypesTold = nil
   self.online = {}
   self.pocket:clear()
@@ -1586,8 +1623,52 @@ function Core:leaveCrew()
   if crew.leaving then return true end
   crew.leaving = true
   self.ledger:writeOwn({ left = true })
-  if self.linkUp or self.linkFailed then finishLeaving(self) else self.listener("changed") end
+  if self.linkUp or self.linkFailed or self.channelCapped then finishLeaving(self) else self.listener("changed") end
   return true
+end
+
+local function moveTo(self, generation, from)
+  self.db.crew.generation = generation
+  self.generationFrom = from
+  self.channelCapped = nil
+  self.ledger:writeOwn({ generation = generation })
+  sendOwnNow(self)
+  if self.trace then self.trace(("channel generation %d (%s)"):format(generation, from)) end
+end
+
+function Core:raiseGeneration(quiet)
+  local crew = self.db.crew
+  if not crew then return false end
+  local highest, from = self.ledger:highestGeneration()
+  if highest <= (crew.generation or 0) then return false end
+  moveTo(self, highest, ("%s's record"):format(self.ledger:record(from).displayName or from))
+  if not quiet then self.listener("crewChanged") end
+  return true
+end
+
+Core.MAX_MOVES = 5
+
+function Core:channelBroken()
+  local crew = self.db.crew
+  if not crew then return end
+  local moves = self.db.channelMoves
+  if moves.count >= Core.MAX_MOVES then
+    if self.trace then self.trace(("channel broken, not moving: %d moves this session already"):format(moves.count)) end
+    self.channelCapped = true
+    if crew.leaving then
+      finishLeaving(self)
+      return
+    end
+    if not moves.told then
+      moves.told = true
+      self.listener("notice", "noChannel")
+    end
+    self.listener("changed")
+    return
+  end
+  moves.count = moves.count + 1
+  moveTo(self, (crew.generation or 0) + 1, "moved this session")
+  self.listener("crewChanged")
 end
 
 local JOIN_FAILURES = { wrongPassword = true, tooManyChannels = true }
@@ -1671,6 +1752,7 @@ local function dataReceived(self, records, from, whispered)
     end
   end
   if changed then
+    self:raiseGeneration()
     if alone then noteWalkIn(self, records) end
     checkGoals(self)
     tellNewerBff(self)

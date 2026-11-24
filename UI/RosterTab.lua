@@ -350,6 +350,10 @@ local function createFooter()
   footer.status:SetPoint("TOPLEFT", INSET, -10)
   footer.status:SetWordWrap(true)
 
+  footer.report = Skin.button(footer, "Report a bug", function() ns.Contact.show() end)
+  footer.report:SetWidth(110)
+  footer.report:SetPoint("TOPLEFT", footer.status, "BOTTOMLEFT", 0, -6)
+
   local codeLabel = Skin.label(footer, "small", MUTED)
   codeLabel:SetPoint("BOTTOMLEFT", INSET, CODE_LINE)
   codeLabel:SetText("Crew code")
@@ -394,6 +398,8 @@ local function drawFooter(crew, counts)
   footer.status:SetText(status or "")
   local height = 46
   if status then height = height + footer.status:GetStringHeight() + 6 end
+  footer.report:SetShown(crew.capped and not crew.alone)
+  if footer.report:IsShown() then height = height + footer.report:GetHeight() + 6 end
   footer:SetHeight(height)
   return height
 end

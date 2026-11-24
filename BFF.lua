@@ -17,6 +17,7 @@ local MESSAGES = {
   tooManyChannels = "BFF couldn't join its channel: leave a chat channel and /reload.",
   wrongPassword = "BFF couldn't join its channel: leave the Crew and start a new one.",
   leftCrew = "You left the Crew.",
+  noChannel = "The game won't let BFF into any channel for your Crew. Try again later.",
   minimapHidden = "Minimap button hidden. Type /bff minimap to show it again.",
   outOfDate = "BFF is out of date: someone in your Crew has a newer version. Update to keep seeing them.",
   invalidItem = "That isn't an item. Drop one on the Spares tab (/bff spares), or type /bff spares add and shift-click it into the chat box.",
@@ -200,7 +201,7 @@ local function start(isInitialLogin)
   })
   ns.core:setTrace(traceLine)
   ns.ChannelLink.setTrace(traceLine)
-  ns.ChannelLink.start(ns.core)
+  ns.ChannelLink.start(ns.core, isInitialLogin)
   ns.ChannelLink.setCrew(ns.core:crew())
   ns.Panel.start(ns.core)
   ns.PocketCamp.start(ns.core)

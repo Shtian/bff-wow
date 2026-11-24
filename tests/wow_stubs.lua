@@ -95,7 +95,15 @@ return function()
     GetChannelList = function() return end,
     JoinTemporaryChannel = function(name)
       game.joins = (game.joins or 0) + 1
-      if not game.refuseJoin then game.channels[name:upper()] = 5 end
+      game.joined = game.joined or {}
+      game.joined[#game.joined + 1] = name
+      if game.refuseJoin then return end
+      game.channels[name:upper()] = 5
+      local answer = game.joinAnswer and game.joinAnswer(name) or "YOU_CHANGED"
+      if answer == "none" then return end
+      schedule(0.1, function()
+        game.fire("CHAT_MSG_CHANNEL_NOTICE", answer, "", "", "5. " .. name, "", "", 0, 5, name)
+      end)
     end,
     LeaveChannelByName = function(name) game.channels[name:upper()] = nil end,
     ListChannelByName = function(name) game.listed[#game.listed + 1] = name end,

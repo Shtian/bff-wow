@@ -472,3 +472,134 @@ describe("The last join failure", function()
     assert.same({ kind = "wrongPassword", at = 1000 }, core:joinFailure())
   end)
 end)
+
+describe("Leaving and rejoining the same Crew", function()
+  local function crewOfThree()
+    local ns = load()
+    local net = ns.FakeNet.new()
+    local ann = net:add("Ann"):login()
+    local bob = net:add("Bob"):login()
+    local cat = net:add("Cat"):login()
+    local code = ann:join()
+    bob:join(code)
+    cat:join(code)
+    net:run(20)
+    bob:play({ level = 11 })
+    net:run(20)
+    assert.is_true(ann.core:removeMember(cat.memberId))
+    ann.core:channelBroken()
+    return net, ann, bob, code
+  end
+
+  local function entries(client)
+    local all = {}
+    for _, day in ipairs(client.core:feed().days) do
+      for _, entry in ipairs(day.entries) do
+        local reactors = {}
+        for _, reactor in ipairs(entry.reactors or {}) do reactors[#reactors + 1] = reactor.displayName or reactor.name end
+        all[#all + 1] = { text = entry.text, reactors = reactors }
+      end
+    end
+    return all
+  end
+
+  local function react(client)
+    for _, day in ipairs(client.core:feed().days) do
+      for _, entry in ipairs(day.entries) do
+        if entry.key and client.core:react(entry.key) then return true end
+      end
+    end
+    return false
+  end
+
+  local function removedNames(client)
+    local names = {}
+    for _, member in ipairs(client.core:removed()) do names[#names + 1] = member.displayName end
+    return names
+  end
+
+  local function members(client)
+    local names = {}
+    for _, row in ipairs(client.core:rows("name")) do names[#names + 1] = row.displayName end
+    return names
+  end
+
+  local function reached(client)
+    local result = {}
+    for _, row in ipairs(client.core:goals()) do result[row.track] = row.reached end
+    return result
+  end
+
+  local function contains(list, wanted)
+    for _, item in ipairs(list) do
+      if item.text == wanted.text then
+        assert.same(wanted, item)
+        return
+      end
+    end
+    error("missing feed entry " .. tostring(wanted.text))
+  end
+
+  it("keeps the Crew's data out of sight, and brings it all back", function()
+    local net, ann, _, code = crewOfThree()
+    assert.is_true(react(ann))
+    net:run(5)
+    local feed, goals = entries(ann), reached(ann)
+    assert.same({ "Ann", "Bob" }, members(ann))
+    assert.same({ "Cat" }, removedNames(ann))
+    assert.is_true(#feed > 0)
+    local reactedTo = false
+    for _, entry in ipairs(feed) do reactedTo = reactedTo or #entry.reactors > 0 end
+    assert.is_true(reactedTo)
+    assert.equal(1, ann.core:crew().generation)
+
+    ann.core:leaveCrew()
+    net:run(5)
+    assert.is_nil(ann.core:crew())
+    assert.same({ "Ann" }, members(ann))
+    assert.same({}, removedNames(ann))
+    assert.same({}, entries(ann))
+
+    ann:join(code)
+    assert.same({ "Ann", "Bob" }, members(ann))
+    assert.same({ "Cat" }, removedNames(ann))
+    assert.same(goals, reached(ann))
+    assert.equal(1, ann.core:crew().generation)
+    local after = entries(ann)
+    for _, entry in ipairs(feed) do contains(after, entry) end
+  end)
+
+  it("brings it back after a logout too", function()
+    local net, ann, _, code = crewOfThree()
+    ann.core:leaveCrew()
+    net:run(5)
+    ann:logout()
+    net:run(5)
+    ann:login()
+    assert.is_nil(ann.core:crew())
+    ann:join(code)
+    assert.same({ "Ann", "Bob" }, members(ann))
+    assert.equal(1, ann.core:crew().generation)
+  end)
+
+  it("wipes it on starting or joining a different Crew", function()
+    local net, ann, _, code = crewOfThree()
+    ann.core:leaveCrew()
+    net:run(5)
+    ann:join()
+    assert.same({ "Ann" }, members(ann))
+    assert.same({}, removedNames(ann))
+    assert.equal(0, ann.core:crew().generation)
+
+    ann.core:leaveCrew()
+    net:run(5)
+    ann:join(withCheck("K3F9A2Q"))
+    assert.same({ "Ann" }, members(ann))
+    ann.core:leaveCrew()
+    net:run(5)
+    ann:join(code)
+    assert.same({ "Ann" }, members(ann))
+    assert.same({}, removedNames(ann))
+    assert.equal(0, ann.core:crew().generation)
+  end)
+end)

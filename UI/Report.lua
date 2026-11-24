@@ -20,6 +20,12 @@ local function lastJoinFailure()
   return ("%s at %s"):format(ns.ChannelLink.FAILURE_REASONS[failure.kind], date("%Y-%m-%d %H:%M:%S", failure.at))
 end
 
+local function channelGeneration(crew)
+  if not crew then return "Channel generation: none (no Crew)" end
+  return ("Channel generation: %d (%s) · moves this session: %d"):format(
+    crew.generation, crew.generationFrom, crew.moves)
+end
+
 function Report.text()
   local gameVersion, build, _, interface = GetBuildInfo()
   local forever = WOW_PROJECT_CAMELOT ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CAMELOT
@@ -36,6 +42,7 @@ function Report.text()
       yesNo(crew), crew and ns.core:rosterCounts().members or 0, link.peers),
     "Link: " .. (link.up and "up" or ("down (%s)"):format(link.reason or "not started")),
     "Last join failure: " .. lastJoinFailure(),
+    channelGeneration(crew),
     ("In an instance: %s · chat messaging lockdown: %s"):format(
       link.instance or "no", yesNo(link.lockdown)),
     "",
