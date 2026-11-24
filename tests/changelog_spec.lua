@@ -113,6 +113,10 @@ describe("Changelog", function()
       assert.is_nil(Changelog.version("2.2"))
     end)
 
+    it("has no version for a beta, which isn't released yet", function()
+      assert.is_nil(Changelog.version("v2.3.0-beta-a1b2c3d"))
+    end)
+
     it("compares versions by number, not as text", function()
       assert.is_true(Changelog.newer("2.10.0", "2.9.1"))
       assert.is_true(Changelog.newer("3.0.0", "2.99.99"))

@@ -264,7 +264,7 @@ UI/    Skin.lua  CampSheet.lua  CampScene.lua  LanternSeats.lua  StrayPet.lua  F
        RosterTab.lua  FeedTab.lua  TrophiesTab.lua  PlayTimesTab.lua  SparesTab.lua  ProfessionsTab.lua  DungeonsTab.lua  CatchesTab.lua  SettingsTab.lua  WhatsNewTab.lua
 Dev/   FakeNet.lua  Sim.lua          -- left out of releases
 Libs/                                -- fetched, gitignored
-scripts/ fetch-libs.sh  package.sh  changelog-text.sh  camp-art.mjs   -- package.sh builds the release zip (with changelog-text.sh's ChangelogText.lua); camp-art.mjs the Camp's TGA sheets
+scripts/ fetch-libs.sh  package.sh  changelog-text.sh  pending-changelog.sh  camp-art.mjs   -- package.sh builds the release or beta zip (with changelog-text.sh's ChangelogText.lua; a beta's changelog from pending-changelog.sh); camp-art.mjs the Camp's TGA sheets
 Media/ BFF.tga  CampSprites.tga  CampBackdrop.tga
 tests/ load.lua  wow_stubs.lua  *_spec.lua
 .busted  .luacheckrc  .pkgmeta

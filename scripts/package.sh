@@ -8,6 +8,11 @@
 #   scripts/package.sh 0.1.0              build and upload
 #   scripts/package.sh 0.1.0 --no-upload  build only, into .release/
 #
+# A prerelease version (2.17.0-beta-a1b2c3d, from bumpy's snapshot in
+# .github/workflows/beta.yml) is a beta: CurseForge only, as a beta file, with
+# the pending bump files at the top of its changelog. Bumpy makes no GitHub
+# release for a snapshot, so there's none to upload to.
+#
 # Needs bash 4+ (the packager's), git, curl, jq and svn (CurseForge
 # externals); gh for the upload. On macOS, run it in a Linux container.
 set -euo pipefail
@@ -20,13 +25,29 @@ usage() {
 }
 
 version="${1:-}"
-[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || usage
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || usage
 upload=true
 case "${2:-}" in
   "") ;;
   --no-upload) upload=false ;;
   *) usage ;;
 esac
+
+# A release uploads to CurseForge when it can and always to its GitHub release;
+# a beta must reach CurseForge, and has no GitHub release.
+beta=false
+[[ "$version" == *-* ]] && beta=true
+curseforge=false
+[[ -n "${CF_API_KEY:-}" && -n "${CURSEFORGE_PROJECT_ID:-}" ]] && curseforge=true
+github=false
+if $upload && ! $beta; then github=true; fi
+if $upload && ! $curseforge; then
+  if $beta; then
+    echo "A beta only goes to CurseForge, and CF_API_KEY or CURSEFORGE_PROJECT_ID isn't set" >&2
+    exit 1
+  fi
+  echo "CF_API_KEY or CURSEFORGE_PROJECT_ID not set; skipping CurseForge" >&2
+fi
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
@@ -40,13 +61,27 @@ zip="BFF-$tag.zip"
 # never pushed. On a retry bumpy's lightweight tag can sit on HEAD too; the
 # packager prefers the highest name, so v<version> still wins.
 work="$(mktemp -d)"
-trap 'git tag -d "$tag" >/dev/null 2>&1 || true; git checkout -- ChangelogText.lua 2>/dev/null || true; rm -rf "$work"' EXIT
+# A beta rewrites CHANGELOG.md below, so it needs a clean one to put back.
+restore=(ChangelogText.lua)
+if $beta; then
+  git diff --quiet -- CHANGELOG.md || { echo "CHANGELOG.md has uncommitted changes, which a beta build would lose" >&2; exit 1; }
+  restore+=(CHANGELOG.md)
+fi
+trap 'git tag -d "$tag" >/dev/null 2>&1 || true; git checkout -- "${restore[@]}" 2>/dev/null || true; rm -rf "$work"' EXIT
 git tag -f "$tag" >/dev/null
 
 # What's new reads the newest releases from ChangelogText.lua, which the
 # checkout carries empty: write them in for the zip. The packager copies the
 # working tree, so the zip gets this copy; the trap puts the empty one back.
 scripts/changelog-text.sh
+
+# A beta's CHANGELOG.md (CurseForge's changelog, through .pkgmeta) starts with
+# what it brings. After changelog-text.sh, so What's new never lists a beta;
+# it's off on a beta anyway, since Changelog.version only takes X.Y.Z.
+if $beta; then
+  { head -n 1 CHANGELOG.md; echo; scripts/pending-changelog.sh "$version"; echo; tail -n +2 CHANGELOG.md; } >"$work/CHANGELOG.md"
+  cp "$work/CHANGELOG.md" CHANGELOG.md
+fi
 
 # The packager fetches the .pkgmeta externals, leaves out the ignored paths and
 # writes .release/BFF-v<version>.zip. Bumpy owns the GitHub release, so the
@@ -58,12 +93,9 @@ scripts/changelog-text.sh
 # a tag ("Found future tag"), expecting a tag build to follow, and our build tag
 # is on HEAD. Outside Actions it only loses its log groups and step outputs.
 packager_args=(-r "$release_dir")
-if $upload && [[ -n "${CF_API_KEY:-}" && -n "${CURSEFORGE_PROJECT_ID:-}" ]]; then
+if $upload && $curseforge; then
   packager_args+=(-p "$CURSEFORGE_PROJECT_ID")
 else
-  if $upload; then
-    echo "CF_API_KEY or CURSEFORGE_PROJECT_ID not set; skipping CurseForge" >&2
-  fi
   packager_args+=(-d)
 fi
 curl -fsSL -o "$work/release.sh" \
@@ -94,7 +126,7 @@ jq -n --arg version "$tag" --arg filename "$zip" --argjson metadata "$metadata" 
   '{releases: [{name: "BFF", version: $version, filename: $filename, nolib: false, metadata: $metadata}]}' \
   >"$release_dir/release.json"
 
-if $upload; then
+if $github; then
   # gh finds a draft release by its pending tag name too.
   gh release upload "bff@$version" "$release_dir/$zip" "$release_dir/release.json" --clobber
 else

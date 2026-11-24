@@ -1,0 +1,74 @@
+name: beta
+
+# Actions → beta → Run workflow uploads a beta of the pending release to
+# CurseForge: bumpy's snapshot works out the next version from the pending bump
+# files and runs scripts/package.sh with 2.17.0-beta-<sha>, which the packager
+# uploads as a beta file. Nothing goes to git: no commit, tag, GitHub release
+# or changelog entry, and the bump files stay pending for the real release.
+# It builds from the branch picked in Run workflow, normally main. Only someone
+# with write access can run a workflow, and only the repo owner can run this
+# one. See docs/design/settings-and-release.md, "Betas".
+on:
+  workflow_dispatch:
+    inputs:
+      allow_major:
+        description: "Allow a major (protocol) bump: beta players stop seeing the rest of the Crew, who are told they're out of date"
+        type: boolean
+        default: false
+
+concurrency:
+  group: beta
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  owner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only the repo owner uploads betas
+        if: github.triggering_actor != github.repository_owner
+        run: |
+          echo "::error::Only ${{ github.repository_owner }} can upload a beta."
+          exit 1
+
+  # Before uploading, and in its own job: bumpy won't publish from a working
+  # tree with untracked files, and the Lua setup leaves some.
+  test:
+    needs: owner
+    uses: ./.github/workflows/test.yml
+
+  beta:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve bumpy version
+        run: echo "BUMPY_VERSION=$(jq -r '.devDependencies["@varlock/bumpy"]' package.json)" >> "$GITHUB_ENV"
+
+      # A major bump is a protocol bump: everyone on the release would be told
+      # they're out of date, with nothing newer to update to on CurseForge.
+      - name: Refuse a major bump
+        if: ${{ !inputs.allow_major }}
+        run: |
+          # bumpy status exits 1 when nothing is pending, still printing the plan.
+          plan=$(npx -y "@varlock/bumpy@$BUMPY_VERSION" status --json) || jq -e '.bumpFiles == []' <<<"$plan" >/dev/null
+          if jq -e '.releases[] | select(.name == "bff" and .type == "major")' <<<"$plan" >/dev/null; then
+            echo "::error::The pending release is major. A beta of it splits the Crew; run again with allow_major to do it anyway."
+            exit 1
+          fi
+
+      # The packager checks out CurseForge externals with svn.
+      - name: Install svn
+        run: command -v svn || (sudo apt-get update && sudo apt-get install -y subversion)
+
+      - name: Upload the beta
+        run: npx -y "@varlock/bumpy@$BUMPY_VERSION" ci release --snapshot beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
