@@ -36,10 +36,12 @@ Why hash instead of using the code directly:
 - A fixed `BFF` prefix keeps names from starting with a digit, makes BFF's channel easy to spot when debugging, and stays well under the channel name length limit.
 - Two Crews colliding on a 32-bit name hash is not a concern at our scale. If it ever happened, the second Crew would be locked out by the first one's password, and the wrong-password notice below would tell them to start a new Crew.
 
-Joining follows #2: `JoinTemporaryChannel(name, password)` from the channel link once the channel list has settled (or after a 10 s fallback), never during lockdown. The channel is then removed from every chat frame. A temporary channel is left automatically on logout. Join failures keep the channel link down and show a `notice`:
+Joining follows #2: `JoinTemporaryChannel(name, password)` from the channel link once the channel list has settled (or after a 10 s fallback), never during lockdown. The channel is then removed from every chat frame. A temporary channel is left automatically on logout. A join failure keeps the channel link down: the channel link tells Core (`joinFailed(kind)`), Core saves the kind and time until the link next comes up, and shows a `notice`:
 
-- Too many channels: "BFF couldn't join its channel: leave a chat channel and /reload."
-- Wrong password: "BFF couldn't join its channel: start a new Crew."
+- Too many channels (the game's error, or no channel 10 s after asking): "BFF couldn't join its channel: leave a chat channel and /reload."
+- Wrong password: "BFF couldn't join its channel: leave the Crew and start a new one."
+
+The link doesn't try again until the Crew changes or the next `/reload`. `/bff report` gives the failure as the link's down reason ("wrong password" or "too many channels") and the saved last failure with its time, so it is still there after a `/reload` or relog until a join succeeds. The sync log has each join attempt and how it ended (joined, already in the channel, wrong password, too many channels, timed out) and every notice for the Crew channel with its kind and both names the game gives (arg 2 and arg 5), readable or not. Which kinds Forever sends, and which name is who, isn't checked in game: retail's `PASSWORD_CHANGED` and `OWNER_CHANGED` name who did it, so a Member still in the channel can see who locked it.
 
 ## One Crew at a time
 
@@ -88,6 +90,8 @@ The default display name for slash commands is the current Character's name, as 
 2. Your record goes out as DATA right away if the link is up (already a send trigger in #8), or on the next `up()` if it is down (lockdown, not yet in the channel). If you log out first, the leaving state survives in saved data and the next login rejoins the channel to finish.
 3. Once the DATA has been handed to the link, Core forgets the Crew: the code, every other Member's record, the Remove list, the Feed log and While you were away. Then it fires `crewChanged`. Your own record (Member id, Characters, Main) is kept locally, so rejoining resumes where you left off.
 4. The channel link leaves the channel a few seconds later, after ChatThrottleLib has drained.
+
+**After a failed join** (wrong password, too many channels) the link will never come up, so leaving doesn't wait for it: step 3 happens straight away and nothing is sent, not even the tombstone. The others see you go offline as usual. This covers a leave started after the failure, one already waiting when it happens, and one pending at login whose join then fails (the failure finishes it, with "You left the Crew." and no failure notice). You can then start or join another Crew. Joining the same code while a leave is still waiting cancels it, as before.
 
 On the other side:
 

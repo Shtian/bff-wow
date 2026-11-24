@@ -15,7 +15,7 @@ local MESSAGES = {
   invalidName = "A display name is 2 to 16 characters (/bff name <name>).",
   noCrew = "You're not in a Crew. Type /bff to start or join one.",
   tooManyChannels = "BFF couldn't join its channel: leave a chat channel and /reload.",
-  wrongPassword = "BFF couldn't join its channel: start a new Crew.",
+  wrongPassword = "BFF couldn't join its channel: leave the Crew and start a new one.",
   leftCrew = "You left the Crew.",
   minimapHidden = "Minimap button hidden. Type /bff minimap to show it again.",
   outOfDate = "BFF is out of date: someone in your Crew has a newer version. Update to keep seeing them.",
@@ -200,7 +200,7 @@ local function start(isInitialLogin)
   })
   ns.core:setTrace(traceLine)
   ns.ChannelLink.setTrace(traceLine)
-  ns.ChannelLink.start(ns.core, function(kind) say(MESSAGES[kind]) end)
+  ns.ChannelLink.start(ns.core)
   ns.ChannelLink.setCrew(ns.core:crew())
   ns.Panel.start(ns.core)
   ns.PocketCamp.start(ns.core)

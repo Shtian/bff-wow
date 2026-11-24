@@ -1441,6 +1441,7 @@ local function enter(self, code, displayName, joining)
   self.crewGoals:clear()
   self.db.catchTypesTold = nil
   self.db.crew = { code = code, joined = joining or nil }
+  self.linkFailed = nil
   if joining then self.feedState:ownJoined() end
   self.listener("crewChanged")
   updateLink(self)
@@ -1563,8 +1564,9 @@ end
 
 local function finishLeaving(self)
   self.db.crew = nil
+  self.linkFailed = nil
   updateLink(self)
-  self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } })
+  if self.linkUp then self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } }) end
   self.ledger:forgetOthers()
   self.ledger:clearReactions()
   self.spareLife:clear()
@@ -1584,12 +1586,34 @@ function Core:leaveCrew()
   if crew.leaving then return true end
   crew.leaving = true
   self.ledger:writeOwn({ left = true })
-  if self.linkUp then finishLeaving(self) else self.listener("changed") end
+  if self.linkUp or self.linkFailed then finishLeaving(self) else self.listener("changed") end
   return true
+end
+
+local JOIN_FAILURES = { wrongPassword = true, tooManyChannels = true }
+
+function Core:joinFailed(kind)
+  local crew = self.db.crew
+  if not crew or not JOIN_FAILURES[kind] then return end
+  self.linkFailed = true
+  self.db.joinFailure = { kind = kind, at = self.now() }
+  if crew.leaving then
+    finishLeaving(self)
+  else
+    self.listener("notice", kind)
+  end
+end
+
+function Core:joinFailure()
+  local saved = self.db.joinFailure
+  if type(saved) ~= "table" or not JOIN_FAILURES[saved.kind] or type(saved.at) ~= "number" then return nil end
+  return { kind = saved.kind, at = saved.at }
 end
 
 function Core:up()
   self.linkUp = true
+  self.linkFailed = nil
+  self.db.joinFailure = nil
   if self.db.crew and self.db.crew.leaving then
     finishLeaving(self)
   else

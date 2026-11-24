@@ -4,7 +4,7 @@ local CHANNEL = "BFFABCDEFG"
 
 local function fakeCore()
   local core = { calls = {} }
-  for _, method in ipairs({ "up", "down", "gone", "sendFailed", "received" }) do
+  for _, method in ipairs({ "up", "down", "gone", "sendFailed", "received", "joinFailed" }) do
     core[method] = function(_, ...)
       core.calls[#core.calls + 1] = { method, ... }
     end
@@ -766,6 +766,113 @@ describe("The channel link", function()
       game.fire("ADDON_RESTRICTION_STATE_CHANGED", 1, 0)
       game.fire("CHAT_MSG_CHANNEL_LIST", list("Bob", "7. Friends", 7, "Friends"))
       assert.equal(2, #listLines(lines))
+    end)
+  end)
+
+  describe("when joining fails", function()
+    -- WoW: a channel notice carries its kind, then arg 2 and arg 5 names,
+    -- arg 4 channel name, arg 8 channel index and arg 9 base name.
+    local function channelNotice(kind, arg2, arg5)
+      return kind, arg2 or "", "", "5. " .. CHANNEL, arg5 or "", "", 0, 5, CHANNEL
+    end
+
+    local function refused()
+      local game = wow()
+      game.refuseJoin = true
+      local link = game.load("Game/ChannelLink.lua", {}).ChannelLink
+      local lines = {}
+      link.setTrace(function(line) lines[#lines + 1] = line end)
+      local core = fakeCore()
+      link.start(core)
+      link.setCrew({ channel = CHANNEL, password = "pw" })
+      game.advance(11)
+      return game, link, core, lines
+    end
+
+    it("tells Core and gives the wrong password as the reason the link is down", function()
+      local game, link, core, lines = refused()
+      game.fire("CHAT_MSG_CHANNEL_NOTICE", channelNotice("WRONG_PASSWORD"))
+      assert.same({ { "joinFailed", "wrongPassword" } }, core.calls)
+      assert.equal("wrong password", link.state().reason)
+      assert.same({
+        "joining the Crew channel",
+        'channel notice WRONG_PASSWORD: arg 2 "" · arg 5 "" · arg 4 "5. ' .. CHANNEL
+          .. '" · arg 8 5 · arg 9 "' .. CHANNEL .. '"',
+        "join failed: wrong password",
+      }, lines)
+
+      game.advance(30)
+      assert.equal(1, game.joins)
+      assert.equal(1, core.count("joinFailed"))
+    end)
+
+    it("gives too many channels as the reason, from the game's error or a timeout", function()
+      local game, link, core, lines = refused()
+      game.fire("UI_ERROR_MESSAGE", 0, "You can only be in 10 channels at a time.")
+      assert.same({ { "joinFailed", "tooManyChannels" } }, core.calls)
+      assert.equal("too many channels", link.state().reason)
+      assert.equal("join failed: too many channels", lines[#lines])
+
+      game, link, core, lines = refused()
+      game.advance(10)
+      assert.same({ { "joinFailed", "tooManyChannels" } }, core.calls)
+      assert.equal("too many channels", link.state().reason)
+      assert.equal("join failed: timed out after 10 s", lines[#lines])
+    end)
+
+    it("tries again for a new Crew", function()
+      local game, link, core = refused()
+      game.fire("CHAT_MSG_CHANNEL_NOTICE", channelNotice("WRONG_PASSWORD"))
+      game.refuseJoin = false
+      link.setCrew(nil)
+      link.setCrew({ channel = "BFFHIJKMNP", password = "pw" })
+      game.advance(1)
+      assert.equal(2, game.joins)
+      assert.equal("waiting for the member list", link.state().reason)
+      assert.equal(1, core.count("joinFailed"))
+    end)
+
+    it("traces joining, and being in the channel already after a reload", function()
+      local game = wow()
+      local link = game.load("Game/ChannelLink.lua", {}).ChannelLink
+      local lines = {}
+      link.setTrace(function(line) lines[#lines + 1] = line end)
+      link.start(fakeCore())
+      link.setCrew({ channel = CHANNEL, password = "pw" })
+      game.advance(11)
+      assert.same({ "joining the Crew channel", "joined the Crew channel" }, lines)
+
+      game = wow()
+      game.channels[CHANNEL] = 5
+      link = game.load("Game/ChannelLink.lua", {}).ChannelLink
+      lines = {}
+      link.setTrace(function(line) lines[#lines + 1] = line end)
+      link.start(fakeCore())
+      link.setCrew({ channel = CHANNEL, password = "pw" })
+      assert.same({ "already in the Crew channel" }, lines)
+    end)
+
+    it("traces every notice for the Crew channel with both names, and none for another channel", function()
+      local game, link = linked()
+      local lines = {}
+      link.setTrace(function(line) lines[#lines + 1] = line end)
+      game.fire("CHAT_MSG_CHANNEL_NOTICE_USER", channelNotice("PASSWORD_CHANGED", "Bob"))
+      game.fire("CHAT_MSG_CHANNEL_NOTICE_USER", channelNotice("OWNER_CHANGED", "Cat-Realm", "Bob"))
+      game.fire("CHAT_MSG_CHANNEL_NOTICE_USER", "OWNER_CHANGED", "Dan", "", "7. Friends", "", "", 0, 7, "Friends")
+      game.fire("CHAT_MSG_CHANNEL_NOTICE_USER", channelNotice(game.secret(), game.secret()))
+      local where = ' · arg 4 "5. ' .. CHANNEL .. '" · arg 8 5 · arg 9 "' .. CHANNEL .. '"'
+      assert.same({
+        'channel notice PASSWORD_CHANGED: arg 2 "Bob" · arg 5 ""' .. where,
+        'channel notice OWNER_CHANGED: arg 2 "Cat-Realm" · arg 5 "Bob"' .. where,
+        'channel notice secret: arg 2 secret · arg 5 ""' .. where,
+      }, lines)
+    end)
+
+    it("ignores a wrong password notice once in the channel", function()
+      local game, link, core = linked()
+      game.fire("CHAT_MSG_CHANNEL_NOTICE", channelNotice("WRONG_PASSWORD"))
+      assert.equal(0, core.count("joinFailed"))
+      assert.is_true(link.state().up)
     end)
   end)
 end)

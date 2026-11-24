@@ -31,12 +31,11 @@ local FILTERED_EVENTS = {
 }
 
 local core
-local onNotice
 local trace
 local target
 local joining = false
 local joined = false
-local failed = false
+local failed
 local settled = false
 local isUp = false
 local listAsked
@@ -120,8 +119,15 @@ local function dropUnsent(key, why)
   if trace and unsent > 0 then trace(("  dropped %d unsent chunks to %s (%s)"):format(unsent, box.name, why)) end
 end
 
+local FAILURE_REASONS = {
+  wrongPassword = "wrong password",
+  tooManyChannels = "too many channels",
+}
+ChannelLink.FAILURE_REASONS = FAILURE_REASONS
+
 local function downReason()
   if not target then return "no Crew" end
+  if failed then return FAILURE_REASONS[failed] end
   if not joined then return "not in the channel" end
   if not presence:ready() then return "waiting for the member list" end
   if lockdown() then return "lockdown" end
@@ -161,7 +167,8 @@ local function askList()
   ListChannelByName(target.channel)
 end
 
-local function onJoined()
+local function onJoined(how)
+  if trace then trace(how) end
   joining = false
   joined = true
   listsTraced = {}
@@ -171,24 +178,26 @@ local function onJoined()
   update("joined the channel")
 end
 
-local function fail(kind)
+local function fail(kind, outcome)
+  if trace then trace("join failed: " .. outcome) end
   joining = false
-  failed = true
-  onNotice(kind)
+  failed = kind
   update()
+  core:joinFailed(kind)
 end
 
 local function tryJoin()
   if not target or joined or joining or failed or lockdown() then return end
   if channelIndex(target.channel) then
     -- WoW: channel membership survives a /reload.
-    onJoined()
+    onJoined("already in the Crew channel")
     return
   end
   if not settled then return end
 
   joining = true
   local name = target.channel
+  if trace then trace("joining the Crew channel") end
   JoinTemporaryChannel(name, target.password)
   local waited = 0
   C_Timer.NewTicker(JOIN_POLL, function(ticker)
@@ -197,10 +206,10 @@ local function tryJoin()
       ticker:Cancel()
     elseif channelIndex(name) then
       ticker:Cancel()
-      onJoined()
+      onJoined("joined the Crew channel")
     elseif waited >= JOIN_TIMEOUT then
       ticker:Cancel()
-      fail("tooManyChannels")
+      fail("tooManyChannels", ("timed out after %d s"):format(JOIN_TIMEOUT))
     end
   end)
 end
@@ -289,7 +298,7 @@ local tooManyPattern = patternFor(ERR_TOO_MANY_CHAT_CHANNELS)
 
 local function onError(text)
   if joining and tooManyPattern and readable(text) and text:find(tooManyPattern) then
-    fail("tooManyChannels")
+    fail("tooManyChannels", "too many channels")
   end
 end
 
@@ -304,15 +313,29 @@ function events.CHANNEL_UI_UPDATE()
   end)
 end
 
-function events.CHAT_MSG_CHANNEL_NOTICE(kind, ...)
-  if not isTarget((select(8, ...))) then return end
+-- WoW: a channel notice carries its kind, then arg 2 and arg 5 names (who
+-- did it or who it is about, which differs by kind), arg 4 channel name,
+-- arg 8 channel index and arg 9 base name.
+local function traceChannelNotice(kind, arg2, arg4, arg5, arg8, arg9)
+  if not trace then return end
+  trace(("channel notice %s: arg 2 %s · arg 5 %s · %s"):format(
+    readable(kind) and kind or shown(kind), shown(arg2), shown(arg5), channelArgs(arg4, arg8, arg9)))
+end
+
+function events.CHAT_MSG_CHANNEL_NOTICE(kind, arg2, _, arg4, arg5, _, _, arg8, arg9)
+  if not isTarget(arg9) then return end
+  traceChannelNotice(kind, arg2, arg4, arg5, arg8, arg9)
+  if not readable(kind) then return end
   if kind == "WRONG_PASSWORD" then
-    fail("wrongPassword")
+    if not joined then fail("wrongPassword", "wrong password") end
   elseif kind == "YOU_LEFT" or kind == "SUSPENDED" then
-    if trace then trace("channel notice: " .. kind) end
     joined = false
     update()
   end
+end
+
+function events.CHAT_MSG_CHANNEL_NOTICE_USER(kind, arg2, _, arg4, arg5, _, _, arg8, arg9)
+  if isTarget(arg9) then traceChannelNotice(kind, arg2, arg4, arg5, arg8, arg9) end
 end
 
 local function currentInstance()
@@ -549,9 +572,8 @@ framing = ns.Framing.new({
 
 strangerFraming = ns.Framing.new({ now = GetTime })
 
-function ChannelLink.start(theCore, notice)
+function ChannelLink.start(theCore)
   core = theCore
-  onNotice = notice
 
   ChannelLink:RegisterComm(PREFIX, onComm)
   instanceType = currentInstance()
@@ -584,7 +606,7 @@ function ChannelLink.setCrew(crew)
   end
   target = crew and { channel = crew.channel, password = crew.password }
   presence:stop()
-  failed = false
+  failed = nil
   if name then ours[name:upper()] = true end
   update()
   tryJoin()
