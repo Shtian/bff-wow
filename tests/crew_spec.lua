@@ -472,3 +472,124 @@ describe("The last join failure", function()
     assert.same({ kind = "wrongPassword", at = 1000 }, core:joinFailure())
   end)
 end)
+
+describe("Leaving and rejoining the same Crew", function()
+  local function copy(value)
+    if type(value) ~= "table" then return value end
+    local result = {}
+    for k, v in pairs(value) do result[k] = copy(v) end
+    return result
+  end
+
+  local function crewOfThree()
+    local ns = load()
+    local net = ns.FakeNet.new()
+    local ann = net:add("Ann"):login()
+    local bob = net:add("Bob"):login()
+    local cat = net:add("Cat"):login()
+    local code = ann:join()
+    bob:join(code)
+    cat:join(code)
+    net:run(20)
+    bob:play({ level = 11 })
+    net:run(20)
+    assert.is_true(ann.core:removeMember(cat.memberId))
+    ann.core:channelBroken()
+    return net, ann, bob, code
+  end
+
+  local function crewData(client)
+    local db = client.db
+    local others = {}
+    for id, record in pairs(db.records) do
+      if id ~= db.memberId then others[id] = copy(record) end
+    end
+    return {
+      records = others,
+      removed = copy(db.removed),
+      feed = copy(db.feed),
+      feedJoins = copy(db.feedJoins),
+      reached = copy(db.goals.reached),
+      reactions = copy(db.records[db.memberId].reactions),
+      generation = client.core:crew() and client.core:crew().generation,
+    }
+  end
+
+  local function react(client)
+    for _, day in ipairs(client.core:feed().days) do
+      for _, entry in ipairs(day.entries) do
+        if entry.key and client.core:react(entry.key) then return true end
+      end
+    end
+    return false
+  end
+
+  local function removedNames(client)
+    local names = {}
+    for _, member in ipairs(client.core:removed()) do names[#names + 1] = member.displayName end
+    return names
+  end
+
+  it("keeps the Crew's data out of sight, and brings it all back", function()
+    local net, ann, bob, code = crewOfThree()
+    assert.is_true(react(ann))
+    net:run(5)
+    local before = crewData(ann)
+    assert.is_table(before.records[bob.memberId])
+    assert.same({ "Cat" }, removedNames(ann))
+    assert.is_not_nil(next(before.feed))
+    assert.is_table(before.reactions)
+    assert.equal(1, before.generation)
+
+    ann.core:leaveCrew()
+    net:run(5)
+    assert.is_nil(ann.core:crew())
+    assert.equal(1, #ann.core:rows())
+    assert.same({}, ann.core:removed())
+    assert.same({}, ann.db.feed)
+    assert.is_nil(ann.db.records[ann.db.memberId].reactions)
+
+    ann:join(code)
+    local after = crewData(ann)
+    assert.same(before.records, after.records)
+    assert.same({ "Cat" }, removedNames(ann))
+    assert.same(before.feedJoins, after.feedJoins)
+    assert.same(before.reached, after.reached)
+    assert.same(before.reactions, after.reactions)
+    assert.equal(1, after.generation)
+    assert.is_table(ann:rowFor(bob))
+    for i, entry in ipairs(before.feed) do assert.same(entry, after.feed[i]) end
+  end)
+
+  it("brings it back after a logout too", function()
+    local net, ann, bob, code = crewOfThree()
+    ann.core:leaveCrew()
+    net:run(5)
+    ann:logout()
+    net:run(5)
+    ann:login()
+    assert.is_nil(ann.core:crew())
+    ann:join(code)
+    assert.is_table(ann:rowFor(bob))
+    assert.equal(1, ann.core:crew().generation)
+  end)
+
+  it("wipes it on starting or joining a different Crew", function()
+    local net, ann = crewOfThree()
+    ann.core:leaveCrew()
+    net:run(5)
+    ann:join()
+    assert.equal(1, #ann.core:rows())
+    assert.same({}, ann.core:removed())
+    assert.same({}, ann.db.feedJoins)
+    assert.equal(0, ann.core:crew().generation)
+    assert.is_nil(ann.db.records[ann.db.memberId].generation)
+    assert.is_nil(ann.db.keptCrew)
+
+    ann.core:leaveCrew()
+    net:run(5)
+    ann:join(withCheck("K3F9A2Q"))
+    assert.equal(1, #ann.core:rows())
+    assert.is_nil(ann.db.keptCrew)
+  end)
+end)

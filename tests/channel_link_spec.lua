@@ -4,7 +4,7 @@ local CHANNEL = "BFFABCDEFG"
 
 local function fakeCore()
   local core = { calls = {} }
-  for _, method in ipairs({ "up", "down", "gone", "sendFailed", "received", "joinFailed" }) do
+  for _, method in ipairs({ "up", "down", "gone", "sendFailed", "received", "joinFailed", "channelBroken" }) do
     core[method] = function(_, ...)
       core.calls[#core.calls + 1] = { method, ... }
     end
@@ -840,7 +840,12 @@ describe("The channel link", function()
       link.start(fakeCore())
       link.setCrew({ channel = CHANNEL, password = "pw" })
       game.advance(11)
-      assert.same({ "joining the Crew channel", "joined the Crew channel" }, lines)
+      assert.same({
+        "joining the Crew channel",
+        'channel notice YOU_CHANGED: arg 2 "" · arg 5 "" · arg 4 "5. ' .. CHANNEL
+          .. '" · arg 8 5 · arg 9 "' .. CHANNEL .. '"',
+        "joined the Crew channel",
+      }, lines)
 
       game = wow()
       game.channels[CHANNEL] = 5
@@ -872,6 +877,99 @@ describe("The channel link", function()
       local game, link, core = linked()
       game.fire("CHAT_MSG_CHANNEL_NOTICE", channelNotice("WRONG_PASSWORD"))
       assert.equal(0, core.count("joinFailed"))
+      assert.is_true(link.state().up)
+    end)
+  end)
+
+  describe("when the game breaks the channel", function()
+    local NEXT = "BFFHIJKMNP"
+
+    local function crewNotice(kind, name)
+      return kind, "", "", "5. " .. name, "", "", 0, 5, name
+    end
+
+    local function joining(answer)
+      local game = wow()
+      game.joinAnswer = answer
+      local link = game.load("Game/ChannelLink.lua", {}).ChannelLink
+      local lines = {}
+      link.setTrace(function(line) lines[#lines + 1] = line end)
+      local core = fakeCore()
+      link.start(core)
+      link.setCrew({ channel = CHANNEL, password = "pw" })
+      game.advance(11)
+      return game, link, core, lines
+    end
+
+    it("doesn't count a channel number alone as joined, and waits for the member list", function()
+      local game, link, core, lines = joining(function() return "none" end)
+      assert.equal("not in the channel", link.state().reason)
+      assert.same({ CHANNEL }, game.listed)
+      game.advance(10)
+      assert.equal("join not confirmed after 10 s", lines[#lines])
+      assert.equal(0, core.count("joinFailed"))
+
+      game.advance(30)
+      assert.equal(1, game.joins)
+      assert.equal("not in the channel", link.state().reason)
+
+      game.fire("CHAT_MSG_CHANNEL_LIST", "*Bob", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
+      assert.is_true(link.state().up)
+      assert.equal(1, core.count("up"))
+    end)
+
+    it("ignores a member list for another channel while joining", function()
+      local game, link = joining(function() return "none" end)
+      game.fire("CHAT_MSG_CHANNEL_LIST", "*Bob", nil, nil, "6. Friends", nil, nil, nil, nil, "Friends")
+      assert.equal("not in the channel", link.state().reason)
+    end)
+
+    it("tells Core when the join gets INVALID_NAME, and joins the channel Core moves to", function()
+      local game = wow()
+      game.joinAnswer = function(name) return name == CHANNEL and "INVALID_NAME" or "YOU_CHANGED" end
+      local link = game.load("Game/ChannelLink.lua", {}).ChannelLink
+      local core = fakeCore()
+      local reasons = {}
+      function core.channelBroken()
+        core.calls[#core.calls + 1] = { "channelBroken" }
+        reasons[#reasons + 1] = link.state().reason
+        link.setCrew({ channel = NEXT, password = "pw" })
+      end
+      link.start(core)
+      link.setCrew({ channel = CHANNEL, password = "pw" })
+      game.advance(11)
+
+      assert.equal(1, core.count("channelBroken"))
+      assert.same({ "the game broke the channel" }, reasons)
+      assert.same({ CHANNEL, NEXT }, game.joined)
+      game.fire("CHAT_MSG_CHANNEL_LIST", "*Bob", nil, nil, "5. " .. NEXT, nil, nil, nil, nil, NEXT)
+      assert.is_true(link.state().up)
+      game.advance(5)
+      assert.is_nil(game.channels[CHANNEL])
+    end)
+
+    it("takes the link down and tells Core on INVALID_NAME after it was up", function()
+      local game, link, core = linked()
+      game.fire("CHAT_MSG_CHANNEL_NOTICE", crewNotice("INVALID_NAME", CHANNEL))
+      assert.equal(1, core.count("channelBroken"))
+      assert.equal(1, core.count("down"))
+      assert.equal("the game broke the channel", link.state().reason)
+    end)
+
+    it("stays down when Core won't move again, and tells it only once", function()
+      local game, link, core = joining(function() return "INVALID_NAME" end)
+      assert.equal(1, core.count("channelBroken"))
+      game.fire("CHAT_MSG_CHANNEL_NOTICE", crewNotice("INVALID_NAME", CHANNEL))
+      game.advance(30)
+      assert.equal(1, core.count("channelBroken"))
+      assert.equal(1, game.joins)
+      assert.equal("the game broke the channel", link.state().reason)
+    end)
+
+    it("ignores INVALID_NAME for another channel", function()
+      local game, link, core = linked()
+      game.fire("CHAT_MSG_CHANNEL_NOTICE", crewNotice("INVALID_NAME", "Friends"))
+      assert.equal(0, core.count("channelBroken"))
       assert.is_true(link.state().up)
     end)
   end)

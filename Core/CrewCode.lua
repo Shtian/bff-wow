@@ -68,6 +68,7 @@ local function base32(n)
   return table.concat(chars)
 end
 
-function CrewCode.channel(code)
-  return "BFF" .. base32(fnv1a("name:" .. code)), base32(fnv1a("pass:" .. code))
+function CrewCode.channel(code, generation)
+  local named = (generation or 0) > 0 and code .. "#" .. generation or code
+  return "BFF" .. base32(fnv1a("name:" .. named)), base32(fnv1a("pass:" .. code))
 end

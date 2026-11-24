@@ -166,7 +166,7 @@ end
 function Ledger:writeOwn(fields)
   local record = ownRecord(self)
   local changed = false
-  for _, field in ipairs({ "displayName", "left", "main", "joinedAt", "bff", "look" }) do
+  for _, field in ipairs({ "displayName", "left", "main", "joinedAt", "bff", "look", "generation" }) do
     local value = fields[field]
     if value ~= nil and (value or nil) ~= record[field] then
       record[field] = value or nil
@@ -192,11 +192,6 @@ function Ledger:addReaction(key)
   bump(self, record)
 end
 
-function Ledger:clearReactions()
-  local record = self:own()
-  if record then record.reactions = nil end
-end
-
 function Ledger:tombstone()
   local record = ownRecord(self)
   return { id = record.id, version = record.version, displayName = record.displayName, left = true }
@@ -209,13 +204,39 @@ function Ledger:knowsOthers()
   return false
 end
 
-function Ledger:forgetOthers()
-  for id in pairs(self.db.records) do
-    if id ~= self.db.memberId then self.db.records[id] = nil end
+function Ledger:putAway()
+  local own = self:own()
+  local kept = { records = {}, via = self.db.via, removed = self.db.removed, reactions = own and own.reactions }
+  for id, record in pairs(self.db.records) do
+    if record ~= own then kept.records[id] = record end
   end
+  self.db.records = { [self.db.memberId] = own }
+  if own then own.reactions = nil end
   self.db.heard = {}
   self.db.via = {}
   self.db.removed = {}
+  return kept
+end
+
+function Ledger:bringBack(kept)
+  for id, record in pairs(kept.records) do
+    if id ~= self.db.memberId then self.db.records[id] = record end
+  end
+  self.db.via = kept.via
+  self.db.removed = kept.removed
+  local own = self:own()
+  if own then own.reactions = kept.reactions end
+end
+
+function Ledger:highestGeneration()
+  local highest, from = 0, nil
+  for id, record in pairs(self.db.records) do
+    local generation = record.generation or 0
+    if id ~= self.db.memberId and not record.left and generation > highest then
+      highest, from = generation, id
+    end
+  end
+  return highest, from
 end
 
 function Ledger:remove(id)
@@ -302,6 +323,7 @@ end
 local function isText(value) return type(value) == "string" end
 local function isNumber(value) return type(value) == "number" end
 local function isFraction(value) return isNumber(value) and value >= 0 and value <= 1 end
+local function isCount(value) return isNumber(value) and value >= 0 and value == math.floor(value) end
 local function isOptional(check)
   return function(value) return value == nil or check(value) end
 end
@@ -315,6 +337,7 @@ local RECORD_SHAPE = {
   joinedAt = isOptional(isNumber),
   bff = isOptional(isText),
   playTimes = isOptional(ns.PlayTimes.valid),
+  generation = isOptional(isCount),
 }
 local CHARACTER_SHAPE = {
   guid = isText,

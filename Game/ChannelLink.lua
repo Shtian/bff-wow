@@ -122,6 +122,7 @@ end
 local FAILURE_REASONS = {
   wrongPassword = "wrong password",
   tooManyChannels = "too many channels",
+  brokenChannel = "the game broke the channel",
 }
 ChannelLink.FAILURE_REASONS = FAILURE_REASONS
 
@@ -167,14 +168,14 @@ local function askList()
   ListChannelByName(target.channel)
 end
 
-local function onJoined(how)
+local function onJoined(how, listed)
   if trace then trace(how) end
   joining = false
   joined = true
   listsTraced = {}
   hide(target.channel)
   presence:start()
-  askList()
+  if not listed then askList() end
   update("joined the channel")
 end
 
@@ -186,9 +187,33 @@ local function fail(kind, outcome)
   core:joinFailed(kind)
 end
 
+-- WoW: the client hands out a channel number even when the server refused
+-- the join, so only YOU_CHANGED or the member list says BFF got in.
+local function awaitConfirmation(name)
+  local waited, numbered = 0, false
+  C_Timer.NewTicker(JOIN_POLL, function(ticker)
+    waited = waited + JOIN_POLL
+    if not joining or not target or target.channel ~= name then
+      ticker:Cancel()
+    elseif not numbered and channelIndex(name) then
+      numbered = true
+      if trace then trace("got a channel number, waiting for the game to confirm the join") end
+      listAsked = GetTime()
+      ListChannelByName(name)
+    elseif waited >= JOIN_TIMEOUT then
+      ticker:Cancel()
+      if not numbered then
+        fail("tooManyChannels", ("timed out after %d s"):format(JOIN_TIMEOUT))
+      elseif trace then
+        trace(("join not confirmed after %d s"):format(JOIN_TIMEOUT))
+      end
+    end
+  end)
+end
+
 local function tryJoin()
   if not target or joined or joining or failure or lockdown() then return end
-  if channelIndex(target.channel) then
+  if not target.asked and channelIndex(target.channel) then
     -- WoW: channel membership survives a /reload.
     onJoined("already in the Crew channel")
     return
@@ -196,22 +221,19 @@ local function tryJoin()
   if not settled then return end
 
   joining = true
-  local name = target.channel
+  target.asked = true
   if trace then trace("joining the Crew channel") end
-  JoinTemporaryChannel(name, target.password)
-  local waited = 0
-  C_Timer.NewTicker(JOIN_POLL, function(ticker)
-    waited = waited + JOIN_POLL
-    if not joining or not target or target.channel ~= name then
-      ticker:Cancel()
-    elseif channelIndex(name) then
-      ticker:Cancel()
-      onJoined("joined the Crew channel")
-    elseif waited >= JOIN_TIMEOUT then
-      ticker:Cancel()
-      fail("tooManyChannels", ("timed out after %d s"):format(JOIN_TIMEOUT))
-    end
-  end)
+  JoinTemporaryChannel(target.channel, target.password)
+  awaitConfirmation(target.channel)
+end
+
+local function broken()
+  if trace then trace("the game broke the Crew channel") end
+  joining = false
+  joined = false
+  failure = "brokenChannel"
+  update()
+  core:channelBroken()
 end
 
 local function leave(name)
@@ -323,11 +345,15 @@ local function traceChannelNotice(kind, arg2, arg4, arg5, arg8, arg9)
 end
 
 function events.CHAT_MSG_CHANNEL_NOTICE(kind, arg2, _, arg4, arg5, _, _, arg8, arg9)
-  if not isTarget(arg9) then return end
+  if not isTarget(baseName(arg4, arg9)) then return end
   traceChannelNotice(kind, arg2, arg4, arg5, arg8, arg9)
-  if not readable(kind) then return end
+  if not readable(kind) or failure then return end
   if kind == "WRONG_PASSWORD" then
     if not joined then fail("wrongPassword") end
+  elseif kind == "INVALID_NAME" then
+    broken()
+  elseif kind == "YOU_CHANGED" then
+    if not joined then onJoined("joined the Crew channel") end
   elseif kind == "YOU_LEFT" or kind == "SUSPENDED" then
     joined = false
     update()
@@ -380,13 +406,16 @@ end
 -- WoW: a member list reads "*Owner, @Moderator, First Last, Name-Realm".
 function events.CHAT_MSG_CHANNEL_LIST(text, _, _, arg4, _, _, _, arg8, arg9)
   local where = channelArgs(arg4, arg8, arg9)
-  if not joined then
+  local isCrew = isTarget(baseName(arg4, arg9))
+  if not joined and not (joining and isCrew) then
     traceList(text, where, "ignored: not in the Crew channel yet")
     return
-  elseif not isTarget(baseName(arg4, arg9)) then
+  elseif not isCrew then
     traceList(text, where, "other channel")
     return
-  elseif not readable(text) then
+  end
+  if not joined then onJoined("joined the Crew channel (member list)", true) end
+  if not readable(text) then
     traceList(text, where, "Crew channel, ignored: text unreadable")
     return
   end

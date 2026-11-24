@@ -14,7 +14,10 @@ local function report(options)
   ns.syncLog:add("20:30:00 1.000  link up (member list)")
   ns.syncLog:add("20:30:01 2.000  left the group, or it disbanded")
   ns.core = {
-    crew = function() return options.crew ~= false and { code = "X" } or nil end,
+    crew = function()
+      if options.crew == false then return nil end
+      return options.crew or { code = "X", generation = 0, generationFrom = "saved", steps = 0 }
+    end,
     rosterCounts = function() return { members = 2 } end,
     joinFailure = function() return options.failure end,
   }
@@ -35,6 +38,7 @@ describe("/bff report", function()
       "Crew: yes · other Members known: 2 · peers in the channel: 1",
       "Link: up",
       "Last join failure: none since the last join",
+      "Channel generation: 0 (saved) · moves this session: 0",
       "In an instance: party · chat messaging lockdown: yes",
       "",
       "Sync log, oldest first (2 lines):",
@@ -56,5 +60,11 @@ describe("/bff report", function()
     })
     assert.truthy(text:find("Link: down (wrong password)", 1, true))
     assert.truthy(text:find("Last join failure: wrong password at 2023-11-14 22:13:20", 1, true))
+  end)
+
+  it("gives the channel generation, where it came from, and the moves this session", function()
+    local text = report({ crew = { code = "X", generation = 3, generationFrom = "Ann's record", steps = 2 } })
+    assert.truthy(text:find("Channel generation: 3 (Ann's record) · moves this session: 2", 1, true))
+    assert.truthy(report({ crew = false }):find("Channel generation: none (no Crew)", 1, true))
   end)
 end)

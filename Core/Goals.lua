@@ -240,6 +240,17 @@ function Goals:clear()
   self:load()
 end
 
+function Goals:putAway()
+  local kept = self.db.goals
+  self:clear()
+  return kept
+end
+
+function Goals:bringBack(kept)
+  self.db.goals = kept
+  self:load()
+end
+
 local function counted(self)
   local records = {}
   for _, record in self.ledger:records() do
