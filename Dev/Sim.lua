@@ -656,14 +656,38 @@ local LINK = "c0a0ff"
 local DIM = "8c8a99"
 local TRACE = "e0a070"
 
-local BUTTONS = {
-  { "ding", "Ding" }, { "xp", "XP" }, { "die", "Die" }, { "zone", "Zone" },
-  { "alt", "Alt" }, { "max", "Max" }, { "skill", "Skill" }, { "fish", "Fish" }, { "doing", "Doing" }, { "form", "Form" },
-  { "quest", "Quest" },
-  { "inside", "Inst" }, { "group", "Group" },
-  { "react", "React" }, { "cheer", "Cheer" }, { "respects", "Resp" }, { "welcome", "Welc" }, { "offer", "Offer" },
-  { "claim", "Claim" },
+local ACTION_GROUPS = {
+  { "Character", { { "ding", "Ding" }, { "xp", "XP" }, { "die", "Die" }, { "zone", "Zone" }, { "alt", "Alt" },
+    { "max", "Max" }, { "skill", "Skill" }, { "fish", "Fish" }, { "quest", "Quest" } } },
+  { "Status", { { "doing", "Doing" }, { "form", "Form" }, { "inside", "Inst" }, { "group", "Group" } } },
+  { "Crew", { { "react", "React" }, { "cheer", "Cheer" }, { "respects", "Resp" }, { "welcome", "Welc" },
+    { "offer", "Offer" }, { "claim", "Claim" } } },
 }
+
+local ACTION_ROW = 26
+local MEMBER_LABEL_WIDTH = 70
+local GROUP_LABEL_WIDTH = 64
+local GROUP_GAP = 12
+local BUTTON_GAP = 4
+
+local function layoutActions()
+  local placed, x, row = {}, MEMBER_LABEL_WIDTH, 0
+  for _, group in ipairs(ACTION_GROUPS) do
+    local width = GROUP_LABEL_WIDTH + #group[2] * (BUTTON_WIDTH + BUTTON_GAP)
+    if x > MEMBER_LABEL_WIDTH then
+      if x + GROUP_GAP + width > WIDTH - 2 * INSET then
+        x, row = MEMBER_LABEL_WIDTH, row + 1
+      else
+        x = x + GROUP_GAP
+      end
+    end
+    placed[#placed + 1] = { name = group[1], buttons = group[2], x = x, row = row }
+    x = x + width
+  end
+  return placed, row + 1
+end
+
+local ACTION_LAYOUT, ACTION_ROWS = layoutActions()
 
 local frame
 local watched
@@ -826,26 +850,31 @@ end
 
 local function actionBar()
   local bar = CreateFrame("Frame", nil, frame)
-  bar:SetHeight(22)
+  bar:SetHeight(ACTION_ROWS * ACTION_ROW)
   bar:SetPoint("TOPLEFT", INSET, -(Skin.HEADER_HEIGHT + 44))
   bar:SetPoint("RIGHT", -INSET, 0)
+  local middle = -ACTION_ROW / 2 + 2
   frame.actionsLabel = Skin.label(bar, "small", Skin.GOLD)
-  frame.actionsLabel:SetPoint("LEFT", 0, 0)
-  frame.actionsLabel:SetWidth(70)
+  frame.actionsLabel:SetPoint("LEFT", bar, "TOPLEFT", 0, middle)
+  frame.actionsLabel:SetWidth(MEMBER_LABEL_WIDTH)
   frame.actionButtons = {}
-  local anchor = frame.actionsLabel
-  for _, spec in ipairs(BUTTONS) do
-    local action = spec[1]
-    local button = Skin.button(bar, spec[2], function() act(selected, action) end)
-    button:SetSize(BUTTON_WIDTH, 22)
-    button:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
-    anchor = button
-    frame.actionButtons[#frame.actionButtons + 1] = button
+  for _, group in ipairs(ACTION_LAYOUT) do
+    local top = -group.row * ACTION_ROW
+    local name = Skin.label(bar, "small", Skin.MUTED)
+    name:SetPoint("LEFT", bar, "TOPLEFT", group.x + BUTTON_GAP, top + middle)
+    name:SetText(group.name)
+    for i, spec in ipairs(group.buttons) do
+      local action = spec[1]
+      local button = Skin.button(bar, spec[2], function() act(selected, action) end)
+      button:SetSize(BUTTON_WIDTH, 22)
+      button:SetPoint("TOPLEFT", group.x + GROUP_LABEL_WIDTH + (i - 1) * (BUTTON_WIDTH + BUTTON_GAP), top)
+      frame.actionButtons[#frame.actionButtons + 1] = button
+    end
   end
   return bar
 end
 
-local LIST_TOP = Skin.HEADER_HEIGHT + 44 + 30
+local LIST_TOP = Skin.HEADER_HEIGHT + 44 + ACTION_ROWS * ACTION_ROW + 4
 
 local function memberRow(i)
   local row = CreateFrame("Button", nil, frame)
