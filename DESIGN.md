@@ -204,7 +204,7 @@ BFF has its own flat skin. It deliberately rejects Blizzard's parchment, stone f
 **Key Characteristics:**
 - Near-black windows (97% opaque) over the game, with 1px hairlines in firelight cream at 7–10% for structure, lit by the Camp's fire under its band.
 - Ember Gold is the only accent in the game, and it means news. The Trophies tab's trophy colours are the one deliberate exception (and Catches shows items in their quality colours), and even there gold is news. Gold and teal appear together only on brand surfaces and inside the icon.
-- Friz Quadrata names things (titles, headings, labels) and Arial Narrow carries everything else in the game. Cinzel and Archivo Narrow stand in for them on the web.
+- Friz Quadrata names things (titles, headings, labels) and Arial Narrow carries everything else in the game. Cinzel and Archivo Narrow stand in for them on the web. The Camp's name tags are the one exception, in the pixel font Tiny5 (the Two Faces Rule).
 - Square corners in the game; rounding is faked with stepped pixels only where a chip needs it.
 - Full-colour game icons with a faded 1px edge in their kind's colour carry the meaning of each Feed entry.
 
@@ -265,6 +265,7 @@ Hues and tiers are `Skin.TROPHY_HUES` and `Skin.TROPHY_QUALITIES`; don't use the
 - **Small** (Arial Narrow, 12px): Character lines, checkbox labels, header-right status, level badges, small buttons, intro and helper lines.
 - **Tiny** (Arial Narrow, 11px): badge text (unseen counts, the minimap count), chart captions (heatmap hours and legend) and a medal's date. Nothing smaller ships.
 - **Figure** (Arial Narrow, 18px): the big progress numbers on the Trophies tab's tiles, and nothing else.
+- **Camp name** (Tiny5, 12px): the names and levels gained on the Camp's name tags, and nothing else. Arial Narrow on Korean and Chinese clients, which Tiny5 has no glyphs for.
 The gallery has its own scale, sized for 1920×1080 images that are also seen as roughly 300px-wide thumbnails on CurseForge:
 - **Brand display** (Cinzel 600, 104px, 1.06, solid Ember Gold): the hero's title.
 - **Brand title** (Cinzel 600, 96px): every other slide's title, 2–4 words, so it still reads in a thumbnail. Solid Ember Gold with a soft offset shadow for the scenery behind; never a gradient. 84px on the banner.
@@ -274,7 +275,7 @@ The gallery has its own scale, sized for 1920×1080 images that are also seen as
 - No label above a title: the title names the feature itself.
 
 ### Named Rules
-**The Two Faces Rule.** One serif to name things (titles, headings, labels), one narrow sans for everything else. No third family.
+**The Two Faces Rule.** One serif to name things (titles, headings, labels), one narrow sans for everything else. No third family, except inside the Camp: its name tags are pixel art like the figures (the Lit Camp Rule), so their names are in Tiny5 (`Media/Tiny5.ttf`, SIL Open Font License, `Media/Tiny5-OFL.txt`), a pixel font that reads on the day sky where Arial Narrow didn't. Nothing outside the Camp's band uses it.
 
 ## Layout
 
@@ -369,7 +370,7 @@ An 18×9 infinity (`Media/Forever.tga`, `Skin.foreverMark`), drawn after the emb
 A small square (18–20px) holding the Reaction's icon, desaturated at 55% alpha until clicked. Once given it's full colour with a faint 1px edge (30% white), and its tooltip says "You reacted". In a Feed entry's reactor list, "You" is Ash Text among Smoke Muted names.
 
 ### Camp band
-Full panel width, under the header and above the sidebar and every tab: about 120px, or about 78px in a window under 460px high, rounded to whole art pixels and bottom-aligned so the short one crops the sky. Names in Small, class-coloured, centred above each figure and cut to the room Core gives them. In While you were away it's the popup's top (440 wide), with levels gained over heads in Online Green, gold for max level. Plays no sound, and stops animating while hidden.
+Full panel width, under the header and above the sidebar and every tab: about 120px, or about 78px in a window under 460px high, rounded to whole art pixels and bottom-aligned so the short one crops the sky. Each name sits on a pixel name tag above its figure: a solid tag in the art's outline black with cut corners, a lighter lip along its top and a tail down to the head, drawn in art pixels like the sprites. The name is in Camp name type, class-coloured ("You" in its class colour too), and the tag fits the name, cut to the room Core gives it. In While you were away it's the popup's top (440 wide), with levels gained over heads in Online Green, gold for max level. Plays no sound, and stops animating while hidden.
 
 ### Toast
 300×40, Night Window at 88%, a 24px Feed picture (the Member's Camp figure instead, for an entry about a Member while the Camp is on), Body text (Ember Gold for news), and an optional Reaction button. A 2px timer line shows the time left at 18% white on every toast. Toasts fade over 0.6s.

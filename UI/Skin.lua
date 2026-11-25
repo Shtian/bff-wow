@@ -256,6 +256,8 @@ end
 local NARROW = "Fonts\\ARIALN.TTF"
 local FRIZ = "Fonts\\FRIZQT__.TTF"
 local CIRCLE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
+local TINY5 = "Interface\\AddOns\\BFF\\Media\\Tiny5.ttf"
+local LOCALES_WITHOUT_TINY5_GLYPHS = { koKR = true, zhCN = true, zhTW = true }
 
 local function font(name, path, size)
   local object = CreateFont(name)
@@ -273,6 +275,7 @@ Skin.fonts = {
   small = font("BFFFontSmall", NARROW, 12),
   tiny = font("BFFFontTiny", NARROW, 11),
   figure = font("BFFFontFigure", NARROW, 18),
+  campName = font("BFFFontCampName", LOCALES_WITHOUT_TINY5_GLYPHS[GetLocale()] and NARROW or TINY5, 12),
 }
 
 function Skin.classColor(classFilename)
