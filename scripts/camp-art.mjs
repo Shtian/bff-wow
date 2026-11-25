@@ -1250,7 +1250,10 @@ writeFileSync(join(root, "Media", "Dither25.tga"), tga(dither((x, y) => x % 2 ==
 const vignettes = vignetteSheet();
 writeFileSync(join(root, "Media", "EmptyStates.tga"), tga(vignettes.img));
 
-const skyColor = (look) => hex(look.sky[0]).map((v) => +(v / 255).toFixed(3)).join(", ");
+const luaColor = (color) => hex(color).map((v) => +(v / 255).toFixed(3)).join(", ");
+const skyColor = (look) => luaColor(look.sky[0]);
+// A Camp name sits on a tag in the outline's black, with a lighter lip along its top.
+const NAME_TAG = { fill: PAL.K, lip: "#1d1a26" };
 const lines = placed.map((s) => `    ${s.name} = { ${s.x}, ${s.y}, ${s.w}, ${s.h} },`);
 const vignetteLines = vignettes.art.map((v) =>
   `      ${v.name} = { hold = ${v.hold}, ${v.cells.map((c) => `{ ${c.x}, ${c.y} }`).join(", ")} },`);
@@ -1320,6 +1323,7 @@ ${Object.keys(PETS).map((key) => `    ${key} = { awake = "${petSprite(key)}", id
     lights = ${LIGHTS.length},
   },
   sky = { night = { ${skyColor(NIGHT)} }, day = { ${skyColor(DAY)} } },
+  nameTag = { fill = { ${luaColor(NAME_TAG.fill)} }, lip = { ${luaColor(NAME_TAG.lip)} } },
 }
 `);
 console.log(`CampSprites ${img.width}x${img.height}, ${placed.length} sprites; CampBackdrop ${FILE_W}x${FILE_H}; EmptyStates ${vignettes.img.width}x${vignettes.img.height}`);

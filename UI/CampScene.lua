@@ -48,7 +48,9 @@ local LANTERNS = { sag = 3, perColumns = 60, fewest = 4, most = 6, fireClear = 1
   sprites = { "lanternRed", "lanternGold" }, sway = { 0, 0, 1, 1, 0, 0, -1, -1 }, swayStep = 4, swayLag = 3 }
 local FIREFLIES = { count = 8, seed = 23, low = 4, high = 8, drift = 7, rise = 3, fireReach = 7, fireRows = 20,
   every = 20, spread = 5, lit = 14 }
-local NAME_ROWS = 4
+local NAME_TAG = { tail = 2, edge = 1, textRows = 5, sidePadding = 1 }
+NAME_TAG.rows = 2 * NAME_TAG.edge + NAME_TAG.textRows
+local NAME_ROWS = NAME_TAG.tail + NAME_TAG.rows
 local NIGHT_ONLY = { bats = true, fireworks = true, fireflies = true }
 local SKY = { column = 7, row = 30, rows = 9, sunEvery = 12, stars = 4, moonClear = { 3, 2 },
   spots = { { 0.17, 33 }, { 0.41, 37 }, { 0.69, 32 }, { 0.94, 36 }, { 0.06, 31 }, { 0.29, 35 }, { 0.58, 34 },
@@ -123,11 +125,15 @@ local SMOKE_SEAT = { after = WALK_FOR, every = 0.5, puff = 3, row = 4 }
 local PET_CUE_FOR = { hop = HOP_FOR, fish = 4, star = 4 }
 local PET_MARK = { x = 3, row = 1 }
 
+local function screenPixel(frame)
+  local factor = PixelUtil and PixelUtil.GetPixelToUIUnitFactor and PixelUtil.GetPixelToUIUnitFactor() or 1
+  return factor / frame:GetEffectiveScale()
+end
+
 -- WoW: a size that isn't a whole number of screen pixels draws some art
 -- pixels a screen pixel wider than others.
 function CampScene.artUnit(frame, target)
-  local factor = PixelUtil and PixelUtil.GetPixelToUIUnitFactor and PixelUtil.GetPixelToUIUnitFactor() or 1
-  local onePixel = factor / frame:GetEffectiveScale()
+  local onePixel = screenPixel(frame)
   local pixels = math.max(1, math.floor(target / onePixel + 0.5))
   return pixels * onePixel
 end
@@ -291,10 +297,23 @@ function CampScene.head(parent)
 end
 
 local function nameLabel(parent)
-  local label = Skin.label(parent, "small", nil, "OVERLAY")
-  label:SetJustifyH("CENTER")
+  local label = Skin.label(parent, "campName", nil, "OVERLAY")
   label:SetWordWrap(false)
   return label
+end
+
+local function colorTexture(parent, sublevel, color)
+  local t = parent:CreateTexture(nil, "OVERLAY", nil, sublevel)
+  t:SetColorTexture(color[1], color[2], color[3], 1)
+  return t
+end
+
+local function nameTag(parent)
+  local tag = { lip = colorTexture(parent, -1, Sheet.nameTag.lip) }
+  for _, part in ipairs({ "wide", "tall", "tailWide", "tailTip" }) do
+    tag[part] = colorTexture(parent, -2, Sheet.nameTag.fill)
+  end
+  return tag
 end
 
 local function pool(make)
@@ -330,6 +349,64 @@ end
 local function put(scene, t, x, row)
   t:ClearAllPoints()
   t:SetPoint("BOTTOMLEFT", scene.art, "BOTTOMLEFT", (scene.fire + x) * scene.unit, row * scene.unit)
+end
+
+local function fillRect(scene, t, x, row, columns, rows)
+  put(scene, t, x, row)
+  t:SetSize(columns * scene.unit, rows * scene.unit)
+  t:Show()
+end
+
+local function drawNameTag(scene, tag, centre, row, columns)
+  local left = math.floor(centre - columns / 2 + 0.5)
+  local tail = math.floor(centre + 0.5)
+  local bottom = row + NAME_TAG.tail
+  local rows = NAME_TAG.rows
+  fillRect(scene, tag.tailTip, tail, row, 1, 1)
+  fillRect(scene, tag.tailWide, tail - 1, row + 1, 3, 1)
+  fillRect(scene, tag.wide, left + 1, bottom, columns - 2, rows)
+  fillRect(scene, tag.tall, left, bottom + 1, columns, rows - 2)
+  fillRect(scene, tag.lip, left + 1, bottom + rows - 2, columns - 2, 1)
+  return left + NAME_TAG.edge, bottom + NAME_TAG.edge
+end
+
+local function fontPixel(scene)
+  local onePixel = screenPixel(scene.band)
+  local perArtPixel = math.floor(scene.unit / onePixel + 0.5)
+  return math.max(1, math.floor(perArtPixel / 2 + 0.5)) * onePixel, onePixel
+end
+
+local function sizeNameFont(scene, label)
+  local grid = Skin.CAMP_NAME_GRID
+  local size = grid and grid.line * fontPixel(scene) or select(2, Skin.fonts.campName:GetFont())
+  if label.fontSize ~= size then
+    local path, _, flags = Skin.fonts.campName:GetFont()
+    label:SetFont(path, size, flags)
+    label.fontSize = size
+  end
+end
+
+local function placeName(scene, label, column, row, columns)
+  local unit, grid = scene.unit, Skin.CAMP_NAME_GRID
+  local x, y = (scene.fire + column) * unit, row * unit
+  local width, height = columns * unit, NAME_TAG.textRows * unit
+  label:ClearAllPoints()
+  if not grid then
+    label:SetJustifyH("CENTER")
+    label:SetPoint("BOTTOMLEFT", scene.art, "BOTTOMLEFT", x, y)
+    label:SetSize(width, height)
+    label:Show()
+    return
+  end
+  local pixel, onePixel = fontPixel(scene)
+  local function snapDown(v) return math.floor(v / onePixel) * onePixel end
+  local dx = math.max(0, snapDown((width - label:GetUnboundedStringWidth()) / 2))
+  local dy = snapDown((height - grid.cap * pixel) / 2) - grid.descent * pixel
+  label:SetJustifyH("LEFT")
+  label:SetJustifyV("BOTTOM")
+  label:SetPoint("BOTTOMLEFT", scene.art, "BOTTOMLEFT", x + dx, y + dy)
+  label:SetSize(width - dx, grid.line * pixel)
+  label:Show()
 end
 
 local function hopping(scene, actor, late)
@@ -605,6 +682,46 @@ local function drawPet(scene, parts, actor, f, hidden)
   put(scene, parts.pet, x, ROW.pet + lift)
 end
 
+local function labelName(scene, label, actor)
+  if scene.gains then
+    if not actor.gained then return false end
+    label:SetText(actor.gained)
+    Skin.color(label, actor.highlight and Skin.GOLD or Skin.ONLINE)
+  else
+    if not (scene.names and actor.label) then return false end
+    label:SetText(actor.label)
+    label:SetTextColor(Skin.classColor(actor.classFilename))
+  end
+  return true
+end
+
+local function drawName(scene, parts, actor, centre, row)
+  local label = parts.label
+  if not labelName(scene, label, actor) then
+    label:Hide()
+    hideParts(parts.tag)
+    return nil
+  end
+  sizeNameFont(scene, label)
+  local wanted = math.ceil(label:GetUnboundedStringWidth() / scene.unit) + 2 * (NAME_TAG.sidePadding + NAME_TAG.edge)
+  local columns = math.max(2 * NAME_TAG.edge + 1, math.min(wanted, actor.labelWidth or actor.width))
+  local textColumn, textRow = drawNameTag(scene, parts.tag, centre, row, columns)
+  placeName(scene, label, textColumn, textRow, columns - 2 * NAME_TAG.edge)
+  return columns
+end
+
+local function nameRow(scene, top)
+  return math.min(top + LABEL_GAP, rowsOf(scene) - NAME_ROWS)
+end
+
+local function restingTop(actor)
+  if actor.pose == "asleep" then return ROW.asleep + Sheet.sprites.asleep[4] + SLEEP[3].row + Sheet.sprites.sleep3[4] end
+  local pose = POSE[actor.pose] or {}
+  local row = (pose.standing and ROW.standing or ROW.seated) + (pose.lift or 0)
+  local hat = hatPlace(actor.hat, row)
+  return math.max(row + Sheet.sprites.seated[4], hat and hat.top or 0)
+end
+
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
   local top, hatTop
@@ -704,23 +821,16 @@ local function drawActor(scene, parts, actor, f)
   drawPuff(scene, parts, actor)
 
   local centre = x + actor.width / 2
-  local label = parts.label
-  label:ClearAllPoints()
-  local labelRow = math.max(top, hatTop or top) + LABEL_GAP
-  label:SetPoint("BOTTOM", scene.art, "BOTTOMLEFT", (scene.fire + centre) * scene.unit, labelRow * scene.unit)
-  label:SetWidth(actor.labelWidth * scene.unit)
-  local text
-  if scene.gains then text = actor.gained elseif scene.names then text = actor.label end
-  label:SetText(text or "")
-  if scene.gains then
-    Skin.color(label, actor.highlight and Skin.GOLD or Skin.ONLINE)
-  else
-    label:SetTextColor(Skin.classColor(actor.classFilename))
-  end
-  label:SetShown(text ~= nil)
-  local halfName = (actor.labelWidth or actor.width) / 2
+  local drawnTop = math.max(top, hatTop or top)
+  local labelRow = nameRow(scene, drawnTop)
+  local columns = drawName(scene, parts, actor, centre, labelRow)
+  local halfName = (columns or actor.width) / 2
   scene.clearOf[#scene.clearOf + 1] = { left = math.min(x - 1, centre - halfName), right = math.max(x + actor.width, centre + halfName),
     top = labelRow + NAME_ROWS }
+  if columns then
+    local settledTop = actor.form and drawnTop or restingTop(actor)
+    scene.namesReach = math.max(scene.namesReach, nameRow(scene, settledTop) + NAME_ROWS)
+  end
 
   if actor.spark then
     setSprite(parts.spark, "spark", scene.unit)
@@ -1138,15 +1248,9 @@ local function stringRow(scene, column)
   return rowsOf(scene) - 1 - math.floor(LANTERNS.sag * (1 - u * u) + 0.5)
 end
 
-local function namesReach()
-  local top = ROW.seated + Sheet.sprites.seated[4]
-  for name in pairs(Sheet.hats) do top = math.max(top, hatPlace(name, ROW.seated).top) end
-  return top + LABEL_GAP + NAME_ROWS
-end
-
 local function lanternsFit(scene)
   local lowest = rowsOf(scene) - 1 - LANTERNS.sag - Sheet.sprites.lanternRed[4]
-  return lowest > namesReach()
+  return lowest > scene.namesReach
 end
 
 local function spread(list, from, to, count)
@@ -1361,6 +1465,7 @@ local function drawFrame(scene, f)
 
   scene.actorParts.used = 0
   scene.clearOf = {}
+  scene.namesReach = 0
   for _, actor in ipairs(view.actors) do drawActor(scene, take(scene.actorParts), actor, f) end
   hideRest(scene.actorParts)
 
@@ -1478,7 +1583,8 @@ function CampScene.new(parent, options)
         alt = texture(band.art, "OVERLAY", 1),
         puff = texture(band.art, "OVERLAY", 2),
         cheer = {},
-        label = shadowed(nameLabel(band.art)),
+        label = nameLabel(band.art),
+        tag = nameTag(band.art),
       }
     end),
     doorParts = pool(function()
@@ -1522,6 +1628,7 @@ function CampScene.new(parent, options)
     end),
     smokes = {},
     clearOf = {},
+    namesReach = 0,
     nextAt = {},
     graveParts = pool(function()
       return {

@@ -12,6 +12,7 @@ local LAYOUT = {
   grave = 8,
   graveGap = 2,
   gap = 4,
+  labelGap = 2,
   margin = 2,
   tent = 36,
   minColumns = 128,
@@ -174,7 +175,7 @@ local function labelRoom(actors, left, right)
     if nextOne then after = (nextOne.x + nextOne.width / 2 + centre) / 2 end
     if centre > 0 and (not prev or prev.x + prev.width / 2 < 0) then before = math.max(before, 0) end
     if centre < 0 and (not nextOne or nextOne.x + nextOne.width / 2 > 0) then after = math.min(after, 0) end
-    actor.labelWidth = math.max(actor.width, math.floor(2 * math.min(centre - before, after - centre)) - LAYOUT.gap)
+    actor.labelWidth = math.max(actor.width, math.floor(2 * math.min(centre - before, after - centre)) - LAYOUT.labelGap)
   end
 end
 

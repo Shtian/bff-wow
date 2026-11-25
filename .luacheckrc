@@ -59,6 +59,7 @@ stds.wow = {
     "GetGameTime",
     "GetItemIcon",
     "GetItemInfo",
+    "GetLocale",
     "GetLootSlotInfo",
     "GetLootSlotLink",
     "GetLootSourceInfo",
