@@ -265,7 +265,7 @@ Hues and tiers are `Skin.TROPHY_HUES` and `Skin.TROPHY_QUALITIES`; don't use the
 - **Small** (Arial Narrow, 12px): Character lines, checkbox labels, header-right status, level badges, small buttons, intro and helper lines.
 - **Tiny** (Arial Narrow, 11px): badge text (unseen counts, the minimap count), chart captions (heatmap hours and legend) and a medal's date. Nothing smaller ships.
 - **Figure** (Arial Narrow, 18px): the big progress numbers on the Trophies tab's tiles, and nothing else.
-- **Camp name** (Tiny5, 12px): the names and levels gained on the Camp's name tags, and nothing else. Arial Narrow on Korean and Chinese clients, which Tiny5 has no glyphs for.
+- **Camp name** (Tiny5, about 12px, sized to whole screen pixels): the names and levels gained on the Camp's name tags, and nothing else. Arial Narrow on Korean and Chinese clients, which Tiny5 has no glyphs for.
 The gallery has its own scale, sized for 1920×1080 images that are also seen as roughly 300px-wide thumbnails on CurseForge:
 - **Brand display** (Cinzel 600, 104px, 1.06, solid Ember Gold): the hero's title.
 - **Brand title** (Cinzel 600, 96px): every other slide's title, 2–4 words, so it still reads in a thumbnail. Solid Ember Gold with a soft offset shadow for the scenery behind; never a gradient. 84px on the banner.

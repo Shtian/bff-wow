@@ -126,11 +126,15 @@ local SMOKE_SEAT = { after = WALK_FOR, every = 0.5, puff = 3, row = 4 }
 local PET_CUE_FOR = { hop = HOP_FOR, fish = 4, star = 4 }
 local PET_MARK = { x = 3, row = 1 }
 
+local function screenPixel(frame)
+  local factor = PixelUtil and PixelUtil.GetPixelToUIUnitFactor and PixelUtil.GetPixelToUIUnitFactor() or 1
+  return factor / frame:GetEffectiveScale()
+end
+
 -- WoW: a size that isn't a whole number of screen pixels draws some art
 -- pixels a screen pixel wider than others.
 function CampScene.artUnit(frame, target)
-  local factor = PixelUtil and PixelUtil.GetPixelToUIUnitFactor and PixelUtil.GetPixelToUIUnitFactor() or 1
-  local onePixel = factor / frame:GetEffectiveScale()
+  local onePixel = screenPixel(frame)
   local pixels = math.max(1, math.floor(target / onePixel + 0.5))
   return pixels * onePixel
 end
@@ -295,7 +299,6 @@ end
 
 local function nameLabel(parent)
   local label = Skin.label(parent, "campName", nil, "OVERLAY")
-  label:SetJustifyH("CENTER")
   label:SetWordWrap(false)
   return label
 end
@@ -355,7 +358,7 @@ local function fillRect(scene, t, x, row, columns, rows)
   t:Show()
 end
 
-local function drawNameTag(scene, tag, label, centre, row, columns)
+local function drawNameTag(scene, tag, centre, row, columns)
   local left = math.floor(centre - columns / 2 + 0.5)
   local tail = math.floor(centre + 0.5)
   local bottom = row + NAME_TAG.tail
@@ -365,8 +368,45 @@ local function drawNameTag(scene, tag, label, centre, row, columns)
   fillRect(scene, tag.wide, left + 1, bottom, columns - 2, rows)
   fillRect(scene, tag.tall, left, bottom + 1, columns, rows - 2)
   fillRect(scene, tag.lip, left + 1, bottom + rows - 2, columns - 2, 1)
-  put(scene, label, left + NAME_TAG.textInset, bottom + NAME_TAG.edge)
-  label:SetSize((columns - 2 * NAME_TAG.textInset) * scene.unit, NAME_TAG.textRows * scene.unit)
+  return left + NAME_TAG.textInset, bottom + NAME_TAG.edge
+end
+
+local function fontPixel(scene)
+  local onePixel = screenPixel(scene.band)
+  local perArtPixel = math.floor(scene.unit / onePixel + 0.5)
+  return math.max(1, math.floor(perArtPixel / 2 + 0.5)) * onePixel, onePixel
+end
+
+local function sizeNameFont(scene, label)
+  local grid = Skin.CAMP_NAME_GRID
+  local size = grid and grid.line * fontPixel(scene) or select(2, Skin.fonts.campName:GetFont())
+  if label.fontSize ~= size then
+    local path, _, flags = Skin.fonts.campName:GetFont()
+    label:SetFont(path, size, flags)
+    label.fontSize = size
+  end
+end
+
+local function placeName(scene, label, column, row, columns)
+  local unit, grid = scene.unit, Skin.CAMP_NAME_GRID
+  local x, y = (scene.fire + column) * unit, row * unit
+  local width, height = columns * unit, NAME_TAG.textRows * unit
+  label:ClearAllPoints()
+  if not grid then
+    label:SetJustifyH("CENTER")
+    label:SetPoint("BOTTOMLEFT", scene.art, "BOTTOMLEFT", x, y)
+    label:SetSize(width, height)
+    label:Show()
+    return
+  end
+  local pixel, onePixel = fontPixel(scene)
+  local function snapDown(v) return math.floor(v / onePixel) * onePixel end
+  local dx = math.max(0, snapDown((width - label:GetUnboundedStringWidth()) / 2))
+  local dy = snapDown((height - grid.cap * pixel) / 2) - grid.descent * pixel
+  label:SetJustifyH("LEFT")
+  label:SetJustifyV("BOTTOM")
+  label:SetPoint("BOTTOMLEFT", scene.art, "BOTTOMLEFT", x + dx, y + dy)
+  label:SetSize(width - dx, grid.line * pixel)
   label:Show()
 end
 
@@ -663,9 +703,11 @@ local function drawName(scene, parts, actor, centre, row)
     hideParts(parts.tag)
     return nil
   end
+  sizeNameFont(scene, label)
   local wanted = math.ceil(label:GetUnboundedStringWidth() / scene.unit) + 2 * (NAME_TAG.sidePadding + NAME_TAG.edge)
   local columns = math.max(2 * NAME_TAG.textInset + 1, math.min(wanted, actor.labelWidth or actor.width))
-  drawNameTag(scene, parts.tag, label, centre, row, columns)
+  local textColumn, textRow = drawNameTag(scene, parts.tag, centre, row, columns)
+  placeName(scene, label, textColumn, textRow, columns - 2 * NAME_TAG.textInset)
   return columns
 end
 
@@ -1542,7 +1584,7 @@ function CampScene.new(parent, options)
         alt = texture(band.art, "OVERLAY", 1),
         puff = texture(band.art, "OVERLAY", 2),
         cheer = {},
-        label = shadowed(nameLabel(band.art)),
+        label = nameLabel(band.art),
         tag = nameTag(band.art),
       }
     end),
