@@ -24,6 +24,9 @@ local PROFESSIONS = {
   blacksmithing = { 164, "Blacksmithing", 136241 },
   tailoring = { 197, "Tailoring", 136249 },
   skinning = { 393, "Skinning", 134366 },
+  enchanting = { 333, "Enchanting", "Interface\\Icons\\Trade_Engraving" },
+  engineering = { 202, "Engineering", "Interface\\Icons\\Trade_Engineering" },
+  leatherworking = { 165, "Leatherworking", "Interface\\Icons\\Trade_LeatherWorking" },
   firstAid = { 129, "First Aid", 135966, true },
   fishing = { 356, "Fishing", 136245, true },
   cooking = { 185, "Cooking", 133971, true },
@@ -53,11 +56,14 @@ local MEMBERS = {
       professions = professions("mining", 300, 300, "blacksmithing", 262, 300) },
   } },
   { name = "Simba", offline = true, characters = {
-    { name = "Simba", classFilename = "DRUID", levelOffset = 6, zone = "Teldrassil" },
-    { name = "Simbalina", classFilename = "HUNTER", levelOffset = -15, zone = "Durotar", ago = 40 * DAY },
+    { name = "Simba", classFilename = "DRUID", levelOffset = 6, zone = "Teldrassil",
+      professions = professions("skinning", 240, 300, "leatherworking", 225, 300, "fishing", 90, 150) },
+    { name = "Simbalina", classFilename = "HUNTER", levelOffset = -15, zone = "Durotar", ago = 40 * DAY,
+      professions = professions("engineering", 175, 225, "mining", 160, 225) },
   } },
   { name = "Mirelle", offline = true, characters = {
-    { name = "Mirelle", classFilename = "PALADIN", levelOffset = -5, zone = "Darkshore" },
+    { name = "Mirelle", classFilename = "PALADIN", levelOffset = -5, zone = "Darkshore",
+      professions = professions("enchanting", 260, 300, "tailoring", 300, 300, "firstAid", 225, 300, "cooking", 120, 150) },
   } },
 }
 
