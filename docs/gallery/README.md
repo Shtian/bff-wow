@@ -14,7 +14,10 @@ A missing screenshot stops the render. To preview the layout before you have the
 - **Crop every shot** with `"crop": [x, y, width, height]` (pixels in the screenshot) in `slides.json`. Take about 1.3–1.5x the panel's size, so some bright scenery frames the dark panel. Without a crop the whole screen is shown, the panel ends up tiny, and the render warns about it.
 - `camp.jpg` is the Camp band at the top of the panel. Crop it wide and short, around the band with a little of the panel below, and have a few friends online and asleep, a grave with a flower and a spark (`/bffdev` can set these up).
 - `pocket.png` is the Pocket Camp, used on the banner and on its own slide. Have four or five friends online doing different things (one fighting, one fishing, one in a dungeon doorway), and crop it tight to the Camp with a little scenery around it.
-- `toast.png` is shown below the While you were away popup on the cover. Crop it tight to one or two toasts.
+- `away.jpg` is the While you were away popup: Start sim, then Away in `/bffdev`; it shows once sync settles (about 10 s).
+- `toast.jpg` is shown below the While you were away popup on the cover. Crop it tight to one or two toasts (`/bffdev toast`, a death next to a ding).
+- The panel tabs (`roster`, `feed`, `goals` (Trophies), `spares`, `when` (Play Times), `professions`, `together` (Dungeons)) share one crop: take them in one session without moving or resizing the panel or turning the camera, and keep minimap buttons and the quest tracker clear of the crop's corners.
+- Fill each tab before the shot: alts expanded on the Roster, reactions sent in the Feed, a cleared dungeon on the Trophies shelf (Dungeon in `/bffdev`), one Spare claimed, every Member's professions shared. If a tab stays thin, the gap is in the sim's data in `Dev/Sim.lua`.
 - Mock data (dev checkout): `/bffdev` opens the simulator console, which fills the panel with simulated Members, and `/bffdev toast` shows sample toasts.
 
 ## Slides
