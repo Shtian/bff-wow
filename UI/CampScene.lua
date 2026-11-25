@@ -48,9 +48,8 @@ local LANTERNS = { sag = 3, perColumns = 60, fewest = 4, most = 6, fireClear = 1
   sprites = { "lanternRed", "lanternGold" }, sway = { 0, 0, 1, 1, 0, 0, -1, -1 }, swayStep = 4, swayLag = 3 }
 local FIREFLIES = { count = 8, seed = 23, low = 4, high = 8, drift = 7, rise = 3, fireReach = 7, fireRows = 20,
   every = 20, spread = 5, lit = 14 }
-local NAME_TAG = { tail = 2, edge = 1, textRows = 5, sidePadding = 2, clipInset = 1 }
+local NAME_TAG = { tail = 2, edge = 1, textRows = 5, sidePadding = 1 }
 NAME_TAG.rows = 2 * NAME_TAG.edge + NAME_TAG.textRows
-NAME_TAG.textInset = NAME_TAG.edge + NAME_TAG.clipInset
 local NAME_ROWS = NAME_TAG.tail + NAME_TAG.rows
 local NIGHT_ONLY = { bats = true, fireworks = true, fireflies = true }
 local SKY = { column = 7, row = 30, rows = 9, sunEvery = 12, stars = 4, moonClear = { 3, 2 },
@@ -368,7 +367,7 @@ local function drawNameTag(scene, tag, centre, row, columns)
   fillRect(scene, tag.wide, left + 1, bottom, columns - 2, rows)
   fillRect(scene, tag.tall, left, bottom + 1, columns, rows - 2)
   fillRect(scene, tag.lip, left + 1, bottom + rows - 2, columns - 2, 1)
-  return left + NAME_TAG.textInset, bottom + NAME_TAG.edge
+  return left + NAME_TAG.edge, bottom + NAME_TAG.edge
 end
 
 local function fontPixel(scene)
@@ -705,9 +704,9 @@ local function drawName(scene, parts, actor, centre, row)
   end
   sizeNameFont(scene, label)
   local wanted = math.ceil(label:GetUnboundedStringWidth() / scene.unit) + 2 * (NAME_TAG.sidePadding + NAME_TAG.edge)
-  local columns = math.max(2 * NAME_TAG.textInset + 1, math.min(wanted, actor.labelWidth or actor.width))
+  local columns = math.max(2 * NAME_TAG.edge + 1, math.min(wanted, actor.labelWidth or actor.width))
   local textColumn, textRow = drawNameTag(scene, parts.tag, centre, row, columns)
-  placeName(scene, label, textColumn, textRow, columns - 2 * NAME_TAG.textInset)
+  placeName(scene, label, textColumn, textRow, columns - 2 * NAME_TAG.edge)
   return columns
 end
 
