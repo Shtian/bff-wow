@@ -79,9 +79,9 @@ local POSE = {
   adventuring = { standing = true, tool = { "torch", 6, 11 } },
   fighting = { standing = true, tool = { "blade", 6, 12 } },
   crafting = { standing = true, tool = { "hammer", 5, 11 }, front = { "anvil", 5, -1, true } },
-  mining = { standing = true, gathering = true },
-  herbalism = { standing = true, gathering = true },
-  skinning = { standing = true, gathering = true },
+  mining = { standing = true },
+  herbalism = { standing = true },
+  skinning = { standing = true },
   fishing = { tool = { "rod", 7, 0, true }, pond = true },
   vendor = { front = { "bag", 7, -2, true } },
   auction = { front = { "coins", 8, -2, true } },
@@ -91,6 +91,7 @@ local POSE = {
     flap = "griffinWingUp" },
 }
 local GATHERING = { stagger = 3, slots = { "back", "node", "held", "fleck", "find" },
+  overFigure = { "node", "held", "fleck", "find" },
   inHand = { held = true, fleck = true } }
 local HELD_TOP = {}
 for pose, frames in pairs(Sheet.gathering) do
@@ -590,7 +591,7 @@ local function drawPonds(scene, f)
 end
 
 local function hideGathering(parts)
-  for _, slot in ipairs(GATHERING.slots) do parts[slot]:Hide() end
+  for _, slot in ipairs(GATHERING.overFigure) do parts[slot]:Hide() end
 end
 
 local function gatheringFrame(actor, f)
@@ -607,6 +608,11 @@ local function drawGathering(scene, parts, actor, frame, hop)
       parts[slot]:Hide()
     end
   end
+end
+
+local function bodyFor(gathering, hop, standing)
+  if gathering and not hop then return gathering.body end
+  return (hop or standing) and "hop" or "seated"
 end
 
 local function restingBody(pose)
@@ -838,7 +844,7 @@ end
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
   local top, hatTop
-  local sunk = 0
+  local belowSeated = 0
   local walkedIn = playing(scene, "arrive", actor.memberId)
   if actor.pose == "asleep" and walkedIn and walkedIn >= WALK_FOR then walkedIn = nil end
   local welcomed = not walkedIn and actor.pose ~= "asleep" and playing(scene, "welcome", actor.memberId) ~= nil
@@ -872,8 +878,8 @@ local function drawActor(scene, parts, actor, f)
       put(scene, parts.seat, x + OFFSET.seat, ROW.seat)
     end
     parts.back:SetAlpha(1)
-    local gathering = pose.gathering and gatheringFrame(actor, f)
-    local body = gathering and not hop and gathering.body or (hop or standing) and "hop" or "seated"
+    local gathering = not dead and Sheet.gathering[actor.pose] and gatheringFrame(actor, f)
+    local body = bodyFor(gathering, hop, standing)
     if dead then
       body = "skeleton"
       parts.cloth:Hide()
@@ -884,7 +890,7 @@ local function drawActor(scene, parts, actor, f)
     end
     put(scene, parts.cloth, x, row)
     put(scene, parts.skin, x, row)
-    sunk = Sheet.sprites.seated[4] - Sheet.sprites[body][4]
+    belowSeated = Sheet.sprites.seated[4] - Sheet.sprites[body][4]
     if dead then parts.hat:Hide() else hatTop = drawHat(scene, parts, actor, x, headRow(row, body)) end
     for _, z in ipairs(parts.sleep) do z:Hide() end
     top = row + Sheet.sprites[body][4]
@@ -957,7 +963,7 @@ local function drawActor(scene, parts, actor, f)
     local upright = actor.pose ~= "asleep"
     local lift = upright and not (walkedIn or welcomed) and celebrating(scene, actor, f) and ROW.hop - ROW.seated or 0
     put(scene, parts.spark, x + (upright and OFFSET.seatedSpark or OFFSET.asleepSpark),
-      (upright and SPARK_ROW.seated - sunk or SPARK_ROW.asleep) + lift)
+      (upright and SPARK_ROW.seated - belowSeated or SPARK_ROW.asleep) + lift)
   else
     parts.spark:Hide()
   end

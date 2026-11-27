@@ -371,6 +371,7 @@ describe("What a Member is doing", function()
 
       b:play({ professions = { profession(ALCHEMY, "Alchemy", 12), profession(MINING, "Mining", 11),
         profession(FISHING, "Fishing", 10) }, level = 13 })
+      assert.same({ "mining", "mining" }, shown(b, b))
       net:run(3)
       assert.same({ "mining", "mining" }, shown(a, b))
     end)
@@ -614,7 +615,7 @@ describe("What a Member is doing", function()
       end
       local before = seats()
       local skills = {}
-      for i, skillLine in ipairs({ 393, 182, 186 }) do
+      for i, skillLine in ipairs({ SKINNING, HERBALISM, MINING }) do
         local client = clients[i + 1]
         skills[i] = skillLine
         client:play({ professions = { profession(skillLine, "Gathering", 10) }, level = 11 })
