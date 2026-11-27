@@ -292,23 +292,66 @@ local function latestName(slot)
   return latest and latest.name
 end
 
-function Slots.elsewhere(db, key)
+local function waitingId(db)
+  for _, id in ipairs(unclaimedIds(db)) do
+    if db.crews[id].crew ~= nil then return id end
+  end
+  return nil
+end
+
+local function offerKey(db, key)
   local current = db.rulesets[key]
   local base = baseOf(key, current)
+  for _, other in ipairs(sortedKeys(db.rulesets)) do
+    local entry = db.rulesets[other]
+    local slot = other ~= key and type(entry) == "table" and db.crews[entry.active]
+    if type(slot) == "table" and slot.crew ~= nil and slot.provisional
+      and entry.faction ~= current.faction and baseOf(other, entry) == base then
+      return other
+    end
+  end
+  return nil
+end
+
+function Slots.elsewhere(db, key)
   local crews, offer = {}, nil
+  local offered = offerKey(db, key)
   for _, other in ipairs(sortedKeys(db.rulesets)) do
     local entry = db.rulesets[other]
     local slot = other ~= key and type(entry) == "table" and db.crews[entry.active]
     if type(slot) == "table" and slot.crew ~= nil then
-      crews[#crews + 1] = { key = other, name = entry.name, faction = entry.faction, character = latestName(slot) }
-      if slot.provisional and entry.faction ~= current.faction and baseOf(other, entry) == base then
-        offer = offer or { key = other, name = entry.name, faction = entry.faction }
-      end
+      local crew = { key = other, name = entry.name, faction = entry.faction, character = latestName(slot) }
+      crews[#crews + 1] = crew
+      if other == offered then offer = crew end
     end
   end
-  local unclaimed = false
-  for _, id in ipairs(unclaimedIds(db)) do
-    if db.crews[id].crew ~= nil then unclaimed = true end
-  end
-  return { crews = crews, offer = offer, unclaimed = unclaimed or nil }
+  local ask = waitingId(db) ~= nil and not db.rulesets[key].declined
+  return { crews = crews, offer = offer, ask = ask or nil }
+end
+
+local function replaceActive(db, key, id)
+  local entry = db.rulesets[key]
+  if entry.active ~= nil and entry.active ~= id then db.crews[entry.active] = nil end
+  entry.active = id
+  local slot = db.crews[id]
+  slot.ruleset, slot.provisional = key, nil
+  return slot
+end
+
+function Slots.claimHere(db, key)
+  local id = waitingId(db)
+  return id and replaceActive(db, key, id) or nil
+end
+
+function Slots.decline(db, key)
+  db.rulesets[key].declined = true
+end
+
+function Slots.bringHere(db, key, random)
+  local from = offerKey(db, key)
+  if not from then return nil end
+  local entry = db.rulesets[from]
+  local id = entry.active
+  entry.active = Slots.newSlot(db, from, random)
+  return replaceActive(db, key, id)
 end
