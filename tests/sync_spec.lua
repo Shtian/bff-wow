@@ -133,6 +133,51 @@ describe("Two Members", function()
     assert.equal(changed + 1, a:count("changed"))
   end)
 
+  it("keep a silent Member online but quiet while they stay in the channel", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+
+    b:lockdown(true)
+    local changed = a:count("changed")
+    net:run(13 * 60)
+    local row = a:rowFor(b)
+    assert.is_true(row.online)
+    assert.is_true(row.quiet)
+    assert.equal("online · quiet", row.lastSeenText)
+    assert.is_true(a:count("changed") > changed)
+    assert.equal(1, a.core:rosterCounts().online)
+
+    b:lockdown(false)
+    net:run(5)
+    row = a:rowFor(b)
+    assert.is_true(row.online)
+    assert.is_false(row.quiet)
+    assert.equal("online", row.lastSeenText)
+  end)
+
+  it("mark a quiet Member offline when they leave the channel", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+
+    b:lockdown(true)
+    net:run(13 * 60)
+    b:logout()
+    net:run(1)
+    assert.is_false(a:rowFor(b).online)
+  end)
+
+  it("mark a quiet Member offline when a whisper to them bounces", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+
+    b:lockdown(true)
+    net:run(13 * 60)
+    b:logoutStillListed()
+    assert.is_true(a:rowFor(b).online)
+    net:run(6 * 60)
+    assert.is_false(a:rowFor(b).online)
+  end)
+
   it("send nothing at logout", function()
     local net, clients = crew({ "Ann", "Bob" })
     local mark = #net.wire
@@ -373,28 +418,46 @@ describe("Gossip", function()
     assert.equal(13, b:rowFor(a).level)
   end)
 
-  it("keeps a paused Member silent and offline, and catches up on resume", function()
+  it("takes a paused Member out of the channel, so they show offline at once, and catches up on resume", function()
     local net, clients, ns = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]
 
     a.core:setPaused(true)
     assert.is_true(a.core:isPaused())
+    assert.is_nil(a.core:channel())
+    assert.is_table(a.core:crew())
     local mark = #net.wire
     a:play({ level = 11 })
+    net:run(2)
+    assert.is_false(b:rowFor(a).online)
     net:run(13 * 60)
     assert.same({}, sentSince(net, ns, mark, "Ann"))
     assert.is_false(b:rowFor(a).online)
     assert.equal(10, b:rowFor(a).level)
     b:play({ level = 14 })
     net:run(2)
-    assert.equal(14, a:rowFor(b).level)
+    assert.equal(10, a:rowFor(b).level)
 
     a:reload()
     assert.is_true(a.core:isPaused())
     a.core:setPaused(false)
+    assert.is_table(a.core:channel())
     net:run(5)
     assert.equal(11, b:rowFor(a).level)
     assert.is_true(b:rowFor(a).online)
+    assert.equal(14, a:rowFor(b).level)
+  end)
+
+  it("lets a paused Member leave the Crew through the channel", function()
+    local net, clients = crew({ "Ann", "Bob" })
+    local a, b = clients[1], clients[2]
+
+    a.core:setPaused(true)
+    net:run(2)
+    assert.is_true(a.core:leaveCrew())
+    net:run(2)
+    assert.is_nil(a.core:crew())
+    assert.is_nil(b:rowFor(a))
   end)
 
   it("fits ten Members with three Characters each in one DIGEST", function()

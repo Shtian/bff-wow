@@ -223,7 +223,7 @@ end
 
 local function bindSlot(self, slot, initialLogin)
   self.db = slot
-  self.ledger = ns.Ledger.new(slot, self.now, self.random, initialLogin)
+  self.ledger = ns.Ledger.new(slot, self.now, self.random, initialLogin, self.inChannel)
   self.feedState = ns.Feed.new(slot, self.ledger, self.now, self.maxLevel, initialLogin, self.itemLink, self.itemLook)
   self.spareLife = ns.Spares.new({
     db = slot,
@@ -283,6 +283,7 @@ function Core.new(deps)
     now = deps.now,
     random = deps.random,
     link = deps.link,
+    inChannel = type(deps.link.inChannel) == "function" and deps.link.inChannel or nil,
     listener = deps.listener,
     initialLogin = deps.initialLogin == true,
     maxLevel = deps.maxLevel,
@@ -720,7 +721,8 @@ local function onlineChanged(self)
   local online = ns.Roster.online(self.ledger, now)
   local differs = false
   local arrived = {}
-  for id in pairs(online) do
+  for id, presence in pairs(online) do
+    if self.online[id] and self.online[id] ~= presence then differs = true end
     if not self.online[id] then
       differs = true
       if id ~= self.ledger:memberId() then self.doings:newcomer() end
@@ -1328,7 +1330,10 @@ local function settingFor(key)
 end
 
 local ON_CHANGE = {
-  paused = function(self, paused) self.gossip:setPaused(paused) end,
+  paused = function(self, paused)
+    self.gossip:setPaused(paused)
+    if self.db.crew then self.listener("crewChanged") end
+  end,
 }
 
 local function savedFor(self, setting)
@@ -1525,6 +1530,12 @@ local PAUSED = "You appear offline: the others don't see you. Change it in Setti
 local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
 
 local CAPPED = "The game won't let BFF into any channel for your Crew. Try again later."
+
+function Core:channel()
+  local crew = self:crew()
+  if crew and (crew.leaving or not self:isPaused()) then return crew end
+  return nil
+end
 
 function Core:crew()
   local saved = self.db.crew
@@ -1792,7 +1803,11 @@ function Core:leaveCrew()
   if crew.leaving then return true end
   crew.leaving = true
   self.ledger:writeOwn({ left = true })
-  if self.linkUp or self.linkFailed or self.channelCapped then finishLeaving(self) else self.listener("changed") end
+  if self.linkUp or self.linkFailed or self.channelCapped then
+    finishLeaving(self)
+  else
+    self.listener(self:isPaused() and "crewChanged" or "changed")
+  end
   return true
 end
 

@@ -105,12 +105,15 @@ describe("The Camp", function()
     c.ticks = false
     c:lockdown(true)
     skip(net, 13 * 60)
-    assert.equal("asleep", actorFor(a.core:camp(COLUMNS), c).pose)
+    assert.equal("seated", actorFor(a.core:camp(COLUMNS), c).pose)
+    assert.equal("by the fire · quiet", a:rowFor(c).status)
+    assert.same({ "You: by the fire", "Cid: by the fire · quiet" }, a.core:pocketCamp().tooltip.lines)
 
     c:lockdown(false)
     c.ticks = true
     net:run(10)
     assert.equal("seated", actorFor(a.core:camp(COLUMNS), c).pose)
+    assert.equal("by the fire", a:rowFor(c).status)
   end)
 
   it("always seats you, labelled You, and others by display name", function()

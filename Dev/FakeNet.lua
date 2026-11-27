@@ -98,8 +98,27 @@ local function receive(self, item, client)
 end
 
 local function channelOf(client)
-  local crew = client.core and client.core:crew()
+  local crew = client.core and client.core:channel()
   return crew and crew.channel
+end
+
+local function inChannel(self, client, name)
+  for _, other in ipairs(self.clients) do
+    if other ~= client and characterName(other) == name then
+      if other.stillListed then return true end
+      if channelOf(other) and (not self.channels or channelOf(other) == channelOf(client)) then return true end
+    end
+  end
+  return false
+end
+
+local function bounce(self, item)
+  for _, client in ipairs(self.clients) do
+    if client.stillListed and (item.to == nil or item.to == characterName(client)) then
+      client.stillListed = nil
+      if item.from.core then item.from.core:gone(characterName(client)) end
+    end
+  end
 end
 
 local function hasPeer(self, client, other)
@@ -118,6 +137,7 @@ local function reaches(self, item, client)
 end
 
 local function deliver(self, item)
+  if not item.gone then bounce(self, item) end
   for _, client in ipairs(self.clients) do
     if isListening(client) and reaches(self, item, client) then
       if item.gone then
@@ -133,11 +153,14 @@ local function deliver(self, item)
   end
 end
 
-local relinkMoved
+local relinkMoved, followChannel
 
 function FakeNet:step(time)
   self.clock = time or self.clock + 1
-  for _, client in ipairs(self.clients) do relinkMoved(client) end
+  for _, client in ipairs(self.clients) do
+    relinkMoved(client)
+    followChannel(client)
+  end
   local queue = self.queue
   self.queue = {}
   for _, item in ipairs(queue) do deliver(self, item) end
@@ -182,7 +205,9 @@ function FakeNet:add(name, options)
 end
 
 function FakeNet:attach(core, name)
-  local client = setmetatable({ net = self, name = name or "you", core = core, linkUp = true, vouched = {} }, Client)
+  local client = setmetatable({
+    net = self, name = name or "you", core = core, linkUp = true, vouched = {}, attached = true,
+  }, Client)
   client.framing = newFraming(client)
   self.clients[#self.clients + 1] = client
   return client
@@ -207,6 +232,7 @@ local function newCore(client, initialLogin)
       send = function(message, to)
         if client.core and client.linkUp then net:broadcast(client, message, to) end
       end,
+      inChannel = function(name) return inChannel(net, client, name) end,
     },
     gossip = client.gossip,
     ruleset = copy(client.ruleset),
@@ -244,7 +270,7 @@ function Client:noteMemberId()
 end
 
 local function bringUp(client)
-  if client.locked or not client.core or not client.core:crew() then return end
+  if client.locked or not client.core or not client.core:channel() then return end
   client.linkUp = true
   client.core:up()
 end
@@ -259,6 +285,27 @@ function relinkMoved(client)
     client.core:down()
   end
   bringUp(client)
+end
+
+function followChannel(client)
+  if client.attached then return end
+  if not client.core then
+    client.inCrewChannel = nil
+    return
+  end
+  local wanted = client.core:channel() ~= nil
+  local was = client.inCrewChannel
+  client.inCrewChannel = wanted
+  if was == nil or was == wanted then return end
+  if wanted then
+    bringUp(client)
+  else
+    if client.linkUp then
+      client.linkUp = false
+      client.core:down()
+    end
+    client.net.queue[#client.net.queue + 1] = { from = client, gone = characterName(client) }
+  end
 end
 
 function Client:login()
@@ -276,6 +323,12 @@ function Client:logout(skipGone)
   if not skipGone then
     self.net.queue[#self.net.queue + 1] = { from = self, gone = self.character.name }
   end
+  return self
+end
+
+function Client:logoutStillListed()
+  self:logout(true)
+  self.stillListed = true
   return self
 end
 

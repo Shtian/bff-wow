@@ -40,13 +40,15 @@ function Ledger.newMemberId(random)
   return table.concat(chars)
 end
 
-function Ledger.new(db, now, random, initialLogin)
+local function nobody() return false end
+
+function Ledger.new(db, now, random, initialLogin, inChannel)
   db.memberId = db.memberId or Ledger.newMemberId(random)
   db.records = db.records or {}
   db.via = db.via or {}
   db.removed = db.removed or {}
   if initialLogin or not db.heard then db.heard = {} end
-  return setmetatable({ db = db, now = now }, Ledger)
+  return setmetatable({ db = db, now = now, channelHas = inChannel or nobody }, Ledger)
 end
 
 function Ledger:memberId()
@@ -407,6 +409,19 @@ end
 
 function Ledger:lastHeard(id)
   return self.db.heard[id]
+end
+
+-- WoW: the channel names a Character "First Last" on Forever.
+function Ledger:inChannel(id)
+  local record = self.db.records[id]
+  if not record then return false end
+  for _, character in pairs(record.characters) do
+    local name = character.name
+    if self.channelHas(name) then return true end
+    local last = character.lastName
+    if type(last) == "string" and last ~= "" and self.channelHas(name .. " " .. last) then return true end
+  end
+  return false
 end
 
 -- WoW: on Forever the channel names a Character "First Last", while

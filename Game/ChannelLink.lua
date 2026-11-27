@@ -650,6 +650,10 @@ function ChannelLink.setCrew(crew)
   tryJoin()
 end
 
+function ChannelLink.inChannel(name)
+  return presence:has(name)
+end
+
 function ChannelLink.setTrace(fn)
   trace = fn
 end

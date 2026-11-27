@@ -599,6 +599,8 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
         actor.status = "in " .. actor.instance
       elseif actor.form and actor.pose == "seated" then
         actor.status = FORM_STATUS[actor.form]
+      elseif actor.pose == "seated" and actor.row.quiet then
+        actor.status = STATUS.seated .. " · quiet"
       else
         actor.status = STATUS[actor.pose]
       end
@@ -623,7 +625,7 @@ function Camp.wordRows(rows, on, order)
     if row.own then
       row.status = nil
     elseif on then
-      row.status = row.online and "by the fire" or "asleep · " .. row.lastSeenText
+      row.status = row.quiet and "by the fire · quiet" or row.online and "by the fire" or "asleep · " .. row.lastSeenText
     else
       row.status = row.lastSeenText
     end
