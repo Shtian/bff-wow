@@ -52,9 +52,17 @@ A slot id is 8 characters from `[a-z0-9]`: a new slot's id is its new Member id.
   - After a claim by server ID, Core drops your own Characters whose server ID is neither the current one nor any other Member's (`Ledger:keepCharacters`, which bumps the version and clears a dropped Main).
   - The current Character's GUID isn't in the facts, so `Core:updateOwn` drops it from every other slot's own record (left and unclaimed slots too), once per Character per session.
   - `Core:elsewhere()` (`Slots.elsewhere`) gives what the no-Crew card needs:
-    - `crews`: the other rulesets where you have a Crew, with `key`, `name`, `faction` and the `character` you last played there;
-    - `unclaimed = true` when a slot is waiting to be claimed;
-    - `offer`: the other faction's provisional slot on this ruleset (`key`, `name`, `faction`).
+    - `crews`: the other rulesets where you have a Crew, with `key`, `name`, `faction`, the `character` you last played there, and its `place` ("Normal (Alliance)", or "Ann's Ruleset (Alliance)" with no name saved);
+    - `hint`: "Your Crew is on Normal (Alliance)." naming every place, nil with no Crew elsewhere;
+    - `ask = true` when an unclaimed slot with a Crew is waiting and this ruleset hasn't answered (`declined` on its entry);
+    - `offer`: the other faction's provisional slot on this ruleset, the same table as its `crews` item.
+  - The card's answers, each refusing with `inCrew` in a Crew and `notWaiting` with nothing to answer:
+    - `claimCrewHere()` (`Slots.claimHere`) makes the waiting slot this entry's active one, not `provisional`, since you chose it;
+    - `startFresh()` (`Slots.decline`) marks the entry `declined`, so it stops asking here. Other rulesets still ask, and a match by server ID still claims;
+    - `bringCrewHere()` (`Slots.bringHere`) moves the offered slot into this entry, not `provisional`, and gives the other faction's entry a fresh slot.
+
+    Claiming and bringing rebind through `switchSlot`, drop your Characters that don't belong here (`Slots.belongsHere`), raise the generation and fire `crewChanged`. Starting fresh fires `crewChanged` too. Each answer goes to the sync log.
+  - `rulesetNamed` fires `changed` when the name changes, so the views redraw.
 - **`Core.new`** takes `db` (still the whole `BFF_DB`), plus `ruleset` (the facts). It keeps `self.account` for settings, What's new and `fresh` (the first-install check), and `self.db` for the active slot. A new `bindSlot(slot)` builds the modules that hold a slot:
   - Ledger, Feed, Spares, Goals, Stray, PlayTimes;
   - Gossip, which holds the Ledger;

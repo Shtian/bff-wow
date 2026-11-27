@@ -36,7 +36,7 @@ Core is created with:
   - **`rulesets[key]`**: the `active` slot, the `left` slot if any, and the record ID, faction, name and server IDs that repair a changed key.
 
   The full layout is in `docs/design/crews-per-ruleset.md`.
-- `ruleset` (optional): the facts that pick the slot: `{ realmName, recordId, faction, serverId, name }`, each optional, read by `Game/Ruleset.lua` in game. Core cleans them with `Slots.facts`. The key is `realm:<realm name>:<faction>` when there's a realm name (retail), else `mode:<record ID>:<faction>` (Forever), else `default`. With none the key is `default`, so tests and the dev sim keep one slot. `rulesetNamed(name)` saves a name that arrives after login. `ruleset()` reads back the key, the saved record ID, faction, server IDs and name, whether the slot is `provisional`, and the key repair made this login (`repaired = { from, to, by = "serverId" | "name" }`), which also goes to the sync log once `setTrace` is called.
+- `ruleset` (optional): the facts that pick the slot: `{ realmName, recordId, faction, serverId, name }`, each optional, read by `Game/Ruleset.lua` in game. Core cleans them with `Slots.facts`. The key is `realm:<realm name>:<faction>` when there's a realm name (retail), else `mode:<record ID>:<faction>` (Forever), else `default`. With none the key is `default`, so tests and the dev sim keep one slot. `rulesetNamed(name)` saves a name that arrives after login and fires `changed`. `elsewhere()` is the no-Crew card's read (where your other Crews are, an unclaimed Crew to ask about, the other faction's provisional Crew to offer), answered by `claimCrewHere()`, `startFresh()` and `bringCrewHere()`; see `crews-per-ruleset.md`. `ruleset()` reads back the key, the saved record ID, faction, server IDs and name, whether the slot is `provisional`, and the key repair made this login (`repaired = { from, to, by = "serverId" | "name" }`), which also goes to the sync log once `setTrace` is called.
 - `now()` and `random()`: the clock (`GetServerTime` in game) and randomness, so tests are deterministic.
 - `link`: the outgoing half of the link port (`send(string, to)`).
 - `listener`: receives Core's events.
@@ -238,7 +238,7 @@ Not embedded: AceDB (Core owns plain SavedVariables), AceConsole and AceEvent (a
 
 ## The panel and its tabs
 
-`UI/Panel.lua` is a host. It owns the window (size, place, resize grip), the header, the Camp band and its firelight, the sidebar and the setup screen shown before you're in a Crew. Everything inside the content area belongs to a tab.
+`UI/Panel.lua` is a host. It owns the window (size, place, resize grip), the header, the Camp band and its firelight, the sidebar and the setup screen shown before you're in a Crew. Above the setup sits the no-Crew card from Core's `elsewhere()`: where your Crew is on other Rulesets, the ask about a Crew from before Rulesets (It's here / Start fresh), and Bring your Crew here for the other faction's provisional Crew. Everything inside the content area belongs to a tab.
 
 The panel keeps **one list of tabs**, `TABS`: each with its key (what `Panel.show(key)` and `/bff` commands open), its sidebar label and place, its module, for Feed and Spares the badge count, and for Settings `withoutCrew` (it opens before you're in a Crew; every other tab shows the setup screen then). The sidebar, switching and leaving all read that list. The `.toc` loads every tab before `Panel.lua`.
 
