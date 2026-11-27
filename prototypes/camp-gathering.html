@@ -17,6 +17,8 @@
   Round 5: the boar wins over the deer and the wolves. B now opens on the boar, kneeling to cut it.
   Round 6: boar variations on the Animal toggle: humped with a big head down, small (3 columns shorter),
   rolled over with its legs up, red, and grey.
+  Round 7: a chunkier boar after a reference: big head, a pink snout seen from the front with two
+  nostrils, white tusks either side, a pointed ear, a mottled red-brown hide. Eye shut (default), eye open, small.
     C  A one-sided miner's pick; kneels and gathers a bouquet in the hand; the boar, its hide peeling back.
   The picks are drawn by hand at each angle (round 1 rotated one shape, which bent the diagonals). The animal
   lies behind the figure's legs, its head toward the fire, so it reaches about 7 past the figure (the anvil
@@ -80,6 +82,7 @@ const PAL = {
   R: "#c9481c", B: "#5a3a24", b: "#3a2518", T: "#8c8796", t: "#5d5966", L: "#70e370", P: "#f2b8d0",
   Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8", N: "#ece8d8", A: "#c89a5a", a: "#8f6a3a", r: "#5a1620",
   h: "#468a46", g: "#2c5a33", i: "#9bd47a", c: "#c8682c", e: "#f2a868", p: "#e7e1f0",
+  m: "#7a3e24", M: "#a8643a", n: "#4e2818", j: "#2a1410", u: "#c46a78", v: "#e89aa8", q: "#4a1c24",
 };
 const SIT = ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...", "..KCCDDCCK..", ".KCCCDDCCCK.", ".KSCCDDCCSK.", ".KKCCCCCCKK.", "..KDDKKDDK..", "..KKK..KKK.."];
 const HOP = ["..K.KKKK.K..", ".KSKCCCCKSK.", ".KCCCCCCCCK.", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...", "..KCCDDCCK..", "..KCCDDCCK..", "..KCCDDCCK..", "..KCCCCCCK..", "..KDDKKDDK..", "..KKK..KKK.."];
@@ -163,7 +166,7 @@ const params = new URLSearchParams(location.search);
 let variant = Math.max(0, VARIANTS.findIndex((v) => v.key === (params.get("variant") || "B")));
 const state = {
   who: params.get("who") || "all", prof: params.get("prof") || "mixed", season: params.get("season") || "none",
-  wolf: params.get("wolf") || "boar", world: params.get("world") || "forest", opacity: +(params.get("opacity") || 60), zoom: +(params.get("zoom") || 3),
+  wolf: params.get("wolf") || "chunky", world: params.get("world") || "forest", opacity: +(params.get("opacity") || 60), zoom: +(params.get("zoom") || 3),
 };
 let tick = 0, paused = false;
 const GATHERERS = { you: ["you"], kesh: ["kesh"], both: ["you", "kesh"], neighbours: ["odo", "kesh"], all: ["mira", "you", "kesh"] };
@@ -292,6 +295,9 @@ const BASKET = [".aaa.", "a...a", "AaAaA", "aAaAa", ".AaA."];
 
 const ANIMALS = {
   boar: ["..b.b.b.b.....", ".bbbbbbbbb.B..", "bBaaaaaaaabBa..", ".aaaaaaaaaaaKaP", ".aaaaaaaaaaaNPP", "..AAAAAAAaaN...", "..bb..bb.bb...."],
+  chunky: ["......j.j.j..jj.....",  "....jjjjjjjjjjnj....",  "...jmMMmmmmjjnnj....",  "..jmMMmmnnmjmmmmj...",  ".jmmmmmnnnmjmMmmmj.N",  ".jmnnmmmmmjmmjjNvvvN",  "jmmmmnnmmmjmmmmNuuuN",  "jmmnnmmmmjmmmmmNquqN",  ".jnnnnnnnjnnnnmjuuuj",  "..jnjjnnjjjnjjnjjjj."],
+  chunkyEye: ["......j.j.j..jj.....",  "....jjjjjjjjjjnj....",  "...jmMMmmmmjjnnj....",  "..jmMMmmnnmjmmmmj...",  ".jmmmmmnnnmjmMmmmj.N",  ".jmnnmmmmmjmmjONvvvN",  "jmmmmnnmmmjmmmmNuuuN",  "jmmnnmmmmjmmmmmNquqN",  ".jnnnnnnnjnnnnmjuuuj",  "..jnjjnnjjjnjjnjjjj."],
+  chunkySmall: [".....j.j.jj.....",  "...jjjjjjjnj....",  "..jmMMmmjmnmj...",  ".jmMmnnmjmmmmj.N",  "jmmmmmmmjmjNvvvN",  "jmmnnmmjmmmNquqN",  ".jnnnnnjnnnjuuuj",  "..jnjjnjjnjjjjj."],
   boarHump: [".......b.b.b.....",  ".....bbbbbbbbB...",  "...bbaaaaaaabBB..",  "..baaaaaaaaaaaaK.",  ".baaaaaaaaaaaaaaPP",  "b.aAAAAAAAaaaaNaPP",  "...b.b.....b.bN..."],
   boarSmall: ["..b.b.b....",  ".bbbbbbbB..",  "baaaaaaabB.",  ".aaaaaaaaKP",  ".AAAAAAaNPP",  "..b.b..b.b."],
   boarUp: [".bb.......bb.....",  ".b.........b.....",  ".AAAAAAAAAAAA....",  "aaaaaaaaaaaaaaB..",  "baaaaaaaaaaaaKaP.",  ".bbbbbbbbbbbbaNPP",  "..b.b.b.b.b......"],
@@ -534,7 +540,7 @@ function buildToggles() {
   };
   group("Gathering", "who", [["all", "Three"], ["you", "You"], ["kesh", "Kesh"], ["both", "Both sides"], ["neighbours", "Neighbours"]]);
   group("Profession", "prof", [["mixed", "Mixed"], ["mining", "Mining"], ["herbalism", "Herbalism"], ["skinning", "Skinning"]]);
-  group("Animal (B)", "wolf", [["boar", "Boar"], ["boarHump", "Boar, humped"], ["boarSmall", "Boar, small"], ["boarUp", "Boar, legs up"], ["boarRed", "Boar, red"], ["boarGrey", "Boar, grey"], ["deerSplay", "Deer, splayed"], ["deerFlat", "Deer, flat"], ["wolfX", "Wolf, X eyes"], ["wolfUp", "Wolf, legs up"], ["wolf", "Round 2 wolf"]]);
+  group("Animal (B)", "wolf", [["chunky", "Chunky, eye shut"], ["chunkyEye", "Chunky, eye open"], ["chunkySmall", "Chunky, small"], ["boar", "Boar"], ["boarHump", "Boar, humped"], ["boarSmall", "Boar, small"], ["boarUp", "Boar, legs up"], ["boarRed", "Boar, red"], ["boarGrey", "Boar, grey"], ["deerSplay", "Deer, splayed"], ["deerFlat", "Deer, flat"], ["wolfX", "Wolf, X eyes"], ["wolfUp", "Wolf, legs up"], ["wolf", "Round 2 wolf"]]);
   group("Season", "season", [["none", "None"], ["winter", "Winter"]]);
   group("World", "world", [["forest", "Forest"], ["meadow", "Meadow"], ["snow", "Snow"]]);
   group("Zoom", "zoom", [[2, "2x"], [3, "3x"], [5, "5x"]]);
