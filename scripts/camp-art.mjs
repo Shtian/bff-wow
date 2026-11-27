@@ -62,9 +62,45 @@ const MOON = ["..MMMM", ".MMM..", "MMM...", "MMM...", "MMM...", ".MMM..", "..MMM
 const MOON_PAL = { M: "#d8d4c4" };
 const STAR_TONES = { dim: "#4a4c6e", mid: "#7d7f9e" };
 // The Pocket Camp's poses and one-off animations (docs/design/pocket-camp.md).
-// A fishing rod held out from a seated figure's hand, its line and bobber
-// hanging from the tip; drawn mirrored on the fire's right.
-const ROD = [".....B.", "....B.Z", "....B.Z", "...B..Z", "...B..Z", "..B...Z", "..B...Z", ".B....Z", ".B....R", "B......"];
+// Fishing (chosen in round 3 of prototypes/camp-fishing.html, on the
+// prototype/fishing-visuals branch): a rod arcing out from a seated
+// figure's hand towards the fire, in runs of 2, 2, 1, 1 then flat with the
+// tip drooping a pixel, outlined so it reads on the ground behind it. Its
+// line hangs straight down from the tip to a bobber in a pond on the
+// ground rows under the seat. All of it is drawn mirrored on the fire's
+// right. The pond's frames step the rings round the bobber and its glints;
+// the line's two frames bob the bobber; a fish leaps along a path CampScene
+// holds and lands in a splash.
+const ROD = outlined(["....AA.", "...A..N", "..A....", "..A....", ".A.....", ".A.....", "a......"]);
+const FISH_LINE = [
+  ["Z", "Z", "Z", "Z", "Z", "Z", "Z", "N", "R", "."],
+  ["Z", "Z", "Z", "Z", "Z", "Z", "Z", "Z", "N", "R"],
+];
+const LEAP_FISH = outlined([".F.", "FFf"]);
+const POND_PAL = { w: "#0e2238", d: "#1d4a7a", m: "#2f6fae", l: "#6fb3e6", g: "#d8f0ff" };
+const SPLASH = ["g.N.g", ".N.N."];
+// The pond is 21 columns, from 3 behind the figure's edge to 6 past its
+// other edge (the bobber at the 18th), and the ground's 3 rows. Each frame
+// has its ring (just round the bobber, a step out, none) and one glint.
+const POND_FROM = -3, POND_TO = 17, POND_BOBBER = 14;
+const POND_RINGS = [[[-1, "g"], [1, "g"]], [[-2, "l"], [2, "l"]], []];
+const POND_GLINTS = [4, 0, 8];
+function pond(frame) {
+  const rows = [2, 1, 0].map((row) => {
+    let line = "";
+    for (let u = POND_FROM; u <= POND_TO; u++) {
+      let ch = ".";
+      if (row === 2) ch = u === -1 || u === 15 ? "w" : u >= 0 && u <= 14 ? "l" : ".";
+      if (row === 1) ch = u === -3 || u === 17 ? "w" : u === -2 || u === 16 ? "d" : "m";
+      if (row === 0) ch = u === -1 || u === 15 ? "w" : u >= 0 && u <= 14 ? "d" : ".";
+      if (row === 1 && u === POND_GLINTS[frame]) ch = "g";
+      for (const [du, ring] of POND_RINGS[frame]) if (row === 1 && u === POND_BOBBER + du) ch = ring;
+      line += ch;
+    }
+    return line;
+  });
+  return paint(rows, POND_PAL);
+}
 // A ding's gold star, a rare find's fish held up, and a death's smoke.
 const STAR = ["..G..", "GGYGG", ".GYG.", ".G.G.", "G...G"];
 const FISH = [".FFF...F", "FFKFFFFF", "FfffFFFF", ".fff...f"];
@@ -734,6 +770,9 @@ const SPRITES = [
     [petSprite(key, "Asleep"), paint(outlined(pet.asleep), { ...PAL, ...PET_PAL })],
   ]),
   ["lanternPost", paint(LANTERN_POST, { ...PAL, ...LANTERN_PALS.lanternGold })],
+  ["pond1", pond(0)], ["pond2", pond(1)], ["pond3", pond(2)],
+  ["fishLine1", skin(FISH_LINE[0])], ["fishLine2", skin(FISH_LINE[1])],
+  ["leapFish", skin(LEAP_FISH)], ["splash", paint(SPLASH, { ...PAL, ...POND_PAL })],
 ];
 
 function hex(color) {

@@ -80,7 +80,7 @@ local POSE = {
   fighting = { standing = true, tool = { "blade", 6, 12 } },
   crafting = { standing = true, tool = { "hammer", 5, 11 }, front = { "anvil", 5, -1, true } },
   gathering = { standing = true, tool = { "pick", 3, 11 } },
-  fishing = { tool = { "rod", 10, 3, true } },
+  fishing = { tool = { "rod", 7, 0, true }, fishing = true },
   vendor = { front = { "bag", 7, -2, true } },
   auction = { front = { "coins", 8, -2, true } },
   resting = { back = { "innSign", -1, -1, true } },
@@ -94,6 +94,12 @@ local STAR = { x = 3, rise = 3 }
 local QUEST = { x = 3 }
 local HI = { x = 1, row = 1 }
 local FISH = { x = 2 }
+local FISHING = {
+  pond = { x = -3, row = 0, frames = 3, ticks = 4 },
+  line = { x = 14, bobTicks = 9 },
+  leap = { every = 84, seed = 7, splashTicks = 3, splash = { 2, 2 },
+    path = { { 13, 1 }, { 12, 4 }, { 11, 6 }, { 9, 7 }, { 8, 7 }, { 7, 7 }, { 6, 6 }, { 4, 4 }, { 3, 1 } } },
+}
 local SMOKE = { x = 2, row = -4, rise = 6 }
 local BURST = { x = 4, row = 5, reach = 9,
   ways = { { -1, 1 }, { 1, 1 }, { -1, 0 }, { 1, 0 }, { 0, 1 }, { -1, -1 }, { 1, -1 } } }
@@ -499,17 +505,43 @@ local function partTop(part, row)
   return part and row + part[3] + Sheet.sprites[part[1]][4] or 0
 end
 
-local function posePart(scene, t, actor, part, row, name)
-  name = name or part[1]
-  local mirrored = part[4] and actor.x > 0 or false
+local function placeBeside(scene, t, actor, name, x, row, mirrored)
   setSprite(t, name, scene.unit, mirrored)
-  local x = part[2]
   if mirrored then x = LAYOUT.seated - x - Sheet.sprites[name][3] end
-  put(scene, t, actor.x + x, row + part[3])
+  put(scene, t, actor.x + x, row)
+end
+
+local function posePart(scene, t, actor, part, row, name)
+  placeBeside(scene, t, actor, name or part[1], part[2], row + part[3], part[4] and actor.x > 0 or false)
+end
+
+local function hideFishing(parts)
+  parts.pond:Hide()
+  parts.line:Hide()
+  parts.leap:Hide()
+end
+
+local function drawFishing(scene, parts, actor, f, row)
+  local towardFire = actor.x > 0
+  local pond, line, leap = FISHING.pond, FISHING.line, FISHING.leap
+  local ripple = math.floor(f / pond.ticks) % pond.frames + 1
+  placeBeside(scene, parts.pond, actor, "pond" .. ripple, pond.x, pond.row, towardFire)
+  local dipped = math.floor(f / line.bobTicks) % 2 + 1
+  placeBeside(scene, parts.line, actor, "fishLine" .. dipped, line.x, row - ROW.seated, towardFire)
+  local leapTick = (f + actor.x * leap.seed) % leap.every
+  local at = leap.path[leapTick + 1]
+  if at then
+    placeBeside(scene, parts.leap, actor, "leapFish", at[1], at[2], towardFire)
+  elseif leapTick < #leap.path + leap.splashTicks then
+    placeBeside(scene, parts.leap, actor, "splash", leap.splash[1], leap.splash[2], towardFire)
+  else
+    parts.leap:Hide()
+  end
 end
 
 local function hideExtras(parts)
   parts.tool:Hide()
+  hideFishing(parts)
   parts.back:Hide()
   parts.front:Hide()
   parts.mark:Hide()
@@ -773,6 +805,7 @@ local function drawActor(scene, parts, actor, f)
     top = row + Sheet.sprites.seated[4]
     local markTop = top + (hatTop and HAT_MARK_LIFT or 0)
     if pose.tool then posePart(scene, parts.tool, actor, pose.tool, row) else parts.tool:Hide() end
+    if pose.fishing then drawFishing(scene, parts, actor, f, row) else hideFishing(parts) end
     if pose.back then
       posePart(scene, parts.back, actor, pose.back, row)
     else
@@ -1578,6 +1611,9 @@ function CampScene.new(parent, options)
         },
         tool = texture(band.art, "ARTWORK", 3),
         front = texture(band.art, "ARTWORK", 4),
+        pond = texture(band.art, "ARTWORK", -2),
+        line = texture(band.art, "ARTWORK", 4),
+        leap = texture(band.art, "ARTWORK", 4),
         spark = texture(band.art, "OVERLAY", 0),
         mark = texture(band.art, "OVERLAY", 1),
         alt = texture(band.art, "OVERLAY", 1),
