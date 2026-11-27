@@ -33,17 +33,20 @@ end
 
 local REPAIRED_BY = { serverId = "server ID", name = "name" }
 
+local function repairText(repaired)
+  if not repaired then return nil end
+  local how = repaired.swapped and "%s and %s swapped (by %s)" or "%s moved to %s (by %s)"
+  return how:format(repaired.from, repaired.to, REPAIRED_BY[repaired.by])
+end
+
+local function traceRuleset(self, what)
+  if self.trace then self.trace(("ruleset %s %s"):format(self.rulesetKey, what)) end
+end
+
 local function traceOpening(self)
-  if not self.trace or self.openingTraced then return end
-  self.openingTraced = true
-  local repair = self.rulesetRepair
-  if repair then
-    self.trace(("ruleset %s moved to %s (by %s)"):format(repair.from, repair.to, REPAIRED_BY[repair.by]))
-  end
-  if self.rulesetClaimed then
-    self.trace(("ruleset %s took the Crew saved before Rulesets%s"):format(self.rulesetKey,
-      self.db.provisional and " (provisional)" or ""))
-  end
+  if not self.trace then return end
+  for _, line in ipairs(self.openingLines) do self.trace(line) end
+  self.openingLines = {}
 end
 
 function Core:setTrace(trace)
@@ -298,13 +301,18 @@ function Core.new(deps)
   }, Core)
   self.sessionStart = deps.now()
   self.where = ns.Where.new(deps.now, self.locate)
-  local facts = ns.Slots.facts(deps.ruleset)
-  local opened = ns.Slots.open(deps.db, facts, deps.random, deps.now())
-  self.rulesetKey, self.rulesetEntry, self.rulesetRepair = opened.key, opened.entry, opened.repaired
-  self.rulesetClaimed, self.serverId = opened.claimed, facts.serverId
+  self.facts = ns.Slots.facts(deps.ruleset)
+  local opened = ns.Slots.open(deps.db, self.facts, deps.random, deps.now())
+  self.rulesetKey, self.rulesetEntry, self.rulesetRepair = opened.key, opened.entry, repairText(opened.repaired)
+  self.openingLines = {}
+  if self.rulesetRepair then self.openingLines[1] = "ruleset " .. self.rulesetRepair end
+  if opened.placed then
+    self.openingLines[#self.openingLines + 1] = ("ruleset %s placed the Crew saved before Rulesets here%s"):format(
+      opened.key, opened.slot.provisional and " (provisional)" or "")
+  end
   bindSlot(self, opened.slot, self.initialLogin)
-  if opened.claimed and facts.serverId then
-    self.ledger:keepCharacters(ns.Slots.belongsHere(self.db, facts.serverId))
+  if opened.placed and self.facts.serverId then
+    self.ledger:keepCharacters(ns.Slots.belongsHere(self.db, self.facts.serverId))
   end
   self.whatsNewState = ns.WhatsNew.new(self.account, deps.version, deps.changelog, fresh)
   self.generationFrom = "saved"
@@ -1449,14 +1457,20 @@ function Core:ruleset()
   for i, id in ipairs(entry.serverIds) do serverIds[i] = id end
   return {
     key = self.rulesetKey,
+    realmName = self.facts.realmName,
     recordId = entry.recordId,
     faction = entry.faction,
+    serverId = self.facts.serverId,
     serverIds = serverIds,
     name = entry.name,
     provisional = self.db.provisional == true,
-    repaired = self.rulesetRepair,
+    repair = self.rulesetRepair,
   }
 end
+
+local GO_THERE = "Log in a Character there to see it."
+local ASK = "BFF has your Crew from before Rulesets but can't tell where it belongs. Is this where your Crew is?"
+local OFFER = "Your Crew on %s hasn't heard from anyone yet. If your friends play this faction, bring it here."
 
 local function placeOf(crew)
   local where = crew.name or (crew.character and crew.character .. "'s Ruleset") or "another Ruleset"
@@ -1466,22 +1480,24 @@ end
 local function hintFor(crews)
   if #crews == 0 then return nil end
   local places = {}
-  for i, crew in ipairs(crews) do places[i] = crew.place end
+  for i, crew in ipairs(crews) do places[i] = placeOf(crew) end
   local verb = #crews == 1 and "Your Crew is" or "Your Crews are"
-  return ("%s on %s."):format(verb, ns.Text.list(places))
+  return ("%s on %s. %s"):format(verb, ns.Text.list(places), GO_THERE)
 end
 
 function Core:elsewhere()
-  local elsewhere = ns.Slots.elsewhere(self.account, self.rulesetKey)
-  for _, crew in ipairs(elsewhere.crews) do crew.place = placeOf(crew) end
-  elsewhere.hint = hintFor(elsewhere.crews)
-  return elsewhere
+  local found = ns.Slots.elsewhere(self.account, self.rulesetKey, self.now())
+  return {
+    hint = hintFor(found.crews),
+    ask = found.ask and ASK or nil,
+    offer = found.offer and OFFER:format(placeOf(found.offer)) or nil,
+  }
 end
 
 local function confirmRuleset(self)
   if not self.db.provisional then return end
   self.db.provisional = nil
-  if self.trace then self.trace(("ruleset %s confirmed by a Member"):format(self.rulesetKey)) end
+  traceRuleset(self, "confirmed by a Member")
 end
 
 function Core:rulesetNamed(name)
@@ -1489,7 +1505,7 @@ function Core:rulesetNamed(name)
   local entry = self.rulesetEntry
   if not name or entry.name == name then return end
   entry.name = name
-  if self.trace then self.trace(("ruleset %s named %s"):format(self.rulesetKey, name)) end
+  traceRuleset(self, "named " .. name)
   self.listener("changed")
 end
 
@@ -1596,39 +1612,44 @@ local function enter(self, code, displayName, joining)
   return self:crew()
 end
 
+local function cardAnswer(self, answer)
+  if self.db.crew then return nil, "inCrew" end
+  local result = answer()
+  if not result then return nil, "notWaiting" end
+  return result
+end
+
 local function takeSlot(self, slot, how)
   switchSlot(self, slot)
-  if self.serverId then self.ledger:keepCharacters(ns.Slots.belongsHere(self.db, self.serverId)) end
+  if self.facts.serverId then self.ledger:keepCharacters(ns.Slots.belongsHere(self.db, self.facts.serverId)) end
   self:raiseGeneration(true)
   sendOwnNow(self)
-  if self.trace then self.trace(("ruleset %s %s"):format(self.rulesetKey, how)) end
+  traceRuleset(self, how)
   self.listener("crewChanged")
   return self:crew()
 end
 
-function Core:claimCrewHere()
-  if self.db.crew then return nil, "inCrew" end
-  local slot = ns.Slots.claimHere(self.account, self.rulesetKey)
-  if not slot then return nil, "notWaiting" end
-  return takeSlot(self, slot, "took the Crew saved before Rulesets (asked)")
+function Core:placeCrewHere()
+  return cardAnswer(self, function()
+    local slot = ns.Slots.placeHere(self.account, self.rulesetKey, self.now())
+    return slot and takeSlot(self, slot, "placed the Crew saved before Rulesets here (asked)")
+  end)
 end
 
 function Core:bringCrewHere()
-  if self.db.crew then return nil, "inCrew" end
-  local slot = ns.Slots.bringHere(self.account, self.rulesetKey, self.random)
-  if not slot then return nil, "notWaiting" end
-  return takeSlot(self, slot, "brought the Crew over from the other faction")
+  return cardAnswer(self, function()
+    local slot = ns.Slots.bringHere(self.account, self.rulesetKey, self.random)
+    return slot and takeSlot(self, slot, "brought the Crew over from the other faction")
+  end)
 end
 
 function Core:startFresh()
-  if self.db.crew then return nil, "inCrew" end
-  if not self:elsewhere().ask then return nil, "notWaiting" end
-  ns.Slots.decline(self.account, self.rulesetKey)
-  if self.trace then
-    self.trace(("ruleset %s started fresh, leaving the Crew saved before Rulesets"):format(self.rulesetKey))
-  end
-  self.listener("crewChanged")
-  return true
+  return cardAnswer(self, function()
+    if not ns.Slots.decline(self.account, self.rulesetKey, self.now()) then return false end
+    traceRuleset(self, "started fresh, leaving the Crew saved before Rulesets")
+    self.listener("crewChanged")
+    return true
+  end)
 end
 
 function Core:startCrew(displayName)

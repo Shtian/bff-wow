@@ -216,11 +216,12 @@ local function start(isInitialLogin)
     ns.core:tick()
   end)
   if isInitialLogin and not ns.core:crew() then
-    local elsewhere = ns.core:elsewhere()
-    if elsewhere.ask then
-      say("BFF has your Crew from before Rulesets. Type /bff to say if it belongs here.")
-    elseif elsewhere.hint then
-      say(elsewhere.hint .. " Type /bff to start or join another one here.")
+    local card = ns.core:elsewhere()
+    local question = card.ask or card.offer
+    if question then
+      say(question .. " Type /bff to answer.")
+    elseif card.hint then
+      say(card.hint .. " Type /bff to start or join another one here.")
     else
       say("type /bff to start or join a Crew.")
     end

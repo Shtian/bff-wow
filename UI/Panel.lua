@@ -29,10 +29,6 @@ local CARD_BUTTON_GAP = 10
 local CARD_BLOCK_GAP = 16
 local BUTTON_HEIGHT = 24
 
-local GO_THERE = "Log in a Character there to see it."
-local ASK = "BFF has your Crew from before Rulesets but can't tell where it belongs. Is this where your Crew is?"
-local OFFER = "Your Crew on %s hasn't heard from anyone yet. If your friends play this faction, bring it here."
-
 local GOLD = Skin.GOLD
 local MUTED = Skin.MUTED
 local DIM = Skin.DIM
@@ -409,7 +405,7 @@ end
 
 local function answer(command)
   return function()
-    local _, reason = core[command](core)
+    local _, reason = command()
     card.error:SetText(reason and ns.MESSAGES[reason] or "")
   end
 end
@@ -426,13 +422,12 @@ local function createCard()
   card:SetWidth(SETUP_WIDTH)
   card.hint = cardText()
   card.ask = cardText()
-  card.ask:SetText(ASK)
-  card.claim = Skin.button(card, "It's here", answer("claimCrewHere"), true)
-  card.claim:SetWidth(SETUP_COLUMN)
-  card.fresh = Skin.button(card, "Start fresh", answer("startFresh"))
+  card.place = Skin.button(card, "It's here", answer(function() return core:placeCrewHere() end), true)
+  card.place:SetWidth(SETUP_COLUMN)
+  card.fresh = Skin.button(card, "Start fresh", answer(function() return core:startFresh() end))
   card.fresh:SetWidth(SETUP_COLUMN)
   card.offer = cardText()
-  card.bring = Skin.button(card, "Bring your Crew here", answer("bringCrewHere"), true)
+  card.bring = Skin.button(card, "Bring your Crew here", answer(function() return core:bringCrewHere() end), true)
   card.bring:SetWidth(SETUP_COLUMN)
   card.error = Skin.label(card, "small", ERROR)
   card.error:SetWidth(SETUP_WIDTH)
@@ -460,23 +455,24 @@ local function stackCard(blocks)
 end
 
 local function drawCard()
-  local elsewhere = core:elsewhere()
+  local lines = core:elsewhere()
   local blocks = {}
-  if elsewhere.hint then
-    card.hint:SetText(elsewhere.hint .. " " .. GO_THERE)
-    blocks[#blocks + 1] = { text = card.hint }
-  end
-  if elsewhere.ask then blocks[#blocks + 1] = { text = card.ask, buttons = { card.claim, card.fresh } } end
-  if elsewhere.offer then
-    card.offer:SetText(OFFER:format(elsewhere.offer.place))
-    blocks[#blocks + 1] = { text = card.offer, buttons = { card.bring } }
+  for _, part in ipairs({
+    { line = lines.hint, text = card.hint },
+    { line = lines.ask, text = card.ask, buttons = { card.place, card.fresh } },
+    { line = lines.offer, text = card.offer, buttons = { card.bring } },
+  }) do
+    if part.line then
+      part.text:SetText(part.line)
+      blocks[#blocks + 1] = part
+    end
   end
   local inUse = {}
   for _, block in ipairs(blocks) do
     inUse[block.text] = true
     for _, button in ipairs(block.buttons or {}) do inUse[button] = true end
   end
-  for _, part in ipairs({ card.hint, card.ask, card.claim, card.fresh, card.offer, card.bring }) do
+  for _, part in ipairs({ card.hint, card.ask, card.place, card.fresh, card.offer, card.bring }) do
     part:SetShown(inUse[part] == true)
   end
   if #blocks == 0 then
