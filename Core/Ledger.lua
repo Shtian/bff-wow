@@ -204,28 +204,23 @@ function Ledger:knowsOthers()
   return false
 end
 
-function Ledger:putAway()
-  local own = self:own()
-  local kept = { records = {}, via = self.db.via, removed = self.db.removed, reactions = own and own.reactions }
-  for id, record in pairs(self.db.records) do
-    if record ~= own then kept.records[id] = record end
-  end
-  self.db.records = { [self.db.memberId] = own }
-  if own then own.reactions = nil end
-  self.db.heard = {}
-  self.db.via = {}
-  self.db.removed = {}
-  return kept
+local function copied(value)
+  if type(value) ~= "table" then return value end
+  local result = {}
+  for k, v in pairs(value) do result[k] = copied(v) end
+  return result
 end
 
-function Ledger:bringBack(kept)
-  for id, record in pairs(kept.records) do
-    if id ~= self.db.memberId then self.db.records[id] = record end
-  end
-  self.db.via = kept.via
-  self.db.removed = kept.removed
-  local own = self:own()
-  if own then own.reactions = kept.reactions end
+function Ledger:carryOwn(from)
+  local source = from:own()
+  if not source then return end
+  self:changeOwn(function(record)
+    for _, field in ipairs({ "displayName", "main", "look", "characters" }) do
+      record[field] = copied(source[field])
+    end
+    record.characters = record.characters or {}
+    return true
+  end)
 end
 
 function Ledger:highestGeneration()

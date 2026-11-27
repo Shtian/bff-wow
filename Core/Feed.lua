@@ -289,18 +289,6 @@ function Feed:dropMember(id)
   end
 end
 
-function Feed:putAway()
-  local kept = { feed = self.db.feed, feedJoins = self.db.feedJoins }
-  self.db.feed = {}
-  self.db.feedJoins = {}
-  return kept
-end
-
-function Feed:bringBack(kept)
-  self.db.feed = kept.feed or {}
-  self.db.feedJoins = kept.feedJoins or {}
-end
-
 function Feed:markSeen(item)
   item.seen = true
 end

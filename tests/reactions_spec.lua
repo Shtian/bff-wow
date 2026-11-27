@@ -80,7 +80,8 @@ local function relog(net, client)
 end
 
 local function ownReactions(client)
-  return client:slot().records[client.memberId].reactions or {}
+  local slot = client:slot()
+  return slot.records[slot.memberId].reactions or {}
 end
 
 describe("Reactions", function()

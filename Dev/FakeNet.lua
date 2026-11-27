@@ -234,7 +234,13 @@ local function newCore(client, initialLogin)
     end,
   })
   client.core:updateOwn(copy(client.character))
-  client.memberId = client.core:rows()[1].memberId
+  client:noteMemberId()
+end
+
+function Client:noteMemberId()
+  for _, row in ipairs(self.core:rows()) do
+    if row.own then self.memberId = row.memberId end
+  end
 end
 
 local function bringUp(client)
@@ -315,6 +321,7 @@ function Client:join(code)
   else
     code = assert(self.core:startCrew(self.name)).code
   end
+  self:noteMemberId()
   self.moved = nil
   bringUp(self)
   return code
