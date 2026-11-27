@@ -14,6 +14,7 @@
   Round 4: neither wolf worked; try a deer. Antlers say "deer" at this size. Two dead deer on the Animal toggle:
   collapsed with its legs splayed in two pairs (default), and flat on the ground with its legs stretched out
   front and back. Both lie with the head down, the eye shut.
+  Round 5: the boar wins over the deer and the wolves. B now opens on the boar, kneeling to cut it.
     C  A one-sided miner's pick; kneels and gathers a bouquet in the hand; the boar, its hide peeling back.
   The picks are drawn by hand at each angle (round 1 rotated one shape, which bent the diagonals). The animal
   lies behind the figure's legs, its head toward the fire, so it reaches about 7 past the figure (the anvil
@@ -160,7 +161,7 @@ const params = new URLSearchParams(location.search);
 let variant = Math.max(0, VARIANTS.findIndex((v) => v.key === (params.get("variant") || "B")));
 const state = {
   who: params.get("who") || "all", prof: params.get("prof") || "mixed", season: params.get("season") || "none",
-  wolf: params.get("wolf") || "deerSplay", world: params.get("world") || "forest", opacity: +(params.get("opacity") || 60), zoom: +(params.get("zoom") || 3),
+  wolf: params.get("wolf") || "boar", world: params.get("world") || "forest", opacity: +(params.get("opacity") || 60), zoom: +(params.get("zoom") || 3),
 };
 let tick = 0, paused = false;
 const GATHERERS = { you: ["you"], kesh: ["kesh"], both: ["you", "kesh"], neighbours: ["odo", "kesh"], all: ["mira", "you", "kesh"] };
@@ -526,7 +527,7 @@ function buildToggles() {
   };
   group("Gathering", "who", [["all", "Three"], ["you", "You"], ["kesh", "Kesh"], ["both", "Both sides"], ["neighbours", "Neighbours"]]);
   group("Profession", "prof", [["mixed", "Mixed"], ["mining", "Mining"], ["herbalism", "Herbalism"], ["skinning", "Skinning"]]);
-  group("Animal (B)", "wolf", [["deerSplay", "Deer, splayed"], ["deerFlat", "Deer, flat"], ["wolfX", "Wolf, X eyes"], ["wolfUp", "Wolf, legs up"], ["wolf", "Round 2 wolf"]]);
+  group("Animal (B)", "wolf", [["boar", "Boar"], ["deerSplay", "Deer, splayed"], ["deerFlat", "Deer, flat"], ["wolfX", "Wolf, X eyes"], ["wolfUp", "Wolf, legs up"], ["wolf", "Round 2 wolf"]]);
   group("Season", "season", [["none", "None"], ["winter", "Winter"]]);
   group("World", "world", [["forest", "Forest"], ["meadow", "Meadow"], ["snow", "Snow"]]);
   group("Zoom", "zoom", [[2, "2x"], [3, "3x"], [5, "5x"]]);
