@@ -404,14 +404,16 @@ describe("The channel link", function()
     assert.same({ "Bob", "Cat-Realm" }, targets(game, mark))
   end)
 
-  it("never sends or reports the link up while chat is locked, even with no restriction event", function()
+  it("never sends or reports the link up while chat is locked, and goes down within a second", function()
     local game, link, core = linked()
     game.lockdown = true
-    assert.is_false(link.state().up)
-    assert.equal(1, core.count("down"))
+    assert.same({ up = false, reason = "lockdown", peers = 2, lockdown = true }, link.state())
     local mark = #game.whispers
     link.send("1|digest")
     assert.equal(mark, #game.whispers)
+    assert.equal(0, core.count("down"))
+    game.advance(1)
+    assert.equal(1, core.count("down"))
   end)
 
   it("asks for the member list again a frame after a restriction that doesn't lock chat starts", function()

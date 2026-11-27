@@ -152,7 +152,7 @@ local function update(cause)
 end
 
 local function noticeLockdown()
-  if isUp and lockdown() then update("chat restriction changed") end
+  if isUp and lockdown() then update() end
 end
 
 local function hide(name)
@@ -654,10 +654,14 @@ function ChannelLink.setTrace(fn)
   trace = fn
 end
 
+local function sendable()
+  return isUp and not lockdown()
+end
+
 function ChannelLink.state()
-  noticeLockdown()
+  local up = sendable()
   return {
-    up = isUp, reason = not isUp and downReason() or nil, peers = presence:count(),
+    up = up, reason = not up and downReason() or nil, peers = presence:count(),
     instance = currentInstance(), lockdown = lockdown() and true or false,
   }
 end
@@ -681,8 +685,7 @@ local function whisper(name, chunks, size)
 end
 
 function ChannelLink.send(message, to)
-  noticeLockdown()
-  if not isUp then
+  if not sendable() then
     if trace then trace(("  not sent: link down (%s)"):format(downReason())) end
     return
   end
