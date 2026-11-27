@@ -629,8 +629,8 @@ describe("The Rares slain track", function()
 
   describe("the late baseline", function()
     local function beforeTheTrack(client)
-      client.db.goals.reached.rares = nil
-      client.db.goals.quiet.rares = nil
+      client:slot().goals.reached.rares = nil
+      client:slot().goals.quiet.rares = nil
     end
 
     it("passes the rungs already reached quietly when the track ships", function()
@@ -639,7 +639,7 @@ describe("The Rares slain track", function()
       bob:logout()
       killRares(net, clients[1], ns, 6)
       beforeTheTrack(bob)
-      bob.db.feed = {}
+      bob:slot().feed = {}
       bob:login()
       net:run(40)
       assert.same({}, stepTexts(bob))

@@ -421,7 +421,7 @@ describe("Roster", function()
       local a, b = clients[1], clients[2]
       a.core:removeMember(b.memberId)
       b:logout()
-      a.db.removed[b.memberId].version = nil
+      a:slot().removed[b.memberId].version = nil
       a:reload()
 
       local mark = #net.wire

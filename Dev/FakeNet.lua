@@ -165,6 +165,7 @@ function FakeNet:add(name, options)
     gossip = options.gossip,
     version = options.version,
     changelog = options.changelog,
+    ruleset = copy(options.ruleset),
     bagReads = 0,
     character = copy(options.character) or {
       guid = "Player-0-" .. name, name = name, classFilename = "WARRIOR",
@@ -208,6 +209,7 @@ local function newCore(client, initialLogin)
       end,
     },
     gossip = client.gossip,
+    ruleset = copy(client.ruleset),
     listener = function(event, ...)
       client.events[#client.events + 1] = { event, ... }
       if event == "crewChanged" and net.channels then client.moved = true end
@@ -337,6 +339,10 @@ end
 function Client:move(location)
   self.location = copy(location)
   return self
+end
+
+function Client:slot()
+  return ns.Slots.find(self.db, self.ruleset)
 end
 
 function Client:rowFor(other)

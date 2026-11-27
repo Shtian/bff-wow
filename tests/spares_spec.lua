@@ -197,7 +197,7 @@ describe("Spares", function()
     local a = clients[1]
     local first = post(net, a)
     local second = post(net, a)
-    a.db.nextSpare = nil
+    a:slot().nextSpare = nil
     local third = post(net, a)
     assert.is_true(third > second and second > first)
   end)
