@@ -162,7 +162,7 @@ local function buildRows(ledger, now)
     local characters, hidden = visibleCharacters(own, now)
     hiddenTotal = hiddenTotal + hidden
     if #characters > 0 then
-      ownRow = rowFor(own, characters, "playing", nil, now)
+      ownRow = rowFor(own, characters, "heard", nil, now)
       ownRow.own = true
       ownRow.lastSeenText = nil
     end
