@@ -379,6 +379,43 @@ describe("The channel link", function()
     assert.same({ CHANNEL }, { select(mark + 1, unpack(game.listed)) })
   end)
 
+  it("goes down once a restriction that starts activating locks chat a frame later, and back up when it ends", function()
+    local game, link, core = linked()
+    local lines = {}
+    link.setTrace(function(line) lines[#lines + 1] = line end)
+    game.fire("ADDON_RESTRICTION_STATE_CHANGED", 4, 1)
+    assert.is_true(link.state().up)
+    game.lockdown = true
+    game.advance(0)
+    assert.equal(1, core.count("down"))
+    assert.is_true(lines[#lines] == "link down (lockdown)", lines[#lines])
+    assert.same({ up = false, reason = "lockdown", peers = 2, lockdown = true }, link.state())
+
+    local mark = #game.whispers
+    link.send("1|digest")
+    game.advance(60)
+    link.send("1|digest", "Bob")
+    assert.equal(mark, #game.whispers)
+
+    game.lockdown = false
+    game.fire("ADDON_RESTRICTION_STATE_CHANGED", 4, 0)
+    assert.equal(2, core.count("up"))
+    link.send("1|digest")
+    assert.same({ "Bob", "Cat-Realm" }, targets(game, mark))
+  end)
+
+  it("never sends or reports the link up while chat is locked, and goes down within a second", function()
+    local game, link, core = linked()
+    game.lockdown = true
+    assert.same({ up = false, reason = "lockdown", peers = 2, lockdown = true }, link.state())
+    local mark = #game.whispers
+    link.send("1|digest")
+    assert.equal(mark, #game.whispers)
+    assert.equal(0, core.count("down"))
+    game.advance(1)
+    assert.equal(1, core.count("down"))
+  end)
+
   it("asks for the member list again a frame after a restriction that doesn't lock chat starts", function()
     local game = linked()
     game.fire("ADDON_RESTRICTION_STATE_CHANGED", 0, 1)

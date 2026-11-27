@@ -151,6 +151,10 @@ local function update(cause)
   if up then core:up() else core:down() end
 end
 
+local function noticeLockdown()
+  if isUp and lockdown() then update() end
+end
+
 local function hide(name)
   for i = 1, NUM_CHAT_WINDOWS do
     local frame = _G["ChatFrame" .. i]
@@ -463,7 +467,7 @@ function events.GROUP_LEFT()
 end
 
 -- WoW: while a restriction is activating, InChatMessagingLockdown() doesn't
--- report it yet.
+-- report it yet, and no event fires once it does.
 function events.ADDON_RESTRICTION_STATE_CHANGED(kind, state)
   if trace then trace(("chat restriction: type %s, state %s"):format(tostring(kind), tostring(state))) end
   if state == RESTRICTION_ACTIVATING then
@@ -471,6 +475,7 @@ function events.ADDON_RESTRICTION_STATE_CHANGED(kind, state)
     restrictionStarting = stamp
     C_Timer.After(0, function()
       if restrictionStarting == stamp then restrictionStarting = nil end
+      noticeLockdown()
     end)
   end
   update("chat restriction changed")
@@ -621,6 +626,7 @@ function ChannelLink.start(theCore, isInitialLogin)
   C_Timer.After(SETTLE_FALLBACK, settle)
   C_Timer.NewTicker(LIST_REFRESH, askList)
   C_Timer.NewTicker(1, function()
+    noticeLockdown()
     presence:tick()
     framing:tick()
     strangerFraming:tick()
@@ -648,9 +654,14 @@ function ChannelLink.setTrace(fn)
   trace = fn
 end
 
+local function sendable()
+  return isUp and not lockdown()
+end
+
 function ChannelLink.state()
+  local up = sendable()
   return {
-    up = isUp, reason = not isUp and downReason() or nil, peers = presence:count(),
+    up = up, reason = not up and downReason() or nil, peers = presence:count(),
     instance = currentInstance(), lockdown = lockdown() and true or false,
   }
 end
@@ -674,7 +685,7 @@ local function whisper(name, chunks, size)
 end
 
 function ChannelLink.send(message, to)
-  if not isUp then
+  if not sendable() then
     if trace then trace(("  not sent: link down (%s)"):format(downReason())) end
     return
   end
