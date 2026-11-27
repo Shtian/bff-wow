@@ -6,7 +6,8 @@
   picks three flowers into a basket, then they grow back; skinning kneels and cuts a dead boar, a drop of blood
   on each cut and a 2-pixel stain under it. (Rounds 1 to 6 tried a crooked pick, a sickle, a held flower, a
   bouquet, wolves, deer and other boars; they're in git history.)
-  Open question: which boar. The chunky ones follow a reference: a big head, a pink snout seen from the front
+  Picked: the small chunky boar, and the basket moved in to sit right behind the herbalist.
+  The boars on the page: The chunky ones follow a reference: a big head, a pink snout seen from the front
   with two nostrils, white tusks either side, a pointed ear, a mottled red-brown hide. Eye shut, eye open, small,
   and the round 5 boar to compare. Click one in "Pick a boar".
   Room: the boar lies behind the skinner's legs, head toward the fire. Past the figure, the chunky boar reaches
@@ -94,6 +95,7 @@ const ORE_CHIPS = ["W", "Y", "t"];
 const BASKET = [".aaa.", "a...a", "AaAaA", "aAaAa", ".AaA."];
 const FLOWERS = [{ u: 1, h: 4, c: "P" }, { u: 4, h: 5, c: "p" }, { u: 7, h: 4, c: "F" }];
 const PATCH_U = 8;
+const BASKET_U = -5;
 
 const BOARS = [
   { key: "chunky", name: "Chunky, eye shut", rows: ["......j.j.j..jj.....", "....jjjjjjjjjjnj....", "...jmMMmmmmjjnnj....", "..jmMMmmnnmjmmmmj...", ".jmmmmmnnnmjmMmmmj.N", ".jmnnmmmmmjmmjjNvvvN", "jmmmmnnmmmjmmmmNuuuN", "jmmnnmmmmjmmmmmNquqN", ".jnnnnnnnjnnnnmjuuuj", "..jnjjnnjjjnjjnjjjj."] },
@@ -138,7 +140,7 @@ const CAST = [
 
 const params = new URLSearchParams(location.search);
 const state = {
-  boar: params.get("boar") || "chunky",
+  boar: params.get("boar") || "chunkySmall",
   who: params.get("who") || "all", prof: params.get("prof") || "mixed", season: params.get("season") || "none",
   world: params.get("world") || "forest", opacity: +(params.get("opacity") || 60), zoom: +(params.get("zoom") || 3),
 };
@@ -251,10 +253,10 @@ function herb(t, out) {
   const looks = FLOWERS.map((_, i) => done ? (p - per * 3 < 3 ? "gone" : "bud") : i < k ? "gone" : i > k ? "full" : q < 4 ? "full" : q === 4 ? "lift" : "gone");
   out.front.push(patch(PATCH_U, 3, looks));
   const landed = done ? 3 : k + (q >= 9 ? 1 : 0);
-  const basket = layer().art(BASKET, -6, 3).outline();
-  for (let i = 0; i < landed; i++) basket.set(-5 + i, 6, PAL[FLOWERS[i].c]);
+  const basket = layer().art(BASKET, BASKET_U, 3).outline();
+  for (let i = 0; i < landed; i++) basket.set(BASKET_U + 1 + i, 6, PAL[FLOWERS[i].c]);
   out.back.push(basket);
-  if (!done && q >= 5 && q < 9) out.front.push(flower(layer(), ...arc(q - 5, [PATCH_U + FLOWERS[k].u, 7], [-4, 8], 7, 4), FLOWERS[k].c).outline());
+  if (!done && q >= 5 && q < 9) out.front.push(flower(layer(), ...arc(q - 5, [PATCH_U + FLOWERS[k].u, 7], [BASKET_U + 2, 8], 7, 4), FLOWERS[k].c).outline());
   return out;
 }
 
