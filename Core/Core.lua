@@ -301,7 +301,7 @@ function Core.new(deps)
   local facts = ns.Slots.facts(deps.ruleset)
   local opened = ns.Slots.open(deps.db, facts, deps.random, deps.now())
   self.rulesetKey, self.rulesetEntry, self.rulesetRepair = opened.key, opened.entry, opened.repaired
-  self.rulesetClaimed = opened.claimed
+  self.rulesetClaimed, self.serverId = opened.claimed, facts.serverId
   bindSlot(self, opened.slot, self.initialLogin)
   if opened.claimed and facts.serverId then
     self.ledger:keepCharacters(ns.Slots.belongsHere(self.db, facts.serverId))
@@ -1458,8 +1458,24 @@ function Core:ruleset()
   }
 end
 
+local function placeOf(crew)
+  local where = crew.name or (crew.character and crew.character .. "'s Ruleset") or "another Ruleset"
+  return crew.faction and ("%s (%s)"):format(where, crew.faction) or where
+end
+
+local function hintFor(crews)
+  if #crews == 0 then return nil end
+  local places = {}
+  for i, crew in ipairs(crews) do places[i] = crew.place end
+  local verb = #crews == 1 and "Your Crew is" or "Your Crews are"
+  return ("%s on %s."):format(verb, ns.Text.list(places))
+end
+
 function Core:elsewhere()
-  return ns.Slots.elsewhere(self.account, self.rulesetKey)
+  local elsewhere = ns.Slots.elsewhere(self.account, self.rulesetKey)
+  for _, crew in ipairs(elsewhere.crews) do crew.place = placeOf(crew) end
+  elsewhere.hint = hintFor(elsewhere.crews)
+  return elsewhere
 end
 
 local function confirmRuleset(self)
@@ -1474,6 +1490,7 @@ function Core:rulesetNamed(name)
   if not name or entry.name == name then return end
   entry.name = name
   if self.trace then self.trace(("ruleset %s named %s"):format(self.rulesetKey, name)) end
+  self.listener("changed")
 end
 
 function Core:displayName()
@@ -1577,6 +1594,41 @@ local function enter(self, code, displayName, joining)
   self.listener("crewChanged")
   updateLink(self)
   return self:crew()
+end
+
+local function takeSlot(self, slot, how)
+  switchSlot(self, slot)
+  if self.serverId then self.ledger:keepCharacters(ns.Slots.belongsHere(self.db, self.serverId)) end
+  self:raiseGeneration(true)
+  sendOwnNow(self)
+  if self.trace then self.trace(("ruleset %s %s"):format(self.rulesetKey, how)) end
+  self.listener("crewChanged")
+  return self:crew()
+end
+
+function Core:claimCrewHere()
+  if self.db.crew then return nil, "inCrew" end
+  local slot = ns.Slots.claimHere(self.account, self.rulesetKey)
+  if not slot then return nil, "notWaiting" end
+  return takeSlot(self, slot, "took the Crew saved before Rulesets (asked)")
+end
+
+function Core:bringCrewHere()
+  if self.db.crew then return nil, "inCrew" end
+  local slot = ns.Slots.bringHere(self.account, self.rulesetKey, self.random)
+  if not slot then return nil, "notWaiting" end
+  return takeSlot(self, slot, "brought the Crew over from the other faction")
+end
+
+function Core:startFresh()
+  if self.db.crew then return nil, "inCrew" end
+  if not self:elsewhere().ask then return nil, "notWaiting" end
+  ns.Slots.decline(self.account, self.rulesetKey)
+  if self.trace then
+    self.trace(("ruleset %s started fresh, leaving the Crew saved before Rulesets"):format(self.rulesetKey))
+  end
+  self.listener("crewChanged")
+  return true
 end
 
 function Core:startCrew(displayName)
