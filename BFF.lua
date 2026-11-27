@@ -34,6 +34,7 @@ local MESSAGES = {
   noClaim = "Nobody has claimed that one yet.",
   given = "That one has been given already.",
   notClaimed = "You haven't claimed that one.",
+  notWaiting = "That Crew isn't waiting here any more.",
   winnerChanged = "Someone claimed it earlier in the meantime. Have another look before you Give it.",
 }
 ns.MESSAGES = MESSAGES
@@ -184,6 +185,7 @@ local function start(isInitialLogin)
     ("-- earlier sessions above · this one began %s --"):format(date("%Y-%m-%d %H:%M:%S")))
   ns.core = ns.Core.new({
     db = BFF_DB,
+    ruleset = ns.Ruleset.read(),
     now = GetServerTime,
     random = math.random,
     link = ns.ChannelLink,
@@ -214,7 +216,15 @@ local function start(isInitialLogin)
     ns.core:tick()
   end)
   if isInitialLogin and not ns.core:crew() then
-    say("type /bff to start or join a Crew.")
+    local card = ns.core:elsewhere()
+    local question = card.ask or card.offer
+    if question then
+      say(question .. " Type /bff to answer.")
+    elseif card.hint then
+      say(card.hint .. " Type /bff to open BFF.")
+    else
+      say("type /bff to start or join a Crew.")
+    end
   end
 end
 
@@ -231,6 +241,8 @@ eventFrame:RegisterEvent("LOOT_CLOSED")
 local lootRead = false
 eventFrame:RegisterEvent("UI_SCALE_CHANGED")
 eventFrame:RegisterEvent("DISPLAY_SIZE_CHANGED")
+-- WoW: Battle.net info, the rich presence among it, may not be ready at login.
+eventFrame:RegisterEvent("BN_INFO_CHANGED")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_ENTERING_WORLD" and not ns.core then
     start((...))
@@ -253,6 +265,8 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     end
   elseif event == "LOOT_CLOSED" then
     lootRead = false
+  elseif event == "BN_INFO_CHANGED" then
+    if ns.core then ns.core:rulesetNamed(ns.Ruleset.name()) end
   elseif event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
     if ns.core then
       ns.Panel.refresh()

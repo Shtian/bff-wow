@@ -20,6 +20,12 @@ local function report(options)
     end,
     rosterCounts = function() return { members = 2 } end,
     joinFailure = function() return options.failure end,
+    ruleset = function()
+      return options.ruleset or {
+        key = "mode:15:Alliance", recordId = 15, faction = "Alliance", serverId = "6939",
+        serverIds = { "6939", "6944" }, name = "Normal", provisional = false,
+      }
+    end,
   }
   ns.ChannelLink = {
     FAILURE_REASONS = { wrongPassword = "wrong password", tooManyChannels = "too many channels" },
@@ -35,6 +41,9 @@ describe("/bff report", function()
       "BFF report · 2026-11-11 20:31:05",
       "BFF v0.9.0",
       "Game 1.16.0 (build 65000) · interface 16001 · WoW: Forever: yes",
+      "Ruleset: mode:15:Alliance · realm name: none · record ID: 15 · faction: Alliance · name: Normal",
+      "Server ID: 6939 · seen: 6939, 6944 · provisional: no",
+      "Ruleset repair this session: none",
       "Crew: yes · other Members known: 2 · peers in the channel: 1",
       "Link: up",
       "Last join failure: none since the last join",
@@ -66,5 +75,31 @@ describe("/bff report", function()
     local text = report({ crew = { code = "X", generation = 3, generationFrom = "Ann's record", moves = 2 } })
     assert.truthy(text:find("Channel generation: 3 (Ann's record) · moves this session: 2", 1, true))
     assert.truthy(report({ crew = false }):find("Channel generation: none (no Crew)", 1, true))
+  end)
+
+  it("gives the Ruleset BFF thinks it's on, whether its Crew is provisional, and a repair this session", function()
+    local text = report({ ruleset = {
+      key = "mode:20:Horde", recordId = 20, faction = "Horde", serverId = "6939", serverIds = { "6939" },
+      provisional = true, repair = "mode:15:Horde moved to mode:20:Horde (by server ID)",
+    } })
+    assert.truthy(text:find("Ruleset: mode:20:Horde · realm name: none · record ID: 20 · faction: Horde · name: none",
+      1, true))
+    assert.truthy(text:find("Server ID: 6939 · seen: 6939 · provisional: yes", 1, true))
+    assert.truthy(text:find("Ruleset repair this session: mode:15:Horde moved to mode:20:Horde (by server ID)", 1, true))
+  end)
+
+  it("says none for the facts the game didn't give", function()
+    local text = report({ ruleset = { key = "default", serverIds = {}, provisional = false } })
+    assert.truthy(text:find("Ruleset: default · realm name: none · record ID: none · faction: none · name: none",
+      1, true))
+    assert.truthy(text:find("Server ID: none · seen: none · provisional: no", 1, true))
+  end)
+
+  it("gives the realm name on a game that has realms", function()
+    local text = report({ ruleset = {
+      key = "realm:Stormrage:Horde", realmName = "Stormrage", faction = "Horde", serverId = "1084",
+      serverIds = { "1084" }, provisional = false,
+    } })
+    assert.truthy(text:find("Ruleset: realm:Stormrage:Horde · realm name: Stormrage · record ID: none", 1, true))
   end)
 end)

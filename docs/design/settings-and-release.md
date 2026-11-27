@@ -48,7 +48,7 @@ No other options: the "can play with you" range (±3), the 30-day hide and a cha
 
 ### Storage
 
-Everything is **account-wide** in `BFF_DB`, including the minimap button position (LibDBIcon's table lives inside it). Core owns the layout and defaults (#9); UI reads and writes settings only through Core.
+Everything is **account-wide** in `BFF_DB`, including the minimap button position (LibDBIcon's table lives inside it), except Appear offline (`paused`), which is saved in the Crew's slot (ADR 0009). Its entry in the list is marked `inSlot`. Core owns the layout and defaults (#9); UI reads and writes settings only through Core.
 
 ### One list in Core
 

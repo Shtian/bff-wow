@@ -102,7 +102,7 @@ A field guide of the crew's fishing catches. Every type of fish is filled in by 
 Yes. Everyone in the crew needs it installed, and everyone joins with the same crew code.
 
 **Do we need to be in the same guild?**
-No. You do need to be on the same realm and the same faction: WoW's chat doesn't cross factions or reach other realms. Connected realms haven't been tested yet.
+No. You do need to be on the same ruleset and faction: WoW's chat doesn't cross factions or rulesets. BFF keeps a separate crew for each ruleset and faction you play on, and your settings are shared by all of them.
 
 **How does my news reach a friend who's offline?**
 BFF has no server, so news travels between players who are online at the same time. Any crew member who has your news passes it on, even if you're offline. A crew whose members are never online together won't see each other's news.

@@ -170,8 +170,8 @@ describe("The types caught track", function()
     end)
 
     local function beforeTheTrack(client)
-      client.db.goals.reached.catches = nil
-      client.db.goals.quiet.catches = nil
+      client:slot().goals.reached.catches = nil
+      client:slot().goals.quiet.catches = nil
     end
 
     it("keeps a Crew's catches quiet when the track ships, even ones that arrive in the first sync", function()
@@ -182,7 +182,7 @@ describe("The types caught track", function()
       net:run(5)
       catchTypes(net, clients[1], ns, 22)
       beforeTheTrack(bob)
-      bob.db.feed = {}
+      bob:slot().feed = {}
       bob:login()
       net:run(40)
       assert.same({}, texts(bob, "goal"))
@@ -197,7 +197,7 @@ describe("The types caught track", function()
       local bob = clients[2]
       bob:logout()
       beforeTheTrack(bob)
-      bob.db.feed = {}
+      bob:slot().feed = {}
       bob:login()
       bob:reload()
       net:run(40)
@@ -211,7 +211,7 @@ describe("The types caught track", function()
       local bob = clients[2]
       bob:logout()
       beforeTheTrack(bob)
-      bob.db.feed = {}
+      bob:slot().feed = {}
       bob:login()
       net:run(40)
       catchTypes(net, clients[1], ns, 20)
@@ -516,7 +516,7 @@ describe("While you were away, for Catches", function()
     send(net, ana, SMALLFISH)
     bob:logout()
     net:run(5)
-    bob.db.catchTypesTold = nil
+    bob:slot().catchTypesTold = nil
     send(net, ana, 6303)
     bob.events = {}
     bob:login()
@@ -538,7 +538,7 @@ describe("While you were away, for Catches", function()
     send(net, ana, SMALLFISH)
     bob.core:leaveCrew()
     net:run(5)
-    assert.is_nil(bob.db.catchTypesTold)
+    assert.is_nil(bob:slot().catchTypesTold)
   end)
 
   it("counts catches from after a Member joined, at their first login back", function()

@@ -11,6 +11,11 @@ local MONTHS = {
   "July", "August", "September", "October", "November", "December",
 }
 
+function Text.list(words)
+  if #words < 2 then return words[1] or "" end
+  return table.concat(words, ", ", 1, #words - 1) .. " and " .. words[#words]
+end
+
 function Text.ago(seconds)
   seconds = math.max(0, seconds)
   if seconds < HOUR then return ("%dm"):format(math.floor(seconds / 60)) end

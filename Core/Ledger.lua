@@ -31,7 +31,7 @@ local function same(field, a, b)
   return a == b
 end
 
-local function newMemberId(random)
+function Ledger.newMemberId(random)
   local chars = {}
   for i = 1, ID_LENGTH do
     local n = math.floor(random() * #ID_ALPHABET) + 1
@@ -41,7 +41,7 @@ local function newMemberId(random)
 end
 
 function Ledger.new(db, now, random, initialLogin)
-  db.memberId = db.memberId or newMemberId(random)
+  db.memberId = db.memberId or Ledger.newMemberId(random)
   db.records = db.records or {}
   db.via = db.via or {}
   db.removed = db.removed or {}
@@ -82,6 +82,21 @@ function Ledger:changeOwn(change)
   local changed = change(record)
   if changed then bump(self, record) end
   return changed
+end
+
+function Ledger:keepCharacters(keeps)
+  if not self:own() then return false end
+  return self:changeOwn(function(record)
+    local dropped = false
+    for guid in pairs(record.characters) do
+      if not keeps(guid) then
+        record.characters[guid] = nil
+        dropped = true
+      end
+    end
+    if dropped and record.main ~= nil and record.characters[record.main] == nil then record.main = nil end
+    return dropped
+  end)
 end
 
 function Ledger:updateOwn(character)
@@ -204,28 +219,23 @@ function Ledger:knowsOthers()
   return false
 end
 
-function Ledger:putAway()
-  local own = self:own()
-  local kept = { records = {}, via = self.db.via, removed = self.db.removed, reactions = own and own.reactions }
-  for id, record in pairs(self.db.records) do
-    if record ~= own then kept.records[id] = record end
-  end
-  self.db.records = { [self.db.memberId] = own }
-  if own then own.reactions = nil end
-  self.db.heard = {}
-  self.db.via = {}
-  self.db.removed = {}
-  return kept
+function Ledger.copied(value)
+  if type(value) ~= "table" then return value end
+  local result = {}
+  for k, v in pairs(value) do result[k] = Ledger.copied(v) end
+  return result
 end
 
-function Ledger:bringBack(kept)
-  for id, record in pairs(kept.records) do
-    if id ~= self.db.memberId then self.db.records[id] = record end
-  end
-  self.db.via = kept.via
-  self.db.removed = kept.removed
-  local own = self:own()
-  if own then own.reactions = kept.reactions end
+function Ledger:carryOwn(from)
+  local source = from:own()
+  if not source then return end
+  self:changeOwn(function(record)
+    for _, field in ipairs({ "displayName", "main", "look", "characters" }) do
+      record[field] = Ledger.copied(source[field])
+    end
+    record.characters = record.characters or {}
+    return true
+  end)
 end
 
 function Ledger:highestGeneration()

@@ -31,8 +31,27 @@ function Core.goldText(money)
   return "Gold: " .. ns.Text.grouped(math.floor(money / 10000))
 end
 
+local REPAIRED_BY = { serverId = "server ID", name = "name" }
+
+local function repairText(repaired)
+  if not repaired then return nil end
+  local how = repaired.swapped and "%s and %s swapped (by %s)" or "%s moved to %s (by %s)"
+  return how:format(repaired.from, repaired.to, REPAIRED_BY[repaired.by])
+end
+
+local function traceRuleset(self, what)
+  if self.trace then self.trace(("ruleset %s %s"):format(self.rulesetKey, what)) end
+end
+
+local function traceOpening(self)
+  if not self.trace then return end
+  for _, line in ipairs(self.openingLines) do self.trace(line) end
+  self.openingLines = {}
+end
+
 function Core:setTrace(trace)
   self.trace = type(trace) == "function" and trace or nil
+  traceOpening(self)
 end
 
 local function traceName(self, id, displayName)
@@ -191,59 +210,40 @@ local function noteWalkIn(self, records)
   end
 end
 
-function Core.new(deps)
-  for name, kind in pairs(required) do
-    if type(deps[name]) ~= kind then
-      error(("Core.new: %s must be a %s"):format(name, kind), 2)
-    end
+local function sendBeforeOwn(self)
+  if not self.locate then return nil end
+  return function()
+    local location = self.where:read()
+    local changed = self.ledger:locate(location)
+    local own = self.ledger:own()
+    if not changed and own and self.where:sentSince(own.version) then self.ledger:touch() end
+    self.where:dataSent(location)
   end
-  if type(deps.link.send) ~= "function" then
-    error("Core.new: link.send must be a function", 2)
-  end
+end
 
-  local fresh = next(deps.db) == nil
-  local self = setmetatable({
-    db = deps.db,
-    now = deps.now,
-    random = deps.random,
-    link = deps.link,
-    listener = deps.listener,
-    initialLogin = deps.initialLogin == true,
-    maxLevel = deps.maxLevel,
-    ledger = ns.Ledger.new(deps.db, deps.now, deps.random, deps.initialLogin == true),
-    utcOffset = type(deps.utcOffset) == "number" and deps.utcOffset or 0,
-    daylight = type(deps.daylight) == "function" and deps.daylight or function() end,
-    finalBosses = type(deps.finalBosses) == "table" and deps.finalBosses or ns.Clears.FINAL_BOSSES,
-    linkUp = false,
-    upSince = nil,
-    downSince = nil,
-    doings = ns.Doing.new(deps.now),
-  }, Core)
-  local itemLink = type(deps.itemLink) == "function" and deps.itemLink or nil
-  local itemLook = type(deps.itemLook) == "function" and deps.itemLook or nil
-  self.feedState = ns.Feed.new(deps.db, self.ledger, deps.now, deps.maxLevel, self.initialLogin, itemLink, itemLook)
-  self.sessionStart = deps.now()
+local function bindSlot(self, slot, initialLogin)
+  self.db = slot
+  self.ledger = ns.Ledger.new(slot, self.now, self.random, initialLogin)
+  self.feedState = ns.Feed.new(slot, self.ledger, self.now, self.maxLevel, initialLogin, self.itemLink, self.itemLook)
   self.spareLife = ns.Spares.new({
-    db = deps.db,
+    db = slot,
     ledger = self.ledger,
     feed = self.feedState,
-    now = deps.now,
-    listener = deps.listener,
-    initialLogin = self.initialLogin,
-    itemLink = itemLink,
-    findItem = type(deps.findItem) == "function" and deps.findItem or nil,
+    now = self.now,
+    listener = self.listener,
+    initialLogin = initialLogin,
+    itemLink = self.itemLink,
+    findItem = self.findItem,
   })
-  self.crewGoals = ns.Goals.new(deps.db, self.ledger, deps.now, deps.maxLevel)
-  local locate = type(deps.locate) == "function" and deps.locate or nil
-  self.where = ns.Where.new(deps.now, locate)
+  self.crewGoals = ns.Goals.new(slot, self.ledger, self.now, self.maxLevel)
   self.pocket = ns.Pocket.new({
-    now = deps.now,
+    now = self.now,
     ledger = self.ledger,
     feed = self.feedState,
     goals = self.crewGoals,
     spares = self.spareLife,
     doings = self.doings,
-    listener = deps.listener,
+    listener = self.listener,
     on = function() return self.db.crew ~= nil and self:setting("camp") and self:setting("pocketCamp") end,
     setting = function(key) return self:setting(key) end,
     season = function() return self:season() end,
@@ -256,23 +256,65 @@ function Core.new(deps)
       mark = markStray,
     },
   })
-  self.stray = ns.Stray.new(deps.db, deps.now, deps.random)
-  local Gossip = type(deps.gossip) == "table" and deps.gossip or ns.Gossip
-  self.gossip = Gossip.new(self.ledger, deps.now, deps.random, function(message, to)
+  self.stray = ns.Stray.new(slot, self.now, self.random)
+  self.gossip = self.Gossip.new(self.ledger, self.now, self.random, function(message, to)
     sendMessage(self, message, to)
-  end, locate and function()
-    local location = self.where:read()
-    local changed = self.ledger:locate(location)
-    local own = self.ledger:own()
-    if not changed and own and self.where:sentSince(own.version) then self.ledger:touch() end
-    self.where:dataSent(location)
-  end)
+  end, sendBeforeOwn(self))
   self.gossip:setPaused(self:isPaused())
-  self.playTracker = ns.PlayTimes.new(deps.db, deps.now)
+  self.playTracker = ns.PlayTimes.new(slot, self.now)
   self.playTimesDue = true
+  if initialLogin or type(slot.channelMoves) ~= "table" then slot.channelMoves = { count = 0 } end
   refreshMembers(self)
-  self.whatsNewState = ns.WhatsNew.new(deps.db, deps.version, deps.changelog, fresh)
-  if self.initialLogin or type(self.db.channelMoves) ~= "table" then self.db.channelMoves = { count = 0 } end
+end
+
+function Core.new(deps)
+  for name, kind in pairs(required) do
+    if type(deps[name]) ~= kind then
+      error(("Core.new: %s must be a %s"):format(name, kind), 2)
+    end
+  end
+  if type(deps.link.send) ~= "function" then
+    error("Core.new: link.send must be a function", 2)
+  end
+
+  local fresh = next(deps.db) == nil
+  local self = setmetatable({
+    account = deps.db,
+    now = deps.now,
+    random = deps.random,
+    link = deps.link,
+    listener = deps.listener,
+    initialLogin = deps.initialLogin == true,
+    maxLevel = deps.maxLevel,
+    utcOffset = type(deps.utcOffset) == "number" and deps.utcOffset or 0,
+    daylight = type(deps.daylight) == "function" and deps.daylight or function() end,
+    finalBosses = type(deps.finalBosses) == "table" and deps.finalBosses or ns.Clears.FINAL_BOSSES,
+    itemLink = type(deps.itemLink) == "function" and deps.itemLink or nil,
+    itemLook = type(deps.itemLook) == "function" and deps.itemLook or nil,
+    findItem = type(deps.findItem) == "function" and deps.findItem or nil,
+    locate = type(deps.locate) == "function" and deps.locate or nil,
+    Gossip = type(deps.gossip) == "table" and deps.gossip or ns.Gossip,
+    linkUp = false,
+    upSince = nil,
+    downSince = nil,
+    doings = ns.Doing.new(deps.now),
+  }, Core)
+  self.sessionStart = deps.now()
+  self.where = ns.Where.new(deps.now, self.locate)
+  self.facts = ns.Slots.facts(deps.ruleset)
+  local opened = ns.Slots.open(deps.db, self.facts, deps.random, deps.now())
+  self.rulesetKey, self.rulesetEntry, self.rulesetRepair = opened.key, opened.entry, repairText(opened.repaired)
+  self.openingLines = {}
+  if self.rulesetRepair then self.openingLines[1] = "ruleset " .. self.rulesetRepair end
+  if opened.placed then
+    self.openingLines[#self.openingLines + 1] = ("ruleset %s placed the Crew saved before Rulesets here%s"):format(
+      opened.key, opened.slot.provisional and " (provisional)" or "")
+  end
+  bindSlot(self, opened.slot, self.initialLogin)
+  if opened.placed and self.facts.serverId then
+    self.ledger:keepCharacters(ns.Slots.belongsHere(self.db, self.facts.serverId))
+  end
+  self.whatsNewState = ns.WhatsNew.new(self.account, deps.version, deps.changelog, fresh)
   self.generationFrom = "saved"
   self:raiseGeneration(true)
   self.bffVersionOf = function(id)
@@ -392,7 +434,19 @@ local function sendOwnNow(self)
   self.gossip:ownChanged("now")
 end
 
+local function leaveOtherSlots(self, guid)
+  if self.leftOtherSlotsAs == guid then return end
+  self.leftOtherSlotsAs = guid
+  for _, slot in ipairs(ns.Slots.others(self.account, self.db)) do
+    if type(slot.memberId) == "string" then
+      ns.Ledger.new(slot, self.now, self.random):keepCharacters(function(other) return other ~= guid end)
+    end
+  end
+end
+
 function Core:updateOwn(character)
+  self.character = character
+  if type(character) == "table" then leaveOtherSlots(self, character.guid) end
   local versionChanged = self.whatsNewState.version ~= nil and self.ledger:writeOwn({ bff = self.whatsNewState.version })
   local changed, before = self.ledger:updateOwn(character)
   if versionChanged and not changed then self.gossip:ownChanged("later") end
@@ -1150,7 +1204,7 @@ local SETTINGS = {
   {
     key = "paused", section = SHARING, kind = "toggle",
     label = "Appear offline: send nothing, so your Crew sees you as offline",
-    saved = onFlag("paused"),
+    saved = onFlag("paused"), inSlot = true,
   },
   {
     key = "chatLines", section = NOTIFICATIONS, kind = "toggle",
@@ -1277,15 +1331,22 @@ local ON_CHANGE = {
   paused = function(self, paused) self.gossip:setPaused(paused) end,
 }
 
+local function savedFor(self, setting)
+  if setting.inSlot then return self.db end
+  return self.account
+end
+
 function Core:setting(key)
-  return settingFor(key).saved.read(self.db)
+  local setting = settingFor(key)
+  return setting.saved.read(savedFor(self, setting))
 end
 
 function Core:setSetting(key, value)
-  local saved = settingFor(key).saved
-  local before = saved.read(self.db)
-  saved.write(self.db, value)
-  local after = saved.read(self.db)
+  local setting = settingFor(key)
+  local saved, db = setting.saved, savedFor(self, setting)
+  local before = saved.read(db)
+  saved.write(db, value)
+  local after = saved.read(db)
   if (saved.same or rawequal)(before, after) then return end
   local onChange = ON_CHANGE[key]
   if onChange then onChange(self, after) end
@@ -1387,7 +1448,72 @@ function Core:setMinimapShown(shown) self:setSetting("minimap", shown) end
 function Core:isMinimapShown() return self:setting("minimap") end
 
 function Core:minimapIcon()
-  return savedIn(self.db, "minimap")
+  return savedIn(self.account, "minimap")
+end
+
+function Core:ruleset()
+  local entry = self.rulesetEntry
+  local serverIds = {}
+  for i, id in ipairs(entry.serverIds) do serverIds[i] = id end
+  return {
+    key = self.rulesetKey,
+    realmName = self.facts.realmName,
+    recordId = entry.recordId,
+    faction = entry.faction,
+    serverId = self.facts.serverId,
+    serverIds = serverIds,
+    name = entry.name,
+    provisional = self.db.provisional == true,
+    repair = self.rulesetRepair,
+  }
+end
+
+local SEPARATE = "BFF keeps a separate Crew for each %s and faction."
+local ASK = SEPARATE .. " It can't tell which one your Crew from before belongs to. Is this where your Crew is?"
+local OFFER = "Your Crew on %s hasn't heard from anyone yet. If your friends play this faction, bring it here."
+
+local function worldWord(self)
+  return self.facts.realmName and "realm" or "Ruleset"
+end
+
+local function placeOf(crew, world)
+  local where = crew.name or (crew.character and ("%s's %s"):format(crew.character, world)) or "another " .. world
+  return crew.faction and ("%s (%s)"):format(where, crew.faction) or where
+end
+
+local function hintFor(crews, world)
+  if #crews == 0 then return nil end
+  local places = {}
+  for i, crew in ipairs(crews) do places[i] = placeOf(crew, world) end
+  local where = #crews == 1 and "Your Crew is on %s, so log in a Character there to see it."
+    or "Your Crews are on %s, so log in a Character there to see them."
+  return ("%s %s You can also start or join another Crew here."):format(
+    SEPARATE:format(world), where:format(ns.Text.list(places)))
+end
+
+function Core:elsewhere()
+  local found = ns.Slots.elsewhere(self.account, self.rulesetKey, self.now())
+  local world = worldWord(self)
+  return {
+    hint = hintFor(found.crews, world),
+    ask = found.ask and ASK:format(world) or nil,
+    offer = found.offer and OFFER:format(placeOf(found.offer, world)) or nil,
+  }
+end
+
+local function confirmRuleset(self)
+  if not self.db.provisional then return end
+  self.db.provisional = nil
+  traceRuleset(self, "confirmed by a Member")
+end
+
+function Core:rulesetNamed(name)
+  name = ns.Slots.facts({ name = name }).name
+  local entry = self.rulesetEntry
+  if not name or entry.name == name then return end
+  entry.name = name
+  traceRuleset(self, "named " .. name)
+  self.listener("changed")
 end
 
 function Core:displayName()
@@ -1451,33 +1577,86 @@ local function nameOrCurrent(self, displayName)
   return validName(displayName)
 end
 
-local function bringBack(self, code)
-  local kept = self.db.keptCrew
-  self.db.keptCrew = nil
-  if type(kept) ~= "table" or kept.code ~= code then return nil end
-  self.ledger:bringBack(kept.ledger)
-  self.feedState:bringBack(kept.feed)
-  self.crewGoals:bringBack(kept.goals)
-  refreshMembers(self)
-  return kept
+local function switchSlot(self, slot, carryFrom)
+  bindSlot(self, slot, false)
+  if carryFrom then self.ledger:carryOwn(carryFrom) end
+  self.linkFailed = nil
+  self.channelCapped = nil
+  self.toldOutOfDate = nil
+  self.mourning = nil
+  self.generationFrom = "saved"
+  if self.whatsNewState.version then self.ledger:writeOwn({ bff = self.whatsNewState.version }) end
+  if self.character then self.ledger:updateOwn(self.character) end
+  updateLink(self)
+end
+
+local function leftCrewWith(self, code)
+  local slot = ns.Slots.left(self.account, self.rulesetKey)
+  local crew = slot and slot.crew
+  return type(crew) == "table" and crew.code == code and crew or nil
 end
 
 local function enter(self, code, displayName, joining)
-  self.crewGoals:clear()
+  local left = leftCrewWith(self, code)
+  if left then
+    switchSlot(self, ns.Slots.rejoin(self.account, self.rulesetKey))
+  else
+    ns.Slots.dropLeft(self.account, self.rulesetKey)
+    self.crewGoals:clear()
+  end
   self.db.catchTypesTold = nil
-  local kept = bringBack(self, code)
-  local generation = kept and kept.generation or nil
+  local generation = left and left.generation or nil
   self.ledger:writeOwn({ displayName = displayName, left = false, joinedAt = self.now(), generation = generation or false })
   sendOwnNow(self)
   self.db.crew = { code = code, joined = joining or nil, generation = generation }
   self.generationFrom = "saved"
   self.linkFailed = nil
   self.channelCapped = nil
-  if kept then self:raiseGeneration(true) end
+  if left then self:raiseGeneration(true) end
   if joining then self.feedState:ownJoined() end
   self.listener("crewChanged")
   updateLink(self)
   return self:crew()
+end
+
+local function cardAnswer(self, answer)
+  if self.db.crew then return nil, "inCrew" end
+  local result = answer()
+  if not result then return nil, "notWaiting" end
+  return result
+end
+
+local function takeSlot(self, slot, how)
+  switchSlot(self, slot)
+  if self.facts.serverId then self.ledger:keepCharacters(ns.Slots.belongsHere(self.db, self.facts.serverId)) end
+  self:raiseGeneration(true)
+  sendOwnNow(self)
+  traceRuleset(self, how)
+  self.listener("crewChanged")
+  return self:crew()
+end
+
+function Core:placeCrewHere()
+  return cardAnswer(self, function()
+    local slot = ns.Slots.placeHere(self.account, self.rulesetKey, self.now())
+    return slot and takeSlot(self, slot, "placed the Crew saved before Rulesets here (asked)")
+  end)
+end
+
+function Core:bringCrewHere()
+  return cardAnswer(self, function()
+    local slot = ns.Slots.bringHere(self.account, self.rulesetKey, self.random)
+    return slot and takeSlot(self, slot, "brought the Crew over from the other faction")
+  end)
+end
+
+function Core:startFresh()
+  return cardAnswer(self, function()
+    if not ns.Slots.decline(self.account, self.rulesetKey, self.now()) then return false end
+    traceRuleset(self, "started fresh, leaving the Crew saved before Rulesets")
+    self.listener("crewChanged")
+    return true
+  end)
 end
 
 function Core:startCrew(displayName)
@@ -1596,22 +1775,12 @@ end
 
 local function finishLeaving(self)
   local crew = self.db.crew
-  self.db.crew = nil
-  self.linkFailed = nil
-  self.channelCapped = nil
-  updateLink(self)
   if self.linkUp then self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } }) end
   self.spareLife:clear()
-  self.db.keptCrew = {
-    code = crew.code,
-    generation = crew.generation,
-    ledger = self.ledger:putAway(),
-    feed = self.feedState:putAway(),
-    goals = self.crewGoals:putAway(),
-  }
-  self.db.catchTypesTold = nil
-  self.online = {}
-  self.pocket:clear()
+  crew.leaving, crew.left = nil, true
+  local joinFailure = self.db.joinFailure
+  switchSlot(self, ns.Slots.leave(self.account, self.rulesetKey, self.random), self.ledger)
+  self.db.joinFailure = joinFailure
   self.doings:clear()
   self.listener("crewChanged")
   self.listener("notice", "leftCrew")
@@ -1804,6 +1973,7 @@ function Core:received(message, from)
       if quest and self.feedState:isSettled() then self.pocket:animateMember("quest", decoded.from) end
     end
   elseif decoded.type == "DIGEST" and type(decoded.versions) == "table" then
+    confirmRuleset(self)
     local partial = decoded.partial == true
     if self.trace then
       self.trace(("receive DIGEST from %s · ok%s · %s"):format(traceName(self, decoded.from),
@@ -1811,6 +1981,7 @@ function Core:received(message, from)
     end
     self.gossip:digestReceived(decoded.versions, partial, decoded.turns == true, from)
   elseif decoded.type == "DATA" and type(decoded.records) == "table" then
+    confirmRuleset(self)
     changed = dataReceived(self, decoded.records, decoded.from, type(from) == "string")
   elseif self.trace then
     self.trace(("receive %s from %s · ignored (unknown)"):format(tostring(decoded.type), traceName(self, decoded.from)))

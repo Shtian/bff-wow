@@ -45,12 +45,14 @@ Core/Doing.lua
 Core/WhatsNew.lua
 Core/Stray.lua
 Core/Pocket.lua
+Core/Slots.lua
 Core/Core.lua
 
 Link/Presence.lua
 Link/Framing.lua
 
 Game/Snapshot.lua
+Game/Ruleset.lua
 Game/Bags.lua
 Game/Actions.lua
 Game/SyncLog.lua
