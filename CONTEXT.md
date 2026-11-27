@@ -7,7 +7,7 @@ A WoW: Forever addon that keeps a small circle of real-life friends aware of eac
 ### People and characters
 
 **Member**:
-A real person taking part in BFF, identified the same way across all their Characters.
+A real person taking part in a Crew, identified the same way across all their Characters in it. A person in two Crews is a different Member in each.
 _Avoid_: Friend, player, user
 
 **Crew**:
@@ -15,15 +15,19 @@ The set of Members who share BFF data with each other.
 _Avoid_: Group, guild, party, friends
 
 **Crew code**:
-The generated code that names a Crew and is the only key to it. Whoever has it can join; a Member is in at most one Crew at a time.
+The generated code that names a Crew and is the only key to it. Whoever has it can join. A person is in at most one Crew per Ruleset and faction.
 _Avoid_: Invite code, password, Crew name
+
+**Ruleset**:
+Which of WoW: Forever's worlds a Character plays on: Normal, PvP, Roleplay or Roleplay PvP, and later Hardcore. Forever has rulesets instead of realms. A Crew lives on one Ruleset and one faction, since the game's chat reaches no further. On retail, a realm plays this part.
+_Avoid_: Realm, server, shard
 
 **Channel generation**:
 Which of the Crew's hidden channels it is using. Each generation is derived from the Crew code, and generation 0 is the first. When the game breaks the current channel, the Crew moves up one. A generation is never left for a lower one.
 _Avoid_: Channel version, channel index
 
 **Leave (the Crew)**:
-What a Member does to themselves: their record is marked as left, so every other Member stops showing them. Unlike Remove, everyone sees it. The Crew's data is put away, not forgotten, until the Member starts or joins a different Crew.
+What a Member does to themselves: their record is marked as left, so every other Member stops showing them. Unlike Remove, everyone sees it. The Crew's data is put away, not forgotten, until they start or join a different Crew on that Ruleset and faction.
 _Avoid_: Quit, unsubscribe
 
 **Display name**:

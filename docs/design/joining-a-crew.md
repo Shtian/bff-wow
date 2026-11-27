@@ -57,7 +57,7 @@ A partial break, where some Members can use the channel and some can't, heals th
 
 ## One Crew at a time
 
-A Member is in **at most one Crew**. Joining another Crew means leaving the current one first: the panel asks to confirm, and `/bff join` refuses with "Leave your Crew first (/bff leave)". Joining the Crew you are already in does nothing.
+A player is in **at most one Crew per Ruleset and faction** (ADR 0009). A Character on another Ruleset or faction has a Crew of its own, or none. Joining another Crew on the same Ruleset and faction means leaving the current one first: the panel asks to confirm, and `/bff join` refuses with "Leave your Crew first (/bff leave)". Joining the Crew you are already in does nothing.
 
 Why:
 
@@ -65,7 +65,7 @@ Why:
 - The panel, Feed, While you were away and "can play with you" all assume one roster. More Crews would need a Crew picker in each of them.
 - The intended use is one circle of real-life friends (the Crew).
 
-The Member id stays the same across Crews, so leaving and rejoining keeps the same identity.
+Each Crew has its own Member id (ADR 0009). Leaving and rejoining the same Crew keeps it; starting or joining a different Crew gives a new one.
 
 ## First run
 
@@ -102,9 +102,9 @@ The default display name for slash commands is the current Character's name, as 
 2. Your record goes out as DATA right away if the link is up (already a send trigger in #8), or on the next `up()` if it is down (lockdown, not yet in the channel). If you log out first, the leaving state survives in saved data and the next login rejoins the channel to finish.
 3. Once the DATA has been handed to the link, Core puts the Crew away: you show as not in a Crew and the link leaves the channel, but the Crew's data stays in saved data, out of sight. That's every other Member's record, the Remove list, the Feed log, While you were away, reactions, reached goal rungs and the channel generation. Your own Spares and Claims are still withdrawn. Then it fires `crewChanged`.
    - **Rejoining the same code** brings all of it back, as if you hadn't left.
-   - **Starting or joining a different code** wipes it, so Crews stay apart.
+   - **Starting or joining a different code** on the same Ruleset and faction wipes it, so Crews stay apart.
 
-   Your own record (Member id, Characters, Main) is kept either way. Keeping the rest means a Member who leaves and rejoins still knows the others, so their whispers are vouched for even when the member list is broken (ADR 0008).
+   The put-away Crew keeps your own record too (Member id, Characters, Main). Keeping the rest means a Member who leaves and rejoins still knows the others, so their whispers are vouched for even when the member list is broken (ADR 0008).
 4. The channel link leaves the channel a few seconds later, after ChatThrottleLib has drained.
 
 **After a failed join** (wrong password, too many channels) the link will never come up, so leaving doesn't wait for it: step 3 happens straight away and nothing is sent, not even the tombstone. The others see you go offline as usual. This covers a leave started after the failure, one already waiting when it happens, and one pending at login whose join then fails (the failure finishes it, with "You left the Crew." and no failure notice). You can then start or join another Crew. Joining the same code while a leave is still waiting cancels it, as before.
@@ -138,5 +138,5 @@ Scenarios to add to the FakeNet tests:
 
 ## Not decided here
 
-- Whether custom channels reach connected realms, and how Forever's rulesets change "same realm" (still open on the map; the spike in #6 checks the channel itself).
+- Whether custom channels reach connected realms on retail. On Forever a Crew lives on one Ruleset and faction (ADR 0009).
 - The exact setup view layout; it follows the panel style from #7.
