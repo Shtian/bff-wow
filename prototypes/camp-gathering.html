@@ -2,20 +2,23 @@
 <!--
   PROTOTYPE, throwaway. Question: a gathering figure in the Pocket Camp holds a static pick over its head. What
   should an animated gathering pose look like?
-    1  Today's: the static pick overhead, as a baseline.
-    2  Swing: the tool swings back, over and down to strike the ground in front, sparks on the hit. No node.
-    3  Node: the same swing at a node at the figure's feet (ore, herb or hide, like the crafter's anvil); now
-       and then a find pops out of it.
-    4  Crouch: the figure kneels at the node and taps with a short tool (or pulls the herb by hand); finds arc
-       over its head into a sack behind it.
-    5  Find mark: today's raised tool bobbing, and a find floating up over the head now and then, as the
-       fish mark does. The least new art.
-  Profession: the Camp only knows "gathering" today. Professions.practised already sees which skill line grew
-  (182 herbalism, 186 mining, 393 skinning) from a record Core merged, so naming it sends nothing new. "Any"
-  is what we'd show without it: the pick and an ore node.
-  Toggles: who gathers (neighbours on one side tests crowding), profession, season, the game world behind, the
-  backdrop's opacity, zoom (2x is about in-game size), pause and step. The readout lists, per gatherer, how far
-  it reaches past its 12 columns, what it draws over, and what new sprites the variant needs.
+  Round 1 (today's pick, swing, node, crouch, find mark): the node won. Feedback: the pick is too crooked at
+  the ends, herbalism should look like picking flowers, and the hide doesn't read as an animal (a tiny bit of
+  blood). Round 2 keeps round 1's node as a baseline and offers three sets, each a pick, a way of picking
+  flowers and an animal to skin (mix and match across them):
+    1  Round 1 node: the crooked pick, a sickle at a herb, a knife at a flat hide.
+    A  An even arch of a pick; bends, plucks a flower and holds it up; a boar, cut standing.
+    B  A straight pick with pale points; kneels and picks flowers into a basket; a wolf, cut kneeling.
+    C  A one-sided miner's pick; kneels and gathers a bouquet in the hand; the boar, its hide peeling back.
+  The picks are drawn by hand at each angle (round 1 rotated one shape, which bent the diagonals). The animal
+  lies behind the figure's legs, its head toward the fire, so it reaches about 7 past the figure (the anvil
+  reaches 4, the griffin 8). Each cut drips a drop of blood, and there's a 2-pixel stain under the animal.
+  Profession: "Mixed" puts a herbalist on Mira, a miner on You and a skinner on Kesh. The Camp only knows
+  "gathering" today. Professions.practised already sees which skill line grew (182 herbalism, 186 mining,
+  393 skinning) from a record Core merged, so naming it sends nothing new.
+  Toggles: who gathers, profession, season, the game world behind, the backdrop's opacity, zoom (2x is about
+  in-game size), pause and step. The readout lists, per gatherer, how far it reaches past its 12 columns, what
+  it draws over, and what new sprites the set needs.
   Figures, palette, fire, hat and pick are copied from scripts/camp-art.mjs; backdrops are
   Media/CampPocketBackdrop*.tga's 144-column band. Crew data is fake. Run: open the file in a browser.
 -->
@@ -48,7 +51,7 @@
 </style>
 </head>
 <body>
-<h1>Gathering in the Pocket Camp</h1>
+<h1>Gathering in the Pocket Camp: round 2, the node</h1>
 <div class="note" id="note"></div>
 <div id="toggles"></div>
 <div style="display:flex;justify-content:center;gap:8px;margin:4px 16px"><button class="btn" id="pause">Pause</button><button class="btn" id="step">Step a tick</button></div>
@@ -136,25 +139,28 @@ const CAST = [
 ];
 
 const VARIANTS = [
-  { key: "1", name: "Today's pick", sprites: "none new",
-    note: "Today: standing, arms up, the pick held still over the head. It reads as \"holding a pick\", not as working." },
-  { key: "2", name: "Swing", sprites: "4 tool angles a profession (12), 1 strike body, sparks as pixels",
-    note: "The tool swings back, over, forward and down to strike the ground in front; sparks (or leaves, or hide scraps) fly on the hit. No node: the figure stays its own 12 columns plus the tool." },
-  { key: "3", name: "Node", sprites: "Swing's, plus 3 nodes and 3 finds",
-    note: "The same swing, at a node at its feet in front, placed like the crafter's anvil: an ore vein, a herb, a hide. Every fourth strike a find pops up out of it and twinkles." },
-  { key: "4", name: "Crouch", sprites: "1 crouched body, 2 short-tool angles a profession, 3 nodes, 3 finds, a sack",
-    note: "Kneeling at the node, tapping with a short tool (the herbalist pulls the herb by hand, and it lifts on each pull). Every third tap a find arcs over the head into a sack behind." },
-  { key: "5", name: "Find mark", sprites: "3 finds (today's tool for Any; a sickle and a knife otherwise)",
-    note: "Today's raised tool, bobbing a row with the arms, and every 4 s a find floats up over the head and twinkles out, as the fish mark does. The least new art, but it takes the head-mark spot (ALT, the star) while it shows." },
+  { key: "1", name: "Round 1 node", sprites: "4 tool angles a profession (12), 1 strike body, 3 nodes, 3 finds",
+    note: "Round 1's winner, as a baseline: the pick with the crooked ends, a sickle at a herb and a knife at a flat hide." },
+  { key: "A", name: "Arch, raise, boar", set: { pick: "arch", herb: "raise", animal: "boar", skinBody: "SIT" },
+    sprites: "4 pick angles, flower patch (3 flowers, a bud), a held flower, boar, 3 knife angles",
+    note: "Pick: an even arch, the head straight across with one pixel turned down at each end, drawn by hand at each angle so the diagonals stay smooth. Herbs: bends to the patch, plucks the nearest flower and holds it up, and the flower grows back. Skinning: a boar lying at the feet, cut with a short knife, a drop of blood on each cut and a small stain under it." },
+  { key: "B", name: "Points, basket, wolf", set: { pick: "points", herb: "basket", animal: "wolf", skinBody: "CROUCH" },
+    sprites: "4 pick angles, flower patch, basket (0 to 3 flowers), wolf, 2 knife angles, crouched body",
+    note: "Pick: a straight head with pale points and a collar, no curl at all. Herbs: kneels and picks the three flowers one by one into a basket behind, then they grow back. Skinning: a grey wolf lying at the feet, kneeling to cut, the same drops and stain." },
+  { key: "C", name: "One-sided, bouquet, boar flap", set: { pick: "oneSided", herb: "bouquet", animal: "boar", skinBody: "CROUCH", flap: true },
+    sprites: "4 pick angles, flower patch, bouquet (1 to 3), boar, hide flap (3 lengths), 2 knife angles, crouched body",
+    note: "Pick: a miner's pick, a curved point on one side and a flat hammer face on the other. Herbs: kneels and gathers a small bouquet in the hand, 1, 2, then 3 flowers, which twinkles before the patch grows back. Skinning: the boar, kneeling, the hide peeling back a little more with each cut, with drops and a stain." },
 ];
 const params = new URLSearchParams(location.search);
-let variant = Math.max(0, VARIANTS.findIndex((v) => v.key === (params.get("variant") || "1")));
+let variant = Math.max(0, VARIANTS.findIndex((v) => v.key === (params.get("variant") || "A")));
 const state = {
-  who: params.get("who") || "both", prof: params.get("prof") || "mining", season: params.get("season") || "none",
+  who: params.get("who") || "all", prof: params.get("prof") || "mixed", season: params.get("season") || "none",
   world: params.get("world") || "forest", opacity: +(params.get("opacity") || 60), zoom: +(params.get("zoom") || 3),
 };
 let tick = 0, paused = false;
-const GATHERERS = { you: ["you"], kesh: ["kesh"], both: ["you", "kesh"], neighbours: ["odo", "kesh"] };
+const GATHERERS = { you: ["you"], kesh: ["kesh"], both: ["you", "kesh"], neighbours: ["odo", "kesh"], all: ["mira", "you", "kesh"] };
+const MIXED = { mira: "herbalism", you: "mining", odo: "herbalism", kesh: "skinning" };
+const profFor = (m) => (state.prof === "mixed" ? MIXED[m.id] : state.prof);
 const OFFSET = { you: 0, kesh: 5, odo: 11, mira: 3 };
 
 function layer() {
@@ -231,58 +237,151 @@ function twinkle(l, u, r, n) {
   return l.set(u, r + 1, c).set(u, r - 1, c).set(u - 1, r, c).set(u + 1, r, c);
 }
 
+const PICK_UP = {
+  arch: [[-3, 4, "Z"], [-2, 4, "Z"], [-1, 4, "Z"], [0, 4, "t"], [1, 4, "Z"], [2, 4, "Z"], [3, 4, "Z"], [-4, 3, "Z"], [4, 3, "Z"]],
+  points: [[-3, 4, "N"], [-2, 4, "Z"], [-1, 4, "Z"], [0, 4, "t"], [1, 4, "Z"], [2, 4, "Z"], [3, 4, "N"], [-1, 5, "Z"], [0, 5, "Z"], [1, 5, "Z"]],
+  oneSided: [[-2, 5, "Z"], [-2, 4, "Z"], [-2, 3, "Z"], [-1, 4, "Z"], [0, 4, "t"], [1, 4, "Z"], [2, 4, "Z"], [3, 4, "Z"], [4, 3, "N"]],
+};
+const PICK_DIAG = {
+  arch: [[4, 4, "t"], [3, 5, "Z"], [2, 6, "Z"], [5, 3, "Z"], [6, 2, "Z"], [1, 6, "Z"], [6, 1, "Z"]],
+  points: [[4, 4, "t"], [3, 5, "Z"], [2, 6, "N"], [5, 3, "Z"], [6, 2, "N"], [5, 5, "Z"]],
+  oneSided: [[4, 4, "t"], [3, 5, "Z"], [2, 6, "Z"], [1, 6, "N"], [5, 3, "Z"], [6, 3, "Z"], [5, 2, "Z"], [6, 2, "Z"]],
+};
+function pickArt(style, hand, dir) {
+  const l = layer(), [hu, hr] = hand, [dx, dy] = dir;
+  if (dx !== 0 && dy !== 0) {
+    const flip = dx < 0 ? -1 : 1;
+    for (const [x, y, c] of [[0, 0, "a"], [1, 1, "A"], [2, 2, "A"], [3, 3, "A"], ...PICK_DIAG[style]]) l.set(hu + x * flip, hr + y, PAL[c]);
+  } else {
+    const p = [-dy, dx];
+    for (const [j, k, c] of [[0, 0, "a"], [0, 1, "A"], [0, 2, "A"], [0, 3, "A"], ...PICK_UP[style]]) l.set(hu + dx * k + p[0] * j, hr + dy * k + p[1] * j, PAL[c]);
+  }
+  return l.outline();
+}
+
+const FLOWERS = [{ u: 1, h: 4, c: "P" }, { u: 4, h: 5, c: "p" }, { u: 7, h: 4, c: "F" }];
+const PATCH_U = 8;
+function patch(u0, r0, looks) {
+  const l = layer();
+  for (let x = 0; x < 9; x++) l.set(u0 + x, r0, PAL[x % 3 === 1 ? "g" : "h"]);
+  for (const x of [0, 2, 6, 8]) l.set(u0 + x, r0 + 1, PAL.h);
+  FLOWERS.forEach((f, k) => {
+    const look = looks[k] || "full", u = u0 + f.u;
+    if (look === "gone") return;
+    const lift = look === "lift" ? 1 : 0, top = r0 + f.h - 1 + lift;
+    if (look === "bud") {
+      for (let r = r0 + 1; r <= r0 + f.h - 3; r++) l.set(u, r, PAL.i);
+      l.set(u, r0 + f.h - 2, PAL.h);
+      return;
+    }
+    for (let r = r0 + 1; r <= top - 2; r++) l.set(u, r, PAL.i);
+    flower(l, u, top, f.c);
+  });
+  return l.outline();
+}
+function flower(l, u, r, c) { return l.set(u, r, PAL.Y).set(u - 1, r, PAL[c]).set(u + 1, r, PAL[c]).set(u, r + 1, PAL[c]).set(u, r - 1, PAL[c]); }
+const BASKET = [".aaa.", "a...a", "AaAaA", "aAaAa", ".AaA."];
+
+const ANIMALS = {
+  boar: ["..b.b.b.b.....", ".bbbbbbbbb.B..", "bBaaaaaaaabBa..", ".aaaaaaaaaaaKaP", ".aaaaaaaaaaaNPP", "..AAAAAAAaaN...", "..bb..bb.bb...."],
+  wolf: ["..........t.t", ".........tTTt", "TT......tTTTKT", ".TTTTTTTTTTTTTt", "..TTTTTTTTTT...", "...NNNNNNNN....", "...t.t...t.t..."],
+};
+const ANIMAL_U = 6;
+const BLOOD = "#b8141e";
+const SWEEP = [[1, 1], [1, 1], [1, 0], [1, -1], [1, -1], [1, -1], [1, 0], [1, 0]];
+const CUT = [[1, 1], [1, 1], [1, 1], [1, 0], [1, 0], [1, 0]];
+
 function parts(m, t, key) {
-  const kind = PROFESSIONS[state.prof], out = { body: "HOP", under: [], back: [], front: [] };
-  const node = kind.node, find = FINDS[node];
+  const prof = profFor(m), out = { body: "HOP", back: [], front: [] };
   if (key === "1") {
-    out.front.push(layer().art(PICK, 3, 14));
-    return out;
-  }
-  if (key === "2" || key === "3") {
-    const n = t % SWING.length, f = SWING[n];
+    const kind = PROFESSIONS[prof], node = kind.node, f = SWING[t % SWING.length];
     out.body = f.body;
-    const NODE_U = 6;
-    if (key === "3") out.front.push(layer().art(NODES[node], NODE_U + 1, 3).outline());
+    out.front.push(layer().art(NODES[node], 7, 3).outline());
     out.front.push(tool(kind.tool, f.hand, f.dir));
-    if (f.hit != null) out.front.push(chips(layer(), key === "3" ? [12, 6] : [14, 3], f.hit, kind));
-    if (key === "3") {
-      const p = t % (SWING.length * 4) - 4;
-      if (p >= 0 && p < 9) {
-        const l = layer();
-        if (p < 6) l.art(find, ...arc(p, [10, 7], [9, 19], 3, 6)).outline();
-        else twinkle(l, 10, 20, p);
-        out.front.push(l);
-      }
-    }
+    if (f.hit != null) out.front.push(chips(layer(), [12, 6], f.hit, kind));
+    const p = t % (SWING.length * 4) - 4;
+    if (p >= 0 && p < 9) out.front.push(p < 6 ? layer().art(FINDS[node], ...arc(p, [10, 7], [9, 19], 3, 6)).outline() : twinkle(layer(), 10, 20, p));
     return out;
   }
-  if (key === "4") {
-    const n = t % TAP.length, f = TAP[n];
-    out.body = "CROUCH";
-    const pulled = kind.byHand && f.hit != null ? 1 : 0;
-    out.back.push(layer().art(SACK, -5, 3).outline());
-    out.front.push(layer().art(NODES[node], 9, 3 + pulled).outline());
-    if (!kind.byHand) out.front.push(tool(kind.tool, f.hand, f.dir, true));
-    if (f.hit != null) out.front.push(chips(layer(), [13, 5], f.hit, kind));
-    const p = t % (TAP.length * 3) - 3;
-    if (p >= 0 && p < 9) {
-      const l = layer().art(find, ...arc(p, [12, 8], [-4, 6], 12, 9)).outline();
+  const set = VARIANTS.find((v) => v.key === key).set;
+  if (prof === "mining") {
+    const f = SWING[t % SWING.length];
+    out.body = f.body;
+    out.front.push(layer().art(NODES.ore, 7, 3).outline());
+    out.front.push(pickArt(set.pick, f.hand, f.dir));
+    if (f.hit != null) out.front.push(chips(layer(), [12, 6], f.hit, PROFESSIONS.mining));
+    const p = t % (SWING.length * 4) - 4;
+    if (p >= 0 && p < 9) out.front.push(p < 6 ? layer().art(FINDS.ore, ...arc(p, [10, 7], [9, 19], 3, 6)).outline() : twinkle(layer(), 10, 20, p));
+    return out;
+  }
+  if (prof === "herbalism") return herb(set.herb, t, out);
+  return skin(set, t, out);
+}
+
+function herb(kind, t, out) {
+  if (kind === "raise") {
+    const p = t % 20;
+    out.body = p >= 5 && p <= 12 ? "HOP" : "SIT";
+    const first = p < 4 ? "full" : p === 4 ? "lift" : p < 16 ? "gone" : p < 18 ? "bud" : "full";
+    out.front.push(patch(PATCH_U, 3, [first]));
+    if (p >= 5 && p <= 12) {
+      const l = layer().set(9, 15, PAL.i).set(9, 16, PAL.i);
+      flower(l, 9, 18, FLOWERS[0].c).outline();
       out.front.push(l);
+      if (p >= 8 && p <= 10) out.front.push(twinkle(layer(), 12, 19, p));
     }
     return out;
   }
-  const lift = Math.floor(t / 4) % 2;
-  out.body = "HOP";
-  out.lift = lift;
-  if (state.prof === "any" || kind.tool === "pick") out.front.push(layer().art(PICK, 3, 14 + lift));
-  else out.front.push(tool(kind.tool, [9, 14 + lift], [0, 1]));
-  const p = t % 24;
-  if (p < 10) {
-    const l = layer();
-    if (p < 7) l.art(find, 5, 25 + Math.floor(p / 2)).outline();
-    else twinkle(l, 6, 29, p);
-    out.front.push(l);
+  out.body = "CROUCH";
+  const per = kind === "basket" ? 10 : 8, cycle = per * 3 + 6, p = t % cycle;
+  const k = Math.min(3, Math.floor(p / per)), q = p % per, done = p >= per * 3;
+  const looks = FLOWERS.map((_, i) => done ? (p - per * 3 < 3 ? "gone" : "bud") : i < k ? "gone" : i > k ? "full" : q < 4 ? "full" : q === 4 ? "lift" : "gone");
+  out.front.push(patch(PATCH_U, 3, looks));
+  const held = done ? 3 : k + (q >= 5 ? 1 : 0);
+  if (kind === "basket") {
+    const landed = done ? 3 : k + (q >= 9 ? 1 : 0);
+    const l = layer().art(BASKET, -6, 3).outline();
+    for (let i = 0; i < landed; i++) l.set(-5 + i, 6, PAL[FLOWERS[i].c]);
+    out.back.push(l);
+    if (!done && q >= 5 && q < 9) {
+      const f = layer();
+      flower(f, ...arc(q - 5, [PATCH_U + FLOWERS[k].u, 7], [-4, 8], 7, 4), FLOWERS[k].c).outline();
+      out.front.push(f);
+    }
+    return out;
   }
+  if (held > 0) {
+    const l = layer().set(9, 5, PAL.i).set(10, 6, PAL.i).set(10, 7, PAL.i);
+    if (held > 1) l.set(11, 7, PAL.i);
+    if (held > 2) l.set(9, 7, PAL.i);
+    [[10, 9], [12, 8], [8, 8]].slice(0, held).forEach(([u, r], i) => flower(l, u, r, FLOWERS[i].c));
+    out.front.push(l.outline());
+  }
+  if (done && p - per * 3 < 3) out.front.push(twinkle(layer(), 12, 10, p));
+  return out;
+}
+
+function skin(set, t, out) {
+  out.body = set.skinBody;
+  const standing = set.skinBody === "SIT", frames = standing ? SWEEP : CUT, n = t % frames.length;
+  const hand = standing ? [9, 6] : [9, 4], dir = frames[n], hit = standing ? n - 3 : n - 3;
+  const body = layer().art(ANIMALS[set.animal], ANIMAL_U, 3).outline();
+  body.set(ANIMAL_U + 7, 2, BLOOD).set(ANIMAL_U + 8, 2, BLOOD);
+  out.back.push(body);
+  if (set.flap) {
+    const len = Math.floor(t / frames.length) % 4;
+    if (len > 0) {
+      const f = layer();
+      const top = 3 + ANIMALS[set.animal].length;
+      for (let i = 0; i < len; i++) f.set(ANIMAL_U + 5 + i, top + (i === len - 1 ? 1 : 0), PAL.e);
+      out.front.push(f.outline());
+    }
+  }
+  out.front.push(tool("knife", hand, dir, true));
+  const tip = [hand[0] + dir[0] * 4, hand[1] + dir[1] * 4];
+  if (hit === 0) out.front.push(layer().set(tip[0] + 1, tip[1] + 1, BLOOD));
+  if (hit === 1) out.front.push(layer().set(tip[0] + 1, tip[1], BLOOD));
+  if (hit === 2) out.front.push(layer().set(tip[0] + 2, tip[1] - 1, BLOOD));
   return out;
 }
 
@@ -395,7 +494,7 @@ function render(id, phase) {
     const s = stats[m.id], h = hits[m.id] || {};
     const toward = Math.max(0, s.max - 11), away = Math.max(0, -s.min);
     const over = Object.entries(h).map(([o, n]) => `${name(o)} ${n}px`);
-    lines.push(`<b>${m.name}</b> (${m.x < 0 ? "left" : "right"} side): reaches ${toward} toward the fire, ${away} away, up to row ${s.top} · ` +
+    lines.push(`<b>${m.name}</b> ${profFor(m)} (${m.x < 0 ? "left" : "right"} side): reaches ${toward} toward the fire, ${away} away, up to row ${s.top} · ` +
       (over.length ? `<span class="warn">draws over ${over.join(", ")}</span>` : `<span class="ok">draws over nothing</span>`));
   }
   document.getElementById(id + "-out").innerHTML = lines.join("<br>");
@@ -415,8 +514,8 @@ function buildToggles() {
     }
     host.append(g);
   };
-  group("Gathering", "who", [["you", "You"], ["kesh", "Kesh"], ["both", "Both sides"], ["neighbours", "Neighbours"]]);
-  group("Profession", "prof", [["any", "Any"], ["mining", "Mining"], ["herbalism", "Herbalism"], ["skinning", "Skinning"]]);
+  group("Gathering", "who", [["all", "Three"], ["you", "You"], ["kesh", "Kesh"], ["both", "Both sides"], ["neighbours", "Neighbours"]]);
+  group("Profession", "prof", [["mixed", "Mixed"], ["mining", "Mining"], ["herbalism", "Herbalism"], ["skinning", "Skinning"]]);
   group("Season", "season", [["none", "None"], ["winter", "Winter"]]);
   group("World", "world", [["forest", "Forest"], ["meadow", "Meadow"], ["snow", "Snow"]]);
   group("Zoom", "zoom", [[2, "2x"], [3, "3x"], [5, "5x"]]);
