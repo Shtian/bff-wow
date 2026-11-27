@@ -62,9 +62,59 @@ const MOON = ["..MMMM", ".MMM..", "MMM...", "MMM...", "MMM...", ".MMM..", "..MMM
 const MOON_PAL = { M: "#d8d4c4" };
 const STAR_TONES = { dim: "#4a4c6e", mid: "#7d7f9e" };
 // The Pocket Camp's poses and one-off animations (docs/design/pocket-camp.md).
-// A fishing rod held out from a seated figure's hand, its line and bobber
-// hanging from the tip; drawn mirrored on the fire's right.
-const ROD = [".....B.", "....B.Z", "....B.Z", "...B..Z", "...B..Z", "..B...Z", "..B...Z", ".B....Z", ".B....R", "B......"];
+// Fishing (chosen in round 3 of prototypes/camp-fishing.html, on the
+// prototype/fishing-visuals branch): a rod arcing out from a seated
+// figure's hand towards the fire, in runs of 2, 2, 1, 1 then flat with the
+// tip drooping a pixel, outlined so it reads on the ground behind it. Its
+// line hangs straight down from the tip (FISH_LINE_X, in the figure's
+// columns, with CampScene placing the rod at 7) to a bobber in a pond on
+// the ground rows under the seat, with rings round the bobber. All of it
+// is drawn mirrored on the fire's right. The line's two frames bob the
+// bobber; a fish leaps along a path CampScene holds and lands in a splash.
+// CampSheet.fishing carries the pond's and line's geometry.
+const ROD = outlined(["....AA.", "...A..N", "..A....", "..A....", ".A.....", ".A.....", "a......"]);
+const FISH_LINE_X = 14;
+const FISH_LINE = [
+  ["Z", "Z", "Z", "Z", "Z", "Z", "Z", "N", "R", "."],
+  ["Z", "Z", "Z", "Z", "Z", "Z", "Z", "Z", "N", "R"],
+];
+const LEAP_FISH = outlined([".F.", "FFf"]);
+const POND_PAL = { w: "#0e2238", d: "#1d4a7a", m: "#2f6fae", l: "#6fb3e6", g: "#d8f0ff" };
+const SPLASH = ["g.N.g", ".N.N."];
+// The pond's core is open water across the figure's columns 0 to 14; each
+// row reaches past it at both ends, its outermost columns in the listed end
+// tones (outermost first), so the whole pond is 21 columns from -3. Rows
+// top first: the lip, the middle (with the glints), the deep bottom. Two
+// neighbours' ponds would overlap, so CampScene cuts the ends that face
+// each other and joins the cores with POND_WATER, one column of the rows'
+// fills. A glint shows on the middle row for 5 ticks at a time, at columns
+// 0, 8, none, 4 and 12 in turn, as the prototype twinkled them.
+const POND_CORE = [0, 14];
+const POND_ROWS = [
+  { fill: "l", ends: ["w"] },
+  { fill: "m", ends: ["w", "d", "m"] },
+  { fill: "d", ends: ["w"] },
+];
+const POND_REACH = Math.max(...POND_ROWS.map((row) => row.ends.length));
+const POND_GLINTS = [0, 8, null, 4, 12];
+const POND_WATER = POND_ROWS.map((row) => row.fill);
+// The rings round the bobber on the pond's middle row: a step out, two
+// steps out, then none.
+const RIPPLES = [".g.g.", "l...l"];
+function pond(glint) {
+  const from = POND_CORE[0] - POND_REACH, to = POND_CORE[1] + POND_REACH;
+  return paint(POND_ROWS.map((row, i) => {
+    let line = "";
+    for (let u = from; u <= to; u++) {
+      const out = Math.max(POND_CORE[0] - u, u - POND_CORE[1], 0);
+      const end = out > 0 ? row.ends.length - out : -1;
+      if (out > row.ends.length) line += ".";
+      else if (end >= 0) line += row.ends[end];
+      else line += i === 1 && u === glint ? "g" : row.fill;
+    }
+    return line;
+  }), POND_PAL);
+}
 // A ding's gold star, a rare find's fish held up, and a death's smoke.
 const STAR = ["..G..", "GGYGG", ".GYG.", ".G.G.", "G...G"];
 const FISH = [".FFF...F", "FFKFFFFF", "FfffFFFF", ".fff...f"];
@@ -734,6 +784,11 @@ const SPRITES = [
     [petSprite(key, "Asleep"), paint(outlined(pet.asleep), { ...PAL, ...PET_PAL })],
   ]),
   ["lanternPost", paint(LANTERN_POST, { ...PAL, ...LANTERN_PALS.lanternGold })],
+  ...POND_GLINTS.map((glint, i) => [`pond${i + 1}`, pond(glint)]),
+  ["pondWater", paint(POND_WATER, POND_PAL)],
+  ...RIPPLES.map((ripple, i) => [`ripple${i + 1}`, paint([ripple], POND_PAL)]),
+  ["fishLine1", skin(FISH_LINE[0])], ["fishLine2", skin(FISH_LINE[1])],
+  ["leapFish", skin(LEAP_FISH)], ["splash", paint(SPLASH, { ...PAL, ...POND_PAL })],
 ];
 
 function hex(color) {
@@ -1316,6 +1371,14 @@ ${HATS.map((hat) => `    ${hat.key} = { sprite = "${hatSprite(hat.key)}", brow =
   },
   pets = {
 ${Object.keys(PETS).map((key) => `    ${key} = { awake = "${petSprite(key)}", idle = "${petSprite(key, "Idle")}", asleep = "${petSprite(key, "Asleep")}" },`).join("\n")}
+  },
+  fishing = {
+    core = { ${POND_CORE[0]}, ${POND_CORE[1]} },
+    reach = ${POND_REACH},
+    ponds = ${POND_GLINTS.length},
+    line = ${FISH_LINE_X},
+    ripple = { x = ${FISH_LINE_X - (RIPPLES[0].length - 1) / 2}, row = 1 },
+    ripples = ${RIPPLES.length},
   },
   winter = {
     bedSnow = ${BED_SNOW.x},

@@ -80,7 +80,7 @@ local POSE = {
   fighting = { standing = true, tool = { "blade", 6, 12 } },
   crafting = { standing = true, tool = { "hammer", 5, 11 }, front = { "anvil", 5, -1, true } },
   gathering = { standing = true, tool = { "pick", 3, 11 } },
-  fishing = { tool = { "rod", 10, 3, true } },
+  fishing = { tool = { "rod", 7, 0, true }, pond = true },
   vendor = { front = { "bag", 7, -2, true } },
   auction = { front = { "coins", 8, -2, true } },
   resting = { back = { "innSign", -1, -1, true } },
@@ -94,6 +94,11 @@ local STAR = { x = 3, rise = 3 }
 local QUEST = { x = 3 }
 local HI = { x = 1, row = 1 }
 local FISH = { x = 2 }
+local FISHING = {
+  pondTicks = 5, rippleTicks = 4, bobTicks = 9,
+  leap = { every = 84, seed = 7, splashTicks = 3, splash = { 2, 2 },
+    path = { { 13, 1 }, { 12, 4 }, { 11, 6 }, { 9, 7 }, { 8, 7 }, { 7, 7 }, { 6, 6 }, { 4, 4 }, { 3, 1 } } },
+}
 local SMOKE = { x = 2, row = -4, rise = 6 }
 local BURST = { x = 4, row = 5, reach = 9,
   ways = { { -1, 1 }, { 1, 1 }, { -1, 0 }, { 1, 0 }, { 0, 1 }, { -1, -1 }, { 1, -1 } } }
@@ -160,12 +165,13 @@ end
 
 CampScene.sprite = setSprite
 
-local function setSlice(t, name, unit, from, count, width)
+local function setSlice(t, name, unit, from, count, width, mirrored)
   local s = Sheet.sprites[name]
-  local key = ("%s %d %d"):format(name, from, count)
+  local key = ("%s %d %d%s"):format(name, from, count, mirrored and " mirrored" or "")
   if t.sprite ~= key then
-    t:SetTexCoord((s[1] + from) / Sheet.width, (s[1] + from + count) / Sheet.width,
-      s[2] / Sheet.height, (s[2] + s[4]) / Sheet.height)
+    local left, right = (s[1] + from) / Sheet.width, (s[1] + from + count) / Sheet.width
+    if mirrored then left, right = right, left end
+    t:SetTexCoord(left, right, s[2] / Sheet.height, (s[2] + s[4]) / Sheet.height)
     t.sprite = key
   end
   t:SetSize(math.max(width, 1) * unit, s[4] * unit)
@@ -499,17 +505,81 @@ local function partTop(part, row)
   return part and row + part[3] + Sheet.sprites[part[1]][4] or 0
 end
 
-local function posePart(scene, t, actor, part, row, name)
-  name = name or part[1]
-  local mirrored = part[4] and actor.x > 0 or false
+local function placeBeside(scene, t, actor, name, x, row, mirrored)
   setSprite(t, name, scene.unit, mirrored)
-  local x = part[2]
   if mirrored then x = LAYOUT.seated - x - Sheet.sprites[name][3] end
-  put(scene, t, actor.x + x, row + part[3])
+  put(scene, t, actor.x + x, row)
+end
+
+local function posePart(scene, t, actor, part, row, name)
+  placeBeside(scene, t, actor, name or part[1], part[2], row + part[3], part[4] and actor.x > 0 or false)
+end
+
+local function hideFishing(parts)
+  parts.pond:Hide()
+  parts.pondJoin:Hide()
+  parts.ripple:Hide()
+  parts.line:Hide()
+  parts.leap:Hide()
+end
+
+local function pondCore(actor)
+  local core = Sheet.fishing.core
+  if actor.x > 0 then
+    return actor.x + LAYOUT.seated - 1 - core[2], actor.x + LAYOUT.seated - 1 - core[1]
+  end
+  return actor.x + core[1], actor.x + core[2]
+end
+
+local function drawFishing(scene, parts, actor, f, row)
+  local mirrored = actor.x > 0
+  local fishing, leap = Sheet.fishing, FISHING.leap
+  local ripple = math.floor(f / FISHING.rippleTicks) % (fishing.ripples + 1) + 1
+  if ripple <= fishing.ripples then
+    placeBeside(scene, parts.ripple, actor, "ripple" .. ripple, fishing.ripple.x, fishing.ripple.row, mirrored)
+  else
+    parts.ripple:Hide()
+  end
+  local dipped = math.floor(f / FISHING.bobTicks) % 2 + 1
+  placeBeside(scene, parts.line, actor, "fishLine" .. dipped, fishing.line, row - ROW.seated, mirrored)
+  local leapTick = (f + actor.x * leap.seed) % leap.every
+  local at = leap.path[leapTick + 1]
+  if at then
+    placeBeside(scene, parts.leap, actor, "leapFish", at[1], at[2], mirrored)
+  elseif leapTick < #leap.path + leap.splashTicks then
+    placeBeside(scene, parts.leap, actor, "splash", leap.splash[1], leap.splash[2], mirrored)
+  else
+    parts.leap:Hide()
+  end
+  local from, to = pondCore(actor)
+  scene.ponds[#scene.ponds + 1] = { parts = parts, mirrored = mirrored, from = from, to = to }
+end
+
+local function drawPonds(scene, f)
+  local reach, unit = Sheet.fishing.reach, scene.unit
+  local frame = "pond" .. (math.floor(f / FISHING.pondTicks) % Sheet.fishing.ponds + 1)
+  table.sort(scene.ponds, function(a, b) return a.from < b.from end)
+  for i, pond in ipairs(scene.ponds) do
+    local before, after = scene.ponds[i - 1], scene.ponds[i + 1]
+    local joinsBefore = before ~= nil and before.to + 2 * reach >= pond.from
+    local joinsAfter = after ~= nil and pond.to + 2 * reach >= after.from
+    local left, right = pond.from - (joinsBefore and 0 or reach), pond.to + (joinsAfter and 0 or reach)
+    local first = pond.mirrored and pond.to + reach - right or left - (pond.from - reach)
+    setSlice(pond.parts.pond, frame, unit, first, right - left + 1, right - left + 1, pond.mirrored)
+    put(scene, pond.parts.pond, left, 0)
+    local gap = joinsAfter and after.from - pond.to - 1 or 0
+    if gap > 0 then
+      setSlice(pond.parts.pondJoin, "pondWater", unit, 0, 1, gap)
+      put(scene, pond.parts.pondJoin, pond.to + 1, 0)
+    else
+      pond.parts.pondJoin:Hide()
+    end
+  end
 end
 
 local function hideExtras(parts)
   parts.tool:Hide()
+  hideFishing(parts)
   parts.back:Hide()
   parts.front:Hide()
   parts.mark:Hide()
@@ -773,6 +843,7 @@ local function drawActor(scene, parts, actor, f)
     top = row + Sheet.sprites.seated[4]
     local markTop = top + (hatTop and HAT_MARK_LIFT or 0)
     if pose.tool then posePart(scene, parts.tool, actor, pose.tool, row) else parts.tool:Hide() end
+    if pose.pond then drawFishing(scene, parts, actor, f, row) else hideFishing(parts) end
     if pose.back then
       posePart(scene, parts.back, actor, pose.back, row)
     else
@@ -1465,8 +1536,10 @@ local function drawFrame(scene, f)
 
   scene.actorParts.used = 0
   scene.clearOf = {}
+  scene.ponds = {}
   scene.namesReach = 0
   for _, actor in ipairs(view.actors) do drawActor(scene, take(scene.actorParts), actor, f) end
+  drawPonds(scene, f)
   hideRest(scene.actorParts)
 
   scene.graveParts.used = 0
@@ -1578,6 +1651,11 @@ function CampScene.new(parent, options)
         },
         tool = texture(band.art, "ARTWORK", 3),
         front = texture(band.art, "ARTWORK", 4),
+        pond = texture(band.art, "ARTWORK", -2),
+        pondJoin = texture(band.art, "ARTWORK", -2),
+        ripple = texture(band.art, "ARTWORK", -1),
+        line = texture(band.art, "ARTWORK", 4),
+        leap = texture(band.art, "ARTWORK", 4),
         spark = texture(band.art, "OVERLAY", 0),
         mark = texture(band.art, "OVERLAY", 1),
         alt = texture(band.art, "OVERLAY", 1),

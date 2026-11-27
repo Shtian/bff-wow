@@ -117,7 +117,7 @@ A new Feed entry made while running fires the listener event `pocketCampAnimatio
 | ding | a small gold star rises over that Member's head (1.2 s) and stays there while the figure bounces, half a second up and half down |
 | max level | that Member bounces while bursts of sparks fly out, one every 1.8 s; the 24-hour spark stays |
 | death | that Member is a skeleton, with a puff of grey smoke and a flicker for the first 1.6 s |
-| rare find | that Member holds up a fish, bobbing (over the rod, if they're fishing) |
+| rare find | that Member holds up a fish, bobbing (the rod stays out, if they're fishing) |
 | goal (Crew-wide) | the fire flares, taller and purple; no `memberId` |
 | quest (not a Feed kind) | a gold question mark over that Member's head, bobbing |
 | arrive (not a Feed kind) | that Member walks in from the band's nearer edge to their place (2.5 s), then stands there waving with a "hi!" speech bubble over their head; 6 s in all |
@@ -191,12 +191,15 @@ All account-wide. With `camp` off the Pocket Camp never shows, whatever its own 
   | fighting | standing | `blade` in hand |
   | crafting | standing | `hammer` in hand, `anvil` at its feet |
   | gathering | standing | `pick` in hand |
-  | fishing | seated | `rod` out towards the fire |
+  | fishing | seated | `rod` arcing out towards the fire, its line (`fishLine1`, `fishLine2`) straight down from the tip to a bobber in a `pond` on the ground rows under the seat (below) |
   | vendor | seated | `bag` at its feet |
   | auction | seated | `coins` at its feet |
   | resting | seated | `innSign` behind, its board over the head |
   | afk | seated | `afk`, the word AFK in pixel letters, over its head, bobbing a row once a second; it's the head mark's last case, so a one-off mark takes its place while it plays |
   | flying | seated, raised 9 rows | `griffin` under it, `griffinWing` over its legs, lifting to `griffinWingUp` for 3 ticks in 9 |
+
+  - **Fishing's pond.** Chosen in a prototype (`prototypes/camp-fishing.html` on the `prototype/fishing-visuals` branch) because the old rod, dark brown with no outline, a 1-pixel line and bobber, and its line landing on the logs, was hard to see. `drawFishing` in `UI/CampScene.lua` draws the rod's line, the rings and the leap, by `FISHING`'s ticks and `CampSheet.fishing`'s geometry (from `scripts/camp-art.mjs`). The pond is open water across the figure's columns 0 to 14 and the ground's 3 rows, with ends reaching 3 columns further each side (21 in all), under the seat (ARTWORK -2), so it takes no width; next to the fire it runs in front of the logs. A glint twinkles on it, 5 ticks at a time. The bobber dips a row every 9 ticks, rings spread round it (two steps, 4 ticks each, then a rest), and the line moves with the figure when it hops. Every 84 ticks (14 s), offset by the figure's place, a fish (`leapFish`) leaps from the bobber in an arc over the figure's lap and lands in a `splash`.
+  - **Neighbours' ponds join.** `drawPonds` draws the ponds after every figure, left to right: where two would overlap (Members fishing on seats side by side), it cuts the ends facing each other and fills the column between with `pondWater`, so they make one pond.
 
   A doorway (`view.doorways`) is drawn behind its figures from slices of `arch` (`archRaid` for a raid), so it can be as wide as Core says: the sprite's 4 columns at each edge, its middle 8 (the keystone, or the skull) at the doorway's centre, and the column next to each rim stretched over the rest (`drawDoorway`, `DOORWAY` in `UI/CampScene.lua`). One figure's doorway is the sprite as drawn.
 
@@ -233,7 +236,7 @@ None of the rendering has run in a client, and the new sprites were authored as 
 - It's readable over bright and dark scenes at 0%, 60% and 100% opacity, and the backdrop's dithered rim looks right at size.
 - Dragging, the lock, and the position after `/reload` and on another Character.
 - A click in and out of combat; In combat on Stay, Fade and Hide. Faded: that the whole frame fades (backdrop, figures, sprites, "+N", grip), at 0 too, that it comes back to full when combat ends, that the tooltip still shows, and that Fade to shows on the Settings page only while Fade is picked.
-- Each pose and animation reads at size: the rod towards the fire on both sides, the star, fish, smoke, skeleton, bursts and flare, and that 10 s feels right for each.
+- Each pose and animation reads at size: the rod, line and pond towards the fire on both sides (next to the logs, under a neighbour's seat, under a pet), the leaping fish, the star, fish, smoke, skeleton, bursts and flare, and that 10 s feels right for each.
 - The Doing poses on both sides of the fire: the AFK text, the torch and doorway (and the raid's), blade, hammer and anvil, pick, bag, coins, inn sign and the griffin with its wing flapping, and the quest mark.
 - That the events and reads behind Doing behave on Forever: `MERCHANT_SHOW`/`MERCHANT_CLOSED`, `AUCTION_HOUSE_SHOW`/`AUCTION_HOUSE_CLOSED`, `QUEST_TURNED_IN`, `IsResting()`, `UnitIsAFK("player")`, `UnitOnTaxi("player")` and whether `IsFlying` exists, and that none of them reads secret in the open world.
 - Each shapeshift form at size on both sides of the fire: the trot staying clear of its neighbours at the end seats, the bear's swipe and claws, Ghost Wolf's see-through look and glow over bright and dark scenes, both cats, and the puffs.
