@@ -33,16 +33,22 @@ end
 
 local REPAIRED_BY = { serverId = "server ID", name = "name" }
 
-local function traceRepair(self)
+local function traceOpening(self)
+  if not self.trace or self.openingTraced then return end
+  self.openingTraced = true
   local repair = self.rulesetRepair
-  if not (self.trace and repair) or self.repairTraced then return end
-  self.repairTraced = true
-  self.trace(("ruleset %s moved to %s (by %s)"):format(repair.from, repair.to, REPAIRED_BY[repair.by]))
+  if repair then
+    self.trace(("ruleset %s moved to %s (by %s)"):format(repair.from, repair.to, REPAIRED_BY[repair.by]))
+  end
+  if self.rulesetClaimed then
+    self.trace(("ruleset %s took the Crew saved before Rulesets%s"):format(self.rulesetKey,
+      self.db.provisional and " (provisional)" or ""))
+  end
 end
 
 function Core:setTrace(trace)
   self.trace = type(trace) == "function" and trace or nil
-  traceRepair(self)
+  traceOpening(self)
 end
 
 local function traceName(self, id, displayName)
@@ -292,9 +298,14 @@ function Core.new(deps)
   }, Core)
   self.sessionStart = deps.now()
   self.where = ns.Where.new(deps.now, self.locate)
-  local opened = ns.Slots.open(deps.db, ns.Slots.facts(deps.ruleset), deps.random)
+  local facts = ns.Slots.facts(deps.ruleset)
+  local opened = ns.Slots.open(deps.db, facts, deps.random, deps.now())
   self.rulesetKey, self.rulesetEntry, self.rulesetRepair = opened.key, opened.entry, opened.repaired
+  self.rulesetClaimed = opened.claimed
   bindSlot(self, opened.slot, self.initialLogin)
+  if opened.claimed and facts.serverId then
+    self.ledger:keepCharacters(ns.Slots.belongsHere(self.db, facts.serverId))
+  end
   self.whatsNewState = ns.WhatsNew.new(self.account, deps.version, deps.changelog, fresh)
   self.generationFrom = "saved"
   self:raiseGeneration(true)
@@ -415,8 +426,19 @@ local function sendOwnNow(self)
   self.gossip:ownChanged("now")
 end
 
+local function leaveOtherSlots(self, guid)
+  if self.leftOtherSlotsAs == guid then return end
+  self.leftOtherSlotsAs = guid
+  for _, slot in ipairs(ns.Slots.others(self.account, self.db)) do
+    if type(slot.memberId) == "string" then
+      ns.Ledger.new(slot, self.now, self.random):keepCharacters(function(other) return other ~= guid end)
+    end
+  end
+end
+
 function Core:updateOwn(character)
   self.character = character
+  if type(character) == "table" then leaveOtherSlots(self, character.guid) end
   local versionChanged = self.whatsNewState.version ~= nil and self.ledger:writeOwn({ bff = self.whatsNewState.version })
   local changed, before = self.ledger:updateOwn(character)
   if versionChanged and not changed then self.gossip:ownChanged("later") end
@@ -1436,6 +1458,16 @@ function Core:ruleset()
   }
 end
 
+function Core:elsewhere()
+  return ns.Slots.elsewhere(self.account, self.rulesetKey)
+end
+
+local function confirmRuleset(self)
+  if not self.db.provisional then return end
+  self.db.provisional = nil
+  if self.trace then self.trace(("ruleset %s confirmed by a Member"):format(self.rulesetKey)) end
+end
+
 function Core:rulesetNamed(name)
   name = ns.Slots.facts({ name = name }).name
   local entry = self.rulesetEntry
@@ -1861,6 +1893,7 @@ function Core:received(message, from)
       if quest and self.feedState:isSettled() then self.pocket:animateMember("quest", decoded.from) end
     end
   elseif decoded.type == "DIGEST" and type(decoded.versions) == "table" then
+    confirmRuleset(self)
     local partial = decoded.partial == true
     if self.trace then
       self.trace(("receive DIGEST from %s · ok%s · %s"):format(traceName(self, decoded.from),
@@ -1868,6 +1901,7 @@ function Core:received(message, from)
     end
     self.gossip:digestReceived(decoded.versions, partial, decoded.turns == true, from)
   elseif decoded.type == "DATA" and type(decoded.records) == "table" then
+    confirmRuleset(self)
     changed = dataReceived(self, decoded.records, decoded.from, type(from) == "string")
   elseif self.trace then
     self.trace(("receive %s from %s · ignored (unknown)"):format(tostring(decoded.type), traceName(self, decoded.from)))

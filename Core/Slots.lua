@@ -101,6 +101,107 @@ local function note(entry, facts)
   end
 end
 
+local SLOT_KEYS = {
+  "crew", "channelMoves", "joinFailure",
+  "memberId", "records", "via", "removed", "heard",
+  "feed", "feedJoins", "goals",
+  "spareItems", "nextSpare", "spareNews", "spareWinners", "catchTypesTold",
+  "paused", "playTimes", "stray",
+}
+
+local function copied(value)
+  if type(value) ~= "table" then return value end
+  local result = {}
+  for k, v in pairs(value) do result[k] = copied(v) end
+  return result
+end
+
+local function migrate(db, random)
+  if db.migrated then return end
+  db.migrated = 1
+  if type(db.crew) ~= "table" then return end
+  local slot = {}
+  for _, key in ipairs(SLOT_KEYS) do slot[key] = copied(db[key]) end
+  local id = slot.memberId
+  if type(id) ~= "string" or db.crews[id] ~= nil then id = newSlotId(db.crews, random) end
+  db.crews[id] = slot
+end
+
+function Slots.serverIdOf(guid)
+  return type(guid) == "string" and guid:match("^Player%-([^%-]+)%-") or nil
+end
+
+local function tableOr(value)
+  return type(value) == "table" and value or {}
+end
+
+local function ownRecord(slot)
+  local record = tableOr(slot.records)[slot.memberId]
+  return type(record) == "table" and type(record.characters) == "table" and record or nil
+end
+
+local function othersServerIds(slot)
+  local ids = {}
+  for id, record in pairs(tableOr(slot.records)) do
+    if id ~= slot.memberId and type(record) == "table" then
+      for guid in pairs(tableOr(record.characters)) do
+        local serverId = Slots.serverIdOf(guid)
+        if serverId then ids[serverId] = true end
+      end
+    end
+  end
+  return ids
+end
+
+local function crewServerIds(slot, now)
+  local others = othersServerIds(slot)
+  if next(others) then return others end
+  local own = ownRecord(slot)
+  local main = own and ns.Roster.main(own, now)
+  local serverId = main and Slots.serverIdOf(main.guid)
+  return serverId and { [serverId] = true } or {}
+end
+
+function Slots.belongsHere(slot, serverId)
+  local others = othersServerIds(slot)
+  return function(guid)
+    local id = Slots.serverIdOf(guid)
+    return id == nil or id == serverId or others[id] == true
+  end
+end
+
+local function unclaimedIds(db)
+  local ids = {}
+  for _, id in ipairs(sortedKeys(db.crews)) do
+    local slot = db.crews[id]
+    if type(slot) == "table" and slot.ruleset == nil then ids[#ids + 1] = id end
+  end
+  return ids
+end
+
+local function claimable(slot, key, facts, now)
+  if facts.serverId then return crewServerIds(slot, now)[facts.serverId] == true, true end
+  return key == Slots.DEFAULT, false
+end
+
+local function claim(db, key, facts, now)
+  local entry = db.rulesets[key]
+  local active = db.crews[entry.active]
+  if type(active) == "table" and active.crew ~= nil then return false end
+  for _, id in ipairs(unclaimedIds(db)) do
+    local slot = db.crews[id]
+    local claims, provisional = claimable(slot, key, facts, now)
+    if claims then
+      if entry.active ~= nil then db.crews[entry.active] = nil end
+      entry.active = id
+      slot.ruleset = key
+      slot.provisional = provisional or nil
+      return true
+    end
+  end
+  return false
+end
+
 local function activeSlot(db, key, random)
   local entry = db.rulesets[key]
   local slot = db.crews[entry.active]
@@ -110,8 +211,9 @@ local function activeSlot(db, key, random)
   return slot
 end
 
-function Slots.open(db, facts, random)
+function Slots.open(db, facts, random, now)
   layout(db)
+  migrate(db, random)
   local key = Slots.key(facts)
   local repaired
   if type(db.rulesets[key]) ~= "table" then
@@ -125,7 +227,8 @@ function Slots.open(db, facts, random)
   end
   local entry = db.rulesets[key]
   note(entry, facts)
-  return { key = key, entry = entry, slot = activeSlot(db, key, random), repaired = repaired }
+  local claimed = claim(db, key, facts, now)
+  return { key = key, entry = entry, slot = activeSlot(db, key, random), repaired = repaired, claimed = claimed }
 end
 
 function Slots.left(db, key)
@@ -160,4 +263,52 @@ function Slots.find(db, facts)
   local entry = rulesets[Slots.key(Slots.facts(facts))]
   local crews = type(db.crews) == "table" and db.crews or {}
   return type(entry) == "table" and crews[entry.active] or nil
+end
+
+function Slots.others(db, slot)
+  local list = {}
+  for _, id in ipairs(sortedKeys(db.crews)) do
+    local other = db.crews[id]
+    if type(other) == "table" and other ~= slot then list[#list + 1] = other end
+  end
+  return list
+end
+
+local function baseOf(key, entry)
+  local faction = entry.faction
+  if not faction then return key end
+  local suffix = ":" .. faction
+  return key:sub(-#suffix) == suffix and key:sub(1, -#suffix - 1) or key
+end
+
+local function latestName(slot)
+  local own = ownRecord(slot)
+  local latest
+  for _, character in pairs(own and own.characters or {}) do
+    if type(character.lastPlayed) == "number" and (not latest or character.lastPlayed > latest.lastPlayed) then
+      latest = character
+    end
+  end
+  return latest and latest.name
+end
+
+function Slots.elsewhere(db, key)
+  local current = db.rulesets[key]
+  local base = baseOf(key, current)
+  local crews, offer = {}, nil
+  for _, other in ipairs(sortedKeys(db.rulesets)) do
+    local entry = db.rulesets[other]
+    local slot = other ~= key and type(entry) == "table" and db.crews[entry.active]
+    if type(slot) == "table" and slot.crew ~= nil then
+      crews[#crews + 1] = { key = other, name = entry.name, faction = entry.faction, character = latestName(slot) }
+      if slot.provisional and entry.faction ~= current.faction and baseOf(other, entry) == base then
+        offer = offer or { key = other, name = entry.name, faction = entry.faction }
+      end
+    end
+  end
+  local unclaimed = false
+  for _, id in ipairs(unclaimedIds(db)) do
+    if db.crews[id].crew ~= nil then unclaimed = true end
+  end
+  return { crews = crews, offer = offer, unclaimed = unclaimed or nil }
 end
