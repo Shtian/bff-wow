@@ -184,6 +184,7 @@ local function start(isInitialLogin)
     ("-- earlier sessions above · this one began %s --"):format(date("%Y-%m-%d %H:%M:%S")))
   ns.core = ns.Core.new({
     db = BFF_DB,
+    ruleset = ns.Ruleset.read(),
     now = GetServerTime,
     random = math.random,
     link = ns.ChannelLink,
@@ -231,6 +232,8 @@ eventFrame:RegisterEvent("LOOT_CLOSED")
 local lootRead = false
 eventFrame:RegisterEvent("UI_SCALE_CHANGED")
 eventFrame:RegisterEvent("DISPLAY_SIZE_CHANGED")
+-- WoW: Battle.net info, the rich presence among it, may not be ready at login.
+eventFrame:RegisterEvent("BN_INFO_CHANGED")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_ENTERING_WORLD" and not ns.core then
     start((...))
@@ -253,6 +256,8 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     end
   elseif event == "LOOT_CLOSED" then
     lootRead = false
+  elseif event == "BN_INFO_CHANGED" then
+    if ns.core then ns.core:rulesetNamed(ns.Ruleset.name()) end
   elseif event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
     if ns.core then
       ns.Panel.refresh()

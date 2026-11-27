@@ -52,6 +52,7 @@ Link/Presence.lua
 Link/Framing.lua
 
 Game/Snapshot.lua
+Game/Ruleset.lua
 Game/Bags.lua
 Game/Actions.lua
 Game/SyncLog.lua
