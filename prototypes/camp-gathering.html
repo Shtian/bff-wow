@@ -9,6 +9,8 @@
     1  Round 1 node: the crooked pick, a sickle at a herb, a knife at a flat hide.
     A  An even arch of a pick; bends, plucks a flower and holds it up; a boar, cut standing.
     B  A straight pick with pale points; kneels and picks flowers into a basket; a wolf, cut kneeling.
+  Round 3: B was liked; the wolf should look more dead. The Wolf toggle: X eyes and a tongue out (default),
+  belly up with its legs stiff in the air (also X eyes and tongue, 20 columns long), or round 2's.
     C  A one-sided miner's pick; kneels and gathers a bouquet in the hand; the boar, its hide peeling back.
   The picks are drawn by hand at each angle (round 1 rotated one shape, which bent the diagonals). The animal
   lies behind the figure's legs, its head toward the fire, so it reaches about 7 past the figure (the anvil
@@ -152,10 +154,10 @@ const VARIANTS = [
     note: "Pick: a miner's pick, a curved point on one side and a flat hammer face on the other. Herbs: kneels and gathers a small bouquet in the hand, 1, 2, then 3 flowers, which twinkles before the patch grows back. Skinning: the boar, kneeling, the hide peeling back a little more with each cut, with drops and a stain." },
 ];
 const params = new URLSearchParams(location.search);
-let variant = Math.max(0, VARIANTS.findIndex((v) => v.key === (params.get("variant") || "A")));
+let variant = Math.max(0, VARIANTS.findIndex((v) => v.key === (params.get("variant") || "B")));
 const state = {
   who: params.get("who") || "all", prof: params.get("prof") || "mixed", season: params.get("season") || "none",
-  world: params.get("world") || "forest", opacity: +(params.get("opacity") || 60), zoom: +(params.get("zoom") || 3),
+  wolf: params.get("wolf") || "wolfX", world: params.get("world") || "forest", opacity: +(params.get("opacity") || 60), zoom: +(params.get("zoom") || 3),
 };
 let tick = 0, paused = false;
 const GATHERERS = { you: ["you"], kesh: ["kesh"], both: ["you", "kesh"], neighbours: ["odo", "kesh"], all: ["mira", "you", "kesh"] };
@@ -284,6 +286,8 @@ const BASKET = [".aaa.", "a...a", "AaAaA", "aAaAa", ".AaA."];
 
 const ANIMALS = {
   boar: ["..b.b.b.b.....", ".bbbbbbbbb.B..", "bBaaaaaaaabBa..", ".aaaaaaaaaaaKaP", ".aaaaaaaaaaaNPP", "..AAAAAAAaaN...", "..bb..bb.bb...."],
+  wolfX: ["..........t...t.", "..........TT.TT.", "TT.......TTTTTTT", ".TTTTTTTTTKTKTTTt", "..TTTTTTTTTKTTTP.", "...NNNNNNNKTKT.P.", "...t.t...t.t....."],
+  wolfUp: ["t...t.....t...t...", ".T.T.......T.T....", "..T.........T..t..t", ".NNNNNNNNNNNN.TT.TT", "TTTTTTTTTTTTTTTTTTT", ".TTTTTTTTTTTTTKTKTTt", "..TTTTTTTTTTTTTKTTP.", "...TTTTTTTTTTTKTKTP."],
   wolf: ["..........t.t", ".........tTTt", "TT......tTTTKT", ".TTTTTTTTTTTTTt", "..TTTTTTTTTT...", "...NNNNNNNN....", "...t.t...t.t..."],
 };
 const ANIMAL_U = 6;
@@ -363,16 +367,17 @@ function herb(kind, t, out) {
 
 function skin(set, t, out) {
   out.body = set.skinBody;
+  const animal = set.animal === "wolf" ? state.wolf : set.animal;
   const standing = set.skinBody === "SIT", frames = standing ? SWEEP : CUT, n = t % frames.length;
   const hand = standing ? [9, 6] : [9, 4], dir = frames[n], hit = standing ? n - 3 : n - 3;
-  const body = layer().art(ANIMALS[set.animal], ANIMAL_U, 3).outline();
+  const body = layer().art(ANIMALS[animal], ANIMAL_U, 3).outline();
   body.set(ANIMAL_U + 7, 2, BLOOD).set(ANIMAL_U + 8, 2, BLOOD);
   out.back.push(body);
   if (set.flap) {
     const len = Math.floor(t / frames.length) % 4;
     if (len > 0) {
       const f = layer();
-      const top = 3 + ANIMALS[set.animal].length;
+      const top = 3 + ANIMALS[animal].length;
       for (let i = 0; i < len; i++) f.set(ANIMAL_U + 5 + i, top + (i === len - 1 ? 1 : 0), PAL.e);
       out.front.push(f.outline());
     }
@@ -516,6 +521,7 @@ function buildToggles() {
   };
   group("Gathering", "who", [["all", "Three"], ["you", "You"], ["kesh", "Kesh"], ["both", "Both sides"], ["neighbours", "Neighbours"]]);
   group("Profession", "prof", [["mixed", "Mixed"], ["mining", "Mining"], ["herbalism", "Herbalism"], ["skinning", "Skinning"]]);
+  group("Wolf (B)", "wolf", [["wolfX", "X eyes"], ["wolfUp", "Legs up"], ["wolf", "Round 2"]]);
   group("Season", "season", [["none", "None"], ["winter", "Winter"]]);
   group("World", "world", [["forest", "Forest"], ["meadow", "Meadow"], ["snow", "Snow"]]);
   group("Zoom", "zoom", [[2, "2x"], [3, "3x"], [5, "5x"]]);
@@ -526,7 +532,7 @@ function buildToggles() {
   g.append(r, val); host.append(g);
 }
 function sync() {
-  const p = new URLSearchParams({ variant: VARIANTS[variant].key, who: state.who, prof: state.prof, season: state.season, world: state.world, opacity: state.opacity, zoom: state.zoom });
+  const p = new URLSearchParams({ variant: VARIANTS[variant].key, who: state.who, prof: state.prof, wolf: state.wolf, season: state.season, world: state.world, opacity: state.opacity, zoom: state.zoom });
   history.replaceState(null, "", "?" + p);
   const v = VARIANTS[variant];
   document.getElementById("label").textContent = `${v.key} (${v.name})`;
