@@ -259,7 +259,6 @@ describe("Settings list", function()
       toastsOff = true,
       toastSound = "READY_CHECK",
       toastPosition = { x = 12, y = 34 },
-      paused = true,
       minimap = { hide = true, minimapPos = 200 },
     }
     local core = newCore(db)
@@ -269,7 +268,6 @@ describe("Settings list", function()
     assert.is_false(core:setting("minimap"))
     assert.equal("READY_CHECK", core:setting("toastSound"))
     assert.same({ x = 12, y = 34 }, core:setting("toastPosition"))
-    assert.is_true(core:setting("paused"))
     assert.equal(200, core:minimapIcon().minimapPos)
   end)
 

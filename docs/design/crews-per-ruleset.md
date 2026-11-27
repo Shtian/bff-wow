@@ -20,14 +20,17 @@ BFF_DB = {
     },
   },
   rulesets = {
-    ["mode:15:Alliance"] = { active = slotId, left = slotId | nil, recordId = 15, name = "Normal", serverIds = { "6939" } },
+    ["mode:15:Alliance"] = {
+      active = slotId, left = slotId | nil,
+      recordId = 15, faction = "Alliance", name = "Normal", serverIds = { "6939" },
+    },
   },
   migrated = 1,
   -- the old top-level Crew keys, left as they were until a later release deletes them
 }
 ```
 
-A slot id is 8 characters from `[a-z0-9]`, like a Member id. A ruleset entry's `active` slot is what Core runs on. The entry is made empty (no `crew`) on the first login with that key.
+A slot id is 8 characters from `[a-z0-9]`: a new slot's id is its new Member id. That keeps the number of `random()` calls per new Crew what it was, so FakeNet's seeded clients behave as before. A repair only moves an entry with the same faction, since both factions of a ruleset share its server IDs and name. A ruleset entry's `active` slot is what Core runs on. The entry is made empty (no `crew`) on the first login with that key.
 
 ## Pieces
 

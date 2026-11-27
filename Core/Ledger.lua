@@ -31,7 +31,7 @@ local function same(field, a, b)
   return a == b
 end
 
-local function newMemberId(random)
+function Ledger.newMemberId(random)
   local chars = {}
   for i = 1, ID_LENGTH do
     local n = math.floor(random() * #ID_ALPHABET) + 1
@@ -41,7 +41,7 @@ local function newMemberId(random)
 end
 
 function Ledger.new(db, now, random, initialLogin)
-  db.memberId = db.memberId or newMemberId(random)
+  db.memberId = db.memberId or Ledger.newMemberId(random)
   db.records = db.records or {}
   db.via = db.via or {}
   db.removed = db.removed or {}

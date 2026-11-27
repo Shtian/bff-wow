@@ -127,7 +127,7 @@ describe("Crew goals", function()
     local net, clients = crew({ "Ann", "Bob" }, { Ann = { level = 30 }, Bob = { level = 21 } })
     local a, b = clients[1], clients[2]
     b:logout()
-    b.db.goals = nil
+    b:slot().goals = nil
     a:play({ level = 31, deaths = 26 })
     net:run(5)
     b.events = {}

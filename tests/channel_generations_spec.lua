@@ -201,7 +201,7 @@ describe("Channel generations", function()
     local db = {}
     local core = ns.Core.new(newDeps(db))
     core:startCrew("Stian")
-    db.records.ann = record("ann", 2000, { generation = 3 })
+    core.db.records.ann = record("ann", 2000, { generation = 3 })
 
     local deps = newDeps(db)
     local again = ns.Core.new(deps)
@@ -225,7 +225,7 @@ describe("Channel generations", function()
     local db = {}
     local first = ns.Core.new(newDeps(db))
     first:startCrew("Stian")
-    db.records.ann = record("ann", 2000, { generation = 4, left = true })
+    first.db.records.ann = record("ann", 2000, { generation = 4, left = true })
     assert.equal(0, ns.Core.new(newDeps(db)):crew().generation)
   end)
 

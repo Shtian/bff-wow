@@ -1242,7 +1242,7 @@ SlashCmdList.BFFDEV = function(input)
   if command == "unveil" then
     local days = tonumber(count) or 7
     ns.Panel.hide()
-    BFF_DB.goals.seen = GetServerTime() - days * 24 * 60 * 60
+    ns.core.db.goals.seen = GetServerTime() - days * 24 * 60 * 60
     ns.Panel.show("trophies")
     print(("BFF dev: Trophies tab opened as if last looked at %d days ago."):format(days))
     return
