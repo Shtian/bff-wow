@@ -54,7 +54,8 @@ local SEPARATE = "BFF keeps a separate Crew for each Ruleset and faction."
 local ASK = SEPARATE .. " It can't tell which one your Crew from before belongs to. Is this where your Crew is?"
 
 local function hint(where)
-  return ("%s Yours is on %s: log in a Character there to see it."):format(SEPARATE, where)
+  return ("%s Yours is on %s: log in a Character there to see it, or start a new Crew on this Ruleset, or join one.")
+    :format(SEPARATE, where)
 end
 local DAY = 24 * 60 * 60
 
@@ -131,7 +132,8 @@ describe("A Crew saved before Rulesets", function()
       on(ann, OUTLAND_HORDE, character("6939", "Hordeann"))
       assert.same({
         hint = "BFF keeps a separate Crew for each realm and faction. "
-          .. "Yours is on Outland (Alliance): log in a Character there to see it.",
+          .. "Yours is on Outland (Alliance): log in a Character there to see it, "
+          .. "or start a new Crew on this realm, or join one.",
         offer = "Your Crew on Outland (Alliance) hasn't heard from anyone yet. "
           .. "If your friends play this faction, bring it here.",
       }, ann.core:elsewhere())
@@ -273,7 +275,8 @@ describe("A Crew saved before Rulesets", function()
       on(ann, PVP, character("6856", "Pvpann"))
       assert(ann.core:startCrew("Ann"))
       on(ann, RP, character("6944", "Rpann"))
-      assert.equal(SEPARATE .. " Yours are on PvP (Alliance) and Normal (Alliance): log in a Character there to see them.", ann.core:elsewhere().hint)
+      assert.equal(SEPARATE .. " Yours are on PvP (Alliance) and Normal (Alliance): log in a Character there to see them,"
+        .. " or start a new Crew on this Ruleset, or join one.", ann.core:elsewhere().hint)
     end)
 
     it("says nothing when you have no Crew anywhere else", function()

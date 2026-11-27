@@ -1485,9 +1485,10 @@ local function hintFor(crews, world)
   if #crews == 0 then return nil end
   local places = {}
   for i, crew in ipairs(crews) do places[i] = placeOf(crew, world) end
-  local where = #crews == 1 and "Yours is on %s: log in a Character there to see it."
-    or "Yours are on %s: log in a Character there to see them."
-  return SEPARATE:format(world) .. " " .. where:format(ns.Text.list(places))
+  local where = #crews == 1 and "Yours is on %s: log in a Character there to see it,"
+    or "Yours are on %s: log in a Character there to see them,"
+  return ("%s %s or start a new Crew on this %s, or join one."):format(
+    SEPARATE:format(world), where:format(ns.Text.list(places)), world)
 end
 
 function Core:elsewhere()

@@ -221,7 +221,7 @@ local function start(isInitialLogin)
     if question then
       say(question .. " Type /bff to answer.")
     elseif card.hint then
-      say(card.hint .. " Type /bff to start or join another one here.")
+      say(card.hint .. " Type /bff to open BFF.")
     else
       say("type /bff to start or join a Crew.")
     end
