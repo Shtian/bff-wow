@@ -163,6 +163,7 @@ function FakeNet:add(name, options)
     location = copy(options.location),
     bags = copy(options.bags) or {},
     gossip = options.gossip,
+    Core = options.Core,
     version = options.version,
     changelog = options.changelog,
     ruleset = copy(options.ruleset),
@@ -199,7 +200,7 @@ end
 local function newCore(client, initialLogin)
   local net = client.net
   client.framing = newFraming(client)
-  client.core = ns.Core.new({
+  client.core = (client.Core or ns.Core).new({
     db = client.db,
     now = function() return net.clock end,
     random = client.random,

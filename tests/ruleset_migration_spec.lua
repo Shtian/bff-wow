@@ -1,4 +1,5 @@
 local load = require("tests.load")
+local beforeRulesets = require("tests.before_rulesets")
 
 local NORMAL = { realmName = "", recordId = 15, faction = "Alliance", serverId = "6939", name = "Normal" }
 local NORMAL_HORDE = { realmName = "", recordId = 15, faction = "Horde", serverId = "6939", name = "Normal" }
@@ -10,13 +11,6 @@ local function character(serverId, name)
     guid = ("Player-%s-%s"):format(serverId, name), name = name, classFilename = "WARRIOR",
     level = 10, xp = 0, maxXp = 1000, zone = "Elwynn Forest", deaths = 0,
   }
-end
-
-local function copy(value)
-  if type(value) ~= "table" then return value end
-  local result = {}
-  for k, v in pairs(value) do result[k] = copy(v) end
-  return result
 end
 
 local function on(client, facts, played)
@@ -54,6 +48,10 @@ local function sorted(list)
   return list
 end
 
+local GO_THERE = " Log in a Character there to see it."
+local ASK = "BFF has your Crew from before Rulesets but can't tell where it belongs. Is this where your Crew is?"
+local DAY = 24 * 60 * 60
+
 describe("A Crew saved before Rulesets", function()
   local ns, net
 
@@ -62,41 +60,37 @@ describe("A Crew saved before Rulesets", function()
     net = ns.FakeNet.new({ channels = true })
   end)
 
-  local SLOT_ONLY = { ruleset = true, provisional = true }
-  local LAYOUT = { crews = true, rulesets = true, migrated = true }
-
-  local function toOldLayout(client)
-    if client.core then client:logout() end
-    local slot = ns.Slots.find(client.db, nil)
-    local old = {}
-    for k, v in pairs(client.db) do
-      if not LAYOUT[k] then old[k] = copy(v) end
-    end
-    for k, v in pairs(slot) do
-      if not SLOT_ONLY[k] then old[k] = copy(v) end
-    end
-    client.db = old
-    client.saved = copy(old)
-    return client
-  end
-
   local function savedCrew(options)
     options = options or {}
-    local ann = net:add("Ann", { character = character("6939", "Ann") }):login()
+    local OldCore = beforeRulesets()
+    local ann = net:add("Ann", { Core = OldCore, character = character("6939", "Ann") }):login()
     local code = ann:join()
     local bob
     if not options.alone then
-      bob = net:add("Bob", { character = character("6939", "Bob"), gossip = options.bobGossip }):login()
+      bob = net:add("Bob", { Core = OldCore, character = character("6939", "Bob") }):login()
       bob:join(code)
     end
     for _, extra in ipairs(options.alts or {}) do ann.core:updateOwn(extra) end
     if options.main then assert(ann.core:setMain(options.main)) end
+    if options.paused then ann.core:setPaused(true) end
     ann.core:updateOwn(character("6939", "Ann"))
     net:run(30)
-    local annId = ann.memberId
-    toOldLayout(ann)
+    ann:logout()
+    ann.Core = nil
     if bob and options.bobOffline then bob:logout() end
-    return ann, bob, code, annId
+    return ann, bob, code, ann.memberId
+  end
+
+  local function unplaceable()
+    local ann, _, code, annId = savedCrew({ alone = true })
+    net.clock = net.clock + 31 * DAY
+    return ann, code, annId
+  end
+
+  local function downgrade(client)
+    if client.core then client:logout() end
+    client.Core = beforeRulesets()
+    return client:login()
   end
 
   describe("its move", function()
@@ -113,29 +107,23 @@ describe("A Crew saved before Rulesets", function()
       assert.is_false(ann.core:ruleset().provisional)
     end)
 
-    it("waits when an alt on another Ruleset logs in first, and says where it went later", function()
+    it("tells an alt on another Ruleset where the Crew is without asking, and names its Ruleset later", function()
       local ann, _, code = savedCrew({ bobOffline = true })
       on(ann, PVP, character("6856", "Pvpann"))
       assert.is_nil(ann.core:crew())
-      assert.is_true(ann.core:elsewhere().ask)
+      assert.same({ hint = "Your Crew is on Ann's Ruleset." .. GO_THERE }, ann.core:elsewhere())
       on(ann, NORMAL, character("6939", "Ann"))
       assert.equal(code, ann.core:crew().code)
       on(ann, PVP, character("6856", "Pvpann"))
       assert.is_nil(ann.core:crew())
-      assert.same({
-        crews = { {
-          key = "mode:15:Alliance", name = "Normal", faction = "Alliance", character = "Ann",
-          place = "Normal (Alliance)",
-        } },
-        hint = "Your Crew is on Normal (Alliance).",
-      }, ann.core:elsewhere())
+      assert.same({ hint = "Your Crew is on Normal (Alliance)." .. GO_THERE }, ann.core:elsewhere())
     end)
 
-    it("isn't claimed by your own alt on another Ruleset", function()
+    it("isn't placed by your own alt on another Ruleset", function()
       local ann = savedCrew({ bobOffline = true, alts = { character("6944", "Rpann") } })
       on(ann, RP, character("6944", "Rpann"))
       assert.is_nil(ann.core:crew())
-      assert.is_true(ann.core:elsewhere().ask)
+      assert.same({ hint = "Your Crew is on Ann's Ruleset." .. GO_THERE }, ann.core:elsewhere())
     end)
 
     it("goes where your Main is when you're alone in the Crew", function()
@@ -143,9 +131,17 @@ describe("A Crew saved before Rulesets", function()
         main = "Player-6939-Ann" })
       on(ann, PVP, character("6856", "Pvpann"))
       assert.is_nil(ann.core:crew())
+      assert.same({ hint = "Your Crew is on Ann's Ruleset." .. GO_THERE }, ann.core:elsewhere())
       on(ann, NORMAL, character("6939", "Second"))
       assert.equal(code, ann.core:crew().code)
       assert.is_true(ann.core:ruleset().provisional)
+    end)
+
+    it("asks where it is when neither friends nor a Main place it", function()
+      local ann = unplaceable()
+      on(ann, PVP, character("6856", "Pvpann"))
+      assert.is_nil(ann.core:crew())
+      assert.same({ ask = ASK }, ann.core:elsewhere())
     end)
 
     it("is offered on the other faction while provisional, and not once a Member is heard", function()
@@ -154,8 +150,8 @@ describe("A Crew saved before Rulesets", function()
       assert.is_true(ann.core:ruleset().provisional)
       on(ann, NORMAL, character("6939", "Ann"))
       assert.is_nil(ann.core:crew())
-      assert.same({ key = "mode:15:Horde", name = "Normal", faction = "Horde", character = "Hordeann",
-        place = "Normal (Horde)" }, ann.core:elsewhere().offer)
+      assert.equal("Your Crew on Normal (Horde) hasn't heard from anyone yet. If your friends play this faction, "
+        .. "bring it here.", ann.core:elsewhere().offer)
       on(ann, NORMAL_HORDE, character("6939", "Hordeann"))
       bob:login()
       net:run(30)
@@ -164,22 +160,20 @@ describe("A Crew saved before Rulesets", function()
       assert.is_nil(ann.core:elsewhere().offer)
     end)
 
-    it("runs once and leaves the old saved Crew as it was", function()
+    it("runs once and leaves the old saved Crew for an older BFF", function()
       local ann, bob, code = savedCrew()
-      local old = copy(ann.db)
       on(ann, NORMAL, character("6939", "Ann"))
       ann:play({ level = 12 })
       net:run(30)
       assert.equal(12, bob:rowFor(ann).level)
       on(ann, PVP, character("6856", "Pvpann"))
-      assert.is_nil(ann.core:elsewhere().ask)
-      for key, value in pairs(old) do assert.same(value, ann.db[key]) end
-      assert.equal(code, ann.db.crew.code)
+      assert.same({ hint = "Your Crew is on Normal (Alliance)." .. GO_THERE }, ann.core:elsewhere())
+      downgrade(ann)
+      assert.equal(code, ann.core:crew().code)
     end)
 
     it("carries Appear offline with the Crew", function()
-      local ann = savedCrew({ bobOffline = true })
-      ann.db.paused = true
+      local ann = savedCrew({ bobOffline = true, paused = true })
       on(ann, NORMAL, character("6939", "Ann"))
       assert.is_true(ann.core:isPaused())
       on(ann, PVP, character("6856", "Pvpann"))
@@ -203,7 +197,7 @@ describe("A Crew saved before Rulesets", function()
       assert.same({ "Player-6856-Pvpann", "Player-6939-Ann" }, guidsIn(ownRow(ann)))
     end)
 
-    it("writes the claim and its confirmation to the sync log", function()
+    it("writes the placing and its confirmation to the sync log", function()
       local ann, bob = savedCrew({ bobOffline = true })
       on(ann, NORMAL, character("6939", "Ann"))
       local lines = {}
@@ -213,21 +207,25 @@ describe("A Crew saved before Rulesets", function()
       bob:login()
       net:run(30)
       assert.same({
-        "ruleset mode:15:Alliance took the Crew saved before Rulesets (provisional)",
+        "ruleset mode:15:Alliance placed the Crew saved before Rulesets here (provisional)",
         "ruleset mode:15:Alliance confirmed by a Member",
       }, lines)
     end)
 
-    it("leaves a Crew you had left behind", function()
-      local ann = net:add("Ann", { character = character("6939", "Ann"), db = {
-        memberId = "oldannid",
-        records = {},
-        keptCrew = { code = "K3F9-A2QX", generation = 2, ledger = { records = {} }, feed = {}, goals = {} },
-      } })
-      on(ann, NORMAL)
+    it("leaves a Crew you had left behind to an older BFF", function()
+      local ann, bob, code = savedCrew()
+      bob:logout()
+      downgrade(ann)
+      ann.core:leaveCrew()
+      net:run(30)
+      ann:logout()
+      ann.Core = nil
+      on(ann, NORMAL, character("6939", "Ann"))
       assert.is_nil(ann.core:crew())
-      assert.is_nil(ann.core:elsewhere().ask)
-      assert.equal("K3F9-A2QX", ann.db.keptCrew.code)
+      assert.same({}, ann.core:elsewhere())
+      downgrade(ann)
+      assert(ann.core:joinCrew(code, "Ann"))
+      assert.truthy(ann:rowFor(bob))
     end)
   end)
 
@@ -240,7 +238,7 @@ describe("A Crew saved before Rulesets", function()
       local ann = savedCrew({ bobOffline = true })
       on(ann, { realmName = "", recordId = 15, faction = "Alliance", serverId = "6939" }, character("6939", "Ann"))
       on(ann, PVP, character("6856", "Pvpann"))
-      assert.equal("Your Crew is on Ann's Ruleset (Alliance).", ann.core:elsewhere().hint)
+      assert.equal("Your Crew is on Ann's Ruleset (Alliance)." .. GO_THERE, ann.core:elsewhere().hint)
     end)
 
     it("names every Ruleset where you have a Crew", function()
@@ -249,66 +247,58 @@ describe("A Crew saved before Rulesets", function()
       on(ann, PVP, character("6856", "Pvpann"))
       assert(ann.core:startCrew("Ann"))
       on(ann, RP, character("6944", "Rpann"))
-      assert.equal("Your Crews are on PvP (Alliance) and Normal (Alliance).", ann.core:elsewhere().hint)
+      assert.equal("Your Crews are on PvP (Alliance) and Normal (Alliance)." .. GO_THERE, ann.core:elsewhere().hint)
     end)
 
     it("says nothing when you have no Crew anywhere else", function()
       local ann = on(net:add("Ann", { character = character("6856", "Pvpann") }), PVP)
-      assert.same({ crews = {} }, ann.core:elsewhere())
+      assert.same({}, ann.core:elsewhere())
     end)
 
-    it("asks once, and claiming it here brings the Crew with your Member id", function()
-      local ann, bob, code, annId = savedCrew({ bobOffline = true, alts = { character("6944", "Rpann") } })
+    it("asks once, and placing it here brings the Crew with your Member id", function()
+      local ann, code, annId = unplaceable()
       on(ann, PVP, character("6856", "Pvpann"))
-      assert.is_true(ann.core:elsewhere().ask)
       local before = crewChanges(ann)
-      assert.equal(code, ann.core:claimCrewHere().code)
+      assert.equal(code, ann.core:placeCrewHere().code)
       ann:noteMemberId()
       assert.equal(before + 1, crewChanges(ann))
-      assert.is_nil(ann.core:elsewhere().ask)
+      assert.same({}, ann.core:elsewhere())
       assert.is_false(ann.core:ruleset().provisional)
       assert.equal(annId, ownRow(ann).memberId)
-      assert.same({ "Player-6856-Pvpann", "Player-6939-Ann" }, guidsIn(ownRow(ann)))
-      bob:login()
-      net:run(30)
-      assert.same({ "Player-6856-Pvpann", "Player-6939-Ann" }, guidsIn(bob:rowFor(ann)))
+      assert.same({ "Player-6856-Pvpann" }, guidsIn(ownRow(ann)))
       on(ann, PVP, character("6856", "Pvpann"))
       assert.equal(code, ann.core:crew().code)
       on(ann, NORMAL, character("6939", "Ann"))
       assert.is_nil(ann.core:crew())
-      assert.equal("Your Crew is on PvP (Alliance).", ann.core:elsewhere().hint)
+      assert.same({ hint = "Your Crew is on PvP (Alliance)." .. GO_THERE }, ann.core:elsewhere())
     end)
 
-    it("remembers a start fresh and leaves the Crew for the Ruleset where it belongs", function()
-      local ann, _, code = savedCrew({ bobOffline = true })
+    it("remembers a start fresh, and still asks on another Ruleset", function()
+      local ann, code = unplaceable()
       on(ann, PVP, character("6856", "Pvpann"))
       local before = crewChanges(ann)
       assert.is_true(ann.core:startFresh())
       assert.equal(before + 1, crewChanges(ann))
-      assert.is_nil(ann.core:elsewhere().ask)
+      assert.same({}, ann.core:elsewhere())
       on(ann, PVP, character("6856", "Pvpann"))
-      assert.is_nil(ann.core:elsewhere().ask)
+      assert.same({}, ann.core:elsewhere())
       local fresh = assert(ann.core:startCrew("Ann"))
       assert.are_not.equal(code, fresh.code)
       on(ann, NORMAL, character("6939", "Ann"))
-      assert.equal(code, ann.core:crew().code)
+      assert.equal(ASK, ann.core:elsewhere().ask)
+      assert.equal(code, ann.core:placeCrewHere().code)
     end)
 
-    it("still asks on another Ruleset after a start fresh", function()
+    it("won't place or start fresh in a Crew, or with nothing to ask about", function()
       local ann = savedCrew({ bobOffline = true })
       on(ann, PVP, character("6856", "Pvpann"))
-      ann.core:startFresh()
-      on(ann, RP, character("6944", "Rpann"))
-      assert.is_true(ann.core:elsewhere().ask)
-    end)
-
-    it("won't claim or start fresh with nothing waiting, or in a Crew", function()
-      local ann = savedCrew({ bobOffline = true })
+      assert.same({ nil, "notWaiting" }, { ann.core:placeCrewHere() })
+      assert.same({ nil, "notWaiting" }, { ann.core:startFresh() })
       on(ann, NORMAL, character("6939", "Ann"))
-      assert.same({ nil, "inCrew" }, { ann.core:claimCrewHere() })
+      assert.same({ nil, "inCrew" }, { ann.core:placeCrewHere() })
       assert.same({ nil, "inCrew" }, { ann.core:startFresh() })
       on(ann, PVP, character("6856", "Pvpann"))
-      assert.same({ nil, "notWaiting" }, { ann.core:claimCrewHere() })
+      assert.same({ nil, "notWaiting" }, { ann.core:placeCrewHere() })
       assert.same({ nil, "notWaiting" }, { ann.core:startFresh() })
     end)
 
@@ -322,16 +312,14 @@ describe("A Crew saved before Rulesets", function()
       assert.equal(before + 1, crewChanges(ann))
       assert.equal(annId, ownRow(ann).memberId)
       assert.is_false(ann.core:ruleset().provisional)
-      assert.same({ crews = {} }, ann.core:elsewhere())
+      assert.same({}, ann.core:elsewhere())
       bob:login()
       ann:play({ level = 13 })
       net:run(30)
       assert.equal(13, bob:rowFor(ann).level)
       on(ann, NORMAL_HORDE, character("6939", "Hordeann"))
       assert.is_nil(ann.core:crew())
-      local elsewhere = ann.core:elsewhere()
-      assert.equal("Your Crew is on Normal (Alliance).", elsewhere.hint)
-      assert.is_nil(elsewhere.offer)
+      assert.same({ hint = "Your Crew is on Normal (Alliance)." .. GO_THERE }, ann.core:elsewhere())
     end)
 
     it("won't bring over a Crew that isn't on offer", function()
@@ -346,7 +334,7 @@ describe("A Crew saved before Rulesets", function()
     end)
 
     it("writes the answers to the sync log", function()
-      local ann = savedCrew({ bobOffline = true })
+      local ann = unplaceable()
       on(ann, PVP, character("6856", "Pvpann"))
       local lines = {}
       ann.core:setTrace(function(line)
@@ -357,10 +345,10 @@ describe("A Crew saved before Rulesets", function()
       ann.core:setTrace(function(line)
         if line:match("^ruleset") then lines[#lines + 1] = line end
       end)
-      ann.core:claimCrewHere()
+      ann.core:placeCrewHere()
       assert.same({
         "ruleset mode:14:Alliance started fresh, leaving the Crew saved before Rulesets",
-        "ruleset mode:16:Alliance took the Crew saved before Rulesets (asked)",
+        "ruleset mode:16:Alliance placed the Crew saved before Rulesets here (asked)",
       }, lines)
     end)
 
@@ -376,7 +364,7 @@ describe("A Crew saved before Rulesets", function()
   end)
 
   describe("pruning your Characters", function()
-    it("drops other Rulesets' Characters on a claim, for your friends too", function()
+    it("drops other Rulesets' Characters when it's placed, for your friends on an older BFF too", function()
       local ann, bob = savedCrew({ alts = { character("6856", "Pvpann") }, main = "Player-6856-Pvpann" })
       assert.same({ "Player-6856-Pvpann", "Player-6939-Ann" }, guidsIn(bob:rowFor(ann)))
       on(ann, NORMAL, character("6939", "Ann"))
@@ -416,10 +404,8 @@ describe("A Crew saved before Rulesets", function()
   end)
 
   describe("with Members on older and newer BFF", function()
-    it("syncs an older client and a moved one with the same Member ids", function()
-      local legacy = {}
-      assert(loadfile("tests/fixtures/legacy_gossip.lua"))("BFF", legacy)
-      local ann, bob, _, annId = savedCrew({ bobGossip = legacy.Gossip })
+    it("syncs a client on BFF 2.18.0 and a moved one with the same Member ids", function()
+      local ann, bob, _, annId = savedCrew()
       local bobId = bob.memberId
       on(ann, NORMAL, character("6939", "Ann"))
       ann:play({ level = 14 })

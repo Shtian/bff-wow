@@ -26,28 +26,20 @@ local function channelGeneration(crew)
     crew.generation, crew.generationFrom, crew.moves)
 end
 
-local REPAIRED_BY = { serverId = "server ID", name = "name" }
-
 local function orNone(value)
   if value == nil then return "none" end
   return tostring(value)
 end
 
 local function rulesetLine(ruleset)
-  return ("Ruleset: %s · record ID: %s · faction: %s · name: %s"):format(
-    ruleset.key, orNone(ruleset.recordId), orNone(ruleset.faction), orNone(ruleset.name))
+  return ("Ruleset: %s · realm name: %s · record ID: %s · faction: %s · name: %s"):format(
+    ruleset.key, orNone(ruleset.realmName), orNone(ruleset.recordId), orNone(ruleset.faction), orNone(ruleset.name))
 end
 
 local function serverIdsLine(ruleset)
   local seen = #ruleset.serverIds > 0 and table.concat(ruleset.serverIds, ", ") or "none"
-  return ("Server IDs seen: %s · provisional: %s"):format(seen, yesNo(ruleset.provisional))
-end
-
-local function repairLine(ruleset)
-  local repair = ruleset.repaired
-  if not repair then return "Ruleset repair this session: none" end
-  return ("Ruleset repair this session: %s moved to %s (by %s)"):format(
-    repair.from, repair.to, REPAIRED_BY[repair.by] or tostring(repair.by))
+  return ("Server ID: %s · seen: %s · provisional: %s"):format(
+    orNone(ruleset.serverId), seen, yesNo(ruleset.provisional))
 end
 
 function Report.text()
@@ -65,7 +57,7 @@ function Report.text()
       tostring(gameVersion), tostring(build), tostring(interface), yesNo(forever)),
     rulesetLine(ruleset),
     serverIdsLine(ruleset),
-    repairLine(ruleset),
+    "Ruleset repair this session: " .. orNone(ruleset.repair),
     ("Crew: %s · other Members known: %d · peers in the channel: %d"):format(
       yesNo(crew), crew and ns.core:rosterCounts().members or 0, link.peers),
     "Link: " .. (link.up and "up" or ("down (%s)"):format(link.reason or "not started")),

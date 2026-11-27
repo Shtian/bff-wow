@@ -219,10 +219,10 @@ function Ledger:knowsOthers()
   return false
 end
 
-local function copied(value)
+function Ledger.copied(value)
   if type(value) ~= "table" then return value end
   local result = {}
-  for k, v in pairs(value) do result[k] = copied(v) end
+  for k, v in pairs(value) do result[k] = Ledger.copied(v) end
   return result
 end
 
@@ -231,7 +231,7 @@ function Ledger:carryOwn(from)
   if not source then return end
   self:changeOwn(function(record)
     for _, field in ipairs({ "displayName", "main", "look", "characters" }) do
-      record[field] = copied(source[field])
+      record[field] = Ledger.copied(source[field])
     end
     record.characters = record.characters or {}
     return true

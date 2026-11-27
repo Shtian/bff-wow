@@ -3,9 +3,9 @@ local _, ns = ...
 local Slots = {}
 ns.Slots = Slots
 
-Slots.DEFAULT = "default"
+local DEFAULT = "default"
 
-local function text(value)
+local function nonEmpty(value)
   if type(value) == "string" and value ~= "" then return value end
   return nil
 end
@@ -13,12 +13,16 @@ end
 function Slots.facts(raw)
   if type(raw) ~= "table" then raw = {} end
   return {
-    realmName = text(raw.realmName),
+    realmName = nonEmpty(raw.realmName),
     recordId = type(raw.recordId) == "number" and raw.recordId or nil,
-    faction = text(raw.faction),
-    serverId = text(raw.serverId),
-    name = text(raw.name),
+    faction = nonEmpty(raw.faction),
+    serverId = nonEmpty(raw.serverId),
+    name = nonEmpty(raw.name),
   }
+end
+
+function Slots.serverIdOf(guid)
+  return type(guid) == "string" and guid:match("^Player%-([^%-]+)%-") or nil
 end
 
 local function withFaction(base, faction)
@@ -26,10 +30,10 @@ local function withFaction(base, faction)
   return base .. ":" .. faction
 end
 
-function Slots.key(facts)
+local function keyOf(facts)
   if facts.realmName then return withFaction("realm:" .. facts.realmName, facts.faction) end
   if facts.recordId then return withFaction("mode:" .. facts.recordId, facts.faction) end
-  return Slots.DEFAULT
+  return DEFAULT
 end
 
 local function newSlotId(crews, random)
@@ -39,13 +43,7 @@ local function newSlotId(crews, random)
   end
 end
 
-local function layout(db)
-  if type(db.crews) ~= "table" then db.crews = {} end
-  if type(db.rulesets) ~= "table" then db.rulesets = {} end
-end
-
-function Slots.newSlot(db, key, random)
-  layout(db)
+local function newSlot(db, key, random)
   local id = newSlotId(db.crews, random)
   db.crews[id] = { ruleset = key, memberId = id }
   return id, db.crews[id]
@@ -58,40 +56,61 @@ local function holds(list, value)
   return false
 end
 
-local function sortedKeys(rulesets)
+local function sortedKeys(map)
   local keys = {}
-  for key in pairs(rulesets) do keys[#keys + 1] = key end
+  for key in pairs(map) do keys[#keys + 1] = key end
   table.sort(keys)
   return keys
 end
 
-local function findMoved(rulesets, facts)
-  local keys = sortedKeys(rulesets)
-  local function first(matches)
-    for _, key in ipairs(keys) do
-      local entry = rulesets[key]
-      if type(entry) == "table" and entry.faction == facts.faction and matches(entry) then return key end
-    end
-    return nil
+local function hasCrew(slot)
+  return type(slot) == "table" and slot.crew ~= nil
+end
+
+local function tableOr(value)
+  return type(value) == "table" and value or {}
+end
+
+local function otherEntry(rulesets, key, faction, matches)
+  for _, other in ipairs(sortedKeys(rulesets)) do
+    local entry = rulesets[other]
+    if other ~= key and type(entry) == "table" and entry.faction == faction and matches(entry) then return other end
   end
-  local byServer = facts.serverId and first(function(entry) return holds(entry.serverIds, facts.serverId) end)
-  if byServer then return byServer, "serverId" end
-  local byName = facts.name and first(function(entry) return entry.name == facts.name end)
-  if byName then return byName, "name" end
   return nil
 end
 
-local function moveEntry(db, from, to)
-  local entry = db.rulesets[from]
-  db.rulesets[from] = nil
-  db.rulesets[to] = entry
-  for _, id in ipairs({ entry.active, entry.left }) do
+local function retag(db, key)
+  local entry = db.rulesets[key]
+  if type(entry) ~= "table" then return end
+  for _, id in pairs({ entry.active, entry.left }) do
     local slot = db.crews[id]
-    if type(slot) == "table" then slot.ruleset = to end
+    if type(slot) == "table" then slot.ruleset = key end
   end
 end
 
-local function note(entry, facts)
+local function swapEntries(db, from, to)
+  db.rulesets[from], db.rulesets[to] = db.rulesets[to], db.rulesets[from]
+  retag(db, from)
+  retag(db, to)
+end
+
+local function repair(db, key, facts)
+  local found = db.rulesets[key]
+  if type(found) ~= "table" then found = nil end
+  if found and holds(found.serverIds, facts.serverId) then return nil end
+  local function byServerId(entry) return holds(entry.serverIds, facts.serverId) end
+  local function byName(entry) return facts.name ~= nil and entry.name == facts.name end
+  local from, by = otherEntry(db.rulesets, key, facts.faction, byServerId), "serverId"
+  if not from and not found then from, by = otherEntry(db.rulesets, key, facts.faction, byName), "name" end
+  if not from then
+    if not found then db.rulesets[key] = {} end
+    return nil
+  end
+  swapEntries(db, from, key)
+  return { from = from, to = key, by = by, swapped = found ~= nil }
+end
+
+local function recordFacts(entry, facts)
   entry.recordId = facts.recordId or entry.recordId
   entry.name = facts.name or entry.name
   entry.faction = facts.faction
@@ -109,30 +128,15 @@ local SLOT_KEYS = {
   "paused", "playTimes", "stray",
 }
 
-local function copied(value)
-  if type(value) ~= "table" then return value end
-  local result = {}
-  for k, v in pairs(value) do result[k] = copied(v) end
-  return result
-end
-
 local function migrate(db, random)
   if db.migrated then return end
   db.migrated = 1
   if type(db.crew) ~= "table" then return end
   local slot = {}
-  for _, key in ipairs(SLOT_KEYS) do slot[key] = copied(db[key]) end
+  for _, key in ipairs(SLOT_KEYS) do slot[key] = ns.Ledger.copied(db[key]) end
   local id = slot.memberId
   if type(id) ~= "string" or db.crews[id] ~= nil then id = newSlotId(db.crews, random) end
   db.crews[id] = slot
-end
-
-function Slots.serverIdOf(guid)
-  return type(guid) == "string" and guid:match("^Player%-([^%-]+)%-") or nil
-end
-
-local function tableOr(value)
-  return type(value) == "table" and value or {}
 end
 
 local function ownRecord(slot)
@@ -170,7 +174,7 @@ function Slots.belongsHere(slot, serverId)
   end
 end
 
-local function unclaimedIds(db)
+local function unplacedIds(db)
   local ids = {}
   for _, id in ipairs(sortedKeys(db.crews)) do
     local slot = db.crews[id]
@@ -179,23 +183,26 @@ local function unclaimedIds(db)
   return ids
 end
 
-local function claimable(slot, key, facts, now)
+local function placeable(slot, key, facts, now)
   if facts.serverId then return crewServerIds(slot, now)[facts.serverId] == true, true end
-  return key == Slots.DEFAULT, false
+  return key == DEFAULT, false
 end
 
-local function claim(db, key, facts, now)
+local function makeActive(db, key, id)
   local entry = db.rulesets[key]
-  local active = db.crews[entry.active]
-  if type(active) == "table" and active.crew ~= nil then return false end
-  for _, id in ipairs(unclaimedIds(db)) do
-    local slot = db.crews[id]
-    local claims, provisional = claimable(slot, key, facts, now)
-    if claims then
-      if entry.active ~= nil then db.crews[entry.active] = nil end
-      entry.active = id
-      slot.ruleset = key
-      slot.provisional = provisional or nil
+  if entry.active ~= nil and entry.active ~= id then db.crews[entry.active] = nil end
+  entry.active = id
+  local slot = db.crews[id]
+  slot.ruleset, slot.provisional = key, nil
+  return slot
+end
+
+local function placeWaiting(db, key, facts, now)
+  if hasCrew(db.crews[db.rulesets[key].active]) then return false end
+  for _, id in ipairs(unplacedIds(db)) do
+    local places, provisional = placeable(db.crews[id], key, facts, now)
+    if places then
+      makeActive(db, key, id).provisional = provisional or nil
       return true
     end
   end
@@ -206,29 +213,21 @@ local function activeSlot(db, key, random)
   local entry = db.rulesets[key]
   local slot = db.crews[entry.active]
   if type(slot) ~= "table" then
-    entry.active, slot = Slots.newSlot(db, key, random)
+    entry.active, slot = newSlot(db, key, random)
   end
   return slot
 end
 
 function Slots.open(db, facts, random, now)
-  layout(db)
+  if type(db.crews) ~= "table" then db.crews = {} end
+  if type(db.rulesets) ~= "table" then db.rulesets = {} end
   migrate(db, random)
-  local key = Slots.key(facts)
-  local repaired
-  if type(db.rulesets[key]) ~= "table" then
-    local from, by = findMoved(db.rulesets, facts)
-    if from then
-      moveEntry(db, from, key)
-      repaired = { from = from, to = key, by = by }
-    else
-      db.rulesets[key] = {}
-    end
-  end
+  local key = keyOf(facts)
+  local repaired = repair(db, key, facts)
   local entry = db.rulesets[key]
-  note(entry, facts)
-  local claimed = claim(db, key, facts, now)
-  return { key = key, entry = entry, slot = activeSlot(db, key, random), repaired = repaired, claimed = claimed }
+  recordFacts(entry, facts)
+  local placed = placeWaiting(db, key, facts, now)
+  return { key = key, entry = entry, slot = activeSlot(db, key, random), repaired = repaired, placed = placed }
 end
 
 function Slots.left(db, key)
@@ -247,7 +246,7 @@ function Slots.leave(db, key, random)
   local entry = db.rulesets[key]
   local slot
   entry.left = entry.active
-  entry.active, slot = Slots.newSlot(db, key, random)
+  entry.active, slot = newSlot(db, key, random)
   return slot
 end
 
@@ -259,10 +258,8 @@ function Slots.rejoin(db, key)
 end
 
 function Slots.find(db, facts)
-  local rulesets = type(db.rulesets) == "table" and db.rulesets or {}
-  local entry = rulesets[Slots.key(Slots.facts(facts))]
-  local crews = type(db.crews) == "table" and db.crews or {}
-  return type(entry) == "table" and crews[entry.active] or nil
+  local entry = tableOr(db.rulesets)[keyOf(Slots.facts(facts))]
+  return type(entry) == "table" and tableOr(db.crews)[entry.active] or nil
 end
 
 function Slots.others(db, slot)
@@ -281,77 +278,86 @@ local function baseOf(key, entry)
   return key:sub(-#suffix) == suffix and key:sub(1, -#suffix - 1) or key
 end
 
-local function latestName(slot)
+local function latestName(slot, serverIds)
   local own = ownRecord(slot)
   local latest
-  for _, character in pairs(own and own.characters or {}) do
-    if type(character.lastPlayed) == "number" and (not latest or character.lastPlayed > latest.lastPlayed) then
+  for guid, character in pairs(own and own.characters or {}) do
+    local onServer = serverIds == nil or serverIds[Slots.serverIdOf(guid)] == true
+    if onServer and type(character.lastPlayed) == "number"
+      and (not latest or character.lastPlayed > latest.lastPlayed) then
       latest = character
     end
   end
   return latest and latest.name
 end
 
-local function waitingId(db)
-  for _, id in ipairs(unclaimedIds(db)) do
-    if db.crews[id].crew ~= nil then return id end
-  end
-  return nil
-end
-
-local function offerKey(db, key)
-  local current = db.rulesets[key]
-  local base = baseOf(key, current)
+local function otherCrews(db, key)
+  local list = {}
   for _, other in ipairs(sortedKeys(db.rulesets)) do
     local entry = db.rulesets[other]
     local slot = other ~= key and type(entry) == "table" and db.crews[entry.active]
-    if type(slot) == "table" and slot.crew ~= nil and slot.provisional
-      and entry.faction ~= current.faction and baseOf(other, entry) == base then
+    if hasCrew(slot) then list[#list + 1] = { key = other, entry = entry, slot = slot } end
+  end
+  return list
+end
+
+local function offered(db, key)
+  local current = db.rulesets[key]
+  local base = baseOf(key, current)
+  for _, other in ipairs(otherCrews(db, key)) do
+    if other.slot.provisional and other.entry.faction ~= current.faction and baseOf(other.key, other.entry) == base then
       return other
     end
   end
   return nil
 end
 
-function Slots.elsewhere(db, key)
-  local crews, offer = {}, nil
-  local offered = offerKey(db, key)
-  for _, other in ipairs(sortedKeys(db.rulesets)) do
-    local entry = db.rulesets[other]
-    local slot = other ~= key and type(entry) == "table" and db.crews[entry.active]
-    if type(slot) == "table" and slot.crew ~= nil then
-      local crew = { key = other, name = entry.name, faction = entry.faction, character = latestName(slot) }
-      crews[#crews + 1] = crew
-      if other == offered then offer = crew end
-    end
+local function waitingCrew(db, now)
+  for _, id in ipairs(unplacedIds(db)) do
+    local slot = db.crews[id]
+    if hasCrew(slot) then return id, slot, crewServerIds(slot, now) end
   end
-  local ask = waitingId(db) ~= nil and not db.rulesets[key].declined
-  return { crews = crews, offer = offer, ask = ask or nil }
+  return nil
 end
 
-local function replaceActive(db, key, id)
-  local entry = db.rulesets[key]
-  if entry.active ~= nil and entry.active ~= id then db.crews[entry.active] = nil end
-  entry.active = id
-  local slot = db.crews[id]
-  slot.ruleset, slot.provisional = key, nil
-  return slot
+local function askedAbout(db, key, now)
+  local id, _, serverIds = waitingCrew(db, now)
+  if not id or next(serverIds) or db.rulesets[key].declined then return nil end
+  return id
 end
 
-function Slots.claimHere(db, key)
-  local id = waitingId(db)
-  return id and replaceActive(db, key, id) or nil
+local function crewAt(entry, slot)
+  return { name = entry.name, faction = entry.faction, character = latestName(slot) }
 end
 
-function Slots.decline(db, key)
+function Slots.elsewhere(db, key, now)
+  local crews = {}
+  local offer = offered(db, key)
+  for _, other in ipairs(otherCrews(db, key)) do crews[#crews + 1] = crewAt(other.entry, other.slot) end
+  local id, slot, serverIds = waitingCrew(db, now)
+  if id and next(serverIds) then crews[#crews + 1] = { character = latestName(slot, serverIds) } end
+  return {
+    crews = crews,
+    ask = askedAbout(db, key, now) ~= nil or nil,
+    offer = offer and crewAt(offer.entry, offer.slot) or nil,
+  }
+end
+
+function Slots.placeHere(db, key, now)
+  local id = askedAbout(db, key, now)
+  return id and makeActive(db, key, id) or nil
+end
+
+function Slots.decline(db, key, now)
+  if not askedAbout(db, key, now) then return false end
   db.rulesets[key].declined = true
+  return true
 end
 
 function Slots.bringHere(db, key, random)
-  local from = offerKey(db, key)
+  local from = offered(db, key)
   if not from then return nil end
-  local entry = db.rulesets[from]
-  local id = entry.active
-  entry.active = Slots.newSlot(db, from, random)
-  return replaceActive(db, key, id)
+  local id = from.entry.active
+  from.entry.active = newSlot(db, from.key, random)
+  return makeActive(db, key, id)
 end
