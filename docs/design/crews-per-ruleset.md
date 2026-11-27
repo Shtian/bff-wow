@@ -43,17 +43,18 @@ A slot id is 8 characters from `[a-z0-9]`: a new slot's id is its new Member id.
 
   Each value is nil when the API is missing or returns nothing. Battle.net info may not be ready at login, so `name` is read again on `BN_INFO_CHANGED` and handed to `core:rulesetNamed(name)`.
 - **`Core/Slots.lua` (pure)** owns the layout:
-  - `Slots.open(db, facts, random)` returns the active slot and its ruleset entry. In order, it:
-    1. migrates once (`migrated`);
+  - `Slots.open(db, facts, random, now)` returns the active slot and its ruleset entry. In order, it:
+    1. migrates once (`migrated`): when the old top level has a `crew`, its slot-level keys are copied into one unclaimed slot whose id is the old Member id. A `keptCrew` (a Crew left before the update) isn't brought over: rejoining it gets a new Member id. The old keys stay where they are;
     2. builds the key;
     3. repairs a changed key by server ID, then by name;
-    4. drops the current Character from every other slot's own record;
-    5. claims an unclaimed slot whose other Members' (or, when alone, Main's) server IDs include the current one, marking it `provisional`, and prunes other-ruleset Characters from its own record;
-    6. makes an empty entry and slot if needed.
-  - It also returns what the no-Crew card needs:
-    - an unclaimed slot to ask about;
-    - the other faction's provisional slot to offer;
-    - the names of the rulesets where you have a Crew.
+    4. claims an unclaimed slot when the entry's active slot has no Crew and the other Members' (or, when alone, the Main's) server IDs include the current one, marking it `provisional`. With no server ID and the `default` key (the game gives no facts), it claims without `provisional`, as one Crew for the account;
+    5. makes an empty entry and slot if needed.
+  - After a claim by server ID, Core drops your own Characters whose server ID is neither the current one nor any other Member's (`Ledger:keepCharacters`, which bumps the version and clears a dropped Main).
+  - The current Character's GUID isn't in the facts, so `Core:updateOwn` drops it from every other slot's own record (left and unclaimed slots too), once per Character per session.
+  - `Core:elsewhere()` (`Slots.elsewhere`) gives what the no-Crew card needs:
+    - `crews`: the other rulesets where you have a Crew, with `key`, `name`, `faction` and the `character` you last played there;
+    - `unclaimed = true` when a slot is waiting to be claimed;
+    - `offer`: the other faction's provisional slot on this ruleset (`key`, `name`, `faction`).
 - **`Core.new`** takes `db` (still the whole `BFF_DB`), plus `ruleset` (the facts). It keeps `self.account` for settings, What's new and `fresh` (the first-install check), and `self.db` for the active slot. A new `bindSlot(slot)` builds the modules that hold a slot:
   - Ledger, Feed, Spares, Goals, Stray, PlayTimes;
   - Gossip, which holds the Ledger;
