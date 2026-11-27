@@ -119,6 +119,10 @@ _Avoid_: In range, near, fits
 A Character fits a dungeon when its level is inside the dungeon's recommended range. Separate from Can play: a Member's Character can fit a dungeon you fit and still be too far from you to play together.
 _Avoid_: Can do, eligible
 
+**Quiet**:
+A Member who is online but hasn't been heard from for 12 minutes, while one of their Characters is still in the Crew's channel: usually in a battleground, where the game keeps BFF from sending. Shown as "online · quiet".
+_Avoid_: Busy, away
+
 **Last seen**:
 When a Member or Character was last played, as reported by that Member's own client rather than observed by others.
 _Avoid_: Last online, last active

@@ -23,7 +23,7 @@ pocketCamp() -> nil, or {
       form = "wolf" | "bear" | "cat" | "travel" | "seal" | "moonkin" | nil, -- drawn in the figure's place, seated or fighting
       trots = true | nil, -- the form trots to and fro (wolf, travel)
       doorway = 1 | nil, -- adventuring: the doorway (below) they stand in
-      status = "by the fire" | "in The Deadmines · 25m" | "fishing" | "fighting · 3m" | "in bear form" | "asleep · 4m" | ..., -- the pose in words, or by the fire the form's; with how long from a minute on (below)
+      status = "by the fire" | "by the fire · quiet" | "in The Deadmines · 25m" | "fishing" | "fighting · 3m" | "in bear form" | "asleep · 4m" | ..., -- the pose in words, or by the fire the form's; with how long from a minute on (below)
       since = 180 | nil, -- seconds in this pose, set only when status shows a time
       spark = true | nil, you = true | nil,
       row = { ... }, -- the Member's Roster row, for the tooltip over the figure

@@ -40,13 +40,15 @@ function Ledger.newMemberId(random)
   return table.concat(chars)
 end
 
-function Ledger.new(db, now, random, initialLogin)
+local function nobody() return false end
+
+function Ledger.new(db, now, random, initialLogin, inChannel)
   db.memberId = db.memberId or Ledger.newMemberId(random)
   db.records = db.records or {}
   db.via = db.via or {}
   db.removed = db.removed or {}
   if initialLogin or not db.heard then db.heard = {} end
-  return setmetatable({ db = db, now = now }, Ledger)
+  return setmetatable({ db = db, now = now, channelHas = inChannel or nobody }, Ledger)
 end
 
 function Ledger:memberId()
@@ -411,14 +413,34 @@ end
 
 -- WoW: on Forever the channel names a Character "First Last", while
 -- UnitName's first value is the first name alone.
+local function channelNames(character)
+  local last = character.lastName
+  if type(last) == "string" and last ~= "" then return character.name, character.name .. " " .. last end
+  return character.name
+end
+
+local function matchesChannelName(character, channelName)
+  local lower = channelName:lower()
+  local own = character.name:lower()
+  return own == lower or own == (lower:match("^(%S+)%s") or lower)
+end
+
+function Ledger:inChannel(id)
+  local record = self.db.records[id]
+  if not record then return false end
+  for _, character in pairs(record.characters) do
+    for _, name in ipairs({ channelNames(character) }) do
+      if self.channelHas(name) then return true end
+    end
+  end
+  return false
+end
+
 function Ledger:wentAway(name)
   local any = false
-  local lower = name:lower()
-  local first = lower:match("^(%S+)%s") or lower
   for id, record in pairs(self.db.records) do
     for _, character in pairs(record.characters) do
-      local own = character.name:lower()
-      if (own == lower or own == first) and self.db.heard[id] then
+      if matchesChannelName(character, name) and self.db.heard[id] then
         self.db.heard[id] = nil
         any = true
       end

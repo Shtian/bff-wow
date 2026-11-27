@@ -75,7 +75,8 @@ local function describeCharacter(character, main, yourLevel, now)
   }
 end
 
-local function rowFor(record, characters, online, yourLevel, now)
+local function rowFor(record, characters, presence, yourLevel, now)
+  local online = presence ~= nil
   local main = mainOf(record, characters)
   local shown = online and characters[1] or main
   local row = describeCharacter(shown, main, yourLevel, now)
@@ -89,7 +90,8 @@ local function rowFor(record, characters, online, yourLevel, now)
   row.mainSet = record.main ~= nil and record.main == main.guid
   row.lastSeen = characters[1].lastPlayed
   row.sinceSeen = now - row.lastSeen
-  row.lastSeenText = online and "online" or ns.Text.since(row.sinceSeen)
+  row.quiet = presence == "quiet"
+  row.lastSeenText = row.quiet and "online · quiet" or online and "online" or ns.Text.since(row.sinceSeen)
   row.altsCanPlay = false
   row.alts = {}
   for _, character in ipairs(characters) do
@@ -106,7 +108,13 @@ function Roster.online(ledger, now)
   local online = {}
   for id, record in ledger:records() do
     local heard = ledger:lastHeard(id)
-    if heard and now - heard < ONLINE_FOR and not record.left then online[id] = true end
+    if heard and not record.left then
+      if now - heard < ONLINE_FOR then
+        online[id] = "heard"
+      elseif ledger:inChannel(id) then
+        online[id] = "quiet"
+      end
+    end
   end
   return online
 end
@@ -154,7 +162,7 @@ local function buildRows(ledger, now)
     local characters, hidden = visibleCharacters(own, now)
     hiddenTotal = hiddenTotal + hidden
     if #characters > 0 then
-      ownRow = rowFor(own, characters, true, nil, now)
+      ownRow = rowFor(own, characters, "heard", nil, now)
       ownRow.own = true
       ownRow.lastSeenText = nil
     end
@@ -167,7 +175,7 @@ local function buildRows(ledger, now)
       local characters, hidden = visibleCharacters(record, now)
       hiddenTotal = hiddenTotal + hidden
       if #characters > 0 then
-        local row = rowFor(record, characters, online[record.id] == true, yourLevel, now)
+        local row = rowFor(record, characters, online[record.id], yourLevel, now)
         local via = ledger:via(record.id)
         local relay = via and ledger:record(via)
         row.via = relay and relay.displayName or nil
