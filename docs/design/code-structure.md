@@ -29,7 +29,7 @@ The first draft's Zones module is dropped from v1, because only the overlap find
 
 Core is created with:
 
-- `db`: the whole `BFF_DB` table. Core owns its layout, defaults and migrations, settings included. Core keeps it as `self.account` (settings, What's new and the first-install check) and keeps the active Crew's slot, `BFF_DB.crews[slotId]`, as `self.db` (ADR 0009, `docs/design/crews-per-ruleset.md`).
+- `db`: the whole `BFF_DB` table. Core owns its layout, defaults and migrations, settings included. Core keeps it as `self.account` (settings, What's new and the first-install check) and keeps the active Crew's slot, `BFF_DB.crews[slotId]`, as `self.db` (ADR 0009, `docs/design/crews-per-ruleset.md`). Leaving sets the slot aside as the ruleset's left slot and binds a fresh one; rejoining its code binds it again (`docs/design/joining-a-crew.md`).
 - `ruleset` (optional): the facts that pick the slot: `{ realmName, recordId, faction, serverId, name }`, each optional. With none the key is `default`, so tests and the dev sim keep one slot. `ruleset()` reads back the key, the saved record ID, faction, server IDs and name, and the key repair made this login (`repaired = { from, to, by = "serverId" | "name" }`), which also goes to the sync log once `setTrace` is called.
 - `now()` and `random()`: the clock (`GetServerTime` in game) and randomness, so tests are deterministic.
 - `link`: the outgoing half of the link port (`send(string, to)`).
