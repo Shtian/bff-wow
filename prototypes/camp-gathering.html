@@ -15,6 +15,8 @@
   collapsed with its legs splayed in two pairs (default), and flat on the ground with its legs stretched out
   front and back. Both lie with the head down, the eye shut.
   Round 5: the boar wins over the deer and the wolves. B now opens on the boar, kneeling to cut it.
+  Round 6: boar variations on the Animal toggle: humped with a big head down, small (3 columns shorter),
+  rolled over with its legs up, red, and grey.
     C  A one-sided miner's pick; kneels and gathers a bouquet in the hand; the boar, its hide peeling back.
   The picks are drawn by hand at each angle (round 1 rotated one shape, which bent the diagonals). The animal
   lies behind the figure's legs, its head toward the fire, so it reaches about 7 past the figure (the anvil
@@ -290,6 +292,11 @@ const BASKET = [".aaa.", "a...a", "AaAaA", "aAaAa", ".AaA."];
 
 const ANIMALS = {
   boar: ["..b.b.b.b.....", ".bbbbbbbbb.B..", "bBaaaaaaaabBa..", ".aaaaaaaaaaaKaP", ".aaaaaaaaaaaNPP", "..AAAAAAAaaN...", "..bb..bb.bb...."],
+  boarHump: [".......b.b.b.....",  ".....bbbbbbbbB...",  "...bbaaaaaaabBB..",  "..baaaaaaaaaaaaK.",  ".baaaaaaaaaaaaaaPP",  "b.aAAAAAAAaaaaNaPP",  "...b.b.....b.bN..."],
+  boarSmall: ["..b.b.b....",  ".bbbbbbbB..",  "baaaaaaabB.",  ".aaaaaaaaKP",  ".AAAAAAaNPP",  "..b.b..b.b."],
+  boarUp: [".bb.......bb.....",  ".b.........b.....",  ".AAAAAAAAAAAA....",  "aaaaaaaaaaaaaaB..",  "baaaaaaaaaaaaKaP.",  ".bbbbbbbbbbbbaNPP",  "..b.b.b.b.b......"],
+  boarRed: ["..b.b.b.b.....",  ".bbbbbbbbb.b..",  "bbccccccccbbc..",  ".cccccccccccKcP",  ".cccccccccccNPP",  "..eeeeeeeccN...",  "..bb..bb.bb...."],
+  boarGrey: ["..t.t.t.t.....",  ".ttttttttt.t..",  "tTTTTTTTTTtTT..",  ".TTTTTTTTTTTKTP",  ".TTTTTTTTTTTNPP",  "..ZZZZZZZTTN...",  "..tt..tt.tt...."],
   deerFlat: [".............N...N", ".............NN.NN", "...aaaaaaaa...NNN.", "..aAAAAAAAAa..aA..", ".NAAAAAAAAAAaaAbAb", "..AAAAAAAAAAAAAAA.", "aaaANNNNNNNNNAaaaa", "b................b"],
   deerSplay: [".............N...N", ".............NN.NN", "...aaaaaaaa...NNN.", "..aAAAAAAAAa..aA..", ".NAAAAAAAAAAaaAbAb", "..AAAAAAAAAAAAAAA.", "...NNNNNNNNNN.....", "..a.a......a.a....", ".a.a........a.a...", ".b.b........b.b..."],
   wolfX: ["..........t...t.", "..........TT.TT.", "TT.......TTTTTTT", ".TTTTTTTTTKTKTTTt", "..TTTTTTTTTKTTTP.", "...NNNNNNNKTKT.P.", "...t.t...t.t....."],
@@ -527,7 +534,7 @@ function buildToggles() {
   };
   group("Gathering", "who", [["all", "Three"], ["you", "You"], ["kesh", "Kesh"], ["both", "Both sides"], ["neighbours", "Neighbours"]]);
   group("Profession", "prof", [["mixed", "Mixed"], ["mining", "Mining"], ["herbalism", "Herbalism"], ["skinning", "Skinning"]]);
-  group("Animal (B)", "wolf", [["boar", "Boar"], ["deerSplay", "Deer, splayed"], ["deerFlat", "Deer, flat"], ["wolfX", "Wolf, X eyes"], ["wolfUp", "Wolf, legs up"], ["wolf", "Round 2 wolf"]]);
+  group("Animal (B)", "wolf", [["boar", "Boar"], ["boarHump", "Boar, humped"], ["boarSmall", "Boar, small"], ["boarUp", "Boar, legs up"], ["boarRed", "Boar, red"], ["boarGrey", "Boar, grey"], ["deerSplay", "Deer, splayed"], ["deerFlat", "Deer, flat"], ["wolfX", "Wolf, X eyes"], ["wolfUp", "Wolf, legs up"], ["wolf", "Round 2 wolf"]]);
   group("Season", "season", [["none", "None"], ["winter", "Winter"]]);
   group("World", "world", [["forest", "Forest"], ["meadow", "Meadow"], ["snow", "Snow"]]);
   group("Zoom", "zoom", [[2, "2x"], [3, "3x"], [5, "5x"]]);
