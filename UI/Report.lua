@@ -26,6 +26,30 @@ local function channelGeneration(crew)
     crew.generation, crew.generationFrom, crew.moves)
 end
 
+local REPAIRED_BY = { serverId = "server ID", name = "name" }
+
+local function orNone(value)
+  if value == nil then return "none" end
+  return tostring(value)
+end
+
+local function rulesetLine(ruleset)
+  return ("Ruleset: %s · record ID: %s · faction: %s · name: %s"):format(
+    ruleset.key, orNone(ruleset.recordId), orNone(ruleset.faction), orNone(ruleset.name))
+end
+
+local function serverIdsLine(ruleset)
+  local seen = #ruleset.serverIds > 0 and table.concat(ruleset.serverIds, ", ") or "none"
+  return ("Server IDs seen: %s · provisional: %s"):format(seen, yesNo(ruleset.provisional))
+end
+
+local function repairLine(ruleset)
+  local repair = ruleset.repaired
+  if not repair then return "Ruleset repair this session: none" end
+  return ("Ruleset repair this session: %s moved to %s (by %s)"):format(
+    repair.from, repair.to, REPAIRED_BY[repair.by] or tostring(repair.by))
+end
+
 function Report.text()
   local gameVersion, build, _, interface = GetBuildInfo()
   local forever = WOW_PROJECT_CAMELOT ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CAMELOT
@@ -33,11 +57,15 @@ function Report.text()
   local link = ns.ChannelLink.state()
   local log = ns.syncLog:lines()
 
+  local ruleset = ns.core:ruleset()
   local lines = {
     "BFF report · " .. date("%Y-%m-%d %H:%M:%S"),
     "BFF " .. tostring(ns.VERSION),
     ("Game %s (build %s) · interface %s · WoW: Forever: %s"):format(
       tostring(gameVersion), tostring(build), tostring(interface), yesNo(forever)),
+    rulesetLine(ruleset),
+    serverIdsLine(ruleset),
+    repairLine(ruleset),
     ("Crew: %s · other Members known: %d · peers in the channel: %d"):format(
       yesNo(crew), crew and ns.core:rosterCounts().members or 0, link.peers),
     "Link: " .. (link.up and "up" or ("down (%s)"):format(link.reason or "not started")),
