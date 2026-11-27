@@ -1,0 +1,442 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Question: the Pocket Camp's fishing pose is hard to see. What should fishing look like?
+  Round 3: round 2 picked 1, "Pond". Its rod looked crooked: a 4:7 Bresenham slope steps unevenly (1,2,1,2,1 rows a
+  column), ends in a kinked tip, and the line runs back diagonally to the bobber. Five rods on the same pond, every
+  one in even pixel runs, with the line hanging straight down from the tip (bobber under it):
+    1  Today's: round 2's rod, as a baseline.
+    2  45°: a straight 1:1 diagonal. The plainest; reads as a stick held out.
+    3  Steep: a straight 1:2 (two rows a column). Taller, tip clears the head, bobber closer in.
+    4  Arc: runs of 2,2,1,1 then flat, the tip drooping one pixel. A rod under its own weight.
+    5  Arc + reel: 4, two-toned (dark grip, light blank, pale tip) with a reel at the hand.
+  Toggles: who fishes (two neighbours on one side tests crowding), shared water for neighbours, the season, the
+  game world behind, the backdrop's opacity and zoom (2x is about in-game size). "Catch now" plays a catch.
+  The readout lists, per fisher, how far the parts reach past the seat, what they draw over, what the water
+  runs under, and the contrast of their fill against what's behind.
+  Figures, palette, fire, hats and pets are copied from scripts/camp-art.mjs; backdrops are
+  Media/CampPocketBackdrop*.tga's 144-column band. Crew data is fake. Run: open the file in a browser.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Camp fishing</title>
+<style>
+  :root { --gold:#ffd14a; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99; --raised:#1b1a23; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; color:var(--text); background:#14121b; font:14px/1.4 system-ui, sans-serif; padding-bottom:96px; }
+  h1 { font-size:18px; margin:20px 16px 4px; text-align:center; }
+  h2 { font-size:14px; color:var(--gold); margin:24px 16px 6px; text-align:center; }
+  .note { text-align:center; color:var(--muted); max-width:760px; margin:0 auto 10px; padding:0 16px; min-height:42px; }
+  #toggles { display:flex; flex-wrap:wrap; gap:10px 18px; justify-content:center; margin:12px 16px; color:var(--muted); font-size:13px; }
+  .group { display:flex; gap:4px; align-items:center; }
+  .group button, .btn { font:13px system-ui; color:var(--text); background:var(--raised); border:1px solid rgba(255,255,255,.14); padding:4px 10px; border-radius:4px; cursor:pointer; }
+  .group button.on { background:var(--gold); color:#1a1400; border-color:var(--gold); }
+  .group input[type=range] { width:110px; }
+  .stage { display:flex; justify-content:center; padding:0 16px; overflow-x:auto; }
+  canvas { image-rendering:pixelated; image-rendering:crisp-edges; display:block; }
+  .readout { max-width:760px; margin:8px auto 0; padding:0 16px; font:12px/1.5 ui-monospace, Menlo, monospace; color:var(--dim); }
+  .readout b { color:var(--text); font-weight:600; }
+  .readout .warn { color:#f0a21c; }
+  .readout .ok { color:#70e370; }
+  .switcher { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); display:flex; align-items:center; gap:4px; background:#fff; color:#111; border-radius:999px; padding:6px; box-shadow:0 6px 24px rgba(0,0,0,.5); font:600 13px system-ui; z-index:9; }
+  .switcher button { border:0; background:#eee; border-radius:999px; width:32px; height:32px; font-size:16px; cursor:pointer; }
+  .switcher .label { padding:0 12px; min-width:170px; text-align:center; }
+</style>
+</head>
+<body>
+<h1>Fishing in the Pocket Camp: the pond's rod</h1>
+<div class="note" id="note"></div>
+<div id="toggles"></div>
+<div style="display:flex;justify-content:center;gap:8px;margin:4px 16px"><button class="btn" id="catch">Catch now</button></div>
+
+<h2>Night</h2>
+<div class="stage"><canvas id="night"></canvas></div>
+<div class="readout" id="night-out"></div>
+<h2>Day</h2>
+<div class="stage"><canvas id="day"></canvas></div>
+<div class="readout" id="day-out"></div>
+
+<div class="switcher"><button id="prev" aria-label="Previous variant">←</button><div class="label" id="label"></div><button id="next" aria-label="Next variant">→</button></div>
+<script>
+const BD = {"night":"iVBORw0KGgoAAAANSUhEUgAAAJAAAAAkCAYAAABmHbPbAAAFO0lEQVR4nO2ZTW4UQQyFZzNIQSEZwigEyAKBlFUWbII4A8qeW3AAJMRNOA034gCDPPCih2O7XT/dPZNMSVZR3V3u6vLnV56wWBzaoR3aoT2adrL6sDmMpxs/inb09GKnNn3fxnvZvI9av7jZlIyXT062PSAqnX8Yt429eM7SsAj0n2+/bqzrgEbDg/7i8pM579D36XW8Rm0I8vP19X8Ecy8LscbSCxQ81r34FxP/0XP73g/twxy9F0+rb2pQBkAUyaP8GyZjbBwvnsFhA0TW81OMRTHH8i/7MNV6NaxWfLz4LXopkz5eAA8rUUvmiX+5p038i1n+vv/4uROZO6cCZfwwrLVKpGvSKiXStUokc3pRUBVAYV337PrNyy6bjQztAUFpULxk8ZKj5zpK3jMU12JooDAMj5gEVS9qTUfU8bN3d9csSGQuX/cgkvegl2Ja/AkI7J/fXzve/P6Vfp4TofR91j60rJ8VKHof1hr5s55lCKuh8n4dyYv0JshYgiu2OvubbXJdxgyMjE9Or7Ym/wZEbIAH/vAx7D+TqQJHL+XBOvR3D/WR0oofJEetkg3dz65X77cV9yJoPHhYIWRh0lsAaXi4QN4CcHplFtBa6fAs/LH/qQzv5aBk5iGJOMu9bM/6s+AAhFlYtfFzSH7rPdXHmYaKayFAgpewAkUfk62B8FEIIvzzUVYLReYarlvrK/GtlbYUIg0jktG6z+/jdXrrYpM5sr+WiFQpkK6BePE1NU62BtJKxwABIqhTBiZ+xlIy9s3XdND1r0TJass3X5NvQDLo+aVKJH50HKL7eEava+i7+P6CamKZLz0gC5t1fPExpl/GBCNAVo0zBI2nRBIs1E9cR8H4mnUE8dFqwXJXX/3zIevEdRyrupbTvvS7uKazlLhEiSI/rCjec/r7rATR8VkYf8IpUqAoqFHt4tU43jzvOfZnmRV4CyjL9NEYXbcynzNbz4HqwKxM10omAFyef7zX633z/AzByiWG912Y79VA6PUxl4YqoyRRjZOBpxSiLFAZUFg9kQTWEcQ1nzaoMMxLGg4oQwOzxlYtpYPvGWATWFGnclw0LFpM7v4H4vTqPjRR7RPBoyGJ7mfmezXQ9o+KCYB6m6cgvNneXIbPSxL80rSUh2s3S4m0Gno10NL49RspjbdWi4vmGsiCxrqeUa6hGmhKcDj4mcy26jP+Y+jQfAHFggfHTOQns9/L4IePJQBWDVR8XEU1kEdqtsYZggibwps3lRLJ2jwV0gEZUi4v03VtwhDBuEaJINTHfRQvvIuTxJpvKRMfY/LcKDVQ5njKAsYfNcfxpTfZAkgrYyaYXrKwkum6bCg5s0o3dExFx5WujYpqoLPjVVjDePdhcn8IHstHTSHdw/SvKP0dWkGs+UujBtLfqBXIKuwteOAnUg691iPj15qOn/cej4uwrVevNl7/kOzt+bjjfTYr/sXQ7IJ5QYp6mB7Pbdn17xqUkaikodoFiErgabGb96+LxmPDNCVEQydQ0XE1JTytMCCoJT1Mj0vN85fpW2GbC6qdqIFalaUGlqmtFaK5lGlnoGk9dlph+HJzMdjD9Fib93ymb4VtTqUqhmksqGqPqVJlKQluL2uFaAylmhSWCJp9UJ5SOL7djtOXwlUK1ZRKFIlIswLVwNWzxilVnowxDJ5loYng6QlNJllbYemmRDXwzKE8vZUogicDUa0SzXWcdYOoBqoIrkMNNH8N1F1pekDTenyNoUwtSpUdt0LTqjStNU+JKIzaSheDXj6ypZdNfgh96z7U7n+P9gfFwcktax5sZwAAAABJRU5ErkJggg==","day":"iVBORw0KGgoAAAANSUhEUgAAAJAAAAAkCAYAAABmHbPbAAAElUlEQVR4nO2Zv24UQQzG71HSUgUhJKQUqagoSINEQ490EUKKKGgQoklDgZQuPAIVz0DNA/A2QQ760BfH9tize7t7uR3Jcmb/zHjHv/nGB5vN2ta2trUdTHtz+etm7U/XP4h2/OJkUYu+b/29bN5HXVz/vqn0j44f3XpAVH1/7Q/re/mcpSGIlgc0Gh74j1/fpcZZfZ/X+dppQ5Jfnb+8QzB7CcTqixcouK+9jC8m40fP7btvrcMc3sun5Qc1KAMgiuRR/oZJHwvHwTM4bIDIen7f+7IOU82nYbXy4+VvM5Yy6eMF8LASDdl5Mr7c0ybjiy1hhy5RgTLjMKy9SqRr0i4l0rVKJHM6KKgKoLCue7bE46yaFG+zDN0cmTgq87TyWoYGCsPw8BHDk1/QEXX29v3/axYk8i5fjxQIXoppzMfj8/xT9HkjVN+31mFIPKxA0XyINRrPepYh7IbK+3XEyeUdIckVO/9ydRuUXJc+AyP9T1c/bk3+BkTaeDyGB+NPrTyIo6qMkdLqzdGjZK372Xj1elt5L0HjwaNrFCyABkjDw+ol97efv5vg8HN4VmDDeDz+VIZ5OSmZ97CJeJd7uz07ngUHcpCFVRs/h81vzdN9nGmouBYCJJiEFSj6mGwNhI9CEjE+H2W9UGSu4boVX2VsrbRViDSMXEro+zwfx+nFxSbvyPpaItKlQFYNhOB7apxsDaSVjgECRFCnDEz8jKVkPDZf00m3FNgaO1ML8i/NqgpZEFn38YyOq/VdfH9DNbG8Lx6Qhc06vqxjTAMBhRAf1ThZgxJJsuToY+OF4drKOoL4aLVgwTMYQ+LEdQ085tNj6blaSlxRomgcS3m06e+zNoiOd2P8E05JgaKkRrVLq8bJGo9nGScsAsoyfTRG1724vHesxHjwcH3y7eefez7afDxOC1YuMbzviuJliPQxl4YqoyTRx1ThyUCUBSoDCqsnbwLvO61xocKw6PtYrQANzOpbtVRW2VnJERfnRcOixQTXZV1KtU8Ejw46up9539s5WYDGtlacUVzZTSLJtJSHazdLibQaejXQkfPr11MabwyLi8E1kAWNdT2jXK2dMzU4Fcit+qzyvoBiwWPVX976ZBU9ikff57yXj6ueGqhiGWisWmEKeDJKklWfVvK5PhF4YNGvwKgsiPKVqVE9Zdo4/0Mxag2UWbQsYPzRcxxfrWPIUsYepdX/baML/6iOqipldvNHNZAJjfcS/PNnT8Kgvfswud+Cxxqjp5AeGxzrO7SCZMHT36gVKPML0FsrDZGOVcPTyp+ep6w8Z+f/zj7Lr3YYZuU/Bc3p68d3YJE+D7z2D6/v8VFSotUOw1on0D1IQFTkz4jM1R+et7hYa6DVQivXQA9Vgbbbp00P031t3vMZP/c6TKpA+w5VJblj2UOBqBuWCJq5P6oXmsguP5zsxFfhmnvdqjCNpkBLhGuo0jAMnmWhieCZe52qsIymRNovwSQpLT9UiSJ4MhDBojiXZKNB1AOVVibYlH3e8a3+2DVQNN9c63G6S6UZA5p9sIpSZfsZv2SriMJOWzWY1S/Dj9H+AiuA0CONNbrjAAAAAElFTkSuQmCC","nightWinter":"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","dayWinter":"iVBORw0KGgoAAAANSUhEUgAAAJAAAAAkCAYAAABmHbPbAAAFU0lEQVR4nO1ZPYtVQQx9P2VbK0UEwcLKysJtBBt7YRcRxMJGxMbGQthOf4KVhbWFtVhtIdb+j5WsHjlkTzKZO/e+j903ELK5HzOZ5MxJ7tvVaj/2Yz/248qMx2+/ne3t9dlXYly/f2ergr5r9k6OaFPPP3w/67EPrl871wBR7/t7e8yO8rmRASda+svXHxI80Ke/fpfm2etp2udr0YEkI6lAMGtzRNmm7T22vbb5TR4eP0if23XdisMmdJRPpYdGxAyKHu1viNn2Ltv420BjTAQAmSDI6vldty0O61rPg1XlJ8rfai5m8uXFGIJ1FekAkGIeu+fFNm+yDSd0Th3FYQkm643fSjBOVHEmgQg6oznvFBgGoMB1u4brkWxjORsBNcdh9HBU3kcMp4JnCDRgGAYPlxheHBsy+/DJs//XUJo8s/D1iIFsfRVsnp/XX4dtfqvkV973h4UPxxR/mMmy9QCgbD6/L77vv4q7QBV9HXFy4YTZllyT4zcn58Cw62YDeHjm1cmnc7G/ASIvPB+DB/Ovm3ngRy8zMgOrMv3y3dMhJsvu8zqteX28V/SV7MtYOlqf1nyCTIBaDyAEXTXIdv/o9ccL91gwtz1rYMN8PP+6BOtyYirv4RDhb2ZcZoaqqLLPzJG1BYphPFsh3lHlmFzOfA/EvRAH1hZBglubUU5GZczmQxIxP5eyqaCoXPN75D30zO2ZtjVHC4w4ZOo+r8dgj/xisXcsvopESuCJwKIYIjoRWY+D91o9ED8PYHoQgZ0qYOJnFJPx3B44CuzwC75l80TvM4P3sJDqRz1L+We8X6198Rxcxux90wBZOlT5UmWMTxUQjATxyWOnMtBkDbWVPhYODPdWqgRxaVVgwTOYw/zEdQ94rOfn8mtl++V9VcETMbpiHi9+f9yf8v54nZX4/a+LgbKkRmhHorMepyoAqQeOBxD6qghQSnxpzK57v5h91Dv+hKuTrpjo/eefF7SPcwTCrC1gJmdfeU8tfxlEvsyVQaW+liJwqfu94OGGOgJRFVAVoDB72vvZV5T5peYFC0Oy/TFbATQQZateKipHGeOhT+W8MKMpMgGILC4hSPxXmAIP9z7e6ezkeUaq9kAtFlpSWn5mwFYMrZjMkqmYh3s3MFE0BxgsAyt//Ub548PvReFjuAdSJ0JdrzBX6+SsGzhRkBWI7PecXvDx+wYUBR7+AswYXx1QBbRW/P19znt3uar0QMpRdV2dxgpoWHN/tTR4vB2d6ox9KkzLPRBABPG/o0WxynokXufA9ahRfiJm4jLWxURRGVPOVoKWnRKfoFai1gGmzD/PjP4A9TAsmMw3/lkf1dsOtA4/lyuvPXhS5vH63u2bKVLtfsYwdr9Fs1hDgWhd7KP6F7UPToryq7pH7vGixl7FLIo3++t99eDx+Wv52808h8d/a5/Se7kaovKfDiCMNX5j2FVtG+f/OFfsXl2df5d1hI8uUG0i+UjE1OR6DWnZvVKdf4pW8dgUWCRoKi9tA3NM1Xcf3ZD20jpaf5TptoWB0nH67xdJpUdlTua47DLKXCOi8r8x0CwBriqzHB3damqIt71Ez1f0kky1tHSDaQlQTQnO1PLRk9y5ZAREU8vjEuCaDJYMNNvANFNAk8nbF3cW0b3gmhM0Pr5LMM9sDFQF15zlaIR5KsJgiKQKmgw828hElXwPM9HczGSBqOpILCktPcpEGXgqIIJkfkZSiY+P58aZZwRUEbhwErDJis2B7LH5xLfsuXugbL2p+/F2TzwXZ5o5QLMJJmox0whTVe2Krkq0vyWZp4cUFh29zvRqC5CyL7teOq5zjD86RaHukB2h0gAAAABJRU5ErkJggg=="};
+
+const PAL = {
+  K: "#0b0a12", S: "#e8b890", s: "#b98465", W: "#fff3c4", Y: "#ffe9a0", G: "#ffd14a", O: "#f0a21c",
+  R: "#c9481c", B: "#5a3a24", b: "#3a2518", T: "#8c8796", t: "#5d5966", L: "#70e370", P: "#f2b8d0",
+  Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8", N: "#ece8d8", A: "#c89a5a", a: "#8f6a3a", r: "#5a1620",
+  h: "#468a46", g: "#2c5a33", i: "#9bd47a",
+};
+const SIT = ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...", "..KCCDDCCK..", ".KCCCDDCCCK.", ".KSCCDDCCSK.", ".KKCCCCCCKK.", "..KDDKKDDK..", "..KKK..KKK.."];
+const FIRE = [
+  [".....R.....", "....RR.....", "....ROR..R.", "...ROOR.RR.", ".R.ROOORRR.", ".RRROGGORR.", ".RROOGGOOR.", "RROOGYYGOOR", "ROOGGYYGGOR", "ROGGYYYYGOR", ".ROGYYWYGO.", "..ROGGGGO.."],
+  [".........R.", "..R..R.....", "..RR.RR....", ".RORROR..R.", ".ROORROR.R.", ".ROOOOORRR.", ".ROGGOOGOR.", "RROGYGOGOOR", "ROOGYYGGGOR", "ROGGYYYYGOR", ".ROGYWYYGO.", "..ROGGGGO.."],
+  ["...R.......", "...RR...R..", "..RORR..R..", "..ROOR.RR..", ".RROOORRO..", ".ROOGOOROR.", ".ROGGGOOOR.", "RROGGYGGOOR", "ROOGYYYGGOR", "ROGGYYYYGOR", ".ROGYYWYGO.", "..ROGGGGO.."],
+];
+const LOGS = ["..BB.......BB..", ".BBBBb...bBBBB.", "bbBBBBBBBBBBBbb", "..bbbbbbbbbbb.."];
+const SEAT = ["BBBBBBBBBBBBBB", "bbbbbbbbbbbbbb", "bbbbbbbbbbbbbb"];
+const STRAW = ["....GYYG....", "...GYWYYGO..", "...RRRRRR...", ".OGYYYYYYGO.", "aOGGGGGGGGOa"];
+const CAT = [".....T..T", ".....TTTT", "t....YTYT", "t....TPTT", ".t..TTTTT", ".tTTTTTNT", "..TTTTTNT", "..TtTtTTT"];
+const CLASS = { WARRIOR: "#c69b6d", MAGE: "#3fc7eb", DRUID: "#ff7c0a", PALADIN: "#f48cba", HUNTER: "#aad372" };
+
+function outlined(rows) {
+  const w = Math.max(...rows.map((r) => r.length)) + 2, h = rows.length + 2;
+  const at = (x, y) => { const r = rows[y - 1]; const c = r && r[x - 1]; return c && c !== "." ? c : null; };
+  const out = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) {
+      const own = at(x, y);
+      if (own) { line += own; continue; }
+      let near = false;
+      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (at(x + i, y + j)) near = true;
+      line += near ? "K" : ".";
+    }
+    out.push(line);
+  }
+  return out;
+}
+const STRAW_HAT = outlined(STRAW), CAT_ART = outlined(CAT);
+const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+const shade = (c, k) => "#" + hex(c).map((v) => Math.round(v * k).toString(16).padStart(2, "0")).join("");
+
+const COLS = 144, MARGIN_X = 16, MARGIN_Y = 6, ROWS = 36;
+const W = COLS + 2 * MARGIN_X, H = ROWS + MARGIN_Y + 4;
+const CX = MARGIN_X + COLS / 2, BASE = H - 4;
+const CAST = [
+  { id: "you", name: "You", cls: "HUNTER", x: -21, hat: true, pet: -33 },
+  { id: "mira", name: "Mira", cls: "DRUID", x: -51 },
+  { id: "odo", name: "Odo", cls: "WARRIOR", x: 9 },
+  { id: "kesh", name: "Kesh", cls: "MAGE", x: 25 },
+];
+const FIRE_COLS = [-7, 7];
+
+const VARIANTS = [
+  { key: "1", name: "Today's rod", note: "Round 2's rod: a 4:7 line that steps unevenly, a kinked tip, and a line running back diagonally to the bobber." },
+  { key: "2", name: "45°", note: "A straight 1:1 diagonal from the hand, the line hanging straight down from the tip. The plainest shape: every step is one pixel across, one up." },
+  { key: "3", name: "Steep", note: "A straight 1:2 (two rows a column). Taller: the tip clears the head against the sky, and the bobber lands closer in, further from the fire." },
+  { key: "4", name: "Arc", note: "Runs of 2, 2, 1, 1, then flat, the tip drooping a pixel: a rod bending under its own weight. Runs only ever shorten, so the curve stays smooth." },
+  { key: "5", name: "Arc + reel", note: "The arc, two-toned (dark grip, light blank, pale tip), with a reel at the hand. The most rod-like, at the cost of two more pixels." },
+];
+const params = new URLSearchParams(location.search);
+let variant = Math.max(0, VARIANTS.findIndex((v) => v.key === (params.get("variant") || "1")));
+const state = {
+  who: params.get("who") || "both", shared: params.get("shared") !== "0", season: params.get("season") || "none",
+  world: params.get("world") || "forest", opacity: +(params.get("opacity") || 60), zoom: +(params.get("zoom") || 3),
+};
+let tick = 0, catchAt = -999;
+const FISHERS = { you: ["you"], kesh: ["kesh"], both: ["you", "kesh"], neighbours: ["odo", "kesh"] };
+const OFFSET = { you: 0, kesh: 5, odo: 11 };
+
+function layer() {
+  const px = new Map();
+  return {
+    px,
+    set(u, r, c) { px.set(u + "," + r, c); return this; },
+    line(u0, r0, u1, r1, c) {
+      let dx = Math.abs(u1 - u0), dy = -Math.abs(r1 - r0), sx = u0 < u1 ? 1 : -1, sy = r0 < r1 ? 1 : -1, e = dx + dy;
+      for (;;) { this.set(u0, r0, c); if (u0 === u1 && r0 === r1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; u0 += sx; } if (e2 <= dx) { e += dx; r0 += sy; } }
+      return this;
+    },
+    outline() {
+      const add = [];
+      for (const key of px.keys()) {
+        const [u, r] = key.split(",").map(Number);
+        for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (!px.has(u + i + "," + (r + j))) add.push(u + i + "," + (r + j));
+      }
+      for (const k of add) px.set(k, PAL.K);
+      return this;
+    },
+  };
+}
+
+const bob = (t, every = 9) => (Math.floor(t / every) % 2 ? 1 : 0);
+const CATCH_FOR = 24, CATCH_EVERY = 84;
+function catchPhase(m) {
+  const own = tick - catchAt - Math.floor(OFFSET[m.id] / 2);
+  if (own >= 0 && own < CATCH_FOR) return own;
+  const auto = (tick + OFFSET[m.id] * 7 + CATCH_FOR * 2) % CATCH_EVERY;
+  return auto < CATCH_FOR ? auto : -1;
+}
+
+const WATER = {
+  pond: { rim: "#0e2238", deep: "#1d4a7a", mid: "#2f6fae", lip: "#6fb3e6", glint: "#d8f0ff", rows: 3 },
+  dock: { rim: "#0e2238", deep: "#173f6b", mid: "#2f6fae", lip: "#6fb3e6", glint: "#d8f0ff", rows: 4 },
+  ice: { rim: "#5d7f99", deep: "#a9c6dc", mid: "#c4dcec", lip: "#e4f1f8", glint: "#ffffff", rows: 3 },
+};
+function waterPixels(c0, c1, style, t, seed) {
+  const w = WATER[style], out = [];
+  const top = w.rows - 1;
+  for (let row = 0; row <= top; row++) {
+    const inset = row === 0 ? 1 : row === top ? 2 : 0;
+    for (let c = c0 + inset; c <= c1 - inset; c++) {
+      const edge = c - c0 - inset < 1 || c1 - inset - c < 1;
+      const tone = row === top ? w.lip : row === 0 ? (edge ? w.rim : w.deep) : edge ? w.deep : w.mid;
+      out.push([c, row, tone]);
+    }
+  }
+  out.push([c0 - 1, 1, w.rim], [c1 + 1, 1, w.rim], [c0 + 1, top, w.rim], [c1 - 1, top, w.rim]);
+  for (let c = c0 + 2; c < c1 - 1; c += 4) {
+    const k = (c * 7 + seed) % 5;
+    if ((Math.floor(t / 5) + k) % 5 === 0) out.push([c, 1 + (k % Math.max(1, top - 1)), w.glint]);
+  }
+  return out;
+}
+
+function pondRod(bend) {
+  const tip = [[13, 13], [13, 11], [13, 9]][bend];
+  const rod = layer().line(9, 6, tip[0], tip[1], PAL.A).set(8, 5, PAL.a);
+  if (bend < 2) rod.set(tip[0] + 1, tip[1], PAL.N).set(tip[0] + 2, tip[1] - 1, PAL.N);
+  else rod.set(tip[0] + 1, tip[1] - 1, PAL.N).set(tip[0] + 2, tip[1] - 2, PAL.N);
+  return { rod: rod.outline(), end: [tip[0] + 2, tip[1] - (bend < 2 ? 2 : 3)] };
+}
+function bobber(u, row) { return layer().set(u, row, PAL.R).set(u, row + 1, PAL.N); }
+function rings(l, u, t, reach, tone) {
+  const r = t % 12;
+  if (r < 4) l.set(u - 1, 1, tone.glint).set(u + 1, 1, tone.glint);
+  else if (r < 8 && reach > 1) l.set(u - 2, 1, tone.lip).set(u + 2, 1, tone.lip);
+  else if (reach > 2) l.set(u - 4, 1, tone.lip).set(u + 4, 1, tone.lip).set(u - 3, 1, tone.mid);
+  return l;
+}
+function leap(p, from, to, peak) {
+  if (p >= 12) return null;
+  const fish = layer();
+  if (p < 9) {
+    const k = p / 8, u = Math.round(from + (to - from) * k), row = Math.round(2 + peak * 4 * k * (1 - k));
+    const dir = to < from ? -1 : 1;
+    fish.set(u, row, PAL.F).set(u - dir, row, PAL.F).set(u - 2 * dir, row, PAL.f).set(u - dir, row + 1, PAL.F).outline();
+  } else fish.set(to - 1, 2, PAL.N).set(to + 1, 2, PAL.N).set(to, 3, PAL.N).set(to - 2, 3, WATER.pond.glint).set(to + 2, 3, WATER.pond.glint);
+  return fish;
+}
+
+const RODS = {
+  2: { path: [[9, 6], [10, 7], [11, 8], [12, 9], [13, 10], [14, 11]] },
+  3: { path: [[9, 6], [9, 7], [10, 8], [10, 9], [11, 10], [11, 11], [12, 12], [12, 13], [13, 14], [13, 15]] },
+  4: { path: [[9, 6], [9, 7], [10, 8], [10, 9], [11, 10], [12, 11], [13, 11], [14, 10]] },
+  5: { path: [[9, 6], [9, 7], [10, 8], [10, 9], [11, 10], [12, 11], [13, 11], [14, 10]], grip: 2, reel: [10, 6] },
+};
+function cleanRod(key) {
+  const spec = RODS[key], rod = layer().set(8, 5, PAL.a);
+  spec.path.forEach(([u, r], i) => rod.set(u, r, i === spec.path.length - 1 ? PAL.N : i < (spec.grip || 0) ? PAL.a : PAL.A));
+  if (spec.reel) rod.set(spec.reel[0], spec.reel[1], PAL.Z);
+  const tip = spec.path[spec.path.length - 1];
+  const shaft = spec.path.some(([u, r]) => u === tip[0] && r === tip[1] - 1);
+  return { rod: rod.outline(), tip, hang: shaft ? tip[0] + 1 : tip[0] };
+}
+function partsPond(m, t, p, key) {
+  const b = bob(t);
+  if (key === "1" || !RODS[key]) {
+    const { rod, end } = pondRod(0);
+    const parts = { water: { u0: -2, u1: 16, style: "pond" }, back: [rings(layer(), 12, t, 2, WATER.pond), layer().line(end[0], end[1], 12, 3 - b, PAL.Z), bobber(12, 1 - b), rod] };
+    const fish = p >= 0 ? leap(p, 12, 5, 6) : null;
+    if (fish) parts.front = [fish];
+    return parts;
+  }
+  const { rod, tip, hang } = cleanRod(key);
+  const u = hang;
+  const line = layer().line(u, tip[1] - 1, u, 3 - b, PAL.Z);
+  const parts = { water: { u0: -2, u1: 16, style: "pond" }, back: [rings(layer(), u, t, 2, WATER.pond), bobber(u, 1 - b), rod, line] };
+  const fish = p >= 0 ? leap(p, u, 4, 6) : null;
+  if (fish) parts.front = [fish];
+  return parts;
+}
+
+function rng(seed) { return () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); }
+const WORLDS = {
+  forest: { sky: ["#25352f", "#2f4434"], ground: ["#33402a", "#3c4a2e"], trees: "#1a2619", treesFar: "#223122" },
+  meadow: { sky: ["#8fb9d4", "#b7d3df"], ground: ["#6e9a46", "#86ad55"], trees: "#3e6a35", treesFar: "#5c8a48" },
+  snow: { sky: ["#b9c9d8", "#d8e2ea"], ground: ["#e6edf2", "#f3f6f8"], trees: "#4a5a58", treesFar: "#8a9a9c" },
+};
+function mix(a, b, k) { const A = hex(a), B = hex(b); return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * k).toString(16).padStart(2, "0")).join(""); }
+function drawWorld(ctx, key) {
+  const w = WORLDS[key], r = rng(5), horizon = Math.round(H * 0.55);
+  for (let y = 0; y < H; y++) {
+    const pair = y < horizon ? w.sky : w.ground;
+    ctx.fillStyle = mix(pair[0], pair[1], y < horizon ? y / horizon : (y - horizon) / (H - horizon));
+    ctx.fillRect(0, y, W, 1);
+  }
+  for (const [color, count, tall] of [[w.treesFar, 22, 9], [w.trees, 14, 15]]) {
+    ctx.fillStyle = color;
+    for (let i = 0; i < count; i++) {
+      const x = Math.floor(r() * W), h = tall + Math.floor(r() * 8), base = horizon + Math.floor(r() * 4);
+      for (let j = 0; j < h; j++) { const half = Math.floor((j / h) * 4); ctx.fillRect(x - half, base - h + j, half * 2 + 1, 1); }
+    }
+  }
+}
+
+const images = {};
+function loadImages() {
+  return Promise.all(Object.entries(BD).map(([k, b64]) => new Promise((ok) => { const i = new Image(); i.onload = () => { images[k] = i; ok(); }; i.src = "data:image/png;base64," + b64; })));
+}
+function lum(rgb) { const [r, g, b] = rgb.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }
+function contrast(a, b) { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+
+function render(id, phase) {
+  const canvas = document.getElementById(id), ctx = canvas.getContext("2d");
+  canvas.width = W; canvas.height = H;
+  canvas.style.width = W * state.zoom + "px"; canvas.style.height = H * state.zoom + "px";
+  drawWorld(ctx, state.world);
+  ctx.globalAlpha = state.opacity / 100;
+  ctx.drawImage(images[phase + (state.season === "winter" ? "Winter" : "")], CX - COLS / 2, BASE - ROWS);
+  ctx.globalAlpha = 1;
+  const behind = ctx.getImageData(0, 0, W, H);
+  const out = ctx.getImageData(0, 0, W, H);
+  const owner = new Array(W * H).fill(null);
+  const hits = {};
+  const put = (col, row, color, who, fishing) => {
+    const x = CX + col, y = BASE - 1 - row;
+    if (x < 0 || x >= W || y < 0 || y >= H) return;
+    const i = y * W + x;
+    if (fishing && owner[i] && owner[i] !== who && !owner[i].startsWith(who + ":") && !owner[i].startsWith("water")) {
+      const h = (hits[who] = hits[who] || {});
+      const o = owner[i].split(":")[0];
+      h[o] = (h[o] || 0) + 1;
+    }
+    const [r, g, b] = hex(color);
+    out.data.set([r, g, b, 255], i * 4);
+    owner[i] = fishing ? who + ":fish" : who;
+  };
+  const stamp = (rows, x, row, pal, who, mirror) => rows.forEach((line, i) => [...line].forEach((ch, j) => {
+    if (ch === ".") return;
+    const c = ch === "K" ? PAL.K : pal[ch];
+    if (c) put(mirror ? x + line.length - 1 - j : x + j, row + rows.length - 1 - i, c, who);
+  }));
+  const sample = (stats, col, r, c) => {
+    const x = CX + col, y = BASE - 1 - r;
+    if (c === PAL.K) { stats.outline = true; return; }
+    if (x >= 0 && x < W && y >= 0 && y < H) { const i = (y * W + x) * 4; stats.fill.push(contrast(hex(c), [behind.data[i], behind.data[i + 1], behind.data[i + 2]])); }
+  };
+  const commit = (l, m, stats) => {
+    const mirror = m.x > 0;
+    for (const [k, c] of l.px) {
+      const [u, r] = k.split(",").map(Number);
+      const col = mirror ? m.x + 11 - u : m.x + u;
+      put(col, r, c, m.id, true);
+      stats.min = Math.min(stats.min, u); stats.max = Math.max(stats.max, u); stats.top = Math.max(stats.top, r);
+      sample(stats, col, r, c);
+    }
+  };
+  const colsOf = (m, u0, u1) => (m.x > 0 ? [m.x + 11 - u1, m.x + 11 - u0] : [m.x + u0, m.x + u1]);
+
+  const v = VARIANTS[variant].key;
+  const fishers = FISHERS[state.who];
+  const planned = CAST.map((m) => {
+    const fishing = fishers.includes(m.id);
+    const t = tick + OFFSET[m.id] * 3;
+    return { m, fishing, parts: fishing ? partsPond(m, t, catchPhase(m), v) : null };
+  });
+  const stats = {};
+  for (const { m, fishing } of planned) if (fishing) stats[m.id] = { min: 99, max: -99, top: 0, fill: [], outline: false };
+
+  let spans = planned.filter((p) => p.fishing && p.parts.water).map((p) => {
+    const [c0, c1] = colsOf(p.m, p.parts.water.u0, p.parts.water.u1);
+    return { c0, c1, style: p.parts.water.style, ids: [p.m.id], seed: OFFSET[p.m.id] };
+  }).sort((a, b) => a.c0 - b.c0);
+  if (state.shared) {
+    const merged = [];
+    for (const s of spans) {
+      const last = merged[merged.length - 1];
+      if (last && last.style === s.style && s.c0 - last.c1 <= 8) { last.c1 = Math.max(last.c1, s.c1); last.ids.push(...s.ids); }
+      else merged.push({ ...s, ids: [...s.ids] });
+    }
+    spans = merged;
+  }
+  for (const s of spans) {
+    for (const [c, r, tone] of waterPixels(s.c0, s.c1, s.style, tick, s.seed)) {
+      put(c, r, tone, "water", false);
+      sample(stats[s.ids[0]], c, r, tone);
+    }
+  }
+
+  const f = Math.floor(tick / 2) % 3;
+  stamp(LOGS, -7, 3, PAL, "fire");
+  stamp(FIRE[f], -5, 5, PAL, "fire");
+  for (const { m, fishing, parts } of planned) {
+    if (!fishing) continue;
+    for (const l of parts.under || []) commit(l, m, stats[m.id]);
+  }
+  for (const { m, fishing, parts } of planned) {
+    const mirror = m.x > 0;
+    if (m.pet != null) stamp(CAT_ART, m.pet, 3, PAL, "cat", false);
+    if (!fishing || parts.seat !== false) stamp(SEAT, m.x - 1, 3, PAL, m.id);
+    const pal = { ...PAL, C: CLASS[m.cls], D: shade(CLASS[m.cls], 0.62) };
+    stamp(SIT, m.x, 4, pal, m.id, mirror);
+    if (m.hat) stamp(STRAW_HAT, m.x - 1, 4 + 13 - 2 + 4 + 2 - STRAW_HAT.length, PAL, m.id);
+  }
+  for (const { m, fishing, parts } of planned) {
+    if (!fishing) continue;
+    for (const l of [...(parts.reeds || []), ...(parts.back || [])]) commit(l, m, stats[m.id]);
+    const pal = { ...PAL, C: CLASS[m.cls], D: shade(CLASS[m.cls], 0.62) };
+    stamp(SIT.slice(0, 7), m.x, 4 + 6, pal, m.id, m.x > 0);
+    for (const l of parts.front || []) commit(l, m, stats[m.id]);
+  }
+  ctx.putImageData(out, 0, 0);
+
+  const name = (o) => (o === "fire" ? "the fire/logs" : o === "cat" ? "your cat" : CAST.find((c) => c.id === o)?.name || o);
+  const lines = [`<b>${phase}</b> · ${v} ${VARIANTS[variant].name} · season: ${state.season} · world: ${state.world} · backdrop ${state.opacity}% · tick ${tick}`];
+  for (const { m, fishing } of planned) {
+    if (!fishing) continue;
+    const s = stats[m.id], h = hits[m.id] || {};
+    const toward = Math.max(0, s.max - 11), away = Math.max(0, -s.min);
+    const fill = s.fill.sort((a, b) => a - b), med = fill.length ? fill[Math.floor(fill.length / 2)] : 0;
+    const over = Object.entries(h).map(([o, n]) => `${name(o)} ${n}px`);
+    const span = spans.find((sp) => sp.ids.includes(m.id));
+    const under = [];
+    if (span) {
+      if (span.c1 >= FIRE_COLS[0] && span.c0 <= FIRE_COLS[1]) under.push("the fire");
+      for (const c of CAST) if (c.id !== m.id && !span.ids.includes(c.id) && span.c1 >= c.x - 1 && span.c0 <= c.x + 12) under.push(c.name);
+      if (span.c1 >= -33 && span.c0 <= -23) under.push("your cat");
+    }
+    lines.push(`<b>${m.name}</b> (${m.x < 0 ? "left" : "right"} side): reaches ${toward} toward the fire, ${away} away, up to row ${s.top} · ` +
+      `${over.length ? `<span class="warn">draws over ${over.join(", ")}</span>` : `<span class="ok">draws over nothing</span>`} · ` +
+      (span ? `water cols ${span.c0}..${span.c1}${span.ids.length > 1 ? " (shared)" : ""}${under.length ? `, <span class="warn">runs under ${under.join(", ")}</span>` : ""} · ` : "") +
+      `fill contrast median <span class="${med < 2 ? "warn" : "ok"}">${med.toFixed(1)}:1</span>`);
+  }
+  document.getElementById(id + "-out").innerHTML = lines.join("<br>");
+}
+
+function draw() { render("night", "night"); render("day", "day"); }
+
+function buildToggles() {
+  const host = document.getElementById("toggles");
+  host.innerHTML = "";
+  const group = (label, key, options) => {
+    const g = document.createElement("div"); g.className = "group"; g.append(label + " ");
+    for (const [value, text] of options) {
+      const b = document.createElement("button"); b.textContent = text; b.className = String(state[key]) === String(value) ? "on" : "";
+      b.onclick = () => { state[key] = value; sync(); buildToggles(); draw(); };
+      g.append(b);
+    }
+    host.append(g);
+  };
+  group("Fishing", "who", [["you", "You"], ["kesh", "Kesh"], ["both", "Both sides"], ["neighbours", "Neighbours"]]);
+  group("Water", "shared", [[false, "Own"], [true, "Shared"]]);
+  group("Season", "season", [["none", "None"], ["winter", "Winter"]]);
+  group("World", "world", [["forest", "Forest"], ["meadow", "Meadow"], ["snow", "Snow"]]);
+  group("Zoom", "zoom", [[2, "2x"], [3, "3x"], [5, "5x"]]);
+  const g = document.createElement("div"); g.className = "group"; g.append("Backdrop ");
+  const r = document.createElement("input"); r.type = "range"; r.min = 0; r.max = 100; r.value = state.opacity;
+  const val = document.createElement("span"); val.textContent = state.opacity + "%";
+  r.oninput = () => { state.opacity = +r.value; val.textContent = r.value + "%"; sync(); draw(); };
+  g.append(r, val); host.append(g);
+}
+function sync() {
+  const p = new URLSearchParams({ variant: VARIANTS[variant].key, who: state.who, shared: state.shared ? 1 : 0, season: state.season, world: state.world, opacity: state.opacity, zoom: state.zoom });
+  history.replaceState(null, "", "?" + p);
+  const v = VARIANTS[variant];
+  document.getElementById("label").textContent = `${v.key} (${v.name})`;
+  document.getElementById("note").textContent = v.note;
+}
+function step(d) { variant = (variant + d + VARIANTS.length) % VARIANTS.length; sync(); draw(); }
+document.getElementById("prev").onclick = () => step(-1);
+document.getElementById("next").onclick = () => step(1);
+document.getElementById("catch").onclick = () => { catchAt = tick; };
+addEventListener("keydown", (e) => {
+  if (e.target.closest("input, textarea, [contenteditable]")) return;
+  if (e.key === "ArrowLeft") step(-1);
+  if (e.key === "ArrowRight") step(1);
+});
+loadImages().then(() => { buildToggles(); sync(); draw(); setInterval(() => { tick++; draw(); }, 1000 / 6); });
+</script>
+</body>
+</html>
