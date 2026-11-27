@@ -47,6 +47,21 @@
 
 
 
+
+## 2.19.1
+<sub>2026-11-27</sub>
+
+- *(patch)*
+  Internal: the link now goes down once chat messaging lockdown is in effect, even when the game turns it on after the restriction event, and sends nothing until it ends.
+- *(patch)*
+  Appear offline now shows you offline at once
+
+  Turning on Appear offline used to leave you showing online to your friends for up to 12 minutes. Now BFF steps out of the Crew's channel, so they see you offline straight away. While it's on you don't get their updates either; you catch up as soon as you turn it off.
+- *(patch)*
+  Friends in a battleground no longer show as offline
+
+  A friend in a battleground or other PvP match used to drop to offline after 12 minutes, because the game keeps BFF from sending anything there. Now they stay online for as long as they're in the Crew's channel, shown as "online · quiet" (or "by the fire · quiet" in the Camp) until you hear from them again. They still go offline when they log out.
+
 ## 2.19.0
 <sub>2026-11-27</sub>
 
