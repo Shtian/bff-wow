@@ -95,7 +95,7 @@ const ORE_CHIPS = ["W", "Y", "t"];
 const BASKET = [".aaa.", "a...a", "AaAaA", "aAaAa", ".AaA."];
 const FLOWERS = [{ u: 1, h: 4, c: "P" }, { u: 4, h: 5, c: "p" }, { u: 7, h: 4, c: "F" }];
 const PATCH_U = 8;
-const BASKET_U = -5;
+const BASKET_U = -4;
 
 const BOARS = [
   { key: "chunky", name: "Chunky, eye shut", rows: ["......j.j.j..jj.....", "....jjjjjjjjjjnj....", "...jmMMmmmmjjnnj....", "..jmMMmmnnmjmmmmj...", ".jmmmmmnnnmjmMmmmj.N", ".jmnnmmmmmjmmjjNvvvN", "jmmmmnnmmmjmmmmNuuuN", "jmmnnmmmmjmmmmmNquqN", ".jnnnnnnnjnnnnmjuuuj", "..jnjjnnjjjnjjnjjjj."] },
@@ -193,10 +193,11 @@ function pick(hand, dir) {
 }
 
 const UP = { body: "HOP", hand: [9, 14] };
+const STRIKE = [9, 9];
 const SWING = [
   { ...UP, dir: [-1, 1] }, { ...UP, dir: [-1, 1] }, { ...UP, dir: [0, 1] }, { ...UP, dir: [1, 1] },
-  { body: "SIT", hand: [9, 6], dir: [1, 0], hit: 0 }, { body: "SIT", hand: [9, 6], dir: [1, 0], hit: 1 },
-  { body: "SIT", hand: [9, 6], dir: [1, 0], hit: 2 }, { ...UP, dir: [1, 1] },
+  { body: "SIT", hand: STRIKE, dir: [1, 0], hit: 0 }, { body: "SIT", hand: STRIKE, dir: [1, 0], hit: 1 },
+  { body: "SIT", hand: STRIKE, dir: [1, 0], hit: 2 }, { ...UP, dir: [1, 1] },
 ];
 const CUT = [[1, 1], [1, 1], [1, 1], [1, 0], [1, 0], [1, 0]];
 
@@ -240,7 +241,7 @@ function mine(t, out) {
   out.body = f.body;
   out.front.push(layer().art(ORE, 7, 3).outline());
   out.front.push(pick(f.hand, f.dir));
-  if (f.hit != null) out.front.push(chips(layer(), [12, 6], f.hit));
+  if (f.hit != null) out.front.push(chips(layer(), [12, STRIKE[1] + 1], f.hit));
   const p = t % (SWING.length * 4) - 4;
   if (p >= 0 && p < 9) out.front.push(p < 6 ? layer().art(ORE_FIND, ...arc(p, [10, 7], [9, 19], 3, 6)).outline() : twinkle(layer(), 10, 20, p));
   return out;
