@@ -128,6 +128,33 @@ function Slots.open(db, facts, random)
   return { key = key, entry = entry, slot = activeSlot(db, key, random), repaired = repaired }
 end
 
+function Slots.left(db, key)
+  local slot = db.crews[db.rulesets[key].left]
+  return type(slot) == "table" and slot or nil
+end
+
+function Slots.dropLeft(db, key)
+  local entry = db.rulesets[key]
+  if entry.left ~= nil then db.crews[entry.left] = nil end
+  entry.left = nil
+end
+
+function Slots.leave(db, key, random)
+  Slots.dropLeft(db, key)
+  local entry = db.rulesets[key]
+  local slot
+  entry.left = entry.active
+  entry.active, slot = Slots.newSlot(db, key, random)
+  return slot
+end
+
+function Slots.rejoin(db, key)
+  local entry = db.rulesets[key]
+  db.crews[entry.active] = nil
+  entry.active, entry.left = entry.left, nil
+  return db.crews[entry.active]
+end
+
 function Slots.find(db, facts)
   local rulesets = type(db.rulesets) == "table" and db.rulesets or {}
   local entry = rulesets[Slots.key(Slots.facts(facts))]

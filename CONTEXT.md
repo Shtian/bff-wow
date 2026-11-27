@@ -27,7 +27,7 @@ Which of the Crew's hidden channels it is using. Each generation is derived from
 _Avoid_: Channel version, channel index
 
 **Leave (the Crew)**:
-What a Member does to themselves: their record is marked as left, so every other Member stops showing them. Unlike Remove, everyone sees it. The Crew's data is put away, not forgotten, until they start or join a different Crew on that Ruleset and faction.
+What a Member does to themselves: their record is marked as left, so every other Member stops showing them. Unlike Remove, everyone sees it. The Crew's data is set aside, not forgotten, until they start or join a different Crew on that Ruleset and faction.
 _Avoid_: Quit, unsubscribe
 
 **Display name**:

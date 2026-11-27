@@ -416,6 +416,7 @@ local function sendOwnNow(self)
 end
 
 function Core:updateOwn(character)
+  self.character = character
   local versionChanged = self.whatsNewState.version ~= nil and self.ledger:writeOwn({ bff = self.whatsNewState.version })
   local changed, before = self.ledger:updateOwn(character)
   if versionChanged and not changed then self.gossip:ownChanged("later") end
@@ -1504,29 +1505,42 @@ local function nameOrCurrent(self, displayName)
   return validName(displayName)
 end
 
-local function bringBack(self, code)
-  local kept = self.db.keptCrew
-  self.db.keptCrew = nil
-  if type(kept) ~= "table" or kept.code ~= code then return nil end
-  self.ledger:bringBack(kept.ledger)
-  self.feedState:bringBack(kept.feed)
-  self.crewGoals:bringBack(kept.goals)
-  refreshMembers(self)
-  return kept
+local function switchSlot(self, slot, carryFrom)
+  bindSlot(self, slot, false)
+  if carryFrom then self.ledger:carryOwn(carryFrom) end
+  self.linkFailed = nil
+  self.channelCapped = nil
+  self.toldOutOfDate = nil
+  self.mourning = nil
+  self.generationFrom = "saved"
+  if self.whatsNewState.version then self.ledger:writeOwn({ bff = self.whatsNewState.version }) end
+  if self.character then self.ledger:updateOwn(self.character) end
+  updateLink(self)
+end
+
+local function leftCrewWith(self, code)
+  local slot = ns.Slots.left(self.account, self.rulesetKey)
+  local crew = slot and slot.crew
+  return type(crew) == "table" and crew.code == code and crew or nil
 end
 
 local function enter(self, code, displayName, joining)
-  self.crewGoals:clear()
+  local left = leftCrewWith(self, code)
+  if left then
+    switchSlot(self, ns.Slots.rejoin(self.account, self.rulesetKey))
+  else
+    ns.Slots.dropLeft(self.account, self.rulesetKey)
+    self.crewGoals:clear()
+  end
   self.db.catchTypesTold = nil
-  local kept = bringBack(self, code)
-  local generation = kept and kept.generation or nil
+  local generation = left and left.generation or nil
   self.ledger:writeOwn({ displayName = displayName, left = false, joinedAt = self.now(), generation = generation or false })
   sendOwnNow(self)
   self.db.crew = { code = code, joined = joining or nil, generation = generation }
   self.generationFrom = "saved"
   self.linkFailed = nil
   self.channelCapped = nil
-  if kept then self:raiseGeneration(true) end
+  if left then self:raiseGeneration(true) end
   if joining then self.feedState:ownJoined() end
   self.listener("crewChanged")
   updateLink(self)
@@ -1649,22 +1663,12 @@ end
 
 local function finishLeaving(self)
   local crew = self.db.crew
-  self.db.crew = nil
-  self.linkFailed = nil
-  self.channelCapped = nil
-  updateLink(self)
   if self.linkUp then self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } }) end
   self.spareLife:clear()
-  self.db.keptCrew = {
-    code = crew.code,
-    generation = crew.generation,
-    ledger = self.ledger:putAway(),
-    feed = self.feedState:putAway(),
-    goals = self.crewGoals:putAway(),
-  }
-  self.db.catchTypesTold = nil
-  self.online = {}
-  self.pocket:clear()
+  crew.leaving, crew.left = nil, true
+  local joinFailure = self.db.joinFailure
+  switchSlot(self, ns.Slots.leave(self.account, self.rulesetKey, self.random), self.ledger)
+  self.db.joinFailure = joinFailure
   self.doings:clear()
   self.listener("crewChanged")
   self.listener("notice", "leftCrew")

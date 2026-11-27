@@ -61,9 +61,10 @@ A slot id is 8 characters from `[a-z0-9]`: a new slot's id is its new Member id.
 
   `Core.new` calls it once; starting, joining and leaving call it again.
 - **Leave and rejoin.** `putAway`/`bringBack` and `keptCrew` go away:
-  - Leaving marks the slot's `crew` left. It moves to the entry's `left`, and a fresh empty slot becomes `active`.
-  - Joining the left slot's code makes it active again.
+  - Leaving marks the slot's `crew` left (`crew.left = true`). It moves to the entry's `left`, and a fresh slot with no Crew becomes `active`. Its own record starts as a copy of the left one's display name, Characters, Main and look (`Ledger:carryOwn`), and `joinFailure` moves with it.
+  - Joining the left slot's code makes it active again and deletes the fresh slot.
   - Starting or joining any other code deletes the left slot.
+  - The `Slots` helpers are `left`, `leave`, `rejoin` and `dropLeft`. Core rebinds through `bindSlot`, replays the last Character into the new Ledger, and fires `crewChanged`.
 - **Confirmation.** The first DATA or DIGEST from another Member while `provisional` clears the flag.
 - **`/bff report`** shows the key, the record ID, server IDs, the name, whether the slot is provisional, and any repair this session.
 
