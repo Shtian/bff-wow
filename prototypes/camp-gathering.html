@@ -2,34 +2,20 @@
 <!--
   PROTOTYPE, throwaway. Question: a gathering figure in the Pocket Camp holds a static pick over its head. What
   should an animated gathering pose look like?
-  Round 1 (today's pick, swing, node, crouch, find mark): the node won. Feedback: the pick is too crooked at
-  the ends, herbalism should look like picking flowers, and the hide doesn't read as an animal (a tiny bit of
-  blood). Round 2 keeps round 1's node as a baseline and offers three sets, each a pick, a way of picking
-  flowers and an animal to skin (mix and match across them):
-    1  Round 1 node: the crooked pick, a sickle at a herb, a knife at a flat hide.
-    A  An even arch of a pick; bends, plucks a flower and holds it up; a boar, cut standing.
-    B  A straight pick with pale points; kneels and picks flowers into a basket; a wolf, cut kneeling.
-  Round 3: B was liked; the wolf should look more dead. The Wolf toggle: X eyes and a tongue out (default),
-  belly up with its legs stiff in the air (also X eyes and tongue, 20 columns long), or round 2's.
-  Round 4: neither wolf worked; try a deer. Antlers say "deer" at this size. Two dead deer on the Animal toggle:
-  collapsed with its legs splayed in two pairs (default), and flat on the ground with its legs stretched out
-  front and back. Both lie with the head down, the eye shut.
-  Round 5: the boar wins over the deer and the wolves. B now opens on the boar, kneeling to cut it.
-  Round 6: boar variations on the Animal toggle: humped with a big head down, small (3 columns shorter),
-  rolled over with its legs up, red, and grey.
-  Round 7: a chunkier boar after a reference: big head, a pink snout seen from the front with two
-  nostrils, white tusks either side, a pointed ear, a mottled red-brown hide. Eye shut (default), eye open, small.
-    C  A one-sided miner's pick; kneels and gathers a bouquet in the hand; the boar, its hide peeling back.
-  The picks are drawn by hand at each angle (round 1 rotated one shape, which bent the diagonals). The animal
-  lies behind the figure's legs, its head toward the fire, so it reaches about 7 past the figure (the anvil
-  reaches 4, the griffin 8). Each cut drips a drop of blood, and there's a 2-pixel stain under the animal.
+  Verdict so far: set B. Mining swings a straight pick with pale points at an ore node; herbalism kneels and
+  picks three flowers into a basket, then they grow back; skinning kneels and cuts a dead boar, a drop of blood
+  on each cut and a 2-pixel stain under it. (Rounds 1 to 6 tried a crooked pick, a sickle, a held flower, a
+  bouquet, wolves, deer and other boars; they're in git history.)
+  Open question: which boar. The chunky ones follow a reference: a big head, a pink snout seen from the front
+  with two nostrils, white tusks either side, a pointed ear, a mottled red-brown hide. Eye shut, eye open, small,
+  and the round 5 boar to compare. Click one in "Pick a boar".
+  Room: the boar lies behind the skinner's legs, head toward the fire. Past the figure, the chunky boar reaches
+  15, the small one 11, the round 5 boar 10 (the anvil reaches 4, the griffin 8); each lands on Odo's seat when
+  Kesh skins. The Camp would keep that room clear, as it does for the griffin.
   Profession: "Mixed" puts a herbalist on Mira, a miner on You and a skinner on Kesh. The Camp only knows
-  "gathering" today. Professions.practised already sees which skill line grew (182 herbalism, 186 mining,
-  393 skinning) from a record Core merged, so naming it sends nothing new.
-  Toggles: who gathers, profession, season, the game world behind, the backdrop's opacity, zoom (2x is about
-  in-game size), pause and step. The readout lists, per gatherer, how far it reaches past its 12 columns, what
-  it draws over, and what new sprites the set needs.
-  Figures, palette, fire, hat and pick are copied from scripts/camp-art.mjs; backdrops are
+  "gathering" today; Professions.practised already sees which skill line grew (182 herbalism, 186 mining,
+  393 skinning), so naming it sends nothing new.
+  Figures, palette, fire and hat are copied from scripts/camp-art.mjs; backdrops are
   Media/CampPocketBackdrop*.tga's 144-column band. Crew data is fake. Run: open the file in a browser.
 -->
 <html lang="en">
@@ -40,12 +26,16 @@
 <style>
   :root { --gold:#ffd14a; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99; --raised:#1b1a23; }
   * { box-sizing:border-box; }
-  body { margin:0; min-height:100vh; color:var(--text); background:#14121b; font:14px/1.4 system-ui, sans-serif; padding-bottom:96px; }
+  body { margin:0; min-height:100vh; color:var(--text); background:#14121b; font:14px/1.4 system-ui, sans-serif; padding-bottom:32px; }
   h1 { font-size:18px; margin:20px 16px 4px; text-align:center; }
   h2 { font-size:14px; color:var(--gold); margin:24px 16px 6px; text-align:center; }
-  .note { text-align:center; color:var(--muted); max-width:760px; margin:0 auto 10px; padding:0 16px; min-height:42px; }
-  #toggles { display:flex; flex-wrap:wrap; gap:10px 18px; justify-content:center; margin:12px 16px; color:var(--muted); font-size:13px; }
-  .group { display:flex; gap:4px; align-items:center; }
+  .note { text-align:center; color:var(--muted); max-width:760px; margin:0 auto 10px; padding:0 16px; }
+  #boars { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; padding:0 16px; }
+  .boar { display:flex; flex-direction:column; align-items:center; gap:6px; padding:10px; background:var(--raised); border:2px solid rgba(255,255,255,.1); border-radius:6px; color:var(--text); font:13px system-ui; cursor:pointer; }
+  .boar.on { border-color:var(--gold); }
+  .boar canvas { height:96px; }
+  #toggles { display:flex; flex-wrap:wrap; gap:10px 18px; justify-content:center; margin:16px; color:var(--muted); font-size:13px; }
+  .group { display:flex; gap:4px; align-items:center; flex-wrap:wrap; }
   .group button, .btn { font:13px system-ui; color:var(--text); background:var(--raised); border:1px solid rgba(255,255,255,.14); padding:4px 10px; border-radius:4px; cursor:pointer; }
   .group button.on { background:var(--gold); color:#1a1400; border-color:var(--gold); }
   .group input[type=range] { width:110px; }
@@ -55,14 +45,15 @@
   .readout b { color:var(--text); font-weight:600; }
   .readout .warn { color:#f0a21c; }
   .readout .ok { color:#70e370; }
-  .switcher { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); display:flex; align-items:center; gap:4px; background:#fff; color:#111; border-radius:999px; padding:6px; box-shadow:0 6px 24px rgba(0,0,0,.5); font:600 13px system-ui; z-index:9; }
-  .switcher button { border:0; background:#eee; border-radius:999px; width:32px; height:32px; font-size:16px; cursor:pointer; }
-  .switcher .label { padding:0 12px; min-width:170px; text-align:center; }
 </style>
 </head>
 <body>
-<h1>Gathering in the Pocket Camp: round 2, the node</h1>
-<div class="note" id="note"></div>
+<h1>Gathering in the Pocket Camp: set B</h1>
+<div class="note">Mining swings a straight pick at an ore node. Herbalism kneels and picks flowers into a basket. Skinning kneels and cuts a boar, with a drop of blood on each cut.</div>
+
+<h2>Pick a boar</h2>
+<div id="boars"></div>
+
 <div id="toggles"></div>
 <div style="display:flex;justify-content:center;gap:8px;margin:4px 16px"><button class="btn" id="pause">Pause</button><button class="btn" id="step">Step a tick</button></div>
 
@@ -72,8 +63,6 @@
 <h2>Day</h2>
 <div class="stage"><canvas id="day"></canvas></div>
 <div class="readout" id="day-out"></div>
-
-<div class="switcher"><button id="prev" aria-label="Previous variant">←</button><div class="label" id="label"></div><button id="next" aria-label="Next variant">→</button></div>
 <script>
 const BD = {"night":"iVBORw0KGgoAAAANSUhEUgAAAJAAAAAkCAYAAABmHbPbAAAFO0lEQVR4nO2ZTW4UQQyFZzNIQSEZwigEyAKBlFUWbII4A8qeW3AAJMRNOA034gCDPPCih2O7XT/dPZNMSVZR3V3u6vLnV56wWBzaoR3aoT2adrL6sDmMpxs/inb09GKnNn3fxnvZvI9av7jZlIyXT062PSAqnX8Yt429eM7SsAj0n2+/bqzrgEbDg/7i8pM579D36XW8Rm0I8vP19X8Ecy8LscbSCxQ81r34FxP/0XP73g/twxy9F0+rb2pQBkAUyaP8GyZjbBwvnsFhA0TW81OMRTHH8i/7MNV6NaxWfLz4LXopkz5eAA8rUUvmiX+5p038i1n+vv/4uROZO6cCZfwwrLVKpGvSKiXStUokc3pRUBVAYV337PrNyy6bjQztAUFpULxk8ZKj5zpK3jMU12JooDAMj5gEVS9qTUfU8bN3d9csSGQuX/cgkvegl2Ja/AkI7J/fXzve/P6Vfp4TofR91j60rJ8VKHof1hr5s55lCKuh8n4dyYv0JshYgiu2OvubbXJdxgyMjE9Or7Ym/wZEbIAH/vAx7D+TqQJHL+XBOvR3D/WR0oofJEetkg3dz65X77cV9yJoPHhYIWRh0lsAaXi4QN4CcHplFtBa6fAs/LH/qQzv5aBk5iGJOMu9bM/6s+AAhFlYtfFzSH7rPdXHmYaKayFAgpewAkUfk62B8FEIIvzzUVYLReYarlvrK/GtlbYUIg0jktG6z+/jdXrrYpM5sr+WiFQpkK6BePE1NU62BtJKxwABIqhTBiZ+xlIy9s3XdND1r0TJass3X5NvQDLo+aVKJH50HKL7eEava+i7+P6CamKZLz0gC5t1fPExpl/GBCNAVo0zBI2nRBIs1E9cR8H4mnUE8dFqwXJXX/3zIevEdRyrupbTvvS7uKazlLhEiSI/rCjec/r7rATR8VkYf8IpUqAoqFHt4tU43jzvOfZnmRV4CyjL9NEYXbcynzNbz4HqwKxM10omAFyef7zX633z/AzByiWG912Y79VA6PUxl4YqoyRRjZOBpxSiLFAZUFg9kQTWEcQ1nzaoMMxLGg4oQwOzxlYtpYPvGWATWFGnclw0LFpM7v4H4vTqPjRR7RPBoyGJ7mfmezXQ9o+KCYB6m6cgvNneXIbPSxL80rSUh2s3S4m0Gno10NL49RspjbdWi4vmGsiCxrqeUa6hGmhKcDj4mcy26jP+Y+jQfAHFggfHTOQns9/L4IePJQBWDVR8XEU1kEdqtsYZggibwps3lRLJ2jwV0gEZUi4v03VtwhDBuEaJINTHfRQvvIuTxJpvKRMfY/LcKDVQ5njKAsYfNcfxpTfZAkgrYyaYXrKwkum6bCg5s0o3dExFx5WujYpqoLPjVVjDePdhcn8IHstHTSHdw/SvKP0dWkGs+UujBtLfqBXIKuwteOAnUg691iPj15qOn/cej4uwrVevNl7/kOzt+bjjfTYr/sXQ7IJ5QYp6mB7Pbdn17xqUkaikodoFiErgabGb96+LxmPDNCVEQydQ0XE1JTytMCCoJT1Mj0vN85fpW2GbC6qdqIFalaUGlqmtFaK5lGlnoGk9dlph+HJzMdjD9Fib93ymb4VtTqUqhmksqGqPqVJlKQluL2uFaAylmhSWCJp9UJ5SOL7djtOXwlUK1ZRKFIlIswLVwNWzxilVnowxDJ5loYng6QlNJllbYemmRDXwzKE8vZUogicDUa0SzXWcdYOoBqoIrkMNNH8N1F1pekDTenyNoUwtSpUdt0LTqjStNU+JKIzaSheDXj6ypZdNfgh96z7U7n+P9gfFwcktax5sZwAAAABJRU5ErkJggg==","day":"iVBORw0KGgoAAAANSUhEUgAAAJAAAAAkCAYAAABmHbPbAAAElUlEQVR4nO2Zv24UQQzG71HSUgUhJKQUqagoSINEQ490EUKKKGgQoklDgZQuPAIVz0DNA/A2QQ760BfH9tize7t7uR3Jcmb/zHjHv/nGB5vN2ta2trUdTHtz+etm7U/XP4h2/OJkUYu+b/29bN5HXVz/vqn0j44f3XpAVH1/7Q/re/mcpSGIlgc0Gh74j1/fpcZZfZ/X+dppQ5Jfnb+8QzB7CcTqixcouK+9jC8m40fP7btvrcMc3sun5Qc1KAMgiuRR/oZJHwvHwTM4bIDIen7f+7IOU82nYbXy4+VvM5Yy6eMF8LASDdl5Mr7c0ybjiy1hhy5RgTLjMKy9SqRr0i4l0rVKJHM6KKgKoLCue7bE46yaFG+zDN0cmTgq87TyWoYGCsPw8BHDk1/QEXX29v3/axYk8i5fjxQIXoppzMfj8/xT9HkjVN+31mFIPKxA0XyINRrPepYh7IbK+3XEyeUdIckVO/9ydRuUXJc+AyP9T1c/bk3+BkTaeDyGB+NPrTyIo6qMkdLqzdGjZK372Xj1elt5L0HjwaNrFCyABkjDw+ol97efv5vg8HN4VmDDeDz+VIZ5OSmZ97CJeJd7uz07ngUHcpCFVRs/h81vzdN9nGmouBYCJJiEFSj6mGwNhI9CEjE+H2W9UGSu4boVX2VsrbRViDSMXEro+zwfx+nFxSbvyPpaItKlQFYNhOB7apxsDaSVjgECRFCnDEz8jKVkPDZf00m3FNgaO1ML8i/NqgpZEFn38YyOq/VdfH9DNbG8Lx6Qhc06vqxjTAMBhRAf1ThZgxJJsuToY+OF4drKOoL4aLVgwTMYQ+LEdQ085tNj6blaSlxRomgcS3m06e+zNoiOd2P8E05JgaKkRrVLq8bJGo9nGScsAsoyfTRG1724vHesxHjwcH3y7eefez7afDxOC1YuMbzviuJliPQxl4YqoyTRx1ThyUCUBSoDCqsnbwLvO61xocKw6PtYrQANzOpbtVRW2VnJERfnRcOixQTXZV1KtU8Ejw46up9539s5WYDGtlacUVzZTSLJtJSHazdLibQaejXQkfPr11MabwyLi8E1kAWNdT2jXK2dMzU4Fcit+qzyvoBiwWPVX976ZBU9ikff57yXj6ueGqhiGWisWmEKeDJKklWfVvK5PhF4YNGvwKgsiPKVqVE9Zdo4/0Mxag2UWbQsYPzRcxxfrWPIUsYepdX/baML/6iOqipldvNHNZAJjfcS/PNnT8Kgvfswud+Cxxqjp5AeGxzrO7SCZMHT36gVKPML0FsrDZGOVcPTyp+ep6w8Z+f/zj7Lr3YYZuU/Bc3p68d3YJE+D7z2D6/v8VFSotUOw1on0D1IQFTkz4jM1R+et7hYa6DVQivXQA9Vgbbbp00P031t3vMZP/c6TKpA+w5VJblj2UOBqBuWCJq5P6oXmsguP5zsxFfhmnvdqjCNpkBLhGuo0jAMnmWhieCZe52qsIymRNovwSQpLT9UiSJ4MhDBojiXZKNB1AOVVibYlH3e8a3+2DVQNN9c63G6S6UZA5p9sIpSZfsZv2SriMJOWzWY1S/Dj9H+AiuA0CONNbrjAAAAAElFTkSuQmCC","nightWinter":"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","dayWinter":"iVBORw0KGgoAAAANSUhEUgAAAJAAAAAkCAYAAABmHbPbAAAFU0lEQVR4nO1ZPYtVQQx9P2VbK0UEwcLKysJtBBt7YRcRxMJGxMbGQthOf4KVhbWFtVhtIdb+j5WsHjlkTzKZO/e+j903ELK5HzOZ5MxJ7tvVaj/2Yz/248qMx2+/ne3t9dlXYly/f2ergr5r9k6OaFPPP3w/67EPrl871wBR7/t7e8yO8rmRASda+svXHxI80Ke/fpfm2etp2udr0YEkI6lAMGtzRNmm7T22vbb5TR4eP0if23XdisMmdJRPpYdGxAyKHu1viNn2Ltv420BjTAQAmSDI6vldty0O61rPg1XlJ8rfai5m8uXFGIJ1FekAkGIeu+fFNm+yDSd0Th3FYQkm643fSjBOVHEmgQg6oznvFBgGoMB1u4brkWxjORsBNcdh9HBU3kcMp4JnCDRgGAYPlxheHBsy+/DJs//XUJo8s/D1iIFsfRVsnp/XX4dtfqvkV973h4UPxxR/mMmy9QCgbD6/L77vv4q7QBV9HXFy4YTZllyT4zcn58Cw62YDeHjm1cmnc7G/ASIvPB+DB/Ovm3ngRy8zMgOrMv3y3dMhJsvu8zqteX28V/SV7MtYOlqf1nyCTIBaDyAEXTXIdv/o9ccL91gwtz1rYMN8PP+6BOtyYirv4RDhb2ZcZoaqqLLPzJG1BYphPFsh3lHlmFzOfA/EvRAH1hZBglubUU5GZczmQxIxP5eyqaCoXPN75D30zO2ZtjVHC4w4ZOo+r8dgj/xisXcsvopESuCJwKIYIjoRWY+D91o9ED8PYHoQgZ0qYOJnFJPx3B44CuzwC75l80TvM4P3sJDqRz1L+We8X6198Rxcxux90wBZOlT5UmWMTxUQjATxyWOnMtBkDbWVPhYODPdWqgRxaVVgwTOYw/zEdQ94rOfn8mtl++V9VcETMbpiHi9+f9yf8v54nZX4/a+LgbKkRmhHorMepyoAqQeOBxD6qghQSnxpzK57v5h91Dv+hKuTrpjo/eefF7SPcwTCrC1gJmdfeU8tfxlEvsyVQaW+liJwqfu94OGGOgJRFVAVoDB72vvZV5T5peYFC0Oy/TFbATQQZateKipHGeOhT+W8MKMpMgGILC4hSPxXmAIP9z7e6ezkeUaq9kAtFlpSWn5mwFYMrZjMkqmYh3s3MFE0BxgsAyt//Ub548PvReFjuAdSJ0JdrzBX6+SsGzhRkBWI7PecXvDx+wYUBR7+AswYXx1QBbRW/P19znt3uar0QMpRdV2dxgpoWHN/tTR4vB2d6ox9KkzLPRBABPG/o0WxynokXufA9ahRfiJm4jLWxURRGVPOVoKWnRKfoFai1gGmzD/PjP4A9TAsmMw3/lkf1dsOtA4/lyuvPXhS5vH63u2bKVLtfsYwdr9Fs1hDgWhd7KP6F7UPToryq7pH7vGixl7FLIo3++t99eDx+Wv52808h8d/a5/Se7kaovKfDiCMNX5j2FVtG+f/OFfsXl2df5d1hI8uUG0i+UjE1OR6DWnZvVKdf4pW8dgUWCRoKi9tA3NM1Xcf3ZD20jpaf5TptoWB0nH67xdJpUdlTua47DLKXCOi8r8x0CwBriqzHB3damqIt71Ez1f0kky1tHSDaQlQTQnO1PLRk9y5ZAREU8vjEuCaDJYMNNvANFNAk8nbF3cW0b3gmhM0Pr5LMM9sDFQF15zlaIR5KsJgiKQKmgw828hElXwPM9HczGSBqOpILCktPcpEGXgqIIJkfkZSiY+P58aZZwRUEbhwErDJis2B7LH5xLfsuXugbL2p+/F2TzwXZ5o5QLMJJmox0whTVe2Krkq0vyWZp4cUFh29zvRqC5CyL7teOq5zjD86RaHukB2h0gAAAABJRU5ErkJggg=="};
 
@@ -97,26 +86,24 @@ const LOGS = ["..BB.......BB..", ".BBBBb...bBBBB.", "bbBBBBBBBBBBBbb", "..bbbbbb
 const SEAT = ["BBBBBBBBBBBBBB", "bbbbbbbbbbbbbb", "bbbbbbbbbbbbbb"];
 const STRAW = ["....GYYG....", "...GYWYYGO..", "...RRRRRR...", ".OGYYYYYYGO.", "aOGGGGGGGGOa"];
 const CAT = [".....T..T", ".....TTTT", "t....YTYT", "t....TPTT", ".t..TTTTT", ".tTTTTTNT", "..TTTTTNT", "..TtTtTTT"];
-const PICK_RAW = ["..ZZZZZZ..", ".ZZtAatZZ.", "ZZ..Aa..ZZ", "Z...Aa...Z", "....Aa....", "....Aa....", "....Aa....", "....Aa...."];
 const CLASS = { WARRIOR: "#c69b6d", MAGE: "#3fc7eb", DRUID: "#ff7c0a", PALADIN: "#f48cba", HUNTER: "#aad372" };
 
-const NODES = {
-  ore: ["..tTTt..", ".tTeTct.", "tTcTTTTt", "tTTTeTcT", "ttTtTTtt"],
-  herb: [".p...p..", "pYp.pYp.", ".pi.ip..", "..iii...", "hihhihh.", "hghhghhg"],
-  hide: ["..aAAa..", ".aAAbAAa", "aAbAAAAA", ".a.aAa.a"],
-};
-const FINDS = {
-  ore: ["ec", "cc"],
-  herb: [".p.", "pYp", ".i.", ".i."],
-  hide: ["aAa", "AAA", "aAa"],
-};
-const SACK = [".aa.", "aAAa", "AAAA", "aAAa"];
-const PROFESSIONS = {
-  any: { tool: "pick", node: "ore", chips: ["W", "Y", "t"] },
-  mining: { tool: "pick", node: "ore", chips: ["W", "Y", "t"] },
-  herbalism: { tool: "sickle", node: "herb", chips: ["i", "h", "i"], byHand: true },
-  skinning: { tool: "knife", node: "hide", chips: ["A", "a", "N"] },
-};
+const ORE = ["..tTTt..", ".tTeTct.", "tTcTTTTt", "tTTTeTcT", "ttTtTTtt"];
+const ORE_FIND = ["ec", "cc"];
+const ORE_CHIPS = ["W", "Y", "t"];
+const BASKET = [".aaa.", "a...a", "AaAaA", "aAaAa", ".AaA."];
+const FLOWERS = [{ u: 1, h: 4, c: "P" }, { u: 4, h: 5, c: "p" }, { u: 7, h: 4, c: "F" }];
+const PATCH_U = 8;
+
+const BOARS = [
+  { key: "chunky", name: "Chunky, eye shut", rows: ["......j.j.j..jj.....", "....jjjjjjjjjjnj....", "...jmMMmmmmjjnnj....", "..jmMMmmnnmjmmmmj...", ".jmmmmmnnnmjmMmmmj.N", ".jmnnmmmmmjmmjjNvvvN", "jmmmmnnmmmjmmmmNuuuN", "jmmnnmmmmjmmmmmNquqN", ".jnnnnnnnjnnnnmjuuuj", "..jnjjnnjjjnjjnjjjj."] },
+  { key: "chunkyEye", name: "Chunky, eye open", rows: ["......j.j.j..jj.....", "....jjjjjjjjjjnj....", "...jmMMmmmmjjnnj....", "..jmMMmmnnmjmmmmj...", ".jmmmmmnnnmjmMmmmj.N", ".jmnnmmmmmjmmjONvvvN", "jmmmmnnmmmjmmmmNuuuN", "jmmnnmmmmjmmmmmNquqN", ".jnnnnnnnjnnnnmjuuuj", "..jnjjnnjjjnjjnjjjj."] },
+  { key: "chunkySmall", name: "Chunky, small", rows: [".....j.j.jj.....", "...jjjjjjjnj....", "..jmMMmmjmnmj...", ".jmMmnnmjmmmmj.N", "jmmmmmmmjmjNvvvN", "jmmnnmmjmmmNquqN", ".jnnnnnjnnnjuuuj", "..jnjjnjjnjjjjj."] },
+  { key: "plain", name: "Round 5 boar", rows: ["..b.b.b.b.....", ".bbbbbbbbb.B..", "bBaaaaaaaabBa..", ".aaaaaaaaaaaKaP", ".aaaaaaaaaaaNPP", "..AAAAAAAaaN...", "..bb..bb.bb...."] },
+];
+const boarRows = () => (BOARS.find((b) => b.key === state.boar) || BOARS[0]).rows;
+const ANIMAL_U = 6;
+const BLOOD = "#b8141e";
 
 function outlined(rows) {
   const w = Math.max(...rows.map((r) => r.length)) + 2, h = rows.length + 2;
@@ -135,7 +122,7 @@ function outlined(rows) {
   }
   return out;
 }
-const STRAW_HAT = outlined(STRAW), CAT_ART = outlined(CAT), PICK = outlined(PICK_RAW);
+const STRAW_HAT = outlined(STRAW), CAT_ART = outlined(CAT);
 const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
 const shade = (c, k) => "#" + hex(c).map((v) => Math.round(v * k).toString(16).padStart(2, "0")).join("");
 
@@ -149,24 +136,11 @@ const CAST = [
   { id: "kesh", name: "Kesh", cls: "MAGE", x: 25 },
 ];
 
-const VARIANTS = [
-  { key: "1", name: "Round 1 node", sprites: "4 tool angles a profession (12), 1 strike body, 3 nodes, 3 finds",
-    note: "Round 1's winner, as a baseline: the pick with the crooked ends, a sickle at a herb and a knife at a flat hide." },
-  { key: "A", name: "Arch, raise, boar", set: { pick: "arch", herb: "raise", animal: "boar", skinBody: "SIT" },
-    sprites: "4 pick angles, flower patch (3 flowers, a bud), a held flower, boar, 3 knife angles",
-    note: "Pick: an even arch, the head straight across with one pixel turned down at each end, drawn by hand at each angle so the diagonals stay smooth. Herbs: bends to the patch, plucks the nearest flower and holds it up, and the flower grows back. Skinning: a boar lying at the feet, cut with a short knife, a drop of blood on each cut and a small stain under it." },
-  { key: "B", name: "Points, basket, wolf", set: { pick: "points", herb: "basket", animal: "wolf", skinBody: "CROUCH" },
-    sprites: "4 pick angles, flower patch, basket (0 to 3 flowers), wolf, 2 knife angles, crouched body",
-    note: "Pick: a straight head with pale points and a collar, no curl at all. Herbs: kneels and picks the three flowers one by one into a basket behind, then they grow back. Skinning: a grey wolf lying at the feet, kneeling to cut, the same drops and stain." },
-  { key: "C", name: "One-sided, bouquet, boar flap", set: { pick: "oneSided", herb: "bouquet", animal: "boar", skinBody: "CROUCH", flap: true },
-    sprites: "4 pick angles, flower patch, bouquet (1 to 3), boar, hide flap (3 lengths), 2 knife angles, crouched body",
-    note: "Pick: a miner's pick, a curved point on one side and a flat hammer face on the other. Herbs: kneels and gathers a small bouquet in the hand, 1, 2, then 3 flowers, which twinkles before the patch grows back. Skinning: the boar, kneeling, the hide peeling back a little more with each cut, with drops and a stain." },
-];
 const params = new URLSearchParams(location.search);
-let variant = Math.max(0, VARIANTS.findIndex((v) => v.key === (params.get("variant") || "B")));
 const state = {
+  boar: params.get("boar") || "chunky",
   who: params.get("who") || "all", prof: params.get("prof") || "mixed", season: params.get("season") || "none",
-  wolf: params.get("wolf") || "chunky", world: params.get("world") || "forest", opacity: +(params.get("opacity") || 60), zoom: +(params.get("zoom") || 3),
+  world: params.get("world") || "forest", opacity: +(params.get("opacity") || 60), zoom: +(params.get("zoom") || 3),
 };
 let tick = 0, paused = false;
 const GATHERERS = { you: ["you"], kesh: ["kesh"], both: ["you", "kesh"], neighbours: ["odo", "kesh"], all: ["mira", "you", "kesh"] };
@@ -179,10 +153,9 @@ function layer() {
   return {
     px,
     set(u, r, c) { px.set(u + "," + r, c); return this; },
-    art(rows, u0, r0, pal = PAL) {
+    art(rows, u0, r0) {
       rows.forEach((line, i) => [...line].forEach((ch, j) => {
-        if (ch === ".") return;
-        this.set(u0 + j, r0 + rows.length - 1 - i, ch === "K" ? PAL.K : pal[ch]);
+        if (ch !== ".") this.set(u0 + j, r0 + rows.length - 1 - i, PAL[ch]);
       }));
       return this;
     },
@@ -198,24 +171,21 @@ function layer() {
   };
 }
 
-function tool(kind, hand, dir, short) {
-  const l = layer(), [hu, hr] = hand, [dx, dy] = dir, p = [-dy, dx];
-  const at = (k, j) => [hu + dx * k + p[0] * j, hr + dy * k + p[1] * j];
-  const put = (k, j, c) => { const [u, r] = at(k, j); l.set(u, r, c); };
-  if (kind === "pick") {
-    const L = short ? 3 : 5, span = short ? 2 : 3;
-    for (let k = 0; k < L; k++) put(k, 0, k < 1 ? PAL.a : PAL.A);
-    for (let j = -span; j <= span; j++) put(L, j, j === 0 ? PAL.t : PAL.Z);
-    put(L - 1, span + 1, PAL.Z); put(L - 1, -span - 1, PAL.Z);
-    if (!short) { put(L - 2, span + 1, PAL.Z); put(L - 2, -span - 1, PAL.Z); }
-  } else if (kind === "sickle") {
-    const L = short ? 2 : 3;
-    for (let k = 0; k < L; k++) put(k, 0, PAL.a);
-    put(L, 0, PAL.Z); put(L + 1, 0, PAL.Z); put(L + 2, 1, PAL.N); put(L + 2, 2, PAL.N); put(L + 1, 3, PAL.W);
+function knife(hand, dir) {
+  const l = layer(), [hu, hr] = hand, [dx, dy] = dir;
+  [PAL.a, PAL.a, PAL.Z, PAL.N, PAL.W].forEach((c, k) => l.set(hu + dx * k, hr + dy * k, c));
+  return l.outline();
+}
+
+const PICK_UP = [[0, 0, "a"], [0, 1, "A"], [0, 2, "A"], [0, 3, "A"], [-3, 4, "N"], [-2, 4, "Z"], [-1, 4, "Z"], [0, 4, "t"], [1, 4, "Z"], [2, 4, "Z"], [3, 4, "N"], [-1, 5, "Z"], [0, 5, "Z"], [1, 5, "Z"]];
+const PICK_DIAG = [[0, 0, "a"], [1, 1, "A"], [2, 2, "A"], [3, 3, "A"], [4, 4, "t"], [3, 5, "Z"], [2, 6, "N"], [5, 3, "Z"], [6, 2, "N"], [5, 5, "Z"]];
+function pick(hand, dir) {
+  const l = layer(), [hu, hr] = hand, [dx, dy] = dir;
+  if (dx !== 0 && dy !== 0) {
+    const flip = dx < 0 ? -1 : 1;
+    for (const [x, y, c] of PICK_DIAG) l.set(hu + x * flip, hr + y, PAL[c]);
   } else {
-    put(0, 0, PAL.a); put(1, 0, PAL.a);
-    put(2, 0, PAL.Z); put(3, 0, PAL.N); put(4, 0, short ? PAL.W : PAL.N);
-    if (!short) put(5, 0, PAL.W);
+    for (const [j, k, c] of PICK_UP) l.set(hu + dx * k - dy * j, hr + dy * k + dx * j, PAL[c]);
   }
   return l.outline();
 }
@@ -226,14 +196,10 @@ const SWING = [
   { body: "SIT", hand: [9, 6], dir: [1, 0], hit: 0 }, { body: "SIT", hand: [9, 6], dir: [1, 0], hit: 1 },
   { body: "SIT", hand: [9, 6], dir: [1, 0], hit: 2 }, { ...UP, dir: [1, 1] },
 ];
-const TAP = [
-  { body: "CROUCH", hand: [9, 4], dir: [1, 1] }, { body: "CROUCH", hand: [9, 4], dir: [1, 1] },
-  { body: "CROUCH", hand: [9, 4], dir: [1, 1] }, { body: "CROUCH", hand: [9, 4], dir: [1, 0], hit: 0 },
-  { body: "CROUCH", hand: [9, 4], dir: [1, 0], hit: 1 }, { body: "CROUCH", hand: [9, 4], dir: [1, 0], hit: 2 },
-];
+const CUT = [[1, 1], [1, 1], [1, 1], [1, 0], [1, 0], [1, 0]];
 
-function chips(l, at, hit, kind) {
-  const [u, r] = at, [c1, c2, c3] = kind.chips;
+function chips(l, at, hit) {
+  const [u, r] = at, [c1, c2, c3] = ORE_CHIPS;
   if (hit === 0) l.set(u + 1, r + 1, PAL[c1]).set(u + 2, r + 2, PAL[c2]).set(u - 1, r + 2, PAL[c1]);
   if (hit === 1) l.set(u + 2, r + 3, PAL[c2]).set(u + 3, r + 2, PAL[c1]).set(u - 1, r + 4, PAL[c3]);
   if (hit === 2) l.set(u + 3, r + 1, PAL[c3]).set(u - 2, r + 3, PAL[c3]);
@@ -247,166 +213,70 @@ function twinkle(l, u, r, n) {
   const c = n % 2 ? PAL.Y : PAL.W;
   return l.set(u, r + 1, c).set(u, r - 1, c).set(u - 1, r, c).set(u + 1, r, c);
 }
-
-const PICK_UP = {
-  arch: [[-3, 4, "Z"], [-2, 4, "Z"], [-1, 4, "Z"], [0, 4, "t"], [1, 4, "Z"], [2, 4, "Z"], [3, 4, "Z"], [-4, 3, "Z"], [4, 3, "Z"]],
-  points: [[-3, 4, "N"], [-2, 4, "Z"], [-1, 4, "Z"], [0, 4, "t"], [1, 4, "Z"], [2, 4, "Z"], [3, 4, "N"], [-1, 5, "Z"], [0, 5, "Z"], [1, 5, "Z"]],
-  oneSided: [[-2, 5, "Z"], [-2, 4, "Z"], [-2, 3, "Z"], [-1, 4, "Z"], [0, 4, "t"], [1, 4, "Z"], [2, 4, "Z"], [3, 4, "Z"], [4, 3, "N"]],
-};
-const PICK_DIAG = {
-  arch: [[4, 4, "t"], [3, 5, "Z"], [2, 6, "Z"], [5, 3, "Z"], [6, 2, "Z"], [1, 6, "Z"], [6, 1, "Z"]],
-  points: [[4, 4, "t"], [3, 5, "Z"], [2, 6, "N"], [5, 3, "Z"], [6, 2, "N"], [5, 5, "Z"]],
-  oneSided: [[4, 4, "t"], [3, 5, "Z"], [2, 6, "Z"], [1, 6, "N"], [5, 3, "Z"], [6, 3, "Z"], [5, 2, "Z"], [6, 2, "Z"]],
-};
-function pickArt(style, hand, dir) {
-  const l = layer(), [hu, hr] = hand, [dx, dy] = dir;
-  if (dx !== 0 && dy !== 0) {
-    const flip = dx < 0 ? -1 : 1;
-    for (const [x, y, c] of [[0, 0, "a"], [1, 1, "A"], [2, 2, "A"], [3, 3, "A"], ...PICK_DIAG[style]]) l.set(hu + x * flip, hr + y, PAL[c]);
-  } else {
-    const p = [-dy, dx];
-    for (const [j, k, c] of [[0, 0, "a"], [0, 1, "A"], [0, 2, "A"], [0, 3, "A"], ...PICK_UP[style]]) l.set(hu + dx * k + p[0] * j, hr + dy * k + p[1] * j, PAL[c]);
-  }
-  return l.outline();
-}
-
-const FLOWERS = [{ u: 1, h: 4, c: "P" }, { u: 4, h: 5, c: "p" }, { u: 7, h: 4, c: "F" }];
-const PATCH_U = 8;
+function flower(l, u, r, c) { return l.set(u, r, PAL.Y).set(u - 1, r, PAL[c]).set(u + 1, r, PAL[c]).set(u, r + 1, PAL[c]).set(u, r - 1, PAL[c]); }
 function patch(u0, r0, looks) {
   const l = layer();
   for (let x = 0; x < 9; x++) l.set(u0 + x, r0, PAL[x % 3 === 1 ? "g" : "h"]);
   for (const x of [0, 2, 6, 8]) l.set(u0 + x, r0 + 1, PAL.h);
   FLOWERS.forEach((f, k) => {
-    const look = looks[k] || "full", u = u0 + f.u;
+    const look = looks[k], u = u0 + f.u;
     if (look === "gone") return;
-    const lift = look === "lift" ? 1 : 0, top = r0 + f.h - 1 + lift;
     if (look === "bud") {
       for (let r = r0 + 1; r <= r0 + f.h - 3; r++) l.set(u, r, PAL.i);
       l.set(u, r0 + f.h - 2, PAL.h);
       return;
     }
+    const top = r0 + f.h - 1 + (look === "lift" ? 1 : 0);
     for (let r = r0 + 1; r <= top - 2; r++) l.set(u, r, PAL.i);
     flower(l, u, top, f.c);
   });
   return l.outline();
 }
-function flower(l, u, r, c) { return l.set(u, r, PAL.Y).set(u - 1, r, PAL[c]).set(u + 1, r, PAL[c]).set(u, r + 1, PAL[c]).set(u, r - 1, PAL[c]); }
-const BASKET = [".aaa.", "a...a", "AaAaA", "aAaAa", ".AaA."];
 
-const ANIMALS = {
-  boar: ["..b.b.b.b.....", ".bbbbbbbbb.B..", "bBaaaaaaaabBa..", ".aaaaaaaaaaaKaP", ".aaaaaaaaaaaNPP", "..AAAAAAAaaN...", "..bb..bb.bb...."],
-  chunky: ["......j.j.j..jj.....",  "....jjjjjjjjjjnj....",  "...jmMMmmmmjjnnj....",  "..jmMMmmnnmjmmmmj...",  ".jmmmmmnnnmjmMmmmj.N",  ".jmnnmmmmmjmmjjNvvvN",  "jmmmmnnmmmjmmmmNuuuN",  "jmmnnmmmmjmmmmmNquqN",  ".jnnnnnnnjnnnnmjuuuj",  "..jnjjnnjjjnjjnjjjj."],
-  chunkyEye: ["......j.j.j..jj.....",  "....jjjjjjjjjjnj....",  "...jmMMmmmmjjnnj....",  "..jmMMmmnnmjmmmmj...",  ".jmmmmmnnnmjmMmmmj.N",  ".jmnnmmmmmjmmjONvvvN",  "jmmmmnnmmmjmmmmNuuuN",  "jmmnnmmmmjmmmmmNquqN",  ".jnnnnnnnjnnnnmjuuuj",  "..jnjjnnjjjnjjnjjjj."],
-  chunkySmall: [".....j.j.jj.....",  "...jjjjjjjnj....",  "..jmMMmmjmnmj...",  ".jmMmnnmjmmmmj.N",  "jmmmmmmmjmjNvvvN",  "jmmnnmmjmmmNquqN",  ".jnnnnnjnnnjuuuj",  "..jnjjnjjnjjjjj."],
-  boarHump: [".......b.b.b.....",  ".....bbbbbbbbB...",  "...bbaaaaaaabBB..",  "..baaaaaaaaaaaaK.",  ".baaaaaaaaaaaaaaPP",  "b.aAAAAAAAaaaaNaPP",  "...b.b.....b.bN..."],
-  boarSmall: ["..b.b.b....",  ".bbbbbbbB..",  "baaaaaaabB.",  ".aaaaaaaaKP",  ".AAAAAAaNPP",  "..b.b..b.b."],
-  boarUp: [".bb.......bb.....",  ".b.........b.....",  ".AAAAAAAAAAAA....",  "aaaaaaaaaaaaaaB..",  "baaaaaaaaaaaaKaP.",  ".bbbbbbbbbbbbaNPP",  "..b.b.b.b.b......"],
-  boarRed: ["..b.b.b.b.....",  ".bbbbbbbbb.b..",  "bbccccccccbbc..",  ".cccccccccccKcP",  ".cccccccccccNPP",  "..eeeeeeeccN...",  "..bb..bb.bb...."],
-  boarGrey: ["..t.t.t.t.....",  ".ttttttttt.t..",  "tTTTTTTTTTtTT..",  ".TTTTTTTTTTTKTP",  ".TTTTTTTTTTTNPP",  "..ZZZZZZZTTN...",  "..tt..tt.tt...."],
-  deerFlat: [".............N...N", ".............NN.NN", "...aaaaaaaa...NNN.", "..aAAAAAAAAa..aA..", ".NAAAAAAAAAAaaAbAb", "..AAAAAAAAAAAAAAA.", "aaaANNNNNNNNNAaaaa", "b................b"],
-  deerSplay: [".............N...N", ".............NN.NN", "...aaaaaaaa...NNN.", "..aAAAAAAAAa..aA..", ".NAAAAAAAAAAaaAbAb", "..AAAAAAAAAAAAAAA.", "...NNNNNNNNNN.....", "..a.a......a.a....", ".a.a........a.a...", ".b.b........b.b..."],
-  wolfX: ["..........t...t.", "..........TT.TT.", "TT.......TTTTTTT", ".TTTTTTTTTKTKTTTt", "..TTTTTTTTTKTTTP.", "...NNNNNNNKTKT.P.", "...t.t...t.t....."],
-  wolfUp: ["t...t.....t...t...", ".T.T.......T.T....", "..T.........T..t..t", ".NNNNNNNNNNNN.TT.TT", "TTTTTTTTTTTTTTTTTTT", ".TTTTTTTTTTTTTKTKTTt", "..TTTTTTTTTTTTTKTTP.", "...TTTTTTTTTTTKTKTP."],
-  wolf: ["..........t.t", ".........tTTt", "TT......tTTTKT", ".TTTTTTTTTTTTTt", "..TTTTTTTTTT...", "...NNNNNNNN....", "...t.t...t.t..."],
-};
-const ANIMAL_U = 6;
-const BLOOD = "#b8141e";
-const SWEEP = [[1, 1], [1, 1], [1, 0], [1, -1], [1, -1], [1, -1], [1, 0], [1, 0]];
-const CUT = [[1, 1], [1, 1], [1, 1], [1, 0], [1, 0], [1, 0]];
-
-function parts(m, t, key) {
-  const prof = profFor(m), out = { body: "HOP", back: [], front: [] };
-  if (key === "1") {
-    const kind = PROFESSIONS[prof], node = kind.node, f = SWING[t % SWING.length];
-    out.body = f.body;
-    out.front.push(layer().art(NODES[node], 7, 3).outline());
-    out.front.push(tool(kind.tool, f.hand, f.dir));
-    if (f.hit != null) out.front.push(chips(layer(), [12, 6], f.hit, kind));
-    const p = t % (SWING.length * 4) - 4;
-    if (p >= 0 && p < 9) out.front.push(p < 6 ? layer().art(FINDS[node], ...arc(p, [10, 7], [9, 19], 3, 6)).outline() : twinkle(layer(), 10, 20, p));
-    return out;
-  }
-  const set = VARIANTS.find((v) => v.key === key).set;
-  if (prof === "mining") {
-    const f = SWING[t % SWING.length];
-    out.body = f.body;
-    out.front.push(layer().art(NODES.ore, 7, 3).outline());
-    out.front.push(pickArt(set.pick, f.hand, f.dir));
-    if (f.hit != null) out.front.push(chips(layer(), [12, 6], f.hit, PROFESSIONS.mining));
-    const p = t % (SWING.length * 4) - 4;
-    if (p >= 0 && p < 9) out.front.push(p < 6 ? layer().art(FINDS.ore, ...arc(p, [10, 7], [9, 19], 3, 6)).outline() : twinkle(layer(), 10, 20, p));
-    return out;
-  }
-  if (prof === "herbalism") return herb(set.herb, t, out);
-  return skin(set, t, out);
-}
-
-function herb(kind, t, out) {
-  if (kind === "raise") {
-    const p = t % 20;
-    out.body = p >= 5 && p <= 12 ? "HOP" : "SIT";
-    const first = p < 4 ? "full" : p === 4 ? "lift" : p < 16 ? "gone" : p < 18 ? "bud" : "full";
-    out.front.push(patch(PATCH_U, 3, [first]));
-    if (p >= 5 && p <= 12) {
-      const l = layer().set(9, 15, PAL.i).set(9, 16, PAL.i);
-      flower(l, 9, 18, FLOWERS[0].c).outline();
-      out.front.push(l);
-      if (p >= 8 && p <= 10) out.front.push(twinkle(layer(), 12, 19, p));
-    }
-    return out;
-  }
-  out.body = "CROUCH";
-  const per = kind === "basket" ? 10 : 8, cycle = per * 3 + 6, p = t % cycle;
-  const k = Math.min(3, Math.floor(p / per)), q = p % per, done = p >= per * 3;
-  const looks = FLOWERS.map((_, i) => done ? (p - per * 3 < 3 ? "gone" : "bud") : i < k ? "gone" : i > k ? "full" : q < 4 ? "full" : q === 4 ? "lift" : "gone");
-  out.front.push(patch(PATCH_U, 3, looks));
-  const held = done ? 3 : k + (q >= 5 ? 1 : 0);
-  if (kind === "basket") {
-    const landed = done ? 3 : k + (q >= 9 ? 1 : 0);
-    const l = layer().art(BASKET, -6, 3).outline();
-    for (let i = 0; i < landed; i++) l.set(-5 + i, 6, PAL[FLOWERS[i].c]);
-    out.back.push(l);
-    if (!done && q >= 5 && q < 9) {
-      const f = layer();
-      flower(f, ...arc(q - 5, [PATCH_U + FLOWERS[k].u, 7], [-4, 8], 7, 4), FLOWERS[k].c).outline();
-      out.front.push(f);
-    }
-    return out;
-  }
-  if (held > 0) {
-    const l = layer().set(9, 5, PAL.i).set(10, 6, PAL.i).set(10, 7, PAL.i);
-    if (held > 1) l.set(11, 7, PAL.i);
-    if (held > 2) l.set(9, 7, PAL.i);
-    [[10, 9], [12, 8], [8, 8]].slice(0, held).forEach(([u, r], i) => flower(l, u, r, FLOWERS[i].c));
-    out.front.push(l.outline());
-  }
-  if (done && p - per * 3 < 3) out.front.push(twinkle(layer(), 12, 10, p));
+function mine(t, out) {
+  const f = SWING[t % SWING.length];
+  out.body = f.body;
+  out.front.push(layer().art(ORE, 7, 3).outline());
+  out.front.push(pick(f.hand, f.dir));
+  if (f.hit != null) out.front.push(chips(layer(), [12, 6], f.hit));
+  const p = t % (SWING.length * 4) - 4;
+  if (p >= 0 && p < 9) out.front.push(p < 6 ? layer().art(ORE_FIND, ...arc(p, [10, 7], [9, 19], 3, 6)).outline() : twinkle(layer(), 10, 20, p));
   return out;
 }
 
-function skin(set, t, out) {
-  out.body = set.skinBody;
-  const animal = set.animal === "wolf" ? state.wolf : set.animal;
-  const standing = set.skinBody === "SIT", frames = standing ? SWEEP : CUT, n = t % frames.length;
-  const hand = standing ? [9, 6] : [9, 4], dir = frames[n], hit = standing ? n - 3 : n - 3;
-  const body = layer().art(ANIMALS[animal], ANIMAL_U, 3).outline();
+function herb(t, out) {
+  out.body = "CROUCH";
+  const per = 10, p = t % (per * 3 + 6);
+  const k = Math.min(3, Math.floor(p / per)), q = p % per, done = p >= per * 3;
+  const looks = FLOWERS.map((_, i) => done ? (p - per * 3 < 3 ? "gone" : "bud") : i < k ? "gone" : i > k ? "full" : q < 4 ? "full" : q === 4 ? "lift" : "gone");
+  out.front.push(patch(PATCH_U, 3, looks));
+  const landed = done ? 3 : k + (q >= 9 ? 1 : 0);
+  const basket = layer().art(BASKET, -6, 3).outline();
+  for (let i = 0; i < landed; i++) basket.set(-5 + i, 6, PAL[FLOWERS[i].c]);
+  out.back.push(basket);
+  if (!done && q >= 5 && q < 9) out.front.push(flower(layer(), ...arc(q - 5, [PATCH_U + FLOWERS[k].u, 7], [-4, 8], 7, 4), FLOWERS[k].c).outline());
+  return out;
+}
+
+function skin(t, out) {
+  out.body = "CROUCH";
+  const n = t % CUT.length, hand = [9, 4], dir = CUT[n], hit = n - 3;
+  const body = layer().art(boarRows(), ANIMAL_U, 3).outline();
   body.set(ANIMAL_U + 7, 2, BLOOD).set(ANIMAL_U + 8, 2, BLOOD);
   out.back.push(body);
-  if (set.flap) {
-    const len = Math.floor(t / frames.length) % 4;
-    if (len > 0) {
-      const f = layer();
-      const top = 3 + ANIMALS[animal].length;
-      for (let i = 0; i < len; i++) f.set(ANIMAL_U + 5 + i, top + (i === len - 1 ? 1 : 0), PAL.e);
-      out.front.push(f.outline());
-    }
-  }
-  out.front.push(tool("knife", hand, dir, true));
+  out.front.push(knife(hand, dir));
   const tip = [hand[0] + dir[0] * 4, hand[1] + dir[1] * 4];
   if (hit === 0) out.front.push(layer().set(tip[0] + 1, tip[1] + 1, BLOOD));
   if (hit === 1) out.front.push(layer().set(tip[0] + 1, tip[1], BLOOD));
   if (hit === 2) out.front.push(layer().set(tip[0] + 2, tip[1] - 1, BLOOD));
   return out;
+}
+
+function parts(m, t) {
+  const out = { body: "HOP", back: [], front: [] }, prof = profFor(m);
+  if (prof === "mining") return mine(t, out);
+  if (prof === "herbalism") return herb(t, out);
+  return skin(t, out);
 }
 
 function rng(seed) { return () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); }
@@ -471,22 +341,20 @@ function render(id, phase) {
     for (const [k, c] of l.px) {
       const [u, r] = k.split(",").map(Number);
       put(mirror ? m.x + 11 - u : m.x + u, r, c, m.id, true);
-      stats.min = Math.min(stats.min, u); stats.max = Math.max(stats.max, u); stats.top = Math.max(stats.top, r);
+      stats.min = Math.min(stats.min, u); stats.max = Math.max(stats.max, u);
     }
   };
 
-  const v = VARIANTS[variant].key;
   const gatherers = GATHERERS[state.who];
   const planned = CAST.map((m) => {
     const gathering = gatherers.includes(m.id);
-    return { m, gathering, parts: gathering ? parts(m, tick + OFFSET[m.id] * 3, v) : null };
+    return { m, gathering, parts: gathering ? parts(m, tick + OFFSET[m.id] * 3) : null };
   });
   const stats = {};
-  for (const { m, gathering } of planned) if (gathering) stats[m.id] = { min: 99, max: -99, top: 0 };
+  for (const { m, gathering } of planned) if (gathering) stats[m.id] = { min: 99, max: -99 };
 
-  const f = Math.floor(tick / 2) % 3;
   stamp(LOGS, -7, 3, PAL, "fire");
-  stamp(FIRE[f], -5, 5, PAL, "fire");
+  stamp(FIRE[Math.floor(tick / 2) % 3], -5, 5, PAL, "fire");
   for (const { m, gathering } of planned) {
     if (m.pet != null) stamp(CAT_ART, m.pet, 3, PAL, "cat", false);
     if (!gathering) stamp(SEAT, m.x - 1, 3, PAL, m.id);
@@ -504,24 +372,41 @@ function render(id, phase) {
     stamp(body, m.x, 3, pal, m.id, mirror);
     if (m.hat) stamp(STRAW_HAT, m.x - 1, 3 + body.length - 2 + 4 + 2 - STRAW_HAT.length, PAL, m.id);
   }
-  for (const { m, gathering, parts: pp } of planned) {
-    if (!gathering) continue;
-    for (const l of pp.front) commit(l, m, stats[m.id]);
-  }
+  for (const { m, gathering, parts: pp } of planned) if (gathering) for (const l of pp.front) commit(l, m, stats[m.id]);
   ctx.putImageData(out, 0, 0);
 
   const name = (o) => (o === "fire" ? "the fire/logs" : o === "cat" ? "your cat" : CAST.find((c) => c.id === o)?.name || o);
-  const lines = [`<b>${phase}</b> · ${v} ${VARIANTS[variant].name} · ${state.prof} · season: ${state.season} · world: ${state.world} · backdrop ${state.opacity}% · tick ${tick}`,
-    `new sprites: ${VARIANTS[variant].sprites}`];
+  const lines = [`<b>${phase}</b> · ${state.prof} · tick ${tick}`];
   for (const { m, gathering } of planned) {
     if (!gathering) continue;
     const s = stats[m.id], h = hits[m.id] || {};
-    const toward = Math.max(0, s.max - 11), away = Math.max(0, -s.min);
     const over = Object.entries(h).map(([o, n]) => `${name(o)} ${n}px`);
-    lines.push(`<b>${m.name}</b> ${profFor(m)} (${m.x < 0 ? "left" : "right"} side): reaches ${toward} toward the fire, ${away} away, up to row ${s.top} · ` +
+    lines.push(`<b>${m.name}</b> ${profFor(m)}: reaches ${Math.max(0, s.max - 11)} toward the fire, ${Math.max(0, -s.min)} away · ` +
       (over.length ? `<span class="warn">draws over ${over.join(", ")}</span>` : `<span class="ok">draws over nothing</span>`));
   }
   document.getElementById(id + "-out").innerHTML = lines.join("<br>");
+}
+
+function buildBoars() {
+  const host = document.getElementById("boars");
+  host.innerHTML = "";
+  for (const b of BOARS) {
+    const art = outlined(b.rows), S = 1;
+    const c = document.createElement("canvas");
+    c.width = 24; c.height = 14;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = WORLDS.forest.ground[1]; ctx.fillRect(0, 0, c.width, c.height);
+    art.forEach((line, y) => [...line].forEach((ch, x) => {
+      if (ch === ".") return;
+      ctx.fillStyle = PAL[ch]; ctx.fillRect((x + 1) * S, (c.height - art.length - 1 + y) * S, S, S);
+    }));
+    c.style.width = c.width * 7 + "px"; c.style.height = c.height * 7 + "px";
+    const btn = document.createElement("button");
+    btn.className = "boar" + (state.boar === b.key ? " on" : "");
+    btn.append(c, `${b.name} · ${b.rows[0].length} wide`);
+    btn.onclick = () => { state.boar = b.key; sync(); buildBoars(); draw(); };
+    host.append(btn);
+  }
 }
 
 function draw() { render("night", "night"); render("day", "day"); }
@@ -540,7 +425,6 @@ function buildToggles() {
   };
   group("Gathering", "who", [["all", "Three"], ["you", "You"], ["kesh", "Kesh"], ["both", "Both sides"], ["neighbours", "Neighbours"]]);
   group("Profession", "prof", [["mixed", "Mixed"], ["mining", "Mining"], ["herbalism", "Herbalism"], ["skinning", "Skinning"]]);
-  group("Animal (B)", "wolf", [["chunky", "Chunky, eye shut"], ["chunkyEye", "Chunky, eye open"], ["chunkySmall", "Chunky, small"], ["boar", "Boar"], ["boarHump", "Boar, humped"], ["boarSmall", "Boar, small"], ["boarUp", "Boar, legs up"], ["boarRed", "Boar, red"], ["boarGrey", "Boar, grey"], ["deerSplay", "Deer, splayed"], ["deerFlat", "Deer, flat"], ["wolfX", "Wolf, X eyes"], ["wolfUp", "Wolf, legs up"], ["wolf", "Round 2 wolf"]]);
   group("Season", "season", [["none", "None"], ["winter", "Winter"]]);
   group("World", "world", [["forest", "Forest"], ["meadow", "Meadow"], ["snow", "Snow"]]);
   group("Zoom", "zoom", [[2, "2x"], [3, "3x"], [5, "5x"]]);
@@ -551,23 +435,11 @@ function buildToggles() {
   g.append(r, val); host.append(g);
 }
 function sync() {
-  const p = new URLSearchParams({ variant: VARIANTS[variant].key, who: state.who, prof: state.prof, wolf: state.wolf, season: state.season, world: state.world, opacity: state.opacity, zoom: state.zoom });
-  history.replaceState(null, "", "?" + p);
-  const v = VARIANTS[variant];
-  document.getElementById("label").textContent = `${v.key} (${v.name})`;
-  document.getElementById("note").textContent = v.note;
+  history.replaceState(null, "", "?" + new URLSearchParams(state));
 }
-function step(d) { variant = (variant + d + VARIANTS.length) % VARIANTS.length; sync(); draw(); }
-document.getElementById("prev").onclick = () => step(-1);
-document.getElementById("next").onclick = () => step(1);
 document.getElementById("pause").onclick = (e) => { paused = !paused; e.target.textContent = paused ? "Play" : "Pause"; };
 document.getElementById("step").onclick = () => { tick++; draw(); };
-addEventListener("keydown", (e) => {
-  if (e.target.closest("input, textarea, [contenteditable]")) return;
-  if (e.key === "ArrowLeft") step(-1);
-  if (e.key === "ArrowRight") step(1);
-});
-loadImages().then(() => { buildToggles(); sync(); draw(); setInterval(() => { if (paused) return; tick++; draw(); }, 1000 / 6); });
+loadImages().then(() => { buildBoars(); buildToggles(); sync(); draw(); setInterval(() => { if (paused) return; tick++; draw(); }, 1000 / 6); });
 </script>
 </body>
 </html>
