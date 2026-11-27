@@ -124,7 +124,7 @@ function Professions.same(a, b)
 end
 
 -- WoW: skill lines 182 herbalism, 186 mining, 393 skinning.
-local GATHERING = { [182] = true, [186] = true, [393] = true }
+local GATHERING = { [182] = "herbalism", [186] = "mining", [393] = "skinning" }
 local FISHING = 356
 
 function Professions.practised(before, after)
@@ -134,7 +134,7 @@ function Professions.practised(before, after)
   local found
   for _, entry in ipairs(after) do
     if entry.id ~= FISHING and had[entry.id] and entry.k > had[entry.id] then
-      if GATHERING[entry.id] then return "gathering" end
+      if GATHERING[entry.id] then return GATHERING[entry.id] end
       found = "crafting"
     end
   end

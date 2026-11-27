@@ -79,7 +79,9 @@ local POSE = {
   adventuring = { standing = true, tool = { "torch", 6, 11 } },
   fighting = { standing = true, tool = { "blade", 6, 12 } },
   crafting = { standing = true, tool = { "hammer", 5, 11 }, front = { "anvil", 5, -1, true } },
-  gathering = { standing = true, tool = { "pick", 3, 11 } },
+  mining = { standing = true, gathering = true },
+  herbalism = { standing = true, gathering = true },
+  skinning = { standing = true, gathering = true },
   fishing = { tool = { "rod", 7, 0, true }, pond = true },
   vendor = { front = { "bag", 7, -2, true } },
   auction = { front = { "coins", 8, -2, true } },
@@ -88,6 +90,16 @@ local POSE = {
   flying = { lift = 9, back = { "griffin", -4, -7, true }, front = { "griffinWing", -6, -3, true },
     flap = "griffinWingUp" },
 }
+local GATHERING = { stagger = 3, slots = { "back", "node", "held", "fleck", "find" },
+  inHand = { held = true, fleck = true } }
+local HELD_TOP = {}
+for pose, frames in pairs(Sheet.gathering) do
+  local top = 0
+  for _, frame in ipairs(frames) do
+    if frame.held then top = math.max(top, frame.held[3] + Sheet.sprites[frame.held[1]][4]) end
+  end
+  HELD_TOP[pose] = top
+end
 local DOORWAY = { rim = 4 }
 local FLAP_TICKS = 3
 local STAR = { x = 3, rise = 3 }
@@ -577,8 +589,38 @@ local function drawPonds(scene, f)
   end
 end
 
+local function hideGathering(parts)
+  for _, slot in ipairs(GATHERING.slots) do parts[slot]:Hide() end
+end
+
+local function gatheringFrame(actor, f)
+  local frames = Sheet.gathering[actor.pose]
+  return frames[(f + math.floor(math.abs(actor.x) / GATHERING.stagger)) % #frames + 1]
+end
+
+local function drawGathering(scene, parts, actor, frame, hop)
+  for _, slot in ipairs(GATHERING.slots) do
+    local part = frame[slot]
+    if part and not (hop and GATHERING.inHand[slot]) then
+      placeBeside(scene, parts[slot], actor, part[1], part[2], part[3], actor.x > 0)
+    else
+      parts[slot]:Hide()
+    end
+  end
+end
+
+local function restingBody(pose)
+  local frames = Sheet.gathering[pose]
+  return frames and frames[1].body or "seated"
+end
+
+local function headRow(row, body)
+  return row + Sheet.sprites[body][4] - Sheet.sprites.seated[4]
+end
+
 local function hideExtras(parts)
   parts.tool:Hide()
+  hideGathering(parts)
   hideFishing(parts)
   parts.back:Hide()
   parts.front:Hide()
@@ -788,13 +830,15 @@ local function restingTop(actor)
   if actor.pose == "asleep" then return ROW.asleep + Sheet.sprites.asleep[4] + SLEEP[3].row + Sheet.sprites.sleep3[4] end
   local pose = POSE[actor.pose] or {}
   local row = (pose.standing and ROW.standing or ROW.seated) + (pose.lift or 0)
-  local hat = hatPlace(actor.hat, row)
-  return math.max(row + Sheet.sprites.seated[4], hat and hat.top or 0)
+  local body = restingBody(actor.pose)
+  local hat = hatPlace(actor.hat, headRow(row, body))
+  return math.max(row + Sheet.sprites[body][4], hat and hat.top or 0)
 end
 
 local function drawActor(scene, parts, actor, f)
   local x = actor.x
   local top, hatTop
+  local sunk = 0
   local walkedIn = playing(scene, "arrive", actor.memberId)
   if actor.pose == "asleep" and walkedIn and walkedIn >= WALK_FOR then walkedIn = nil end
   local welcomed = not walkedIn and actor.pose ~= "asleep" and playing(scene, "welcome", actor.memberId) ~= nil
@@ -828,19 +872,22 @@ local function drawActor(scene, parts, actor, f)
       put(scene, parts.seat, x + OFFSET.seat, ROW.seat)
     end
     parts.back:SetAlpha(1)
-    local armsUp = hop or standing
+    local gathering = pose.gathering and gatheringFrame(actor, f)
+    local body = gathering and not hop and gathering.body or (hop or standing) and "hop" or "seated"
     if dead then
+      body = "skeleton"
       parts.cloth:Hide()
-      setSprite(parts.skin, "skeleton", scene.unit)
+      setSprite(parts.skin, body, scene.unit)
     else
-      setSprite(parts.cloth, armsUp and "hopCloth" or "seatedCloth", scene.unit)
-      setSprite(parts.skin, armsUp and "hop" or "seated", scene.unit)
+      setSprite(parts.cloth, body .. "Cloth", scene.unit)
+      setSprite(parts.skin, body, scene.unit)
     end
     put(scene, parts.cloth, x, row)
     put(scene, parts.skin, x, row)
-    if dead then parts.hat:Hide() else hatTop = drawHat(scene, parts, actor, x, row) end
+    sunk = Sheet.sprites.seated[4] - Sheet.sprites[body][4]
+    if dead then parts.hat:Hide() else hatTop = drawHat(scene, parts, actor, x, headRow(row, body)) end
     for _, z in ipairs(parts.sleep) do z:Hide() end
-    top = row + Sheet.sprites.seated[4]
+    top = row + Sheet.sprites[body][4]
     local markTop = top + (hatTop and HAT_MARK_LIFT or 0)
     if pose.tool then posePart(scene, parts.tool, actor, pose.tool, row) else parts.tool:Hide() end
     if pose.pond then drawFishing(scene, parts, actor, f, row) else hideFishing(parts) end
@@ -855,10 +902,12 @@ local function drawActor(scene, parts, actor, f)
     else
       parts.front:Hide()
     end
+    if gathering then drawGathering(scene, parts, actor, gathering, hop) else hideGathering(parts) end
     drawCheer(scene, parts, actor, top, not dead and hopping(scene, actor))
     local marked = drawAnimations(scene, parts, actor, f, row, markTop, pose.away)
     if actor.onAlt and not dead and not marked then
-      drawAlt(scene, parts, actor, math.max(markTop, partTop(pose.tool, row) - ALT.row, partTop(pose.back, row) - ALT.row))
+      drawAlt(scene, parts, actor, math.max(markTop, partTop(pose.tool, row) - ALT.row, partTop(pose.back, row) - ALT.row,
+        (gathering and HELD_TOP[actor.pose] or 0) - ALT.row))
     else
       parts.alt:Hide()
     end
@@ -908,7 +957,7 @@ local function drawActor(scene, parts, actor, f)
     local upright = actor.pose ~= "asleep"
     local lift = upright and not (walkedIn or welcomed) and celebrating(scene, actor, f) and ROW.hop - ROW.seated or 0
     put(scene, parts.spark, x + (upright and OFFSET.seatedSpark or OFFSET.asleepSpark),
-      (upright and SPARK_ROW.seated or SPARK_ROW.asleep) + lift)
+      (upright and SPARK_ROW.seated - sunk or SPARK_ROW.asleep) + lift)
   else
     parts.spark:Hide()
   end
@@ -1651,6 +1700,10 @@ function CampScene.new(parent, options)
         },
         tool = texture(band.art, "ARTWORK", 3),
         front = texture(band.art, "ARTWORK", 4),
+        node = texture(band.art, "ARTWORK", 3),
+        held = texture(band.art, "ARTWORK", 4),
+        fleck = texture(band.art, "ARTWORK", 5),
+        find = texture(band.art, "ARTWORK", 5),
         pond = texture(band.art, "ARTWORK", -2),
         pondJoin = texture(band.art, "ARTWORK", -2),
         ripple = texture(band.art, "ARTWORK", -1),

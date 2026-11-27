@@ -24,6 +24,11 @@ local LAYOUT = {
   pocketRows = 34,
   griffinFore = 8,
   griffinAft = 6,
+  gathering = {
+    mining = { fore = 5, aft = 0 },
+    herbalism = { fore = 6, aft = 5 },
+    skinning = { fore = 11, aft = 0 },
+  },
   formFore = 3,
   formAft = 3,
   formTrot = 4,
@@ -378,7 +383,8 @@ function Camp.view(rows, entries, now, columns, options)
 end
 
 local STATUS = {
-  seated = "by the fire", fishing = "fishing", crafting = "crafting", gathering = "gathering",
+  seated = "by the fire", fishing = "fishing", crafting = "crafting",
+  mining = "mining", herbalism = "picking herbs", skinning = "skinning",
   fighting = "fighting", vendor = "at a vendor", auction = "at the auction house", resting = "resting",
   afk = "away", flying = "flying",
 }
@@ -550,7 +556,10 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
     tent = false, onlineOnly = true, moreText = "+%d", sleepers = bedrolls, season = shown.season, phase = shown.phase,
     lanternCount = shown.lanternCount,
     room = function(row)
-      if poses[row.memberId] == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
+      local pose = poses[row.memberId]
+      if pose == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
+      local gathering = LAYOUT.gathering[pose]
+      if gathering then return gathering.fore, gathering.aft end
       local form = forms[row.memberId]
       if form then return LAYOUT.formFore, LAYOUT.formAft + (TROTS[form] and LAYOUT.formTrot or 0) end
     end,
