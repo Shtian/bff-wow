@@ -107,9 +107,10 @@ Each step passes `scripts/check.sh` on its own.
   - swapped record IDs swap the entries, by server ID, and neither gains the other's server ID;
   - a found key with a server ID no other entry holds keeps its entry and adds the ID;
   - with nothing matching, a new entry is made and the old one is left alone.
-- **Migration:** the saved Crew is made by a real BFF 2.18.0 client (`tests/before_rulesets.lua` loads that release's `Core/` and `Link/` files from the `bff@2.18.0` tag into their own namespace, and FakeNet's `Core` option runs a client on them), then the same client updates.
-  - The old Crew shows up where it's placed, and the old keys still work for BFF 2.18.0 after a downgrade.
-  - It runs only once.
+- **Migration:** the saved Crew is made by current clients on the default facts (one `default` slot). The spec then turns Ann's saved table into the old top-level layout: it copies her active slot's keys to the top level and removes `crews`, `rulesets` and `migrated`. Then she logs in with Ruleset facts.
+  - The old Crew shows up where it's placed, with the same Member id, and a friend sees the moved client.
+  - It runs only once, and the old top-level keys stay: removing `crews`, `rulesets` and `migrated` again brings back the same Crew and Member id.
+  - A Crew left before the update isn't brought over, and joining its code again works.
 - **Placing:**
   - a match with a friend's server ID places it, as `provisional`;
   - a match with only your RP alt doesn't, and the card says where the Crew is instead of asking;
@@ -117,7 +118,7 @@ Each step passes `scripts/check.sh` on its own.
   - with no server ID to go by (alone, and every Character unplayed for over 30 days), the card asks once, and both answers work;
   - so it does when your friends play only on a server where you have no Characters.
 - **Pruning:**
-  - Placing it drops your other-ruleset Characters from your own record, and a friend on BFF 2.18.0 drops them too.
+  - Placing it drops your other-ruleset Characters from your own record, and a friend's client drops them too.
   - Playing a Character removes it from another slot's own record.
 - **Provisional:**
   - a heard Member confirms it;
@@ -126,4 +127,3 @@ Each step passes `scripts/check.sh` on its own.
 - **Leave and rejoin:**
   - rejoining the same code brings back the slot and the Member id;
   - a different code deletes the left slot and gets a new Member id.
-- **FakeNet with mixed versions:** a client on BFF 2.18.0 and a moved client in one Crew still sync, with the same Member ids.

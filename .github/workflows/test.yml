@@ -10,10 +10,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      # tests/before_rulesets.lua reads BFF 2.18.0 from its tag.
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - uses: leafo/gh-actions-lua@v13
         with:

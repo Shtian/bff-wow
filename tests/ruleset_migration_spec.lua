@@ -1,5 +1,4 @@
 local load = require("tests.load")
-local beforeRulesets = require("tests.before_rulesets")
 
 local NORMAL = { realmName = "", recordId = 15, faction = "Alliance", serverId = "6939", name = "Normal" }
 local NORMAL_HORDE = { realmName = "", recordId = 15, faction = "Horde", serverId = "6939", name = "Normal" }
@@ -67,14 +66,20 @@ describe("A Crew saved before Rulesets", function()
     net = ns.FakeNet.new({ channels = true })
   end)
 
+  local function forgetRulesets(db)
+    local slot = db.crews[db.rulesets.default.active]
+    slot.ruleset = nil
+    for key, value in pairs(slot) do db[key] = value end
+    db.crews, db.rulesets, db.migrated = nil, nil, nil
+  end
+
   local function savedCrew(options)
     options = options or {}
-    local OldCore = beforeRulesets()
-    local ann = net:add("Ann", { Core = OldCore, character = character("6939", "Ann") }):login()
+    local ann = net:add("Ann", { character = character("6939", "Ann") }):login()
     local code = ann:join()
     local bob
     if not options.alone then
-      bob = net:add("Bob", { Core = OldCore, character = character(options.bobServer or "6939", "Bob") }):login()
+      bob = net:add("Bob", { character = character(options.bobServer or "6939", "Bob") }):login()
       bob:join(code)
     end
     for _, extra in ipairs(options.alts or {}) do ann.core:updateOwn(extra) end
@@ -82,22 +87,18 @@ describe("A Crew saved before Rulesets", function()
     if options.paused then ann.core:setPaused(true) end
     ann.core:updateOwn(character("6939", "Ann"))
     net:run(30)
+    local annId = ann.memberId
+    if options.left then ann.core:leaveCrew() end
     ann:logout()
-    ann.Core = nil
+    forgetRulesets(ann.db)
     if bob and options.bobOffline then bob:logout() end
-    return ann, bob, code, ann.memberId
+    return ann, bob, code, annId
   end
 
   local function unplaceable()
     local ann, _, code, annId = savedCrew({ alone = true })
     net.clock = net.clock + 31 * DAY
     return ann, code, annId
-  end
-
-  local function downgrade(client)
-    if client.core then client:logout() end
-    client.Core = beforeRulesets()
-    return client:login()
   end
 
   describe("its move", function()
@@ -188,16 +189,21 @@ describe("A Crew saved before Rulesets", function()
       assert.is_nil(ann.core:elsewhere().offer)
     end)
 
-    it("runs once and leaves the old saved Crew for an older BFF", function()
-      local ann, bob, code = savedCrew()
+    it("runs once, keeps the Member ids, and leaves the old saved Crew where it was", function()
+      local ann, bob, code, annId = savedCrew()
       on(ann, NORMAL, character("6939", "Ann"))
       ann:play({ level = 12 })
       net:run(30)
       assert.equal(12, bob:rowFor(ann).level)
+      assert.same(sorted({ annId, bob.memberId }), memberIds(ann))
+      assert.same(sorted({ annId, bob.memberId }), memberIds(bob))
       on(ann, PVP, character("6856", "Pvpann"))
       assert.same({ hint = hint("Normal (Alliance)") }, ann.core:elsewhere())
-      downgrade(ann)
+      ann:logout()
+      ann.db.crews, ann.db.rulesets, ann.db.migrated = nil, nil, nil
+      on(ann, NORMAL, character("6939", "Ann"))
       assert.equal(code, ann.core:crew().code)
+      assert.equal(annId, ann.memberId)
     end)
 
     it("carries Appear offline with the Crew", function()
@@ -240,20 +246,15 @@ describe("A Crew saved before Rulesets", function()
       }, lines)
     end)
 
-    it("leaves a Crew you had left behind to an older BFF", function()
-      local ann, bob, code = savedCrew()
-      bob:logout()
-      downgrade(ann)
-      ann.core:leaveCrew()
-      net:run(30)
-      ann:logout()
-      ann.Core = nil
+    it("leaves a Crew you had left behind, and its code still joins it", function()
+      local ann, bob, code, annId = savedCrew({ left = true })
       on(ann, NORMAL, character("6939", "Ann"))
       assert.is_nil(ann.core:crew())
       assert.same({}, ann.core:elsewhere())
-      downgrade(ann)
-      assert(ann.core:joinCrew(code, "Ann"))
+      ann:join(code)
+      net:run(30)
       assert.truthy(ann:rowFor(bob))
+      assert.are_not.equal(annId, ann.memberId)
     end)
   end)
 
@@ -393,7 +394,7 @@ describe("A Crew saved before Rulesets", function()
   end)
 
   describe("pruning your Characters", function()
-    it("drops other Rulesets' Characters when it's placed, for your friends on an older BFF too", function()
+    it("drops other Rulesets' Characters when it's placed, for your friends too", function()
       local ann, bob = savedCrew({ alts = { character("6856", "Pvpann") }, main = "Player-6856-Pvpann" })
       assert.same({ "Player-6856-Pvpann", "Player-6939-Ann" }, guidsIn(bob:rowFor(ann)))
       on(ann, NORMAL, character("6939", "Ann"))
@@ -429,22 +430,6 @@ describe("A Crew saved before Rulesets", function()
       on(ann, NORMAL, character("6939", "Second"))
       ann:join(code)
       assert.same({ "Player-6939-Second" }, guidsIn(ownRow(ann)))
-    end)
-  end)
-
-  describe("with Members on older and newer BFF", function()
-    it("syncs a client on BFF 2.18.0 and a moved one with the same Member ids", function()
-      local ann, bob, _, annId = savedCrew()
-      local bobId = bob.memberId
-      on(ann, NORMAL, character("6939", "Ann"))
-      ann:play({ level = 14 })
-      bob:play({ level = 15 })
-      net:run(30)
-      assert.equal(annId, ann.memberId)
-      assert.same(sorted({ annId, bobId }), memberIds(ann))
-      assert.same(sorted({ annId, bobId }), memberIds(bob))
-      assert.equal(14, bob:rowFor(ann).level)
-      assert.equal(15, ann:rowFor(bob).level)
     end)
   end)
 end)
