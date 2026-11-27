@@ -67,7 +67,7 @@ describe("A Crew saved before Rulesets", function()
     local code = ann:join()
     local bob
     if not options.alone then
-      bob = net:add("Bob", { Core = OldCore, character = character("6939", "Bob") }):login()
+      bob = net:add("Bob", { Core = OldCore, character = character(options.bobServer or "6939", "Bob") }):login()
       bob:join(code)
     end
     for _, extra in ipairs(options.alts or {}) do ann.core:updateOwn(extra) end
@@ -135,6 +135,14 @@ describe("A Crew saved before Rulesets", function()
       on(ann, NORMAL, character("6939", "Second"))
       assert.equal(code, ann.core:crew().code)
       assert.is_true(ann.core:ruleset().provisional)
+    end)
+
+    it("asks where it is when friends play only where you have no Characters", function()
+      local ann, _, code = savedCrew({ bobOffline = true, bobServer = "0" })
+      on(ann, NORMAL, character("6939", "Ann"))
+      assert.is_nil(ann.core:crew())
+      assert.same({ ask = ASK }, ann.core:elsewhere())
+      assert.equal(code, ann.core:placeCrewHere().code)
     end)
 
     it("asks where it is when neither friends nor a Main place it", function()

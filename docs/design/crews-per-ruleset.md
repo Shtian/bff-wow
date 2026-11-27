@@ -53,7 +53,7 @@ A slot id is 8 characters from `[a-z0-9]`: a new slot's id is its new Member id.
   - The current Character's GUID isn't in the facts, so `Core:updateOwn` drops it from every other slot's own record (left and unplaced slots too), once per Character per session.
   - `Core:elsewhere()` gives the no-Crew card's finished lines, from `Slots.elsewhere`. The panel's card and the login chat line both show them:
     - `hint`: "Your Crew is on Normal (Alliance). Log in a Character there to see it." It names every other ruleset where you have a Crew, by its saved name, else "Ann's Ruleset" after the Character you last played there. A Crew from before Rulesets that BFF can place but that this login doesn't match is named too, with no faction: by the Character of yours last played on one of its server IDs ("Ann's Ruleset"), else "another Ruleset". (A saved entry holding one of its server IDs can't exist while it waits, since that login would have placed it.) Nil with nothing to name;
-    - `ask`: "BFF has your Crew from before Rulesets but can't tell where it belongs. Is this where your Crew is?", only when an unplaced slot with a Crew waits, BFF has no server ID to place it by (no other Member's Characters and no visible Main), and this ruleset hasn't answered (`declined` on its entry);
+    - `ask`: "BFF has your Crew from before Rulesets but can't tell where it belongs. Is this where your Crew is?", only when an unplaced slot with a Crew waits, no login of yours can place it (none of your own Characters shares a server ID with the other Members' Characters, or with your visible Main when alone), and this ruleset hasn't answered (`declined` on its entry);
     - `offer`: "Your Crew on Normal (Horde) hasn't heard from anyone yet. If your friends play this faction, bring it here.", for the other faction's provisional slot on this ruleset.
   - The card's answers, each refusing with `inCrew` in a Crew and `notWaiting` with nothing to answer:
     - `placeCrewHere()` (`Slots.placeHere`) makes the slot that's asked about this entry's active one, not `provisional`, since you chose it;
@@ -114,7 +114,8 @@ Each step passes `scripts/check.sh` on its own.
   - a match with a friend's server ID places it, as `provisional`;
   - a match with only your RP alt doesn't, and the card says where the Crew is instead of asking;
   - alone in the Crew, the Main's server ID places it;
-  - with no server ID to go by (alone, and every Character unplayed for over 30 days), the card asks once, and both answers work.
+  - with no server ID to go by (alone, and every Character unplayed for over 30 days), the card asks once, and both answers work;
+  - so it does when your friends play only on a server where you have no Characters.
 - **Pruning:**
   - Placing it drops your other-ruleset Characters from your own record, and a friend on BFF 2.18.0 drops them too.
   - Playing a Character removes it from another slot's own record.

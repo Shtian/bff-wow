@@ -312,10 +312,21 @@ local function offered(db, key)
   return nil
 end
 
+local function reachableServerIds(slot, now)
+  local own = ownRecord(slot)
+  local reachable = {}
+  for serverId in pairs(crewServerIds(slot, now)) do
+    for guid in pairs(own and own.characters or {}) do
+      if Slots.serverIdOf(guid) == serverId then reachable[serverId] = true end
+    end
+  end
+  return reachable
+end
+
 local function waitingCrew(db, now)
   for _, id in ipairs(unplacedIds(db)) do
     local slot = db.crews[id]
-    if hasCrew(slot) then return id, slot, crewServerIds(slot, now) end
+    if hasCrew(slot) then return id, slot, reachableServerIds(slot, now) end
   end
   return nil
 end
