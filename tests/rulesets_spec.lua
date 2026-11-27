@@ -80,10 +80,12 @@ describe("A Crew per Ruleset and faction", function()
 
     it("names the key, its record ID, server IDs and name", function()
       local ann = startedOn(NORMAL)
-      assert.same({ key = "mode:15:Alliance", recordId = 15, faction = "Alliance", serverIds = { "6939" }, name = "Normal" },
-        ann.core:ruleset())
+      assert.same({
+        key = "mode:15:Alliance", recordId = 15, faction = "Alliance", serverIds = { "6939" }, name = "Normal",
+        provisional = false,
+      }, ann.core:ruleset())
       on(ann, nil)
-      assert.same({ key = "default", serverIds = {} }, ann.core:ruleset())
+      assert.same({ key = "default", serverIds = {}, provisional = false }, ann.core:ruleset())
     end)
   end)
 
@@ -203,6 +205,35 @@ describe("A Crew per Ruleset and faction", function()
       assert.is_false(ann.core:isPaused())
       on(ann, NORMAL)
       assert.is_true(ann.core:isPaused())
+    end)
+  end)
+
+  describe("its name", function()
+    local UNNAMED = { realmName = "", recordId = 15, faction = "Alliance", serverId = "6939" }
+
+    it("is saved when Battle.net info arrives after login, so a later repair can find it", function()
+      local ann, code = startedOn(UNNAMED)
+      ann.core:rulesetNamed("Normal")
+      assert.equal("Normal", ann.core:ruleset().name)
+      on(ann, { realmName = "", recordId = 20, faction = "Alliance", serverId = "7001", name = "Normal" })
+      assert.equal(code, ann.core:crew().code)
+      assert.same({ from = "mode:15:Alliance", to = "mode:20:Alliance", by = "name" }, ann.core:ruleset().repaired)
+    end)
+
+    it("keeps the saved name when Battle.net gives none", function()
+      local ann = startedOn(NORMAL)
+      ann.core:rulesetNamed(nil)
+      ann.core:rulesetNamed("")
+      assert.equal("Normal", ann.core:ruleset().name)
+    end)
+
+    it("writes a new name to the sync log, and not the same one again", function()
+      local ann = startedOn(UNNAMED)
+      local lines = {}
+      ann.core:setTrace(function(line) lines[#lines + 1] = line end)
+      ann.core:rulesetNamed("Normal")
+      ann.core:rulesetNamed("Normal")
+      assert.same({ "ruleset mode:15:Alliance named Normal" }, lines)
     end)
   end)
 

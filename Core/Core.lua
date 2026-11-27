@@ -1430,8 +1430,17 @@ function Core:ruleset()
     faction = entry.faction,
     serverIds = serverIds,
     name = entry.name,
+    provisional = self.db.provisional == true,
     repaired = self.rulesetRepair,
   }
+end
+
+function Core:rulesetNamed(name)
+  name = ns.Slots.facts({ name = name }).name
+  local entry = self.rulesetEntry
+  if not name or entry.name == name then return end
+  entry.name = name
+  if self.trace then self.trace(("ruleset %s named %s"):format(self.rulesetKey, name)) end
 end
 
 function Core:displayName()
