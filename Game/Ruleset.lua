@@ -22,36 +22,31 @@ function Ruleset.nameIn(richPresence)
   return name
 end
 
-local function ask(fn, ...)
+local function readSafely(fn, ...)
   if type(fn) ~= "function" then return nil end
   local ok, value = pcall(fn, ...)
   if not ok or (issecretvalue and issecretvalue(value)) then return nil end
   return value
 end
 
-local function serverIdIn(guid)
-  if not isText(guid) then return nil end
-  return guid:match("^Player%-([^%-]+)%-")
-end
-
 local function playerGuid()
-  local guid = ask(UnitGUID, "player")
+  local guid = readSafely(UnitGUID, "player")
   return isText(guid) and guid or nil
 end
 
 local function nameFor(guid)
   if not (guid and C_BattleNet) then return nil end
-  local info = ask(C_BattleNet.GetGameAccountInfoByGUID, guid)
+  local info = readSafely(C_BattleNet.GetGameAccountInfoByGUID, guid)
   return type(info) == "table" and Ruleset.nameIn(info.richPresence) or nil
 end
 
 function Ruleset.read()
   local guid = playerGuid()
   return {
-    realmName = ask(GetNormalizedRealmName),
-    recordId = C_GameRules and ask(C_GameRules.GetCurrentGameModeRecordID) or nil,
-    faction = ask(UnitFactionGroup, "player"),
-    serverId = serverIdIn(guid),
+    realmName = readSafely(GetNormalizedRealmName),
+    recordId = C_GameRules and readSafely(C_GameRules.GetCurrentGameModeRecordID) or nil,
+    faction = readSafely(UnitFactionGroup, "player"),
+    serverId = ns.Slots.serverIdOf(guid),
     name = nameFor(guid),
   }
 end

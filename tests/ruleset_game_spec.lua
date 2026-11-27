@@ -22,6 +22,7 @@ before_each(function()
   for _, name in ipairs(GLOBALS) do previous[name] = _G[name] end
   _G.issecretvalue = nil
   local ns = {}
+  assert(loadfile("Core/Slots.lua"))("BFF", ns)
   assert(loadfile("Game/Ruleset.lua"))("BFF", ns)
   Ruleset = ns.Ruleset
 end)
