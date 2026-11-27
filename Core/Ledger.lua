@@ -84,6 +84,21 @@ function Ledger:changeOwn(change)
   return changed
 end
 
+function Ledger:keepCharacters(keeps)
+  if not self:own() then return false end
+  return self:changeOwn(function(record)
+    local dropped = false
+    for guid in pairs(record.characters) do
+      if not keeps(guid) then
+        record.characters[guid] = nil
+        dropped = true
+      end
+    end
+    if dropped and record.main ~= nil and record.characters[record.main] == nil then record.main = nil end
+    return dropped
+  end)
+end
+
 function Ledger:updateOwn(character)
   if type(character) ~= "table" or type(character.guid) ~= "string" then
     error("updateOwn: character.guid must be a string", 2)
