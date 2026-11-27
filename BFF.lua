@@ -34,6 +34,7 @@ local MESSAGES = {
   noClaim = "Nobody has claimed that one yet.",
   given = "That one has been given already.",
   notClaimed = "You haven't claimed that one.",
+  notWaiting = "That Crew isn't waiting here any more.",
   winnerChanged = "Someone claimed it earlier in the meantime. Have another look before you Give it.",
 }
 ns.MESSAGES = MESSAGES
@@ -215,7 +216,14 @@ local function start(isInitialLogin)
     ns.core:tick()
   end)
   if isInitialLogin and not ns.core:crew() then
-    say("type /bff to start or join a Crew.")
+    local elsewhere = ns.core:elsewhere()
+    if elsewhere.ask then
+      say("BFF has your Crew from before Rulesets. Type /bff to say if it belongs here.")
+    elseif elsewhere.hint then
+      say(elsewhere.hint .. " Type /bff to start or join another one here.")
+    else
+      say("type /bff to start or join a Crew.")
+    end
   end
 end
 

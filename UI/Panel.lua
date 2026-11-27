@@ -22,6 +22,16 @@ local TITLE = "Best Friends in Forever"
 local SETUP_WIDTH = 320
 local SETUP_COLUMN = 150
 local SETUP_COLUMNS_Y = -72
+local SETUP_Y = 10
+local CARD_GAP = 24
+local CARD_LINE_GAP = 8
+local CARD_BUTTON_GAP = 10
+local CARD_BLOCK_GAP = 16
+local BUTTON_HEIGHT = 24
+
+local GO_THERE = "Log in a Character there to see it."
+local ASK = "BFF has your Crew from before Rulesets but can't tell where it belongs. Is this where your Crew is?"
+local OFFER = "Your Crew on %s hasn't heard from anyone yet. If your friends play this faction, bring it here."
 
 local GOLD = Skin.GOLD
 local MUTED = Skin.MUTED
@@ -49,6 +59,7 @@ local camp
 local campHeight = 0
 local firelight
 local setup
+local card
 local nav
 local pages = {}
 local tab = "roster"
@@ -349,7 +360,6 @@ end
 local function createSetup()
   setup = CreateFrame("Frame", nil, frame.content)
   setup:SetSize(SETUP_WIDTH, -SETUP_COLUMNS_Y + 90)
-  setup:SetPoint("CENTER", 0, 10)
 
   local nameLabel = Skin.label(setup, "label", DIM)
   nameLabel:SetPoint("TOPLEFT")
@@ -397,19 +407,109 @@ local function createSetup()
   setup.codeError:SetWidth(SETUP_COLUMN)
 end
 
+local function answer(command)
+  return function()
+    local _, reason = core[command](core)
+    card.error:SetText(reason and ns.MESSAGES[reason] or "")
+  end
+end
+
+local function cardText()
+  local text = Skin.label(card, "text", MUTED)
+  text:SetWidth(SETUP_WIDTH)
+  text:SetSpacing(2)
+  return text
+end
+
+local function createCard()
+  card = CreateFrame("Frame", nil, frame.content)
+  card:SetWidth(SETUP_WIDTH)
+  card.hint = cardText()
+  card.ask = cardText()
+  card.ask:SetText(ASK)
+  card.claim = Skin.button(card, "It's here", answer("claimCrewHere"), true)
+  card.claim:SetWidth(SETUP_COLUMN)
+  card.fresh = Skin.button(card, "Start fresh", answer("startFresh"))
+  card.fresh:SetWidth(SETUP_COLUMN)
+  card.offer = cardText()
+  card.bring = Skin.button(card, "Bring your Crew here", answer("bringCrewHere"), true)
+  card.bring:SetWidth(SETUP_COLUMN)
+  card.error = Skin.label(card, "small", ERROR)
+  card.error:SetWidth(SETUP_WIDTH)
+end
+
+local function stackCard(blocks)
+  local y = 0
+  for i, block in ipairs(blocks) do
+    if i > 1 then y = y + CARD_BLOCK_GAP end
+    block.text:ClearAllPoints()
+    block.text:SetPoint("TOPLEFT", 0, -y)
+    y = y + block.text:GetStringHeight()
+    if block.buttons then
+      y = y + CARD_BUTTON_GAP
+      for j, button in ipairs(block.buttons) do
+        button:ClearAllPoints()
+        button:SetPoint("TOPLEFT", (j - 1) * (SETUP_WIDTH - SETUP_COLUMN), -y)
+      end
+      y = y + BUTTON_HEIGHT
+    end
+  end
+  card.error:ClearAllPoints()
+  card.error:SetPoint("TOPLEFT", 0, -(y + CARD_LINE_GAP))
+  return y
+end
+
+local function drawCard()
+  local elsewhere = core:elsewhere()
+  local blocks = {}
+  if elsewhere.hint then
+    card.hint:SetText(elsewhere.hint .. " " .. GO_THERE)
+    blocks[#blocks + 1] = { text = card.hint }
+  end
+  if elsewhere.ask then blocks[#blocks + 1] = { text = card.ask, buttons = { card.claim, card.fresh } } end
+  if elsewhere.offer then
+    card.offer:SetText(OFFER:format(elsewhere.offer.place))
+    blocks[#blocks + 1] = { text = card.offer, buttons = { card.bring } }
+  end
+  local inUse = {}
+  for _, block in ipairs(blocks) do
+    inUse[block.text] = true
+    for _, button in ipairs(block.buttons or {}) do inUse[button] = true end
+  end
+  for _, part in ipairs({ card.hint, card.ask, card.claim, card.fresh, card.offer, card.bring }) do
+    part:SetShown(inUse[part] == true)
+  end
+  if #blocks == 0 then
+    card:Hide()
+    return 0
+  end
+  local height = stackCard(blocks)
+  card:SetHeight(height)
+  card:Show()
+  return height + CARD_GAP
+end
+
 local function showSetup()
   if not setup then createSetup() end
+  if not card then createCard() end
   if not setup:IsShown() then
     setup.name:SetText(ns.defaultDisplayName())
     setup.code:SetText("")
     setup.nameError:SetText("")
     setup.codeError:SetText("")
+    card.error:SetText("")
   end
+  local cardHeight = drawCard()
+  setup:ClearAllPoints()
+  setup:SetPoint("CENTER", 0, SETUP_Y - cardHeight / 2)
+  card:ClearAllPoints()
+  card:SetPoint("BOTTOM", setup, "TOP", 0, CARD_GAP)
   setup:Show()
 end
 
 local function hideSetup()
   if setup then setup:Hide() end
+  if card then card:Hide() end
 end
 
 function Panel.refresh()
