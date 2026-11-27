@@ -1468,29 +1468,35 @@ function Core:ruleset()
   }
 end
 
-local GO_THERE = "Log in a Character there to see it."
-local ASK = "BFF has your Crew from before Rulesets but can't tell where it belongs. Is this where your Crew is?"
+local SEPARATE = "BFF keeps a separate Crew for each %s and faction."
+local ASK = SEPARATE .. " It can't tell which one your Crew from before belongs to. Is this where your Crew is?"
 local OFFER = "Your Crew on %s hasn't heard from anyone yet. If your friends play this faction, bring it here."
 
-local function placeOf(crew)
-  local where = crew.name or (crew.character and crew.character .. "'s Ruleset") or "another Ruleset"
+local function worldWord(self)
+  return self.facts.realmName and "realm" or "Ruleset"
+end
+
+local function placeOf(crew, world)
+  local where = crew.name or (crew.character and ("%s's %s"):format(crew.character, world)) or "another " .. world
   return crew.faction and ("%s (%s)"):format(where, crew.faction) or where
 end
 
-local function hintFor(crews)
+local function hintFor(crews, world)
   if #crews == 0 then return nil end
   local places = {}
-  for i, crew in ipairs(crews) do places[i] = placeOf(crew) end
-  local verb = #crews == 1 and "Your Crew is" or "Your Crews are"
-  return ("%s on %s. %s"):format(verb, ns.Text.list(places), GO_THERE)
+  for i, crew in ipairs(crews) do places[i] = placeOf(crew, world) end
+  local where = #crews == 1 and "Yours is on %s: log in a Character there to see it."
+    or "Yours are on %s: log in a Character there to see them."
+  return SEPARATE:format(world) .. " " .. where:format(ns.Text.list(places))
 end
 
 function Core:elsewhere()
   local found = ns.Slots.elsewhere(self.account, self.rulesetKey, self.now())
+  local world = worldWord(self)
   return {
-    hint = hintFor(found.crews),
-    ask = found.ask and ASK or nil,
-    offer = found.offer and OFFER:format(placeOf(found.offer)) or nil,
+    hint = hintFor(found.crews, world),
+    ask = found.ask and ASK:format(world) or nil,
+    offer = found.offer and OFFER:format(placeOf(found.offer, world)) or nil,
   }
 end
 

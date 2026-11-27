@@ -4,6 +4,8 @@ local beforeRulesets = require("tests.before_rulesets")
 local NORMAL = { realmName = "", recordId = 15, faction = "Alliance", serverId = "6939", name = "Normal" }
 local NORMAL_HORDE = { realmName = "", recordId = 15, faction = "Horde", serverId = "6939", name = "Normal" }
 local PVP = { realmName = "", recordId = 14, faction = "Alliance", serverId = "6856", name = "PvP" }
+local OUTLAND = { realmName = "Outland", recordId = 8, faction = "Alliance", serverId = "6939" }
+local OUTLAND_HORDE = { realmName = "Outland", recordId = 8, faction = "Horde", serverId = "6939" }
 local RP = { realmName = "", recordId = 16, faction = "Alliance", serverId = "6944", name = "Roleplay" }
 
 local function character(serverId, name)
@@ -48,8 +50,12 @@ local function sorted(list)
   return list
 end
 
-local GO_THERE = " Log in a Character there to see it."
-local ASK = "BFF has your Crew from before Rulesets but can't tell where it belongs. Is this where your Crew is?"
+local SEPARATE = "BFF keeps a separate Crew for each Ruleset and faction."
+local ASK = SEPARATE .. " It can't tell which one your Crew from before belongs to. Is this where your Crew is?"
+
+local function hint(where)
+  return ("%s Yours is on %s: log in a Character there to see it."):format(SEPARATE, where)
+end
 local DAY = 24 * 60 * 60
 
 describe("A Crew saved before Rulesets", function()
@@ -111,19 +117,31 @@ describe("A Crew saved before Rulesets", function()
       local ann, _, code = savedCrew({ bobOffline = true })
       on(ann, PVP, character("6856", "Pvpann"))
       assert.is_nil(ann.core:crew())
-      assert.same({ hint = "Your Crew is on Ann's Ruleset." .. GO_THERE }, ann.core:elsewhere())
+      assert.same({ hint = hint("Ann's Ruleset") }, ann.core:elsewhere())
       on(ann, NORMAL, character("6939", "Ann"))
       assert.equal(code, ann.core:crew().code)
       on(ann, PVP, character("6856", "Pvpann"))
       assert.is_nil(ann.core:crew())
-      assert.same({ hint = "Your Crew is on Normal (Alliance)." .. GO_THERE }, ann.core:elsewhere())
+      assert.same({ hint = hint("Normal (Alliance)") }, ann.core:elsewhere())
+    end)
+
+    it("names the realm and says realm where the game has realms", function()
+      local ann = savedCrew({ bobOffline = true })
+      on(ann, OUTLAND, character("6939", "Ann"))
+      on(ann, OUTLAND_HORDE, character("6939", "Hordeann"))
+      assert.same({
+        hint = "BFF keeps a separate Crew for each realm and faction. "
+          .. "Yours is on Outland (Alliance): log in a Character there to see it.",
+        offer = "Your Crew on Outland (Alliance) hasn't heard from anyone yet. "
+          .. "If your friends play this faction, bring it here.",
+      }, ann.core:elsewhere())
     end)
 
     it("isn't placed by your own alt on another Ruleset", function()
       local ann = savedCrew({ bobOffline = true, alts = { character("6944", "Rpann") } })
       on(ann, RP, character("6944", "Rpann"))
       assert.is_nil(ann.core:crew())
-      assert.same({ hint = "Your Crew is on Ann's Ruleset." .. GO_THERE }, ann.core:elsewhere())
+      assert.same({ hint = hint("Ann's Ruleset") }, ann.core:elsewhere())
     end)
 
     it("goes where your Main is when you're alone in the Crew", function()
@@ -131,7 +149,7 @@ describe("A Crew saved before Rulesets", function()
         main = "Player-6939-Ann" })
       on(ann, PVP, character("6856", "Pvpann"))
       assert.is_nil(ann.core:crew())
-      assert.same({ hint = "Your Crew is on Ann's Ruleset." .. GO_THERE }, ann.core:elsewhere())
+      assert.same({ hint = hint("Ann's Ruleset") }, ann.core:elsewhere())
       on(ann, NORMAL, character("6939", "Second"))
       assert.equal(code, ann.core:crew().code)
       assert.is_true(ann.core:ruleset().provisional)
@@ -175,7 +193,7 @@ describe("A Crew saved before Rulesets", function()
       net:run(30)
       assert.equal(12, bob:rowFor(ann).level)
       on(ann, PVP, character("6856", "Pvpann"))
-      assert.same({ hint = "Your Crew is on Normal (Alliance)." .. GO_THERE }, ann.core:elsewhere())
+      assert.same({ hint = hint("Normal (Alliance)") }, ann.core:elsewhere())
       downgrade(ann)
       assert.equal(code, ann.core:crew().code)
     end)
@@ -246,7 +264,7 @@ describe("A Crew saved before Rulesets", function()
       local ann = savedCrew({ bobOffline = true })
       on(ann, { realmName = "", recordId = 15, faction = "Alliance", serverId = "6939" }, character("6939", "Ann"))
       on(ann, PVP, character("6856", "Pvpann"))
-      assert.equal("Your Crew is on Ann's Ruleset (Alliance)." .. GO_THERE, ann.core:elsewhere().hint)
+      assert.equal(hint("Ann's Ruleset (Alliance)"), ann.core:elsewhere().hint)
     end)
 
     it("names every Ruleset where you have a Crew", function()
@@ -255,7 +273,7 @@ describe("A Crew saved before Rulesets", function()
       on(ann, PVP, character("6856", "Pvpann"))
       assert(ann.core:startCrew("Ann"))
       on(ann, RP, character("6944", "Rpann"))
-      assert.equal("Your Crews are on PvP (Alliance) and Normal (Alliance)." .. GO_THERE, ann.core:elsewhere().hint)
+      assert.equal(SEPARATE .. " Yours are on PvP (Alliance) and Normal (Alliance): log in a Character there to see them.", ann.core:elsewhere().hint)
     end)
 
     it("says nothing when you have no Crew anywhere else", function()
@@ -278,7 +296,7 @@ describe("A Crew saved before Rulesets", function()
       assert.equal(code, ann.core:crew().code)
       on(ann, NORMAL, character("6939", "Ann"))
       assert.is_nil(ann.core:crew())
-      assert.same({ hint = "Your Crew is on PvP (Alliance)." .. GO_THERE }, ann.core:elsewhere())
+      assert.same({ hint = hint("PvP (Alliance)") }, ann.core:elsewhere())
     end)
 
     it("remembers a start fresh, and still asks on another Ruleset", function()
@@ -327,7 +345,7 @@ describe("A Crew saved before Rulesets", function()
       assert.equal(13, bob:rowFor(ann).level)
       on(ann, NORMAL_HORDE, character("6939", "Hordeann"))
       assert.is_nil(ann.core:crew())
-      assert.same({ hint = "Your Crew is on Normal (Alliance)." .. GO_THERE }, ann.core:elsewhere())
+      assert.same({ hint = hint("Normal (Alliance)") }, ann.core:elsewhere())
     end)
 
     it("won't bring over a Crew that isn't on offer", function()

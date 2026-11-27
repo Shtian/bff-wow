@@ -113,6 +113,7 @@ end
 local function recordFacts(entry, facts)
   entry.recordId = facts.recordId or entry.recordId
   entry.name = facts.name or entry.name
+  entry.realmName = facts.realmName or entry.realmName
   entry.faction = facts.faction
   if type(entry.serverIds) ~= "table" then entry.serverIds = {} end
   if facts.serverId and not holds(entry.serverIds, facts.serverId) then
@@ -338,7 +339,7 @@ local function askedAbout(db, key, now)
 end
 
 local function crewAt(entry, slot)
-  return { name = entry.name, faction = entry.faction, character = latestName(slot) }
+  return { name = entry.name or entry.realmName, faction = entry.faction, character = latestName(slot) }
 end
 
 function Slots.elsewhere(db, key, now)

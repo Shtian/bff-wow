@@ -52,8 +52,8 @@ A slot id is 8 characters from `[a-z0-9]`: a new slot's id is its new Member id.
   - After placing it by server ID, Core drops your own Characters whose server ID is neither the current one nor any other Member's (`Ledger:keepCharacters`, which bumps the version and clears a dropped Main).
   - The current Character's GUID isn't in the facts, so `Core:updateOwn` drops it from every other slot's own record (left and unplaced slots too), once per Character per session.
   - `Core:elsewhere()` gives the no-Crew card's finished lines, from `Slots.elsewhere`. The panel's card and the login chat line both show them:
-    - `hint`: "Your Crew is on Normal (Alliance). Log in a Character there to see it." It names every other ruleset where you have a Crew, by its saved name, else "Ann's Ruleset" after the Character you last played there. A Crew from before Rulesets that BFF can place but that this login doesn't match is named too, with no faction: by the Character of yours last played on one of its server IDs ("Ann's Ruleset"), else "another Ruleset". (A saved entry holding one of its server IDs can't exist while it waits, since that login would have placed it.) Nil with nothing to name;
-    - `ask`: "BFF has your Crew from before Rulesets but can't tell where it belongs. Is this where your Crew is?", only when an unplaced slot with a Crew waits, no login of yours can place it (none of your own Characters shares a server ID with the other Members' Characters, or with your visible Main when alone), and this ruleset hasn't answered (`declined` on its entry);
+    - `hint`: "BFF keeps a separate Crew for each Ruleset and faction. Yours is on Normal (Alliance): log in a Character there to see it." Where the game has realms (retail) it says "realm" instead of "Ruleset". It names every other ruleset where you have a Crew, by its saved name (the Ruleset name, else the realm name), else "Ann's Ruleset" after the Character you last played there. A Crew from before Rulesets that BFF can place but that this login doesn't match is named too, with no faction: by the Character of yours last played on one of its server IDs ("Ann's Ruleset"), else "another Ruleset". (A saved entry holding one of its server IDs can't exist while it waits, since that login would have placed it.) Nil with nothing to name;
+    - `ask`: "BFF keeps a separate Crew for each Ruleset and faction. It can't tell which one your Crew from before belongs to. Is this where your Crew is?", only when an unplaced slot with a Crew waits, no login of yours can place it (none of your own Characters shares a server ID with the other Members' Characters, or with your visible Main when alone), and this ruleset hasn't answered (`declined` on its entry);
     - `offer`: "Your Crew on Normal (Horde) hasn't heard from anyone yet. If your friends play this faction, bring it here.", for the other faction's provisional slot on this ruleset.
   - The card's answers, each refusing with `inCrew` in a Crew and `notWaiting` with nothing to answer:
     - `placeCrewHere()` (`Slots.placeHere`) makes the slot that's asked about this entry's active one, not `provisional`, since you chose it;
@@ -85,7 +85,7 @@ Each step passes `scripts/check.sh` on its own.
 3. **Migration, placing, provisional and pruning.** Drop the current Character from other slots.
 4. **`Game/Ruleset.lua` and the `richPresence` name.** Add the `/bff report` lines.
 5. **The no-Crew card**:
-   - "Your Crew is on Normal (Alliance)", or the name of a Character when no ruleset name is saved;
+   - "BFF keeps a separate Crew for each Ruleset and faction. Yours is on Normal (Alliance)", or the name of a Character when no ruleset or realm name is saved;
    - the ask-once card for an unplaced slot BFF can't place;
    - "Bring your Crew here" for the other faction's provisional slot.
 6. **Bump files**:
