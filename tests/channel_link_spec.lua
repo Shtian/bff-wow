@@ -857,6 +857,61 @@ describe("The channel link", function()
       assert.equal("join failed: timed out after 10 s", lines[#lines])
     end)
 
+    local function leftAndJoinedWithoutNumber(game)
+      game.fire("CHAT_MSG_CHANNEL_NOTICE", "YOU_LEFT", "", "", "6. " .. CHANNEL, "", "", 0, 6, CHANNEL)
+      game.fire("CHAT_MSG_CHANNEL_NOTICE", "YOU_JOINED", "", "", CHANNEL, "", "", 0, 0, "")
+    end
+
+    it("asks for the member list when the game says it joined without a channel number", function()
+      local game, link = refused()
+      leftAndJoinedWithoutNumber(game)
+      assert.same({ CHANNEL }, game.listed)
+      game.fire("CHAT_MSG_CHANNEL_LIST", "*Bob", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
+      assert.is_true(link.state().up)
+    end)
+
+    it("leaves and joins again, not too many channels, when the game answered but never confirmed", function()
+      local game, link, core, lines = refused()
+      game.channels[CHANNEL] = 3
+      leftAndJoinedWithoutNumber(game)
+      game.channels[CHANNEL] = nil
+      game.refuseJoin = false
+      game.advance(10)
+      assert.equal(1, game.joins)
+      assert.equal("join not confirmed after 10 s, leaving and joining again", lines[#lines])
+      game.advance(2)
+      assert.equal(2, game.joins)
+      assert.equal(0, core.count("joinFailed"))
+      game.fire("CHAT_MSG_CHANNEL_LIST", "*Bob", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
+      assert.is_true(link.state().up)
+    end)
+
+    it("leaves before joining again", function()
+      local game = refused()
+      game.channels[CHANNEL] = 3
+      leftAndJoinedWithoutNumber(game)
+      local leftFirst
+      game.env.LeaveChannelByName = function(name)
+        leftFirst = game.joins == 1
+        game.channels[name:upper()] = nil
+      end
+      game.advance(12)
+      assert.is_true(leftFirst)
+    end)
+
+    it("asks for a relog after 3 joins the game answered but never confirmed", function()
+      local game, link, core, lines = refused()
+      for _ = 1, 3 do
+        leftAndJoinedWithoutNumber(game)
+        game.advance(12)
+      end
+      game.advance(60)
+      assert.equal(3, game.joins)
+      assert.same({ { "joinFailed", "stuckChannel" } }, core.calls)
+      assert.equal("join failed: not confirmed after 3 joins", lines[#lines])
+      assert.equal("the game left BFF half in the channel", link.state().reason)
+    end)
+
     it("tries again for a new Crew", function()
       local game, link, core = refused()
       game.fire("CHAT_MSG_CHANNEL_NOTICE", channelNotice("WRONG_PASSWORD"))

@@ -13,6 +13,8 @@ local SETTLE_QUIET = 2
 local SETTLE_FALLBACK = 10
 local JOIN_POLL = 0.5
 local JOIN_TIMEOUT = 10
+local MAX_JOINS = 3
+local REJOIN_DELAY = 2
 local LEAVE_DELAY = 3
 local LEAVE_MAX = 15
 local LIST_REFRESH = 60
@@ -35,6 +37,9 @@ local trace
 local target
 local joining = false
 local joined = false
+local joins = 0
+local answered = false
+local attempt
 local failure
 local settled = false
 local afterLogin = false
@@ -124,6 +129,7 @@ local FAILURE_REASONS = {
   wrongPassword = "wrong password",
   tooManyChannels = "too many channels",
   brokenChannel = "the game broke the channel",
+  stuckChannel = "the game left BFF half in the channel",
 }
 ChannelLink.FAILURE_REASONS = FAILURE_REASONS
 
@@ -192,28 +198,78 @@ local function fail(kind, outcome)
   core:joinFailed(kind)
 end
 
+local function askListOf(name)
+  listAsked = GetTime()
+  ListChannelByName(name)
+end
+
+local function begin()
+  local this = {}
+  attempt = this
+  joining = true
+  target.asked = true
+  answered = false
+  return this
+end
+
+local function current(this, name)
+  return attempt == this and joining and not joined and target ~= nil and target.channel == name
+end
+
+local join
+
+-- WoW: a join on a channel the client half holds (a numbered slot that
+-- GetChannelName doesn't find) makes the game leave it and join it again
+-- without a number. Only a relog has been seen to clear that.
+local function rejoin(this, name)
+  if trace then
+    trace(("join not confirmed after %d s, leaving and joining again"):format(JOIN_TIMEOUT))
+  end
+  LeaveChannelByName(name)
+  C_Timer.After(REJOIN_DELAY, function()
+    if current(this, name) then join() end
+  end)
+end
+
+local function unconfirmed(this, name, numbered)
+  if not answered then
+    if numbered then
+      if trace then trace(("join not confirmed after %d s"):format(JOIN_TIMEOUT)) end
+    else
+      fail("tooManyChannels", ("timed out after %d s"):format(JOIN_TIMEOUT))
+    end
+  elseif joins < MAX_JOINS then
+    rejoin(this, name)
+  else
+    fail("stuckChannel", ("not confirmed after %d joins"):format(joins))
+  end
+end
+
 -- WoW: the client hands out a channel number even when the server refused
 -- the join, so only YOU_CHANGED or the member list says BFF got in.
-local function awaitConfirmation(name)
+local function awaitConfirmation(this, name)
   local waited, numbered = 0, false
   C_Timer.NewTicker(JOIN_POLL, function(ticker)
     waited = waited + JOIN_POLL
-    if not joining or not target or target.channel ~= name then
+    if not current(this, name) then
       ticker:Cancel()
     elseif not numbered and channelIndex(name) then
       numbered = true
       if trace then trace("got a channel number, waiting for the game to confirm the join") end
-      listAsked = GetTime()
-      ListChannelByName(name)
+      askListOf(name)
     elseif waited >= JOIN_TIMEOUT then
       ticker:Cancel()
-      if not numbered then
-        fail("tooManyChannels", ("timed out after %d s"):format(JOIN_TIMEOUT))
-      elseif trace then
-        trace(("join not confirmed after %d s"):format(JOIN_TIMEOUT))
-      end
+      unconfirmed(this, name, numbered)
     end
   end)
+end
+
+function join()
+  local this = begin()
+  joins = joins + 1
+  if trace then trace("joining the Crew channel") end
+  JoinTemporaryChannel(target.channel, target.password)
+  awaitConfirmation(this, target.channel)
 end
 
 local function tryJoin()
@@ -224,13 +280,7 @@ local function tryJoin()
     onJoined("already in the Crew channel")
     return
   end
-  if not settled then return end
-
-  joining = true
-  target.asked = true
-  if trace then trace("joining the Crew channel") end
-  JoinTemporaryChannel(target.channel, target.password)
-  awaitConfirmation(target.channel)
+  if settled then join() end
 end
 
 local function broken()
@@ -354,12 +404,15 @@ function events.CHAT_MSG_CHANNEL_NOTICE(kind, arg2, _, arg4, arg5, _, _, arg8, a
   if not isTarget(baseName(arg4, arg9)) then return end
   traceChannelNotice(kind, arg2, arg4, arg5, arg8, arg9)
   if not readable(kind) then return end
+  if joining then answered = true end
   if kind == "WRONG_PASSWORD" then
     if not joined then fail("wrongPassword") end
   elseif kind == "INVALID_NAME" then
     if not failure then broken() end
   elseif kind == "YOU_CHANGED" then
     if not joined and not failure then onJoined("joined the Crew channel") end
+  elseif kind == "YOU_JOINED" then
+    if joining then askListOf(target.channel) end
   elseif kind == "YOU_LEFT" or kind == "SUSPENDED" then
     joined = false
     update()
@@ -645,6 +698,7 @@ function ChannelLink.setCrew(crew)
   target = crew and { channel = crew.channel, password = crew.password }
   presence:stop()
   failure = nil
+  joins = 0
   if name then ours[name:upper()] = true end
   update()
   tryJoin()
