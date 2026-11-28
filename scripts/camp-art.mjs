@@ -10,9 +10,9 @@
 // grids come from the prototype (prototype/ui-personality). Run it after
 // changing a grid: node scripts/camp-art.mjs. See docs/design/camp.md.
 //
-// Figures come as two layers with the same rectangle: cloth, in white and
-// #9E9E9E so a class colour tint multiplies to the prototype's C and D, and
-// skin and outline, drawn untinted over it.
+// Figures come as two layers with the same rectangle: cloth, in greys so a
+// class colour tint multiplies to the prototype's tones (CLOTH), and skin
+// and outline, drawn untinted over it.
 
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -24,15 +24,35 @@ const PAL = {
   K: "#0b0a12", S: "#e8b890", s: "#b98465", W: "#fff3c4", Y: "#ffe9a0", G: "#ffd14a", O: "#f0a21c",
   R: "#c9481c", B: "#5a3a24", b: "#3a2518", T: "#8c8796", t: "#5d5966", L: "#70e370", P: "#f2b8d0",
   Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8", N: "#ece8d8", A: "#c89a5a", a: "#8f6a3a", r: "#5a1620",
+  p: "#e98f80", h: "#5e3b22", H: "#86562f",
 };
-// Cloth tones: a white C and a 62% D, tinted by the class colour in game.
-// Sleepers' cloth is 55% of that, as the prototype shaded bedrolls.
-const CLOTH = { C: "#ffffff", D: "#9e9e9e" };
-const BED_CLOTH = { C: "#8c8c8c", D: "#575757" };
+// Cloth tones, lit from above-left: 1 white, 2 at 80%, 3 at 60% and 4 at
+// 42%, tinted by the class colour in game. A sleeper's hood is full tone
+// and their quilt (5 to 8) is those at 55%, as the prototype shaded
+// bedrolls.
+const CLOTH = { 1: "#ffffff", 2: "#cccccc", 3: "#999999", 4: "#6b6b6b" };
+const BED_CLOTH = { 1: "#ffffff", 2: "#cccccc", 3: "#999999", 5: "#8c8c8c", 6: "#707070", 7: "#545454", 8: "#3b3b3b" };
 
-const SIT = ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...", "..KCCDDCCK..", ".KCCCDDCCCK.", ".KSCCDDCCSK.", ".KKCCCCCCKK.", "..KDDKKDDK..", "..KKK..KKK.."];
-const HOP = ["..K.KKKK.K..", ".KSKCCCCKSK.", ".KCCCCCCCCK.", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...", "..KCCDDCCK..", "..KCCDDCCK..", "..KCCDDCCK..", "..KCCCCCCK..", "..KDDKKDDK..", "..KKK..KKK.."];
-const BED = ["....KKKK..........", "...KCCCCKKKKKKKKK.", "..KCSSSSKDDDDDDDDK", "..KSKKSSKDCDDDCDDK", "..KSSSSsKDDDDDDDDK", "...KKKKKKKKKKKKKK."];
+// The Tailored figure (#340, prototypes/refined-avatars.html on the
+// prototype/refined-avatars branch): a hair fringe (h, H) under the hood,
+// blush (p), a gold clasp over a dark placket, a belt with a buckle and
+// leather boots.
+const SIT = [
+  "....KKKK....", "...K1112K...", "..K111223K..", "..K2hHhh3K..", "..KSKSSKsK..", "..KpSSSspK..", "...K2332K...",
+  "..K12GG23K..", ".K11244233K.", ".KSBBGBBBsK.", ".KK122233KK.", "..KBbKKBbK..", "..KKK..KKK..",
+];
+const HOP = [
+  "..K.KKKK.K..", ".KSK1112KsK.", ".K11111233K.", ...SIT.slice(3, 8),
+  "..K124423K..", "..KBBGBBBK..", "..K122233K..", ...SIT.slice(11),
+];
+// Asleep under a quilt, the head in side profile looking up (#340,
+// prototypes/sleep-poses.html, B7): a round hood round the back of the
+// head, the quilt rising over the hip and the feet. Two breathing frames,
+// the hip down in the second.
+const BED = [
+  ["...KKKKK..KKKK.KK.", "..K1SSSSKK5556K56K", ".K12SKSSK55555556K", ".K12SpSSK67776777K", "..K3SSSsK78777877K", "...KKKKKKKKKKKKKK."],
+  ["...KKKKK.......KK.", "..K1SSSSKKKKKKK56K", ".K12SKSSK55555556K", ".K12SpSSK67776777K", "..K3SSSsK78777877K", "...KKKKKKKKKKKKKK."],
+];
 const GRAVE = ["..TTTT..", ".TTTTTt.", "TTttttTt", "TTTTTTTt", "TTttttTt", "TTTTTTTt", "TTTTTTTt", "ttttttt."];
 const FLOWER = [".P.", "PGP", ".P.", ".L."];
 const SPARK = ["..W..", ".WGW.", "WGYGW", ".WGW.", "..W.."];
@@ -347,7 +367,7 @@ const HAMMER = outlined(["ZZZZZt", "ZNZZZt", "ZZZZZt", "..Aa..", "..Aa..", "..Aa
 // differ only in where they are drawn share a name. CampSheet.working
 // carries the frames and how far each animation reaches past the figure,
 // toward the fire and away; Core's LAYOUT gives each that much room.
-const CROUCH = [...SIT.slice(0, 9), ".KSCDDDDCSK.", "KDDDDKKDDDDK", "KKKKK..KKKKK"];
+const CROUCH = [...SIT.slice(0, 10), "KBBBbKKBBBbK", "KKKKK..KKKKK"];
 const WORK_PAL = {
   ...PAL, h: "#468a46", g: "#2c5a33", i: "#9bd47a", c: "#c8682c", e: "#f2a868", p: "#e7e1f0",
   m: "#7a3e24", M: "#a8643a", n: "#4e2818", j: "#2a1410", u: "#c46a78", v: "#e89aa8", q: "#4a1c24",
@@ -518,9 +538,9 @@ function skinning(t) {
 // behind. A hop hides the held and fleck slots, so fleck is only ever
 // what the tool throws off. Their sprites are named by what they are and
 // numbered by look, so one drawn in several places is one sprite.
-const STAND = [...SIT.slice(0, 10), "..KCCCCCCK..", "..KDDKKDDK..", "..KKK..KKK.."];
-const STAND_RAISED = [STAND[0], STAND[1], "..KCCCCCCKK.", "..KCSSSSCKSK", "..KSKSSKSKCK", "..KSSSSSsKCK", "...KCCCCKCK.", "..KCCDDCCCK.", ".KCCCDDCCK..", ".KSCCDDCCK..", ...STAND.slice(10)];
-const STAND_STRIKE = [...STAND.slice(0, 5), "..KSSSSSsKK.", "...KCCCCCCSK", "..KCCDDCCKK.", ".KCCCDDCCK..", ".KSCCDDCCK..", ...STAND.slice(10)];
+const STAND = [...SIT.slice(0, 10), ...HOP.slice(10)];
+const STAND_RAISED = [STAND[0], STAND[1], "..K111223KK.", "..K2hHhh3KSK", "..KSKSSKsK3K", "..KpSSSspK3K", "...K2332K3K.", "..K12GG233K.", ".K1124423K..", ".KSBBGBBBK..", ...STAND.slice(10)];
+const STAND_STRIKE = [...STAND.slice(0, 5), "..KpSSSspKK.", "...K233233SK", "..K12GG23KK.", ".K1124423K..", ".KSBBGBBBK..", ...STAND.slice(10)];
 const STAND_JUMP = [...STAND, "............"];
 const CLOUD = [
   [[0, 0], [1, 0]],
@@ -793,16 +813,13 @@ const AFK = outlined([".W..WWW.W.W", "W.W.W...W.W", "WWW.WW..WW.", "W.W.W...W.W"
 // when walking left) and waves (two frames, one arm raised) with a "hi!"
 // speech bubble over their head.
 const WALK = [
-  ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...",
-    "..KCCDDCCK..", ".KSCCDDCCK..", "..KCCDDCCSK.", "..KCCCCCCK..", ".KDDK..KDDK.", ".KKK....KKK."],
-  ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...",
-    "..KCCDDCCK..", "..KCCDDCCK..", "..KSCDDCSK..", "..KCCCCCCK..", "...KDDDDK...", "...KKKKKK..."],
+  [...SIT.slice(0, 8), ".KS124423K..", "..KBBGBBBsK.", HOP[10], ".KBbK..KBbK.", ".KKK....KKK."],
+  [...SIT.slice(0, 8), HOP[8], "..KSBGBBsK..", HOP[10], "...KBbBbK...", "...KKKKKK..."],
 ];
+const WAVE_BODY = [...SIT.slice(4, 8), ".KS124423K..", ...HOP.slice(9)];
 const WAVE = [
-  ["....KKKK..K.", "...KCCCCKSK.", "..KCCCCCCCK.", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...",
-    "..KCCDDCCK..", ".KSCCDDCCK..", "..KCCDDCCK..", "..KCCCCCCK..", "..KDDKKDDK..", "..KKK..KKK.."],
-  ["....KKKK...K", "...KCCCCK.KS", "..KCCCCCCKCK", "..KCSSSSCCK.", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...",
-    "..KCCDDCCK..", ".KSCCDDCCK..", "..KCCDDCCK..", "..KCCCCCCK..", "..KDDKKDDK..", "..KKK..KKK.."],
+  ["....KKKK..K.", "...K1112KsK.", "..K1112233K.", SIT[3], ...WAVE_BODY],
+  ["....KKKK...K", "...K1112K.Ks", "..K111223K3K", "..K2hHhh33K.", ...WAVE_BODY],
 ];
 // "hi!" in 3 by 5 letters on a white bubble with a dark rim, its tail
 // pointing down to the head.
@@ -926,8 +943,27 @@ const PINE = [
   "....B....",
 ];
 const LIGHTS = ["#ff5a44", "#ffd14a", "#70e370", "#7fc4ee", "#f2b8d0"];
-// A sleeper's snow, along the bedroll's top edge over the blanket.
-const BED_SNOW = { x: 9, rows: ["ZNNNNNNZ"] };
+// A sleeper's snow, one for each breathing frame: on the quilt's top
+// edge, a pixel above the outline of each column of the quilt, so it rises
+// over the hip and the feet and dips between them. Shaded at the ends. Two
+// rows, the bottom one level with the bedroll's top row, from the quilt's
+// first column (x).
+const QUILT = /[5-8]/;
+const BED_SNOW = (() => {
+  const columns = [...BED[0][0]].map((_, i) => i).filter((i) => BED[0].some((row) => QUILT.test(row[i])));
+  const x = columns[0];
+  const frames = BED.map((rows) => {
+    const snow = [[], []];
+    columns.forEach((i, n) => {
+      const top = rows.findIndex((row) => row[i] !== ".");
+      const ch = n === 0 || n === columns.length - 1 ? "Z" : "N";
+      snow[0][i - x] = top === 0 ? ch : ".";
+      snow[1][i - x] = top === 1 ? ch : ".";
+    });
+    return snow.map((row) => row.join(""));
+  });
+  return { x, frames };
+})();
 // The roof's snow, over the tent: the top pixel of each column of the
 // roof that isn't outline, and the one under it in every other column, so
 // it reads on the pale canvas.
@@ -1150,13 +1186,14 @@ const hatSprite = (key) => "hat" + key[0].toUpperCase() + key.slice(1);
 const SPRITES = [
   ["seatedCloth", cloth(SIT, CLOTH)], ["seated", skin(SIT)],
   ["hopCloth", cloth(HOP, CLOTH)], ["hop", skin(HOP)],
-  ["asleepCloth", cloth(BED, BED_CLOTH)], ["asleep", skin(BED)],
+  ["asleepCloth", cloth(BED[0], BED_CLOTH)], ["asleep", skin(BED[0])],
+  ["asleepCloth2", cloth(BED[1], BED_CLOTH)], ["asleep2", skin(BED[1])],
   ["grave", skin(GRAVE)], ["flower", skin(FLOWER)], ["spark", skin(SPARK)],
   ["fire1", skin(FIRE[0])], ["fire2", skin(FIRE[1])], ["fire3", skin(FIRE[2])],
   ["logs", skin(LOGS)], ["seat", skin(SEAT)], ["sleep1", skin(SLEEP[0])], ["sleep2", skin(SLEEP[1])], ["sleep3", skin(SLEEP[2])],
   ["ember", skin(EMBER)], ["emberCool", skin(EMBER_COOL)], ["emberWarm", skin(EMBER_WARM)],
   ["glint", skin(GLINT)], ["glintPale", skin(GLINT_PALE)], ["petal", skin(PETAL)],
-  ["tent", tent()], ["tentSnow", tentSnow(tent())], ["bedSnow", skin(BED_SNOW.rows)],
+  ["tent", tent()], ["tentSnow", tentSnow(tent())], ["bedSnow", skin(BED_SNOW.frames[0])], ["bedSnow2", skin(BED_SNOW.frames[1])],
   ["treePine", paint(outlined(PINE), { ...PAL, ...TREE_PAL })],
   ["sun1", paint(SUN[0], SUN_PAL)], ["sun2", paint(SUN[1], SUN_PAL)], ["moon", paint(MOON, MOON_PAL)],
   ["starDim", paint(["S"], { S: STAR_TONES.dim })], ["starMid", paint(["S"], { S: STAR_TONES.mid })],
