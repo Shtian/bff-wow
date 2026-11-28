@@ -56,6 +56,19 @@ local function game(slots, infos, secret)
 end
 
 describe("Professions", function()
+  describe("a profession's window", function()
+    local Professions
+    before_each(function() Professions = load().Professions end)
+
+    it("is named by your own profession of that name, in any locale", function()
+      local yours = { profession(ALCHEMY, "Alchimie", 10), profession(MINING, "Bergbau", 10) }
+      assert.equal(MINING, Professions.lineNamed(yours, "Bergbau"))
+      assert.is_nil(Professions.lineNamed(yours, "Mining"))
+      assert.is_nil(Professions.lineNamed(nil, "Bergbau"))
+      assert.is_nil(Professions.lineNamed(yours, nil))
+    end)
+  end)
+
   describe("read from the game", function()
     local Professions
     before_each(function() Professions = load().Professions end)

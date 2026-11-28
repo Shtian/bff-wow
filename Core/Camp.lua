@@ -413,15 +413,13 @@ for _, dungeon in ipairs(ns.Dungeons.DUNGEONS) do
   if dungeon.kind == "raid" then RAIDS[dungeon.name] = true end
 end
 
-local CHOSEN = { flying = true, auction = true, vendor = true, crafting = true }
-for _, profession in ipairs(ns.Professions.ALL) do
-  if profession.work then CHOSEN[profession.work] = true end
-end
+local SAID_FIRST = { flying = true, auction = true, vendor = true }
+for work in pairs(ns.Professions.WORKS) do SAID_FIRST[work] = true end
 
 local function poseOf(row, doing)
   local id = row.memberId
   local said = not row.instance and doing.said[id] or nil
-  if CHOSEN[said] then return said end
+  if SAID_FIRST[said] then return said end
   if doing.fishing[id] then return "fishing" end
   if doing.working[id] then return doing.working[id] end
   if row.instance then return "adventuring" end

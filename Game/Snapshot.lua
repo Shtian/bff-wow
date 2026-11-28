@@ -231,6 +231,7 @@ function Snapshot.requiredLevel(link)
 end
 
 local windows = { vendor = false, auction = false }
+local professionWindows = {}
 local function flag(ask, ...)
   if not ask then return false end
   local value = ask(...)
@@ -272,18 +273,8 @@ local function form(inCombat)
   return found
 end
 
-local function plain(value)
-  if issecretvalue and issecretvalue(value) then return nil end
-  return value
-end
-
 local function lineNamed(name)
-  name = plain(name)
-  if type(name) ~= "string" then return nil end
-  for _, profession in ipairs(professions or {}) do
-    if profession.name == name then return profession.skillLine end
-  end
-  return nil
+  return ns.Professions.lineNamed(professions, readable(name))
 end
 
 -- WoW: the profession window can show someone else's linked or guild profession.
@@ -301,7 +292,7 @@ local function openProfession(window)
   if someoneElses() then return nil end
   local info = C_TradeSkillUI and askSafely(C_TradeSkillUI.GetBaseProfessionInfo)
   if type(info) == "table" then
-    local id = plain(info.professionID)
+    local id = readable(info.professionID)
     if ns.Professions.workOf(id) then return id end
     local named = lineNamed(info.professionName)
     if named then return named end
@@ -319,7 +310,7 @@ function Snapshot.doing()
     resting = flag(IsResting),
     flying = flag(UnitOnTaxi, "player") or flag(IsFlying),
     form = form(inCombat),
-    profession = windows.profession,
+    profession = professionWindows.trade or professionWindows.craft or nil,
   }
 end
 
@@ -329,9 +320,14 @@ function Snapshot.daylight()
   return nil, GetGameTime()
 end
 
+-- WoW: registering an event the client doesn't have is an error.
+local function knownEvent(event)
+  return C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid(event) or false
+end
+
 local function watchDaylight(core)
   local event = "DIEL_CYCLE_CHANGED"
-  if not (C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid(event)) then return end
+  if not knownEvent(event) then return end
   local frame = CreateFrame("Frame")
   frame:RegisterEvent(event)
   frame:SetScript("OnEvent", function() core:daylightChanged() end)
@@ -350,16 +346,10 @@ local PROFESSION_WINDOW_EVENTS = {
 local function professionWindow(event)
   local window, change = event[1], event[2]
   if change == "close" then
-    windows.profession = nil
-  elseif change == "open" or windows.profession then
-    windows.profession = openProfession(window)
+    professionWindows[window] = nil
+  elseif change == "open" or professionWindows[window] ~= nil then
+    professionWindows[window] = openProfession(window) or false
   end
-end
-
--- WoW: registering an event the client doesn't have is an error.
-local function registerIfKnown(frame, event)
-  if C_EventUtils and C_EventUtils.IsEventValid and not C_EventUtils.IsEventValid(event) then return end
-  pcall(frame.RegisterEvent, frame, event)
 end
 
 local function watchGroup(core)
@@ -376,7 +366,9 @@ end
 local function watchDoing(core)
   local frame = CreateFrame("Frame")
   for event in pairs(WINDOW_EVENTS) do frame:RegisterEvent(event) end
-  for event in pairs(PROFESSION_WINDOW_EVENTS) do registerIfKnown(frame, event) end
+  for event in pairs(PROFESSION_WINDOW_EVENTS) do
+    if knownEvent(event) then frame:RegisterEvent(event) end
+  end
   frame:RegisterEvent("QUEST_TURNED_IN")
   frame:SetScript("OnEvent", function(_, event)
     local window = WINDOW_EVENTS[event]

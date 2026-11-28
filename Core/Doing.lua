@@ -4,13 +4,8 @@ local Doing = {}
 Doing.__index = Doing
 ns.Doing = Doing
 
-local ORDER = { "flying", "auction", "vendor", "profession", "fighting", "afk", "resting" }
-local KNOWN = { crafting = true }
-for _, state in ipairs(ORDER) do KNOWN[state] = true end
-KNOWN.profession = nil
-for _, profession in ipairs(ns.Professions.ALL) do
-  if profession.work then KNOWN[profession.work] = true end
-end
+local KNOWN = { flying = true, auction = true, vendor = true, fighting = true, afk = true, resting = true }
+for work in pairs(ns.Professions.WORKS) do KNOWN[work] = true end
 
 local FORMS = { wolf = "now", bear = "now", cat = "now", moonkin = "now", travel = "held", seal = "held" }
 local TRAVEL_HOLD = 30
@@ -80,13 +75,13 @@ end
 
 function Doing:state()
   local facts = self.facts
-  local on = {
-    flying = facts.flying, auction = facts.auction, vendor = facts.vendor, afk = facts.afk, resting = facts.resting,
-    fighting = self:fighting(), profession = facts.work,
-  }
-  for _, state in ipairs(ORDER) do
-    if on[state] then return state == "profession" and facts.work or state end
-  end
+  if facts.flying then return "flying" end
+  if facts.auction then return "auction" end
+  if facts.vendor then return "vendor" end
+  if facts.work then return facts.work end
+  if self:fighting() then return "fighting" end
+  if facts.afk then return "afk" end
+  if facts.resting then return "resting" end
   return nil
 end
 

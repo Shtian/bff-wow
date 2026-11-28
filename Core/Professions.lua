@@ -135,8 +135,19 @@ local WORK = {}
 for _, profession in ipairs(Professions.ALL) do WORK[profession.skillLine] = profession.work end
 local FISHING = 356
 
+Professions.WORKS = { crafting = true }
+for _, work in pairs(WORK) do Professions.WORKS[work] = true end
+
 function Professions.workOf(skillLine)
   return WORK[skillLine]
+end
+
+function Professions.lineNamed(professions, name)
+  if type(name) ~= "string" then return nil end
+  for _, profession in ipairs(professions or {}) do
+    if profession.name == name then return profession.skillLine end
+  end
+  return nil
 end
 
 function Professions.practised(before, after)

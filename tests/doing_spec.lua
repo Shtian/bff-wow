@@ -42,6 +42,7 @@ end
 
 local ALCHEMY, HERBALISM, MINING, SKINNING, FISHING = 171, 182, 186, 393, 356
 local BLACKSMITHING, TAILORING, COOKING, FIRST_AID = 164, 197, 185, 129
+local SMALLFISH = 6291
 
 local function profession(skillLine, name, skill)
   return { skillLine = skillLine, name = name, icon = 1000 + skillLine, skill = skill, max = 300 }
@@ -301,8 +302,8 @@ describe("What a Member is doing", function()
       assert.same({ "crafting", "crafting" }, shown(b, b))
       net:run(3)
       assert.same({ "crafting", "crafting" }, shown(a, b))
-      b.core:doing({ profession = SKINNING })
-      assert.same({ "skinning", "skinning" }, shown(b, b))
+      b.core:doing({ profession = MINING })
+      assert.same({ "mining", "mining" }, shown(b, b))
     end)
 
     it("comes after flying, the auction house and a vendor, and before fighting, away and resting", function()
@@ -325,6 +326,15 @@ describe("What a Member is doing", function()
       b.core:doing({ profession = ALCHEMY })
       net:run(20)
       assert.equal("alchemy", poseOf(a, b))
+    end)
+
+    it("wins over fishing", function()
+      local _, clients = crew({ "Ann", "Bob" })
+      local a = clients[1]
+      a.core:caught({ items = { { itemId = SMALLFISH, quantity = 1 } }, zone = "Westfall", mapId = 1436 })
+      assert.equal("fishing", poseOf(a, a))
+      a.core:doing({ profession = COOKING })
+      assert.equal("cooking", poseOf(a, a))
     end)
 
     it("is left out in an instance, as other DOINGs are", function()
