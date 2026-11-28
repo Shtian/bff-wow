@@ -4,9 +4,13 @@ local Doing = {}
 Doing.__index = Doing
 ns.Doing = Doing
 
-local ORDER = { "flying", "auction", "vendor", "fighting", "afk", "resting" }
-local KNOWN = {}
+local ORDER = { "flying", "auction", "vendor", "profession", "fighting", "afk", "resting" }
+local KNOWN = { crafting = true }
 for _, state in ipairs(ORDER) do KNOWN[state] = true end
+KNOWN.profession = nil
+for _, profession in ipairs(ns.Professions.ALL) do
+  if profession.work then KNOWN[profession.work] = true end
+end
 
 local FORMS = { wolf = "now", bear = "now", cat = "now", moonkin = "now", travel = "held", seal = "held" }
 local TRAVEL_HOLD = 30
@@ -38,12 +42,18 @@ function Doing.new(now)
   }, Doing)
 end
 
+local function workAt(profession)
+  if profession == true then return "crafting" end
+  if type(profession) ~= "number" then return nil end
+  return ns.Professions.workOf(profession) or "crafting"
+end
+
 function Doing:set(facts)
   local was, wasForm = self.facts.combat, self.facts.form
   self.facts = {
     combat = facts.combat == true, vendor = facts.vendor == true, auction = facts.auction == true,
     afk = facts.afk == true, resting = facts.resting == true, flying = facts.flying == true,
-    form = FORMS[facts.form] and facts.form or nil,
+    form = FORMS[facts.form] and facts.form or nil, work = workAt(facts.profession),
   }
   if was and not self.facts.combat then self.fightingUntil = self.now() + FIGHTING_HOLD end
   if self.facts.form ~= wasForm then self.formSince = self.now() end
@@ -72,10 +82,10 @@ function Doing:state()
   local facts = self.facts
   local on = {
     flying = facts.flying, auction = facts.auction, vendor = facts.vendor, afk = facts.afk, resting = facts.resting,
-    fighting = self:fighting(),
+    fighting = self:fighting(), profession = facts.work,
   }
   for _, state in ipairs(ORDER) do
-    if on[state] then return state end
+    if on[state] then return state == "profession" and facts.work or state end
   end
   return nil
 end

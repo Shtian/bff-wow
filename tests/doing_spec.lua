@@ -273,6 +273,79 @@ describe("What a Member is doing", function()
     assert.equal("flying", poseOf(b, b))
   end)
 
+  describe("a profession's window", function()
+    it("shows the profession on your figure at once and on a Member's with the next DOING", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      local mark = #net.wire
+      b.core:doing({ profession = 171 })
+      assert.same({ "alchemy", "brewing potions" }, shown(b, b))
+      net:run(3)
+      assert.same({ "alchemy", "brewing potions" }, shown(a, b))
+      assert.equal("alchemy", doings(net, mark, "Bob")[1].doing)
+      net:run(70)
+      assert.same({ "alchemy", "brewing potions · 1m" }, shown(a, b))
+
+      b.core:doing({})
+      assert.same({ "seated", "by the fire" }, shown(b, b))
+      net:run(20)
+      assert.same({ "seated", "by the fire" }, shown(a, b))
+    end)
+
+    it("shows crafting for a window it can't name, or a line it doesn't know", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      b.core:doing({ profession = true })
+      assert.same({ "crafting", "crafting" }, shown(b, b))
+      b.core:doing({ profession = 755 })
+      assert.same({ "crafting", "crafting" }, shown(b, b))
+      net:run(3)
+      assert.same({ "crafting", "crafting" }, shown(a, b))
+      b.core:doing({ profession = SKINNING })
+      assert.same({ "skinning", "skinning" }, shown(b, b))
+    end)
+
+    it("comes after flying, the auction house and a vendor, and before fighting, away and resting", function()
+      local _, clients = crew({ "Ann", "Bob" })
+      local a = clients[1]
+      a.core:doing({ profession = COOKING, vendor = true })
+      assert.equal("vendor", poseOf(a, a))
+      a.core:doing({ profession = COOKING, combat = true, afk = true, resting = true })
+      assert.equal("cooking", poseOf(a, a))
+    end)
+
+    it("wins over a fishing or profession spell, as a Member's choice", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      b:play({ professions = { profession(ALCHEMY, "Alchemy", 10), profession(MINING, "Mining", 10) }, level = 11 })
+      net:run(70)
+      b:play({ professions = { profession(ALCHEMY, "Alchemy", 10), profession(MINING, "Mining", 11) }, level = 12 })
+      net:run(3)
+      assert.equal("mining", poseOf(a, b))
+      b.core:doing({ profession = ALCHEMY })
+      net:run(20)
+      assert.equal("alchemy", poseOf(a, b))
+    end)
+
+    it("is left out in an instance, as other DOINGs are", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      b.core:doing({ profession = ALCHEMY })
+      b:move({ instance = "The Deadmines" })
+      b:play({ zone = "The Deadmines" })
+      net:run(15)
+      assert.equal("adventuring", poseOf(a, b))
+    end)
+
+    it("means nothing to a BFF that doesn't know the profession", function()
+      local net, clients, ns = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      net:broadcast(b, ns.Codec.encode({ type = "DOING", from = b.memberId, doing = "jewelcrafting", at = net:now() + 1 }))
+      net:run(2)
+      assert.same({ "seated", "by the fire" }, shown(a, b))
+    end)
+  end)
+
   it("shows a Member by the fire when a newer BFF says something this one doesn't know", function()
     local net, clients, ns = crew({ "Ann", "Bob" })
     local a, b = clients[1], clients[2]

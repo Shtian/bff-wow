@@ -135,6 +135,10 @@ local WORK = {}
 for _, profession in ipairs(Professions.ALL) do WORK[profession.skillLine] = profession.work end
 local FISHING = 356
 
+function Professions.workOf(skillLine)
+  return WORK[skillLine]
+end
+
 function Professions.practised(before, after)
   if not valid(before) or not valid(after) then return nil end
   local had = {}

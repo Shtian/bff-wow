@@ -272,6 +272,43 @@ local function form(inCombat)
   return found
 end
 
+local function plain(value)
+  if issecretvalue and issecretvalue(value) then return nil end
+  return value
+end
+
+local function lineNamed(name)
+  name = plain(name)
+  if type(name) ~= "string" then return nil end
+  for _, profession in ipairs(professions or {}) do
+    if profession.name == name then return profession.skillLine end
+  end
+  return nil
+end
+
+-- WoW: the profession window can show someone else's linked or guild profession.
+local function someoneElses()
+  local ui = C_TradeSkillUI
+  if not ui then return false end
+  return askSafely(ui.IsTradeSkillLinked) == true or askSafely(ui.IsTradeSkillGuild) == true
+end
+
+-- WoW: Midnight names the open profession by C_TradeSkillUI.GetBaseProfessionInfo's
+-- professionID; classic only by its localised name, GetTradeSkillLine's, or
+-- GetCraftDisplaySkillLine's for the craft window (enchanting).
+local function openProfession(window)
+  if window == "craft" then return lineNamed((askSafely(GetCraftDisplaySkillLine))) or true end
+  if someoneElses() then return nil end
+  local info = C_TradeSkillUI and askSafely(C_TradeSkillUI.GetBaseProfessionInfo)
+  if type(info) == "table" then
+    local id = plain(info.professionID)
+    if ns.Professions.workOf(id) then return id end
+    local named = lineNamed(info.professionName)
+    if named then return named end
+  end
+  return lineNamed((askSafely(GetTradeSkillLine))) or true
+end
+
 function Snapshot.doing()
   local inCombat = flag(InCombatLockdown)
   return {
@@ -282,6 +319,7 @@ function Snapshot.doing()
     resting = flag(IsResting),
     flying = flag(UnitOnTaxi, "player") or flag(IsFlying),
     form = form(inCombat),
+    profession = windows.profession,
   }
 end
 
@@ -303,6 +341,26 @@ local WINDOW_EVENTS = {
   MERCHANT_SHOW = { "vendor", true }, MERCHANT_CLOSED = { "vendor", false },
   AUCTION_HOUSE_SHOW = { "auction", true }, AUCTION_HOUSE_CLOSED = { "auction", false },
 }
+local PROFESSION_WINDOW_EVENTS = {
+  TRADE_SKILL_SHOW = { "trade", "open" }, TRADE_SKILL_CLOSE = { "trade", "close" },
+  TRADE_SKILL_LIST_UPDATE = { "trade", "update" }, TRADE_SKILL_DATA_SOURCE_CHANGED = { "trade", "update" },
+  CRAFT_SHOW = { "craft", "open" }, CRAFT_CLOSE = { "craft", "close" },
+}
+
+local function professionWindow(event)
+  local window, change = event[1], event[2]
+  if change == "close" then
+    windows.profession = nil
+  elseif change == "open" or windows.profession then
+    windows.profession = openProfession(window)
+  end
+end
+
+-- WoW: registering an event the client doesn't have is an error.
+local function registerIfKnown(frame, event)
+  if C_EventUtils and C_EventUtils.IsEventValid and not C_EventUtils.IsEventValid(event) then return end
+  pcall(frame.RegisterEvent, frame, event)
+end
 
 local function watchGroup(core)
   local function tell()
@@ -318,11 +376,14 @@ end
 local function watchDoing(core)
   local frame = CreateFrame("Frame")
   for event in pairs(WINDOW_EVENTS) do frame:RegisterEvent(event) end
+  for event in pairs(PROFESSION_WINDOW_EVENTS) do registerIfKnown(frame, event) end
   frame:RegisterEvent("QUEST_TURNED_IN")
   frame:SetScript("OnEvent", function(_, event)
     local window = WINDOW_EVENTS[event]
     if window then
       windows[window[1]] = window[2]
+    elseif PROFESSION_WINDOW_EVENTS[event] then
+      professionWindow(PROFESSION_WINDOW_EVENTS[event])
     elseif event == "QUEST_TURNED_IN" then
       core:questHandedIn()
     end
