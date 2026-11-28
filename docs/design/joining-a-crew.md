@@ -57,7 +57,7 @@ A partial break, where some Members can use the channel and some can't, heals th
 
 ## One Crew at a time
 
-A player is in **at most one Crew per Ruleset and faction** (ADR 0009). A Character on another Ruleset or faction has a Crew of its own, or none. Joining another Crew on the same Ruleset and faction means leaving the current one first: the panel asks to confirm, and `/bff join` refuses with "Leave your Crew first (/bff leave)". Joining the Crew you are already in does nothing.
+A player is in **at most one Crew per Ruleset and faction** (ADR 0009). A Character on another Ruleset or faction has a Crew of its own, or none. You can be in several Crews on the same Ruleset and faction, and play with one at a time (ADR 0010). `/bff start` and `/bff join <code>` from inside a Crew start or join another and switch to it, keeping the one you were in. Joining the Crew you are already in does nothing; joining the code of another of your Crews switches to it. Both are refused during messaging lockdown and while a leave is pending.
 
 Why:
 
@@ -107,7 +107,7 @@ The default display name for slash commands is the current Character's name, as 
    Keeping the left Crew means a Member who leaves and rejoins still knows the others, so their whispers are vouched for even when the member list is broken (ADR 0008).
 4. The channel link leaves the channel a few seconds later, after ChatThrottleLib has drained.
 
-**After a failed join** (wrong password, too many channels) the link will never come up, so leaving doesn't wait for it: step 3 happens straight away and nothing is sent, not even the tombstone. The others see you go offline as usual. This covers a leave started after the failure, one already waiting when it happens, and one pending at login whose join then fails (the failure finishes it, with "You left the Crew." and no failure notice). You can then start or join another Crew. Joining the same code while a leave is still waiting cancels it, as before.
+**After a failed join** (wrong password, too many channels) the link will never come up, so leaving doesn't wait for it: step 3 happens straight away and nothing is sent, not even the tombstone. The others see you go offline as usual. This covers a leave started after the failure, one already waiting when it happens, and one pending at login whose join then fails (the failure finishes it, with "You left <Crew label>." and no failure notice). You can then start or join another Crew. Joining the same code while a leave is still waiting cancels it, as before.
 
 On the other side:
 
@@ -122,7 +122,7 @@ Leaving is not the same as **Remove**: leaving is what you do to yourself, and e
 
 Additions to `docs/design/code-structure.md`:
 
-- **Commands:** `startCrew(displayName)`, `joinCrew(code, displayName)` (returns an error for an invalid code or when already in another Crew), `leaveCrew()`, `setDisplayName(name)`.
+- **Commands:** `startCrew(displayName)`, `joinCrew(code, displayName)` (returns an error for an invalid code or name, or during lockdown or a pending leave), `leaveCrew()`, `setDisplayName(name)`.
 - **Read:** `crew()` returns the code, channel name and password, or nil when not in a Crew.
 - **Listener event:** `crewChanged`, fired on joining and when leaving has finished. App routes it to the channel link so it joins or leaves the channel.
 - **New internal file:** `Core/CrewCode.lua` generates, normalises and checks codes and derives the channel name and password.

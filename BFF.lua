@@ -11,13 +11,13 @@ ns.say = say
 
 local MESSAGES = {
   invalidCode = "That code doesn't look right.",
-  inCrew = "You're in a Crew. Pick Start or join another Crew… from the Crew menu in Settings first.",
+  inCrew = "You're in a Crew already.",
   invalidName = "A display name is 2 to 16 characters (/bff name <name>).",
   noCrew = "You're not in a Crew. Type /bff to start or join one.",
   tooManyChannels = "BFF couldn't join its channel: leave a chat channel and /reload.",
   wrongPassword = "BFF couldn't join its channel: leave the Crew and start a new one.",
   stuckChannel = "BFF couldn't get into its channel: log out and back in (a /reload isn't enough).",
-  leftCrew = "You left the Crew.",
+  leftCrew = "You left %s.",
   noChannel = "The game won't let BFF into any channel for your Crew. Try again later.",
   minimapHidden = "Minimap button hidden. Type /bff minimap to show it again.",
   outOfDate = "BFF is out of date: someone in your Crew has a newer version. Update to keep seeing them.",
@@ -126,7 +126,7 @@ local function onCoreEvent(event, arg, more)
     ns.Minimap.refresh()
     ns.MapPins.refresh()
   elseif event == "notice" then
-    say(MESSAGES[arg])
+    say(MESSAGES[arg]:format(more and more.crew or "the Crew"))
   elseif event == "newerBff" then
     say(arg.text)
   elseif event == "feedEntry" or event == "reaction" or event == "spare" then
@@ -288,7 +288,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 end)
 
 StaticPopupDialogs.BFF_LEAVE_CREW = {
-  text = "Leave your Crew? The others will see that you left.",
+  text = "Leave %s? The others will see that you left.",
   button1 = YES,
   button2 = NO,
   OnAccept = function() ns.core:leaveCrew() end,
@@ -298,7 +298,8 @@ StaticPopupDialogs.BFF_LEAVE_CREW = {
 }
 
 function ns.confirmLeave()
-  StaticPopup_Show("BFF_LEAVE_CREW")
+  local current = ns.core:crews().current
+  StaticPopup_Show("BFF_LEAVE_CREW", current and current.label or "your Crew")
 end
 
 -- WoW: a Forever Character's name can be "First Last".

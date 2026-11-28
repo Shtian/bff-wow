@@ -377,12 +377,21 @@ function Client:relink()
   return self
 end
 
+local function noteGone(self, before)
+  local after = self.core:channel()
+  if before and not (after and after.channel == before.channel) then
+    self.net.queue[#self.net.queue + 1] = { from = self, gone = characterName(self), channel = before.channel }
+  end
+end
+
 function Client:join(code)
+  local before = self.core:channel()
   if code then
     assert(self.core:joinCrew(code, self.name))
   else
     code = assert(self.core:startCrew(self.name)).code
   end
+  noteGone(self, before)
   self:noteMemberId()
   self.moved = nil
   bringUp(self)
@@ -392,10 +401,7 @@ end
 function Client:switchCrew(id)
   local before = self.core:channel()
   local crew, reason = self.core:switchCrew(id)
-  local after = self.core:channel()
-  if before and not (after and after.channel == before.channel) then
-    self.net.queue[#self.net.queue + 1] = { from = self, gone = characterName(self), channel = before.channel }
-  end
+  noteGone(self, before)
   return crew, reason
 end
 

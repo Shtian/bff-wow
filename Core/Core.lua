@@ -1692,10 +1692,13 @@ function Core:startFresh()
   end)
 end
 
+local stepOut
+
 function Core:startCrew(displayName)
-  if self.db.crew then return nil, "inCrew" end
   local name = nameOrCurrent(self, displayName)
   if not name then return nil, "invalidName" end
+  local ok, blocked = stepOut(self)
+  if not ok then return nil, blocked end
   return enter(self, ns.CrewCode.generate(self.random), name)
 end
 
@@ -1703,12 +1706,13 @@ function Core:joinCrew(code, displayName)
   code = ns.CrewCode.normalise(code)
   if not code then return nil, "invalidCode" end
   local current = self.db.crew
-  if current and current.code ~= code then return nil, "inCrew" end
   local name = nameOrCurrent(self, displayName)
   if not name then return nil, "invalidName" end
-  if not current then
+  if not current or current.code ~= code then
     local id, wasLeft = ns.Slots.withCode(self.account, self.rulesetKey, code)
-    if id and not wasLeft then return bindCrew(self, id) end
+    if id and not wasLeft then return self:switchCrew(id) end
+    local ok, blocked = stepOut(self)
+    if not ok then return nil, blocked end
     return enter(self, code, name, true)
   end
 
@@ -1812,7 +1816,7 @@ function Core:crews()
     left = left,
     leftButton = #left > 0 and ("Left Crews (%d)"):format(#left) or nil,
     current = inCrew and crewRow(self, self.slotId) or nil,
-    header = inCrew and #list >= 2 or nil,
+    header = inCrew or nil,
     menu = (inCrew or #list > 0) or nil,
     alsoIn = inCrew and alsoInLine(list) or nil,
     picker = not inCrew and #list > 0 and ("Who is %s playing with?"):format(characterNameOf(self)) or nil,
@@ -1845,13 +1849,20 @@ function bindCrew(self, id)
   return self:crew()
 end
 
-function Core:startAnother()
+function stepOut(self)
   if not self.db.crew then return true end
   local blocked = switchBlocked(self)
   if blocked then return nil, blocked end
   local name = self.ledger:displayName()
   switchSlot(self, (ns.Slots.blank(self.account, self.rulesetKey, self.random)))
   if name then self.ledger:writeOwn({ displayName = name }) end
+  return true
+end
+
+function Core:startAnother()
+  if not self.db.crew then return true end
+  local ok, blocked = stepOut(self)
+  if not ok then return nil, blocked end
   self.listener("crewChanged")
   return true
 end
@@ -1976,6 +1987,7 @@ local function finishLeaving(self)
   local crew = self.db.crew
   if self.linkUp then self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } }) end
   self.spareLife:clear()
+  local label = labelOf(self.account.crews[self.slotId])
   crew.leaving, crew.left = nil, true
   self.db.leftAt = self.now()
   local joinFailure = self.db.joinFailure
@@ -1983,7 +1995,7 @@ local function finishLeaving(self)
   self.db.joinFailure = joinFailure
   self.doings:clear()
   self.listener("crewChanged")
-  self.listener("notice", "leftCrew")
+  self.listener("notice", "leftCrew", { crew = label })
 end
 
 function Core:leaveCrew()
