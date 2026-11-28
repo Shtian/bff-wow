@@ -899,6 +899,62 @@ describe("The channel link", function()
       assert.is_true(leftFirst)
     end)
 
+    it("waits out a lockdown that starts before joining again, then joins", function()
+      local game, link = refused()
+      leftAndJoinedWithoutNumber(game)
+      game.refuseJoin = false
+      game.advance(10)
+      game.lockdown = true
+      game.advance(2)
+      assert.equal(1, game.joins)
+      game.lockdown = false
+      game.fire("ADDON_RESTRICTION_STATE_CHANGED", 0, 0)
+      game.advance(1)
+      assert.equal(2, game.joins)
+      game.fire("CHAT_MSG_CHANNEL_LIST", "*Bob", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
+      assert.is_true(link.state().up)
+    end)
+
+    it("doesn't take a confirmation while waiting to join again, having just left", function()
+      local game, link = refused()
+      leftAndJoinedWithoutNumber(game)
+      game.advance(10)
+      game.fire("CHAT_MSG_CHANNEL_NOTICE", channelNotice("YOU_CHANGED"))
+      game.fire("CHAT_MSG_CHANNEL_LIST", "*Bob", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
+      assert.equal("not in the channel", link.state().reason)
+      game.advance(2)
+      assert.equal(2, game.joins)
+    end)
+
+    it("doesn't join the old Crew's channel when the Crew changes while waiting to join again", function()
+      local game, link = refused()
+      leftAndJoinedWithoutNumber(game)
+      game.advance(10)
+      game.refuseJoin = false
+      link.setCrew({ channel = "BFFHIJKMNP", password = "pw" })
+      game.advance(5)
+      assert.same({ CHANNEL, "BFFHIJKMNP" }, game.joined)
+    end)
+
+    it("counts joins again from the last time it got in", function()
+      local game, link, core = refused()
+      leftAndJoinedWithoutNumber(game)
+      game.advance(12)
+      leftAndJoinedWithoutNumber(game)
+      game.fire("CHAT_MSG_CHANNEL_NOTICE", channelNotice("YOU_CHANGED"))
+      game.fire("CHAT_MSG_CHANNEL_LIST", "*Bob", nil, nil, "5. " .. CHANNEL, nil, nil, nil, nil, CHANNEL)
+      assert.is_true(link.state().up)
+
+      game.fire("CHAT_MSG_CHANNEL_NOTICE", channelNotice("YOU_LEFT"))
+      game.fire("ADDON_RESTRICTION_STATE_CHANGED", 0, 0)
+      for _ = 1, 2 do
+        leftAndJoinedWithoutNumber(game)
+        game.advance(12)
+      end
+      assert.equal(0, core.count("joinFailed"))
+      assert.equal(5, game.joins)
+    end)
+
     it("asks for a relog after 3 joins the game answered but never confirmed", function()
       local game, link, core, lines = refused()
       for _ = 1, 3 do
