@@ -28,7 +28,10 @@ local function report(options)
     end,
   }
   ns.ChannelLink = {
-    FAILURE_REASONS = { wrongPassword = "wrong password", tooManyChannels = "too many channels" },
+    FAILURE_REASONS = {
+      wrongPassword = "wrong password", tooManyChannels = "too many channels",
+      stuckChannel = "the game left BFF half in the channel",
+    },
     state = function() return options.link or { up = true, peers = 1, instance = "party", lockdown = true } end,
   }
   game.load("UI/Report.lua", ns)

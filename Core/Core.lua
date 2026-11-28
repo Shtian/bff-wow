@@ -1855,7 +1855,7 @@ function Core:channelBroken()
   self.listener("crewChanged")
 end
 
-local JOIN_FAILURES = { wrongPassword = true, tooManyChannels = true }
+local JOIN_FAILURES = { wrongPassword = true, tooManyChannels = true, stuckChannel = true }
 
 function Core:joinFailed(kind)
   local crew = self.db.crew

@@ -16,6 +16,7 @@ local MESSAGES = {
   noCrew = "You're not in a Crew. Type /bff to start or join one.",
   tooManyChannels = "BFF couldn't join its channel: leave a chat channel and /reload.",
   wrongPassword = "BFF couldn't join its channel: leave the Crew and start a new one.",
+  stuckChannel = "BFF couldn't get into its channel: log out and back in (a /reload isn't enough).",
   leftCrew = "You left the Crew.",
   noChannel = "The game won't let BFF into any channel for your Crew. Try again later.",
   minimapHidden = "Minimap button hidden. Type /bff minimap to show it again.",
