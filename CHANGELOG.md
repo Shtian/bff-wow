@@ -50,6 +50,23 @@
 
 
 
+
+## 2.21.0
+<sub>2026-11-28</sub>
+
+- *(minor)*
+  The Pocket Camp shows a profession while you craft
+
+  While your profession window is open, your figure shows that profession's animation, and your friends see it too, even at max skill. Before, it only showed for a minute after a skill point.
+- *(minor)*
+  The Pocket Camp shows you gathering
+
+  Mining a node, picking an herb or skinning a corpse shows that profession on your figure for a minute, and your friends see it too, even at max skill. Before, it only showed on a skill point.
+- *(patch)*
+  BFF no longer calls a half-joined channel "too many channels"
+
+  Sometimes the game holds on to BFF's channel without really letting it in (an empty row in your Channels settings), and joining again only makes it worse until you log out. BFF used to call this "too many channels" and tell you to /reload, which didn't help. It now leaves the channel and tries again, and if that doesn't work, it tells you to log out and back in.
+
 ## 2.20.0
 <sub>2026-11-28</sub>
 
