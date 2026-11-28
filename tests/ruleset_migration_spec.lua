@@ -67,7 +67,8 @@ describe("A Crew saved before Rulesets", function()
   end)
 
   local function forgetRulesets(db)
-    local slot = db.crews[db.rulesets.default.active]
+    local entry = db.rulesets.default
+    local slot = db.crews[entry.crews[1] or entry.blank]
     slot.ruleset = nil
     for key, value in pairs(slot) do db[key] = value end
     db.crews, db.rulesets, db.migrated = nil, nil, nil

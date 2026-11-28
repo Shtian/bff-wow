@@ -141,7 +141,9 @@ local function deliver(self, item)
   for _, client in ipairs(self.clients) do
     if isListening(client) and reaches(self, item, client) then
       if item.gone then
-        if client ~= item.from then client.core:gone(item.gone) end
+        if client ~= item.from and (item.channel == nil or channelOf(client) == item.channel) then
+          client.core:gone(item.gone)
+        end
       elseif item.to == nil or characterName(client) == item.to then
         if client ~= item.from and self.fail and self.fail(item.message, item.from.name, client.name) then
           if item.from.core then item.from.core:sendFailed(characterName(client)) end
@@ -221,6 +223,12 @@ function Client:count(event, kind)
   return n
 end
 
+local function factsOf(client)
+  local facts = copy(client.ruleset) or {}
+  facts.guid = client.character and client.character.guid
+  return facts
+end
+
 local function newCore(client, initialLogin)
   local net = client.net
   client.framing = newFraming(client)
@@ -235,7 +243,8 @@ local function newCore(client, initialLogin)
       inChannel = function(name) return inChannel(net, client, name) end,
     },
     gossip = client.gossip,
-    ruleset = copy(client.ruleset),
+    ruleset = factsOf(client),
+    lockdown = function() return client.locked == true end,
     listener = function(event, ...)
       client.events[#client.events + 1] = { event, ... }
       if event == "crewChanged" and net.channels then client.moved = true end
@@ -380,6 +389,16 @@ function Client:join(code)
   return code
 end
 
+function Client:switchCrew(id)
+  local before = self.core:channel()
+  local crew, reason = self.core:switchCrew(id)
+  local after = self.core:channel()
+  if before and not (after and after.channel == before.channel) then
+    self.net.queue[#self.net.queue + 1] = { from = self, gone = characterName(self), channel = before.channel }
+  end
+  return crew, reason
+end
+
 function Client:play(changes)
   for k, v in pairs(changes or {}) do self.character[k] = v end
   if self.core then self.core:updateOwn(copy(self.character)) end
@@ -402,7 +421,7 @@ function Client:move(location)
 end
 
 function Client:slot()
-  return ns.Slots.find(self.db, self.ruleset)
+  return ns.Slots.find(self.db, factsOf(self))
 end
 
 function Client:rowFor(other)

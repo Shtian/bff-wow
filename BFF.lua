@@ -11,7 +11,7 @@ ns.say = say
 
 local MESSAGES = {
   invalidCode = "That code doesn't look right.",
-  inCrew = "Leave your Crew first (/bff leave).",
+  inCrew = "You're in a Crew. Pick Start or join another Crew… from the Crew menu in Settings first.",
   invalidName = "A display name is 2 to 16 characters (/bff name <name>).",
   noCrew = "You're not in a Crew. Type /bff to start or join one.",
   tooManyChannels = "BFF couldn't join its channel: leave a chat channel and /reload.",
@@ -36,6 +36,10 @@ local MESSAGES = {
   given = "That one has been given already.",
   notClaimed = "You haven't claimed that one.",
   notWaiting = "That Crew isn't waiting here any more.",
+  lockdown = "Can't switch Crew right now. The game blocks addon messages in combat and instances.",
+  leaving = "Can't switch Crew until your leave finishes.",
+  unknownCrew = "That Crew isn't one of yours here any more.",
+  invalidLabel = "That's too long: a Crew label is up to 32 characters.",
   winnerChanged = "Someone claimed it earlier in the meantime. Have another look before you Give it.",
 }
 ns.MESSAGES = MESSAGES
@@ -196,6 +200,7 @@ local function start(isInitialLogin)
     utcOffset = utcOffset(),
     daylight = ns.Snapshot.daylight,
     locate = ns.Snapshot.locate,
+    lockdown = function() return C_ChatInfo.InChatMessagingLockdown and C_ChatInfo.InChatMessagingLockdown() end,
     itemLink = ns.Snapshot.itemLink,
     itemLook = ns.Skin.itemLook,
     findItem = ns.Bags.findItem,
@@ -207,6 +212,7 @@ local function start(isInitialLogin)
   ns.ChannelLink.start(ns.core, isInitialLogin)
   ns.ChannelLink.setCrew(ns.core:channel())
   ns.Panel.start(ns.core)
+  ns.CrewMenu.start(ns.core)
   ns.PocketCamp.start(ns.core)
   ns.Minimap.start(ns.core)
   ns.MapPins.start(ns.core)

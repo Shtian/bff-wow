@@ -33,7 +33,7 @@ local view, core
 local back
 local sections
 local rows = {}
-local nameRow, lookRow, codeRow, leaveRow
+local nameRow, lookRow, codeRow, crewsRow, leaveRow
 
 local function smallButton(parent, text, onClick)
   local button = Skin.button(parent, text, onClick)
@@ -352,9 +352,11 @@ local function createYou()
 end
 
 local function createLeave()
+  crewsRow = createRow("Your Crews")
+  placeControl(crewsRow, smallButton(crewsRow, "Crew menu", function(self) ns.CrewMenu.show(self) end))
   leaveRow = createRow("Leave your Crew")
   placeControl(leaveRow, smallButton(leaveRow, "Leave Crew", ns.confirmLeave))
-  return leaveRow
+  return crewsRow, leaveRow
 end
 local extras = { paused = createLeave }
 
@@ -368,7 +370,7 @@ local function create()
       row.key, row.kind, row.needs, row.section = setting.key, setting.kind, setting.needs, section.title
       rows[setting.key] = row
       list[#list + 1] = row
-      if extras[setting.key] then list[#list + 1] = extras[setting.key]() end
+      for _, extra in ipairs(extras[setting.key] and { extras[setting.key]() } or {}) do list[#list + 1] = extra end
     end
     sections[#sections + 1] = { heading = sectionHeading(section.title), rows = list }
   end
@@ -426,6 +428,7 @@ function SettingsTab.draw(page)
   end
   codeRow:SetShown(crew ~= nil)
   leaveRow:SetShown(crew ~= nil and not crew.leaving)
+  crewsRow:SetShown(core:crews().menu == true)
 
   local y = -INSET
   back:SetShown(crew == nil)

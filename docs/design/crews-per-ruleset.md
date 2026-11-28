@@ -32,6 +32,8 @@ BFF_DB = {
 
 A slot id is 8 characters from `[a-z0-9]`: a new slot's id is its new Member id. That keeps the number of `random()` calls per new Crew what it was, so FakeNet's seeded clients behave as before. A repair only moves an entry with the same faction, since both factions of a ruleset share its server IDs and name. A ruleset entry's `active` slot is what Core runs on. The entry is made empty (no `crew`) on the first login with that key.
 
+ADR 0010 (#317) replaced `active` and `left` with `crews`, `left` (lists), `lastUsed` and `blank`; see that ADR for the layout and its migration. The rest of this file describes the #318 build.
+
 ## Pieces
 
 - **`Game/Ruleset.lua` (the game side)** reads the facts once at `PLAYER_ENTERING_WORLD`, before `Core.new`:

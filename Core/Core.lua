@@ -294,6 +294,7 @@ function Core.new(deps)
     itemLook = type(deps.itemLook) == "function" and deps.itemLook or nil,
     findItem = type(deps.findItem) == "function" and deps.findItem or nil,
     locate = type(deps.locate) == "function" and deps.locate or nil,
+    lockdown = type(deps.lockdown) == "function" and deps.lockdown or function() return false end,
     Gossip = type(deps.gossip) == "table" and deps.gossip or ns.Gossip,
     linkUp = false,
     upSince = nil,
@@ -305,6 +306,7 @@ function Core.new(deps)
   self.facts = ns.Slots.facts(deps.ruleset)
   local opened = ns.Slots.open(deps.db, self.facts, deps.random, deps.now())
   self.rulesetKey, self.rulesetEntry, self.rulesetRepair = opened.key, opened.entry, repairText(opened.repaired)
+  self.slotId = opened.id
   self.openingLines = {}
   if self.rulesetRepair then self.openingLines[1] = "ruleset " .. self.rulesetRepair end
   if opened.placed then
@@ -438,7 +440,7 @@ end
 local function leaveOtherSlots(self, guid)
   if self.leftOtherSlotsAs == guid then return end
   self.leftOtherSlotsAs = guid
-  for _, slot in ipairs(ns.Slots.others(self.account, self.db)) do
+  for _, slot in ipairs(ns.Slots.outside(self.account, self.rulesetKey)) do
     if type(slot.memberId) == "string" then
       ns.Ledger.new(slot, self.now, self.random):keepCharacters(function(other) return other ~= guid end)
     end
@@ -1511,6 +1513,7 @@ function Core:elsewhere()
 end
 
 local function confirmRuleset(self)
+  self.db.syncedAt = self.now()
   if not self.db.provisional then return end
   self.db.provisional = nil
   traceRuleset(self, "confirmed by a Member")
@@ -1541,6 +1544,11 @@ function Core:channel()
   return nil
 end
 
+local function footerOf(status, alsoIn)
+  if status and alsoIn then return status .. "\n" .. alsoIn end
+  return status or alsoIn
+end
+
 function Core:crew()
   local saved = self.db.crew
   if not saved then return nil end
@@ -1566,6 +1574,7 @@ function Core:crew()
     joined = saved.joined == true,
     status = status,
     waiting = waiting,
+    footer = footerOf(not waiting and status or nil, self:crews().alsoIn),
     capped = self.channelCapped == true,
     generation = generation,
     generationFrom = self.generationFrom,
@@ -1574,6 +1583,12 @@ function Core:crew()
 end
 
 local MIN_NAME, MAX_NAME = 2, 16
+
+local function utf8Chars(s)
+  local chars = {}
+  for char in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do chars[#chars + 1] = char end
+  return chars
+end
 
 local function utf8Length(s)
   return #s:gsub("[\128-\191]", "")
@@ -1592,8 +1607,9 @@ local function nameOrCurrent(self, displayName)
   return validName(displayName)
 end
 
-local function switchSlot(self, slot, carryFrom)
-  bindSlot(self, slot, false)
+local function switchSlot(self, id, carryFrom)
+  self.slotId = id
+  bindSlot(self, self.account.crews[id], false)
   if carryFrom then self.ledger:carryOwn(carryFrom) end
   self.linkFailed = nil
   self.channelCapped = nil
@@ -1605,18 +1621,20 @@ local function switchSlot(self, slot, carryFrom)
   updateLink(self)
 end
 
-local function leftCrewWith(self, code)
-  local slot = ns.Slots.left(self.account, self.rulesetKey)
-  local crew = slot and slot.crew
-  return type(crew) == "table" and crew.code == code and crew or nil
+local bindCrew
+
+local function guidOf(self)
+  return type(self.character) == "table" and self.character.guid or self.facts.guid
 end
 
 local function enter(self, code, displayName, joining)
-  local left = leftCrewWith(self, code)
+  local id, wasLeft = ns.Slots.withCode(self.account, self.rulesetKey, code)
+  local left = wasLeft and self.account.crews[id].crew or nil
   if left then
-    switchSlot(self, ns.Slots.rejoin(self.account, self.rulesetKey))
+    switchSlot(self, id)
+    ns.Slots.rejoin(self.account, self.rulesetKey, id, guidOf(self))
   else
-    ns.Slots.dropLeft(self.account, self.rulesetKey)
+    ns.Slots.adopt(self.account, self.rulesetKey, self.slotId, guidOf(self))
     self.crewGoals:clear()
   end
   self.db.catchTypesTold = nil
@@ -1641,8 +1659,8 @@ local function cardAnswer(self, answer)
   return result
 end
 
-local function takeSlot(self, slot, how)
-  switchSlot(self, slot)
+local function takeSlot(self, id, how)
+  switchSlot(self, id)
   if self.facts.serverId then self.ledger:keepCharacters(ns.Slots.belongsHere(self.db, self.facts.serverId)) end
   self:raiseGeneration(true)
   sendOwnNow(self)
@@ -1653,15 +1671,15 @@ end
 
 function Core:placeCrewHere()
   return cardAnswer(self, function()
-    local slot = ns.Slots.placeHere(self.account, self.rulesetKey, self.now())
-    return slot and takeSlot(self, slot, "placed the Crew saved before Rulesets here (asked)")
+    local slot, id = ns.Slots.placeHere(self.account, self.rulesetKey, self.now(), guidOf(self))
+    return slot and takeSlot(self, id, "placed the Crew saved before Rulesets here (asked)")
   end)
 end
 
 function Core:bringCrewHere()
   return cardAnswer(self, function()
-    local slot = ns.Slots.bringHere(self.account, self.rulesetKey, self.random)
-    return slot and takeSlot(self, slot, "brought the Crew over from the other faction")
+    local slot, id = ns.Slots.bringHere(self.account, self.rulesetKey, guidOf(self))
+    return slot and takeSlot(self, id, "brought the Crew over from the other faction")
   end)
 end
 
@@ -1688,7 +1706,11 @@ function Core:joinCrew(code, displayName)
   if current and current.code ~= code then return nil, "inCrew" end
   local name = nameOrCurrent(self, displayName)
   if not name then return nil, "invalidName" end
-  if not current then return enter(self, code, name, true) end
+  if not current then
+    local id, wasLeft = ns.Slots.withCode(self.account, self.rulesetKey, code)
+    if id and not wasLeft then return bindCrew(self, id) end
+    return enter(self, code, name, true)
+  end
 
   if current.leaving then
     current.leaving = nil
@@ -1696,6 +1718,168 @@ function Core:joinCrew(code, displayName)
     sendOwnNow(self)
   end
   return self:crew()
+end
+
+local LOCKED = "Can't switch Crew right now. The game blocks addon messages in combat and instances."
+local STILL_LEAVING = "Can't switch Crew until your leave finishes."
+local SHORT_LABEL = 18
+local MAX_LABEL = 32
+Core.MAX_CREW_LABEL = MAX_LABEL
+local NAMES_SHOWN = 2
+
+local function shortened(label)
+  local chars = utf8Chars(label)
+  if #chars <= SHORT_LABEL then return label end
+  return table.concat(chars, "", 1, SHORT_LABEL - 1) .. "…"
+end
+
+local function defaultLabel(slot)
+  local names = ns.Slots.otherNames(slot)
+  if #names == 0 then
+    local crew = type(slot.crew) == "table" and slot.crew
+    return crew and ("Crew " .. crew.code) or "A Crew"
+  end
+  local shown = table.concat(names, ", ", 1, math.min(#names, NAMES_SHOWN))
+  if #names > NAMES_SHOWN then shown = ("%s +%d"):format(shown, #names - NAMES_SHOWN) end
+  return shown
+end
+
+local function labelOf(slot)
+  return type(slot.label) == "string" and slot.label or defaultLabel(slot)
+end
+
+local function sinceText(self, time, prefix, never)
+  if type(time) ~= "number" then return never end
+  return prefix .. ns.Text.since(self.now() - time)
+end
+
+local function withDetail(label, detail)
+  return detail and ("%s · %s"):format(label, detail) or label
+end
+
+local function crewRow(self, id, locked)
+  local slot = self.account.crews[id]
+  local label = labelOf(slot)
+  local current = id == self.slotId
+  local lastPlayed = sinceText(self, ns.Slots.lastPlayed(slot), "last played ", nil)
+  return {
+    id = id,
+    label = label,
+    headerLabel = shortened(label),
+    pickText = withDetail(label, lastPlayed),
+    renamed = type(slot.label) == "string",
+    current = current,
+    locked = locked and not current or nil,
+    lastPlayed = lastPlayed,
+    synced = sinceText(self, slot.syncedAt, "last synced ", "not synced yet"),
+  }
+end
+
+local function characterNameOf(self)
+  local name = type(self.character) == "table" and self.character.name
+  return type(name) == "string" and name or "this Character"
+end
+
+local function alsoInLine(rows)
+  local others = {}
+  for _, row in ipairs(rows) do
+    if not row.current then others[#others + 1] = withDetail(row.label, row.synced) end
+  end
+  return #others > 0 and "Also in: " .. table.concat(others, "; ") or nil
+end
+
+local function switchBlocked(self)
+  if self.db.crew and self.db.crew.leaving then return "leaving", STILL_LEAVING end
+  if self.lockdown() then return "lockdown", LOCKED end
+  return nil
+end
+
+function Core:crews()
+  local ids, leftIds = ns.Slots.ids(self.account, self.rulesetKey)
+  local _, lockedText = switchBlocked(self)
+  local locked = lockedText ~= nil
+  local inCrew = self.db.crew ~= nil
+  local list, left = {}, {}
+  for _, id in ipairs(ids) do list[#list + 1] = crewRow(self, id, locked) end
+  for _, id in ipairs(leftIds) do
+    local row = crewRow(self, id, locked and inCrew)
+    row.leftText = sinceText(self, self.account.crews[id].leftAt, "left ", nil)
+    row.leftLine = withDetail(row.label, row.leftText)
+    left[#left + 1] = row
+  end
+  return {
+    list = list,
+    left = left,
+    leftButton = #left > 0 and ("Left Crews (%d)"):format(#left) or nil,
+    current = inCrew and crewRow(self, self.slotId) or nil,
+    header = inCrew and #list >= 2 or nil,
+    menu = (inCrew or #list > 0) or nil,
+    alsoIn = inCrew and alsoInLine(list) or nil,
+    picker = not inCrew and #list > 0 and ("Who is %s playing with?"):format(characterNameOf(self)) or nil,
+    locked = locked or nil,
+    lockedText = lockedText,
+  }
+end
+
+local function listed(list, id)
+  for _, other in ipairs(list) do
+    if other == id then return true end
+  end
+  return false
+end
+
+function Core:switchCrew(id)
+  if id == self.slotId and self.db.crew then return self:crew() end
+  if not listed((ns.Slots.ids(self.account, self.rulesetKey)), id) then return nil, "unknownCrew" end
+  local blocked = switchBlocked(self)
+  if blocked then return nil, blocked end
+  return bindCrew(self, id)
+end
+
+function bindCrew(self, id)
+  switchSlot(self, id)
+  ns.Slots.use(self.account, self.rulesetKey, id, guidOf(self))
+  self:raiseGeneration(true)
+  traceRuleset(self, "switched Crew")
+  self.listener("crewChanged")
+  return self:crew()
+end
+
+function Core:startAnother()
+  if not self.db.crew then return true end
+  local blocked = switchBlocked(self)
+  if blocked then return nil, blocked end
+  local name = self.ledger:displayName()
+  switchSlot(self, (ns.Slots.blank(self.account, self.rulesetKey, self.random)))
+  if name then self.ledger:writeOwn({ displayName = name }) end
+  self.listener("crewChanged")
+  return true
+end
+
+function Core:renameCrew(label)
+  if not self.db.crew then return nil, "noCrew" end
+  if label ~= nil and type(label) ~= "string" then return nil, "invalidLabel" end
+  label = label and label:match("^%s*(.-)%s*$") or ""
+  if #utf8Chars(label) > MAX_LABEL then return nil, "invalidLabel" end
+  self.db.label = label ~= "" and label or nil
+  self.listener("changed")
+  return true
+end
+
+function Core:rejoinCrew(id)
+  local _, leftIds = ns.Slots.ids(self.account, self.rulesetKey)
+  if not listed(leftIds, id) then return nil, "unknownCrew" end
+  local blocked = self.db.crew and switchBlocked(self)
+  if blocked then return nil, blocked end
+  local slot = self.account.crews[id]
+  local name = validName(ns.Slots.ownDisplayName(slot)) or nameOrCurrent(self, nil)
+  return enter(self, slot.crew.code, name, true)
+end
+
+function Core:deleteLeftCrew(id)
+  if not ns.Slots.delete(self.account, self.rulesetKey, id) then return nil, "unknownCrew" end
+  self.listener("changed")
+  return true
 end
 
 function Core:setDisplayName(displayName)
@@ -1793,8 +1977,9 @@ local function finishLeaving(self)
   if self.linkUp then self.gossip:sendNow({ type = "DATA", records = { self.ledger:tombstone() } }) end
   self.spareLife:clear()
   crew.leaving, crew.left = nil, true
+  self.db.leftAt = self.now()
   local joinFailure = self.db.joinFailure
-  switchSlot(self, ns.Slots.leave(self.account, self.rulesetKey, self.random), self.ledger)
+  switchSlot(self, ns.Slots.leave(self.account, self.rulesetKey, self.slotId, self.random), self.ledger)
   self.db.joinFailure = joinFailure
   self.doings:clear()
   self.listener("crewChanged")

@@ -63,8 +63,10 @@ describe("the Ruleset facts at login", function()
       realmName = "", recordId = 15, faction = "Alliance", guid = "Player-6939-0A1B2C3D",
       richPresence = "World of Warcraft: Forever - Normal - Elwynn Forest",
     })
-    assert.same({ realmName = "", recordId = 15, faction = "Alliance", serverId = "6939", name = "Normal" },
-      Ruleset.read())
+    assert.same({
+      realmName = "", recordId = 15, faction = "Alliance", serverId = "6939", name = "Normal",
+      guid = "Player-6939-0A1B2C3D",
+    }, Ruleset.read())
     assert.equal("Normal", Ruleset.name())
   end)
 
@@ -77,6 +79,6 @@ describe("the Ruleset facts at login", function()
   it("leaves out an API that errors", function()
     playOn({ faction = "Horde", guid = "Player-6856-0A1B2C3D", richPresence = "x" })
     _G.C_BattleNet.GetGameAccountInfoByGUID = function() error("Battle.net is down") end
-    assert.same({ faction = "Horde", serverId = "6856" }, Ruleset.read())
+    assert.same({ faction = "Horde", serverId = "6856", guid = "Player-6856-0A1B2C3D" }, Ruleset.read())
   end)
 end)
