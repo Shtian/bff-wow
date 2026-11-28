@@ -57,7 +57,7 @@ A partial break, where some Members can use the channel and some can't, heals th
 
 ## One Crew at a time
 
-A player is in **at most one Crew per Ruleset and faction** (ADR 0009). A Character on another Ruleset or faction has a Crew of its own, or none. Joining another Crew on the same Ruleset and faction means leaving the current one first: the panel asks to confirm, and `/bff join` refuses with "Leave your Crew first (/bff leave)". Joining the Crew you are already in does nothing.
+A player is in **at most one Crew per Ruleset and faction** (ADR 0009). A Character on another Ruleset or faction has a Crew of its own, or none. You can be in several Crews on the same Ruleset and faction, and play with one at a time (ADR 0010). `/bff start` and `/bff join <code>` from inside a Crew start or join another and switch to it, keeping the one you were in. Joining the Crew you are already in does nothing; joining the code of another of your Crews switches to it. `/bff join` with the code of a Crew you left uses the display name you had there (`core:displayName(code)`); the panel uses the name in its box. Both are refused during messaging lockdown and while a leave is pending.
 
 Why:
 
@@ -100,14 +100,14 @@ The default display name for slash commands is the current Character's name, as 
 
 1. Core sets the **left** flag in your own record, bumps its version and enters a saved **leaving** state. While leaving, `crew()` still returns the channel and Gossip keeps running.
 2. Your record goes out as DATA right away if the link is up (already a send trigger in #8), or on the next `up()` if it is down (lockdown, not yet in the channel). If you log out first, the leaving state survives in saved data and the next login rejoins the channel to finish.
-3. Once the DATA has been handed to the link, Core sets the Crew's slot aside as the Ruleset's **left** slot and makes a fresh slot active (ADR 0009, `docs/design/crews-per-ruleset.md`): you show as not in a Crew and the link leaves the channel, but the Crew's data stays in saved data, out of sight. That's your own record and Member id, every other Member's record, the Remove list, the Feed log, While you were away, reactions, reached goal rungs and the channel generation. Your own Spares and Claims are still withdrawn. The fresh slot has a new Member id, and its own record starts as a copy of yours: display name, Characters, Main and look, without reactions. The last join failure moves to it too. Then Core fires `crewChanged`.
+3. Once the DATA has been handed to the link, Core moves the Crew's slot to the front of the Ruleset's **left** Crews and binds a fresh blank slot (ADR 0009 and 0010, `docs/design/crews-per-ruleset.md`). Every Character whose last used Crew it was is marked to get the picker next time: you show as not in a Crew and the link leaves the channel, but the Crew's data stays in saved data, out of sight. That's your own record and Member id, every other Member's record, the Remove list, the Feed log, While you were away, reactions, reached goal rungs and the channel generation. Your own Spares and Claims are still withdrawn. The fresh slot has a new Member id, and its own record starts as a copy of yours: display name, Characters, Main and look, without reactions. The last join failure moves to it too. Then Core fires `crewChanged`.
    - **Rejoining the same code** makes the left slot active again and drops the fresh one, so everything comes back as if you hadn't left, Member id included.
-   - **Starting or joining a different code** on the same Ruleset and faction deletes the left slot, so Crews stay apart, and you join under the fresh slot's new Member id.
+   - **Starting or joining a different code** on the same Ruleset and faction keeps the left slot (ADR 0010: left Crews are kept until deleted from the Crew menu). You join under the fresh slot's new Member id, so Crews stay apart.
 
    Keeping the left Crew means a Member who leaves and rejoins still knows the others, so their whispers are vouched for even when the member list is broken (ADR 0008).
 4. The channel link leaves the channel a few seconds later, after ChatThrottleLib has drained.
 
-**After a failed join** (wrong password, too many channels) the link will never come up, so leaving doesn't wait for it: step 3 happens straight away and nothing is sent, not even the tombstone. The others see you go offline as usual. This covers a leave started after the failure, one already waiting when it happens, and one pending at login whose join then fails (the failure finishes it, with "You left the Crew." and no failure notice). You can then start or join another Crew. Joining the same code while a leave is still waiting cancels it, as before.
+**After a failed join** (wrong password, too many channels) the link will never come up, so leaving doesn't wait for it: step 3 happens straight away and nothing is sent, not even the tombstone. The others see you go offline as usual. This covers a leave started after the failure, one already waiting when it happens, and one pending at login whose join then fails (the failure finishes it, with "You left <Crew label>." and no failure notice). You can then start or join another Crew. Joining the same code while a leave is still waiting cancels it, as before.
 
 On the other side:
 
@@ -122,7 +122,7 @@ Leaving is not the same as **Remove**: leaving is what you do to yourself, and e
 
 Additions to `docs/design/code-structure.md`:
 
-- **Commands:** `startCrew(displayName)`, `joinCrew(code, displayName)` (returns an error for an invalid code or when already in another Crew), `leaveCrew()`, `setDisplayName(name)`.
+- **Commands:** `startCrew(displayName)`, `joinCrew(code, displayName)` (returns an error for an invalid code or name, or during lockdown or a pending leave), `leaveCrew()`, `setDisplayName(name)`.
 - **Read:** `crew()` returns the code, channel name and password, or nil when not in a Crew.
 - **Listener event:** `crewChanged`, fired on joining and when leaving has finished. App routes it to the channel link so it joins or leaves the channel.
 - **New internal file:** `Core/CrewCode.lua` generates, normalises and checks codes and derives the channel name and password.

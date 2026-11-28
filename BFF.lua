@@ -11,13 +11,13 @@ ns.say = say
 
 local MESSAGES = {
   invalidCode = "That code doesn't look right.",
-  inCrew = "Leave your Crew first (/bff leave).",
+  inCrew = "You're in a Crew already.",
   invalidName = "A display name is 2 to 16 characters (/bff name <name>).",
   noCrew = "You're not in a Crew. Type /bff to start or join one.",
   tooManyChannels = "BFF couldn't join its channel: leave a chat channel and /reload.",
   wrongPassword = "BFF couldn't join its channel: leave the Crew and start a new one.",
   stuckChannel = "BFF couldn't get into its channel: log out and back in (a /reload isn't enough).",
-  leftCrew = "You left the Crew.",
+  leftCrew = "You left %s.",
   noChannel = "The game won't let BFF into any channel for your Crew. Try again later.",
   minimapHidden = "Minimap button hidden. Type /bff minimap to show it again.",
   outOfDate = "BFF is out of date: someone in your Crew has a newer version. Update to keep seeing them.",
@@ -36,6 +36,10 @@ local MESSAGES = {
   given = "That one has been given already.",
   notClaimed = "You haven't claimed that one.",
   notWaiting = "That Crew isn't waiting here any more.",
+  lockdown = "Can't switch Crew right now. The game blocks addon messages in combat and instances.",
+  leaving = "Can't switch Crew until your leave finishes.",
+  unknownCrew = "That Crew isn't one of yours here any more.",
+  invalidLabel = "That's too long: a Crew label is up to 32 characters.",
   winnerChanged = "Someone claimed it earlier in the meantime. Have another look before you Give it.",
 }
 ns.MESSAGES = MESSAGES
@@ -122,7 +126,7 @@ local function onCoreEvent(event, arg, more)
     ns.Minimap.refresh()
     ns.MapPins.refresh()
   elseif event == "notice" then
-    say(MESSAGES[arg])
+    say(MESSAGES[arg]:format(more and more.crew or "the Crew"))
   elseif event == "newerBff" then
     say(arg.text)
   elseif event == "feedEntry" or event == "reaction" or event == "spare" then
@@ -196,6 +200,7 @@ local function start(isInitialLogin)
     utcOffset = utcOffset(),
     daylight = ns.Snapshot.daylight,
     locate = ns.Snapshot.locate,
+    lockdown = function() return C_ChatInfo.InChatMessagingLockdown and C_ChatInfo.InChatMessagingLockdown() end,
     itemLink = ns.Snapshot.itemLink,
     itemLook = ns.Skin.itemLook,
     findItem = ns.Bags.findItem,
@@ -207,6 +212,7 @@ local function start(isInitialLogin)
   ns.ChannelLink.start(ns.core, isInitialLogin)
   ns.ChannelLink.setCrew(ns.core:channel())
   ns.Panel.start(ns.core)
+  ns.CrewMenu.start(ns.core)
   ns.PocketCamp.start(ns.core)
   ns.Minimap.start(ns.core)
   ns.MapPins.start(ns.core)
@@ -282,7 +288,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 end)
 
 StaticPopupDialogs.BFF_LEAVE_CREW = {
-  text = "Leave your Crew? The others will see that you left.",
+  text = "Leave %s? The others will see that you left.",
   button1 = YES,
   button2 = NO,
   OnAccept = function() ns.core:leaveCrew() end,
@@ -292,12 +298,13 @@ StaticPopupDialogs.BFF_LEAVE_CREW = {
 }
 
 function ns.confirmLeave()
-  StaticPopup_Show("BFF_LEAVE_CREW")
+  local current = ns.core:crews().current
+  StaticPopup_Show("BFF_LEAVE_CREW", current and current.label or "your Crew")
 end
 
 -- WoW: a Forever Character's name can be "First Last".
-function ns.defaultDisplayName()
-  return ns.core:displayName() or (UnitName("player") or ""):match("^%S*")
+function ns.defaultDisplayName(code)
+  return ns.core:displayName(code) or (UnitName("player") or ""):match("^%S*")
 end
 local defaultName = ns.defaultDisplayName
 
@@ -313,7 +320,7 @@ function commands.start()
 end
 
 function commands.join(code)
-  local crew, reason = ns.core:joinCrew(code, defaultName())
+  local crew, reason = ns.core:joinCrew(code, defaultName(code))
   if crew then say("you're in the Crew " .. crew.code .. ".") else say(MESSAGES[reason]) end
 end
 

@@ -48,6 +48,7 @@ function Ruleset.read()
     faction = readSafely(UnitFactionGroup, "player"),
     serverId = ns.Slots.serverIdOf(guid),
     name = nameFor(guid),
+    guid = guid,
   }
 end
 

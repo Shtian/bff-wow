@@ -116,6 +116,9 @@ Only people with your crew code. There's no owner, kick or ban. To hide someone 
 **I can't join a crew, or nothing happens.**
 BFF uses one of your character's custom chat channels, and WoW allows about 10. If you're at the cap, leave a channel and `/reload`. BFF works with one crew at a time.
 
+**Can I be in more than one crew?**
+Yes, even on the same ruleset and faction. You play with one at a time: each character remembers its crew, and you switch from the crew menu at the top of the panel (or Settings → Your Crews). Switching never makes you look like you left. The other crews just see you as offline. You can't switch in combat or instances, since WoW blocks addon messages there.
+
 **How long is history kept?**
 The feed keeps 30 days or 200 entries, whichever runs out first. Friends unseen for 30 days are hidden from the panel.
 

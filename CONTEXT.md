@@ -15,8 +15,12 @@ The set of Members who share BFF data with each other.
 _Avoid_: Group, guild, party, friends
 
 **Crew code**:
-The generated code that names a Crew and is the only key to it. Whoever has it can join. A person is in at most one Crew per Ruleset and faction.
+The generated code that names a Crew and is the only key to it. Whoever has it can join. A person can be in several Crews on one Ruleset and faction, but plays with one at a time: each Character picks its Crew, and only that Crew's channel is joined.
 _Avoid_: Invite code, password, Crew name
+
+**Crew label**:
+The name a person gives one of their Crews, to tell them apart in the Crew menu. It is local: it is never sent, so each person may call the same Crew something else. Until it's renamed, it is the other Members' display names ("Anna, Bjørn +3").
+_Avoid_: Crew name (a shared name doesn't exist)
 
 **Ruleset**:
 Which of WoW: Forever's worlds a Character plays on: Normal, PvP, Roleplay or Roleplay PvP, and later Hardcore. Forever has rulesets instead of realms. A Crew lives on one Ruleset and one faction, since the game's chat reaches no further. On retail, a realm plays this part.
@@ -27,7 +31,7 @@ Which of the Crew's hidden channels it is using. Each generation is derived from
 _Avoid_: Channel version, channel index
 
 **Leave (the Crew)**:
-What a Member does to themselves: their record is marked as left, so every other Member stops showing them. Unlike Remove, everyone sees it. The Crew's data is set aside, not forgotten, until they start or join a different Crew on that Ruleset and faction.
+What a Member does to themselves: their record is marked as left, so every other Member stops showing them. Unlike Remove, everyone sees it. The Crew's data is set aside as a left Crew, not forgotten, until the person deletes it. Rejoining a left Crew brings back its data and Member id.
 _Avoid_: Quit, unsubscribe
 
 **Display name**:

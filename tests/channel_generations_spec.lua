@@ -163,7 +163,7 @@ describe("Channel generations", function()
     for _ = 1, 6 do core:channelBroken() end
     core:leaveCrew()
     assert.is_nil(core:crew())
-    assert.same({ "notice", "leftCrew" }, deps.events[#deps.events])
+    assert.same({ "notice", "leftCrew" }, { unpack(deps.events[#deps.events], 1, 2) })
   end)
 
   it("finish a waiting leave at the cap, since the link won't come up", function()
@@ -174,7 +174,7 @@ describe("Channel generations", function()
     core:leaveCrew()
     core:channelBroken()
     assert.is_nil(core:crew())
-    assert.same({ "notice", "leftCrew" }, deps.events[#deps.events])
+    assert.same({ "notice", "leftCrew" }, { unpack(deps.events[#deps.events], 1, 2) })
   end)
 
   it("join the highest generation in a current Member's record, and never go down", function()

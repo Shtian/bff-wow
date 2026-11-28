@@ -267,6 +267,39 @@ local function createGrip()
   frame.grip = grip
 end
 
+local CREW_BUTTON_HEIGHT = 18
+
+local function createCrewButton()
+  local button = CreateFrame("Button", nil, frame.header)
+  button:SetHeight(CREW_BUTTON_HEIGHT)
+  button:SetPoint("LEFT", frame.title, "RIGHT", 10, 0)
+  Skin.fill(button, Skin.SECONDARY)
+  Skin.border(button, Skin.BORDER)
+  Skin.fill(button, Skin.HOVER, "HIGHLIGHT")
+  button.label = Skin.label(button, "small", TEXT)
+  button.label:SetPoint("LEFT", 8, 0)
+  button.chevron = Skin.icon(button, "chevron", MUTED)
+  button.chevron:SetPoint("LEFT", button.label, "RIGHT", 6, 0)
+  button:SetScript("OnClick", function(self) ns.CrewMenu.show(self) end)
+  button:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+    GameTooltip:AddLine(self.full)
+    GameTooltip:Show()
+  end)
+  button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  button:Hide()
+  frame.crewButton = button
+end
+
+local function drawCrewButton(crews)
+  local button = frame.crewButton
+  button:SetShown(crews.header == true)
+  if not crews.header then return end
+  button.full = crews.current.label
+  button.label:SetText(crews.current.headerLabel)
+  button:SetWidth(button.label:GetStringWidth() + button.chevron:GetWidth() + 22)
+end
+
 local function create()
   frame = Skin.window("BFFPanel", ns.Core.PANEL_WIDTH, TITLE)
   applyPlace()
@@ -301,6 +334,7 @@ local function create()
 
   frame.headerRight:ClearAllPoints()
   frame.headerRight:SetPoint("RIGHT", frame.report, "LEFT", -8, 0)
+  createCrewButton()
   frame.onlineDot = frame.header:CreateTexture(nil, "OVERLAY")
   frame.onlineDot:SetSize(6, 6)
   frame.onlineDot:SetColorTexture(1, 1, 1, 1)
@@ -351,6 +385,7 @@ local function layout(inCrew)
   frame.content:SetPoint("BOTTOMRIGHT", -1, 1)
   frame.onlineDot:SetShown(inCrew)
   if not inCrew then frame.headerRight:SetText("") end
+  drawCrewButton(core:crews())
 end
 
 local function createSetup()
@@ -429,8 +464,49 @@ local function createCard()
   card.offer = cardText()
   card.bring = Skin.button(card, "Bring your Crew here", answer(function() return core:bringCrewHere() end), true)
   card.bring:SetWidth(SETUP_COLUMN)
+  card.picker = cardText()
+  card.picks = {}
+  card.leftCrews = Skin.button(card, "", function(self) ns.CrewMenu.showLeft(self) end)
+  card.leftCrews:SetWidth(SETUP_WIDTH)
   card.error = Skin.label(card, "small", ERROR)
   card.error:SetWidth(SETUP_WIDTH)
+end
+
+local function pickButton(i)
+  local button = card.picks[i]
+  if button then return button end
+  button = Skin.button(card, "", function(self)
+    local _, reason = core:switchCrew(self.crewId)
+    card.error:SetText(reason and ns.MESSAGES[reason] or "")
+  end)
+  button:SetWidth(SETUP_WIDTH)
+  button:HookScript("OnEnter", function(self)
+    if not self.lockedText then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(self.lockedText, 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  button:HookScript("OnLeave", function() GameTooltip:Hide() end)
+  card.picks[i] = button
+  return button
+end
+
+local function pickerButtons(crews)
+  local buttons = {}
+  for i, row in ipairs(crews.list) do
+    local button = pickButton(i)
+    button.crewId = row.id
+    button:SetText(row.pickText)
+    button:SetEnabled(not row.locked)
+    button.lockedText = row.locked and crews.lockedText or nil
+    buttons[#buttons + 1] = button
+  end
+  for i = #crews.list + 1, #card.picks do card.picks[i]:Hide() end
+  if crews.leftButton then
+    card.leftCrews:SetText(crews.leftButton)
+    buttons[#buttons + 1] = card.leftCrews
+  end
+  return buttons
 end
 
 local function stackCard(blocks)
@@ -440,7 +516,14 @@ local function stackCard(blocks)
     block.text:ClearAllPoints()
     block.text:SetPoint("TOPLEFT", 0, -y)
     y = y + block.text:GetStringHeight()
-    if block.buttons then
+    if block.stacked then
+      for _, button in ipairs(block.buttons) do
+        y = y + CARD_LINE_GAP
+        button:ClearAllPoints()
+        button:SetPoint("TOPLEFT", 0, -y)
+        y = y + BUTTON_HEIGHT
+      end
+    elseif block.buttons then
       y = y + CARD_BUTTON_GAP
       for j, button in ipairs(block.buttons) do
         button:ClearAllPoints()
@@ -456,8 +539,10 @@ end
 
 local function drawCard()
   local lines = core:elsewhere()
+  local crews = core:crews()
   local blocks = {}
   for _, part in ipairs({
+    { line = crews.picker, text = card.picker, buttons = crews.picker and pickerButtons(crews), stacked = true },
     { line = lines.hint, text = card.hint },
     { line = lines.ask, text = card.ask, buttons = { card.place, card.fresh } },
     { line = lines.offer, text = card.offer, buttons = { card.bring } },
@@ -472,7 +557,8 @@ local function drawCard()
     inUse[block.text] = true
     for _, button in ipairs(block.buttons or {}) do inUse[button] = true end
   end
-  for _, part in ipairs({ card.hint, card.ask, card.place, card.fresh, card.offer, card.bring }) do
+  for _, part in ipairs({ card.picker, card.leftCrews, card.hint, card.ask, card.place, card.fresh, card.offer,
+    card.bring, unpack(card.picks) }) do
     part:SetShown(inUse[part] == true)
   end
   if #blocks == 0 then

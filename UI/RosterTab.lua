@@ -394,7 +394,7 @@ local function drawFooter(crew, counts)
 
   -- WoW: a wrapping FontString has no height until its width is set.
   footer.status:SetWidth(page.width - 2 * INSET)
-  local status = not crew.waiting and crew.status or nil
+  local status = crew.footer
   footer.status:SetText(status or "")
   local height = 46
   if status then height = height + footer.status:GetStringHeight() + 6 end
