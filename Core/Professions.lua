@@ -135,8 +135,8 @@ local WORK = {}
 for _, profession in ipairs(Professions.ALL) do WORK[profession.skillLine] = profession.work end
 local FISHING = 356
 
-Professions.WORKS = { crafting = true }
-for _, work in pairs(WORK) do Professions.WORKS[work] = true end
+Professions.WORK_STATES = { crafting = true }
+for _, work in pairs(WORK) do Professions.WORK_STATES[work] = true end
 
 function Professions.workOf(skillLine)
   return WORK[skillLine]

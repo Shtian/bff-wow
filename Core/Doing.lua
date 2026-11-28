@@ -5,7 +5,7 @@ Doing.__index = Doing
 ns.Doing = Doing
 
 local KNOWN = { flying = true, auction = true, vendor = true, fighting = true, afk = true, resting = true }
-for work in pairs(ns.Professions.WORKS) do KNOWN[work] = true end
+for work in pairs(ns.Professions.WORK_STATES) do KNOWN[work] = true end
 
 local FORMS = { wolf = "now", bear = "now", cat = "now", moonkin = "now", travel = "held", seal = "held" }
 local TRAVEL_HOLD = 30
@@ -28,7 +28,8 @@ function Doing.new(now)
     formSince = -math.huge,
     sentForm = nil,
     fightingUntil = -math.huge,
-    gathering = nil,
+    gatheringWork = nil,
+    gatheringUntil = -math.huge,
     sent = false,
     sentAt = -math.huge,
     unheard = false,
@@ -53,6 +54,7 @@ function Doing:set(facts)
     form = FORMS[facts.form] and facts.form or nil, work = workAt(facts.profession),
   }
   if was and not self.facts.combat then self.fightingUntil = self.now() + FIGHTING_HOLD end
+  if self.facts.combat then self.gatheringUntil = -math.huge end
   if self.facts.form ~= wasForm then self.formSince = self.now() end
 end
 
@@ -73,14 +75,12 @@ end
 
 function Doing:gathered(spellId)
   local work = ns.Professions.gatheredBy(spellId)
-  if work then self.gathering = { work = work, at = self.now() } end
+  if work then self.gatheringWork, self.gatheringUntil = work, self.now() + GATHERING_HOLD end
   return work ~= nil
 end
 
-local function gatheringNow(self)
-  local gathering = self.gathering
-  if gathering and self.now() - gathering.at < GATHERING_HOLD then return gathering.work end
-  return nil
+local function gathering(self)
+  return self.now() < self.gatheringUntil and self.gatheringWork or nil
 end
 
 function Doing:fighting()
@@ -93,8 +93,8 @@ function Doing:state()
   if facts.auction then return "auction" end
   if facts.vendor then return "vendor" end
   if facts.work then return facts.work end
-  local gathering = gatheringNow(self)
-  if gathering then return gathering end
+  local work = gathering(self)
+  if work then return work end
   if self:fighting() then return "fighting" end
   if facts.afk then return "afk" end
   if facts.resting then return "resting" end

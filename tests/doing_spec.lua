@@ -329,13 +329,20 @@ describe("What a Member is doing", function()
       assert.equal("alchemy", poseOf(a, b))
     end)
 
-    it("wins over fishing", function()
-      local _, clients = crew({ "Ann", "Bob" })
-      local a = clients[1]
-      a.core:caught({ items = { { itemId = SMALLFISH, quantity = 1 } }, zone = "Westfall", mapId = 1436 })
-      assert.equal("fishing", poseOf(a, a))
-      a.core:doing({ profession = COOKING })
-      assert.equal("cooking", poseOf(a, a))
+    it("wins over fishing, on your figure and a Member's", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      b.core:caught({ items = { { itemId = SMALLFISH, quantity = 1 } }, zone = "Westfall", mapId = 1436 })
+      b:play({ level = 11 })
+      for _ = 1, 70 do
+        if poseOf(a, b) == "fishing" then break end
+        net:run(1)
+      end
+      assert.equal("fishing", poseOf(a, b))
+      b.core:doing({ profession = COOKING })
+      assert.equal("cooking", poseOf(b, b))
+      net:run(20)
+      assert.equal("cooking", poseOf(a, b))
     end)
 
     it("is left out in an instance, as other DOINGs are", function()
@@ -441,6 +448,20 @@ describe("What a Member is doing", function()
       assert.equal("cooking", poseOf(a, a))
       a.core:doing({ vendor = true })
       assert.equal("vendor", poseOf(a, a))
+      a.core:doing({ flying = true })
+      assert.equal("flying", poseOf(a, a))
+    end)
+
+    it("ends when combat starts, so being attacked while mining shows fighting", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a = clients[1]
+      a.core:gathered(MINING_SPELL)
+      a.core:doing({ combat = true })
+      assert.equal("fighting", poseOf(a, a))
+      a.core:doing({})
+      net:run(21)
+      a.core:doing({})
+      assert.equal("seated", poseOf(a, a))
     end)
   end)
 

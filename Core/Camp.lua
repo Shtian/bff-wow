@@ -414,7 +414,7 @@ for _, dungeon in ipairs(ns.Dungeons.DUNGEONS) do
 end
 
 local SAID_FIRST = { flying = true, auction = true, vendor = true }
-for work in pairs(ns.Professions.WORKS) do SAID_FIRST[work] = true end
+for work in pairs(ns.Professions.WORK_STATES) do SAID_FIRST[work] = true end
 
 local function poseOf(row, doing)
   local id = row.memberId
