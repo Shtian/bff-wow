@@ -1,0 +1,667 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Question: every crafting profession in the Pocket Camp shows the same static hammer and
+  anvil (Professions.practised says "crafting" for any line but the gathering ones). Gathering is now animated
+  (#328). What should alchemy, blacksmithing, enchanting, engineering, leatherworking, tailoring, cooking and
+  first aid look like?
+  Two sets, switchable with the bar at the bottom (or ?set=A|B|now):
+  - A, "At the bench": the figure kneels or stands at a prop on the ground toward the fire, as gathering does.
+    Bigger and easier to read, but each needs room past the figure, which Core would keep clear as it does for
+    the griffin and the boar.
+  - B, "In the lap": the figure stays on its seat by the fire and works on something in its hands. Smaller and
+    cosier, and needs little or no room.
+  - "now" is today's pose, roughly, to compare.
+  Professions.practised already sees the skill line that rose (171 alchemy, 164 blacksmithing, 333 enchanting,
+  202 engineering, 165 leatherworking, 197 tailoring, 185 cooking, 129 first aid), so naming it sends nothing new.
+  The readout under each scene says how far each pose reaches past the figure and what it draws over.
+  ?strip=1 (with &set=, &only=alchemy,cooking, &from=, &count=, &z=) lays out every tick of each cycle side by side.
+  Figures, palette, fire and hat are copied from scripts/camp-art.mjs and the gathering prototype; backdrops are
+  Media/CampPocketBackdrop*.tga's 144-column band. Crew data is fake. Run: open the file in a browser.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Camp crafting</title>
+<style>
+  :root { --gold:#ffd14a; --text:#e8e6e3; --muted:#adabb8; --dim:#8c8a99; --raised:#1b1a23; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; color:var(--text); background:#14121b; font:14px/1.4 system-ui, sans-serif; padding-bottom:90px; }
+  h1 { font-size:18px; margin:20px 16px 4px; text-align:center; }
+  h2 { font-size:14px; color:var(--gold); margin:24px 16px 6px; text-align:center; }
+  .note { text-align:center; color:var(--muted); max-width:760px; margin:0 auto 10px; padding:0 16px; }
+  #gallery { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; padding:0 16px; }
+  .tile { display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px; background:var(--raised); border:2px solid rgba(255,255,255,.1); border-radius:6px; color:var(--text); font:13px system-ui; cursor:pointer; }
+  .tile.on { border-color:var(--gold); }
+  .tile small { color:var(--dim); font-size:11px; }
+  #toggles { display:flex; flex-wrap:wrap; gap:10px 18px; justify-content:center; margin:16px; color:var(--muted); font-size:13px; }
+  .group { display:flex; gap:4px; align-items:center; flex-wrap:wrap; }
+  .group button, .btn { font:13px system-ui; color:var(--text); background:var(--raised); border:1px solid rgba(255,255,255,.14); padding:4px 10px; border-radius:4px; cursor:pointer; }
+  .group button.on { background:var(--gold); color:#1a1400; border-color:var(--gold); }
+  .group input[type=range] { width:110px; }
+  .stage { display:flex; justify-content:center; padding:0 16px; overflow-x:auto; }
+  canvas { image-rendering:pixelated; image-rendering:crisp-edges; display:block; }
+  .readout { max-width:760px; margin:8px auto 0; padding:0 16px; font:12px/1.5 ui-monospace, Menlo, monospace; color:var(--dim); }
+  .readout b { color:var(--text); font-weight:600; }
+  .readout .warn { color:#f0a21c; }
+  .readout .ok { color:#70e370; }
+  #switcher { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); display:flex; align-items:center; gap:4px; background:#fff; color:#111; border-radius:999px; padding:6px; box-shadow:0 6px 24px rgba(0,0,0,.5); font:600 14px system-ui; z-index:10; max-width:calc(100vw - 32px); }
+  #switcher button { border:0; background:#111; color:#fff; width:34px; height:34px; border-radius:50%; font-size:16px; cursor:pointer; flex:none; }
+  #switcher span { padding:0 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+</style>
+</head>
+<body>
+<h1 id="title">Crafting in the Pocket Camp</h1>
+<div class="note" id="blurb"></div>
+
+<h2>Each profession</h2>
+<div id="gallery"></div>
+
+<div id="toggles"></div>
+<div style="display:flex;justify-content:center;gap:8px;margin:4px 16px"><button class="btn" id="pause">Pause</button><button class="btn" id="step">Step a tick</button></div>
+
+<h2>Night</h2>
+<div class="stage"><canvas id="night"></canvas></div>
+<div class="readout" id="night-out"></div>
+<h2>Day</h2>
+<div class="stage"><canvas id="day"></canvas></div>
+<div class="readout" id="day-out"></div>
+
+<div id="switcher"><button id="prev" aria-label="Previous set">←</button><span id="label"></span><button id="next" aria-label="Next set">→</button></div>
+<script>
+const BD = {"night":"iVBORw0KGgoAAAANSUhEUgAAAJAAAAAkCAYAAABmHbPbAAAFO0lEQVR4nO2ZTW4UQQyFZzNIQSEZwigEyAKBlFUWbII4A8qeW3AAJMRNOA034gCDPPCih2O7XT/dPZNMSVZR3V3u6vLnV56wWBzaoR3aoT2adrL6sDmMpxs/inb09GKnNn3fxnvZvI9av7jZlIyXT062PSAqnX8Yt429eM7SsAj0n2+/bqzrgEbDg/7i8pM579D36XW8Rm0I8vP19X8Ecy8LscbSCxQ81r34FxP/0XP73g/twxy9F0+rb2pQBkAUyaP8GyZjbBwvnsFhA0TW81OMRTHH8i/7MNV6NaxWfLz4LXopkz5eAA8rUUvmiX+5p038i1n+vv/4uROZO6cCZfwwrLVKpGvSKiXStUokc3pRUBVAYV337PrNyy6bjQztAUFpULxk8ZKj5zpK3jMU12JooDAMj5gEVS9qTUfU8bN3d9csSGQuX/cgkvegl2Ja/AkI7J/fXzve/P6Vfp4TofR91j60rJ8VKHof1hr5s55lCKuh8n4dyYv0JshYgiu2OvubbXJdxgyMjE9Or7Ym/wZEbIAH/vAx7D+TqQJHL+XBOvR3D/WR0oofJEetkg3dz65X77cV9yJoPHhYIWRh0lsAaXi4QN4CcHplFtBa6fAs/LH/qQzv5aBk5iGJOMu9bM/6s+AAhFlYtfFzSH7rPdXHmYaKayFAgpewAkUfk62B8FEIIvzzUVYLReYarlvrK/GtlbYUIg0jktG6z+/jdXrrYpM5sr+WiFQpkK6BePE1NU62BtJKxwABIqhTBiZ+xlIy9s3XdND1r0TJass3X5NvQDLo+aVKJH50HKL7eEava+i7+P6CamKZLz0gC5t1fPExpl/GBCNAVo0zBI2nRBIs1E9cR8H4mnUE8dFqwXJXX/3zIevEdRyrupbTvvS7uKazlLhEiSI/rCjec/r7rATR8VkYf8IpUqAoqFHt4tU43jzvOfZnmRV4CyjL9NEYXbcynzNbz4HqwKxM10omAFyef7zX633z/AzByiWG912Y79VA6PUxl4YqoyRRjZOBpxSiLFAZUFg9kQTWEcQ1nzaoMMxLGg4oQwOzxlYtpYPvGWATWFGnclw0LFpM7v4H4vTqPjRR7RPBoyGJ7mfmezXQ9o+KCYB6m6cgvNneXIbPSxL80rSUh2s3S4m0Gno10NL49RspjbdWi4vmGsiCxrqeUa6hGmhKcDj4mcy26jP+Y+jQfAHFggfHTOQns9/L4IePJQBWDVR8XEU1kEdqtsYZggibwps3lRLJ2jwV0gEZUi4v03VtwhDBuEaJINTHfRQvvIuTxJpvKRMfY/LcKDVQ5njKAsYfNcfxpTfZAkgrYyaYXrKwkum6bCg5s0o3dExFx5WujYpqoLPjVVjDePdhcn8IHstHTSHdw/SvKP0dWkGs+UujBtLfqBXIKuwteOAnUg691iPj15qOn/cej4uwrVevNl7/kOzt+bjjfTYr/sXQ7IJ5QYp6mB7Pbdn17xqUkaikodoFiErgabGb96+LxmPDNCVEQydQ0XE1JTytMCCoJT1Mj0vN85fpW2GbC6qdqIFalaUGlqmtFaK5lGlnoGk9dlph+HJzMdjD9Fib93ymb4VtTqUqhmksqGqPqVJlKQluL2uFaAylmhSWCJp9UJ5SOL7djtOXwlUK1ZRKFIlIswLVwNWzxilVnowxDJ5loYng6QlNJllbYemmRDXwzKE8vZUogicDUa0SzXWcdYOoBqoIrkMNNH8N1F1pekDTenyNoUwtSpUdt0LTqjStNU+JKIzaSheDXj6ypZdNfgh96z7U7n+P9gfFwcktax5sZwAAAABJRU5ErkJggg==","day":"iVBORw0KGgoAAAANSUhEUgAAAJAAAAAkCAYAAABmHbPbAAAElUlEQVR4nO2Zv24UQQzG71HSUgUhJKQUqagoSINEQ490EUKKKGgQoklDgZQuPAIVz0DNA/A2QQ760BfH9tize7t7uR3Jcmb/zHjHv/nGB5vN2ta2trUdTHtz+etm7U/XP4h2/OJkUYu+b/29bN5HXVz/vqn0j44f3XpAVH1/7Q/re/mcpSGIlgc0Gh74j1/fpcZZfZ/X+dppQ5Jfnb+8QzB7CcTqixcouK+9jC8m40fP7btvrcMc3sun5Qc1KAMgiuRR/oZJHwvHwTM4bIDIen7f+7IOU82nYbXy4+VvM5Yy6eMF8LASDdl5Mr7c0ybjiy1hhy5RgTLjMKy9SqRr0i4l0rVKJHM6KKgKoLCue7bE46yaFG+zDN0cmTgq87TyWoYGCsPw8BHDk1/QEXX29v3/axYk8i5fjxQIXoppzMfj8/xT9HkjVN+31mFIPKxA0XyINRrPepYh7IbK+3XEyeUdIckVO/9ydRuUXJc+AyP9T1c/bk3+BkTaeDyGB+NPrTyIo6qMkdLqzdGjZK372Xj1elt5L0HjwaNrFCyABkjDw+ol97efv5vg8HN4VmDDeDz+VIZ5OSmZ97CJeJd7uz07ngUHcpCFVRs/h81vzdN9nGmouBYCJJiEFSj6mGwNhI9CEjE+H2W9UGSu4boVX2VsrbRViDSMXEro+zwfx+nFxSbvyPpaItKlQFYNhOB7apxsDaSVjgECRFCnDEz8jKVkPDZf00m3FNgaO1ML8i/NqgpZEFn38YyOq/VdfH9DNbG8Lx6Qhc06vqxjTAMBhRAf1ThZgxJJsuToY+OF4drKOoL4aLVgwTMYQ+LEdQ085tNj6blaSlxRomgcS3m06e+zNoiOd2P8E05JgaKkRrVLq8bJGo9nGScsAsoyfTRG1724vHesxHjwcH3y7eefez7afDxOC1YuMbzviuJliPQxl4YqoyTRx1ThyUCUBSoDCqsnbwLvO61xocKw6PtYrQANzOpbtVRW2VnJERfnRcOixQTXZV1KtU8Ejw46up9539s5WYDGtlacUVzZTSLJtJSHazdLibQaejXQkfPr11MabwyLi8E1kAWNdT2jXK2dMzU4Fcit+qzyvoBiwWPVX976ZBU9ikff57yXj6ueGqhiGWisWmEKeDJKklWfVvK5PhF4YNGvwKgsiPKVqVE9Zdo4/0Mxag2UWbQsYPzRcxxfrWPIUsYepdX/baML/6iOqipldvNHNZAJjfcS/PNnT8Kgvfswud+Cxxqjp5AeGxzrO7SCZMHT36gVKPML0FsrDZGOVcPTyp+ep6w8Z+f/zj7Lr3YYZuU/Bc3p68d3YJE+D7z2D6/v8VFSotUOw1on0D1IQFTkz4jM1R+et7hYa6DVQivXQA9Vgbbbp00P031t3vMZP/c6TKpA+w5VJblj2UOBqBuWCJq5P6oXmsguP5zsxFfhmnvdqjCNpkBLhGuo0jAMnmWhieCZe52qsIymRNovwSQpLT9UiSJ4MhDBojiXZKNB1AOVVibYlH3e8a3+2DVQNN9c63G6S6UZA5p9sIpSZfsZv2SriMJOWzWY1S/Dj9H+AiuA0CONNbrjAAAAAElFTkSuQmCC","nightWinter":"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","dayWinter":"iVBORw0KGgoAAAANSUhEUgAAAJAAAAAkCAYAAABmHbPbAAAFU0lEQVR4nO1ZPYtVQQx9P2VbK0UEwcLKysJtBBt7YRcRxMJGxMbGQthOf4KVhbWFtVhtIdb+j5WsHjlkTzKZO/e+j903ELK5HzOZ5MxJ7tvVaj/2Yz/248qMx2+/ne3t9dlXYly/f2ergr5r9k6OaFPPP3w/67EPrl871wBR7/t7e8yO8rmRASda+svXHxI80Ke/fpfm2etp2udr0YEkI6lAMGtzRNmm7T22vbb5TR4eP0if23XdisMmdJRPpYdGxAyKHu1viNn2Ltv420BjTAQAmSDI6vldty0O61rPg1XlJ8rfai5m8uXFGIJ1FekAkGIeu+fFNm+yDSd0Th3FYQkm643fSjBOVHEmgQg6oznvFBgGoMB1u4brkWxjORsBNcdh9HBU3kcMp4JnCDRgGAYPlxheHBsy+/DJs//XUJo8s/D1iIFsfRVsnp/XX4dtfqvkV973h4UPxxR/mMmy9QCgbD6/L77vv4q7QBV9HXFy4YTZllyT4zcn58Cw62YDeHjm1cmnc7G/ASIvPB+DB/Ovm3ngRy8zMgOrMv3y3dMhJsvu8zqteX28V/SV7MtYOlqf1nyCTIBaDyAEXTXIdv/o9ccL91gwtz1rYMN8PP+6BOtyYirv4RDhb2ZcZoaqqLLPzJG1BYphPFsh3lHlmFzOfA/EvRAH1hZBglubUU5GZczmQxIxP5eyqaCoXPN75D30zO2ZtjVHC4w4ZOo+r8dgj/xisXcsvopESuCJwKIYIjoRWY+D91o9ED8PYHoQgZ0qYOJnFJPx3B44CuzwC75l80TvM4P3sJDqRz1L+We8X6198Rxcxux90wBZOlT5UmWMTxUQjATxyWOnMtBkDbWVPhYODPdWqgRxaVVgwTOYw/zEdQ94rOfn8mtl++V9VcETMbpiHi9+f9yf8v54nZX4/a+LgbKkRmhHorMepyoAqQeOBxD6qghQSnxpzK57v5h91Dv+hKuTrpjo/eefF7SPcwTCrC1gJmdfeU8tfxlEvsyVQaW+liJwqfu94OGGOgJRFVAVoDB72vvZV5T5peYFC0Oy/TFbATQQZateKipHGeOhT+W8MKMpMgGILC4hSPxXmAIP9z7e6ezkeUaq9kAtFlpSWn5mwFYMrZjMkqmYh3s3MFE0BxgsAyt//Ub548PvReFjuAdSJ0JdrzBX6+SsGzhRkBWI7PecXvDx+wYUBR7+AswYXx1QBbRW/P19znt3uar0QMpRdV2dxgpoWHN/tTR4vB2d6ox9KkzLPRBABPG/o0WxynokXufA9ahRfiJm4jLWxURRGVPOVoKWnRKfoFai1gGmzD/PjP4A9TAsmMw3/lkf1dsOtA4/lyuvPXhS5vH63u2bKVLtfsYwdr9Fs1hDgWhd7KP6F7UPToryq7pH7vGixl7FLIo3++t99eDx+Wv52808h8d/a5/Se7kaovKfDiCMNX5j2FVtG+f/OFfsXl2df5d1hI8uUG0i+UjE1OR6DWnZvVKdf4pW8dgUWCRoKi9tA3NM1Xcf3ZD20jpaf5TptoWB0nH67xdJpUdlTua47DLKXCOi8r8x0CwBriqzHB3damqIt71Ez1f0kky1tHSDaQlQTQnO1PLRk9y5ZAREU8vjEuCaDJYMNNvANFNAk8nbF3cW0b3gmhM0Pr5LMM9sDFQF15zlaIR5KsJgiKQKmgw828hElXwPM9HczGSBqOpILCktPcpEGXgqIIJkfkZSiY+P58aZZwRUEbhwErDJis2B7LH5xLfsuXugbL2p+/F2TzwXZ5o5QLMJJmox0whTVe2Krkq0vyWZp4cUFh29zvRqC5CyL7teOq5zjD86RaHukB2h0gAAAABJRU5ErkJggg=="};
+
+const PAL = {
+  K: "#0b0a12", S: "#e8b890", s: "#b98465", W: "#fff3c4", Y: "#ffe9a0", G: "#ffd14a", O: "#f0a21c",
+  R: "#c9481c", B: "#5a3a24", b: "#3a2518", T: "#8c8796", t: "#5d5966", L: "#70e370", P: "#f2b8d0",
+  Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8", N: "#ece8d8", A: "#c89a5a", a: "#8f6a3a", r: "#5a1620",
+  h: "#468a46", g: "#2c5a33", i: "#9bd47a", c: "#c8682c", e: "#f2a868", p: "#e7e1f0",
+  m: "#7a3e24", M: "#a8643a", n: "#4e2818", j: "#2a1410", u: "#c46a78", v: "#e89aa8", q: "#4a1c24",
+  V: "#9a5ce0", I: "#d6b4ff", X: "#d42a2a",
+};
+const SIT = ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...", "..KCCDDCCK..", ".KCCCDDCCCK.", ".KSCCDDCCSK.", ".KKCCCCCCKK.", "..KDDKKDDK..", "..KKK..KKK.."];
+const HOP = ["..K.KKKK.K..", ".KSKCCCCKSK.", ".KCCCCCCCCK.", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...", "..KCCDDCCK..", "..KCCDDCCK..", "..KCCDDCCK..", "..KCCCCCCK..", "..KDDKKDDK..", "..KKK..KKK.."];
+const CROUCH = [...SIT.slice(0, 9), ".KSCDDDDCSK.", "KDDDDKKDDDDK", "KKKKK..KKKKK"];
+const BODY = { HOP, SIT, CROUCH };
+const FIRE = [
+  [".....R.....", "....RR.....", "....ROR..R.", "...ROOR.RR.", ".R.ROOORRR.", ".RRROGGORR.", ".RROOGGOOR.", "RROOGYYGOOR", "ROOGGYYGGOR", "ROGGYYYYGOR", ".ROGYYWYGO.", "..ROGGGGO.."],
+  [".........R.", "..R..R.....", "..RR.RR....", ".RORROR..R.", ".ROORROR.R.", ".ROOOOORRR.", ".ROGGOOGOR.", "RROGYGOGOOR", "ROOGYYGGGOR", "ROGGYYYYGOR", ".ROGYWYYGO.", "..ROGGGGO.."],
+  ["...R.......", "...RR...R..", "..RORR..R..", "..ROOR.RR..", ".RROOORRO..", ".ROOGOOROR.", ".ROGGGOOOR.", "RROGGYGGOOR", "ROOGYYYGGOR", "ROGGYYYYGOR", ".ROGYYWYGO.", "..ROGGGGO.."],
+];
+const LOGS = ["..BB.......BB..", ".BBBBb...bBBBB.", "bbBBBBBBBBBBBbb", "..bbbbbbbbbbb.."];
+const SEAT = ["BBBBBBBBBBBBBB", "bbbbbbbbbbbbbb", "bbbbbbbbbbbbbb"];
+const STRAW = ["....GYYG....", "...GYWYYGO..", "...RRRRRR...", ".OGYYYYYYGO.", "aOGGGGGGGGOa"];
+const CAT = [".....T..T", ".....TTTT", "t....YTYT", "t....TPTT", ".t..TTTTT", ".tTTTTTNT", "..TTTTTNT", "..TtTtTTT"];
+const CLASS = { WARRIOR: "#c69b6d", MAGE: "#3fc7eb", DRUID: "#ff7c0a", PALADIN: "#f48cba", HUNTER: "#aad372" };
+
+function outlined(rows) {
+  const w = Math.max(...rows.map((r) => r.length)) + 2, h = rows.length + 2;
+  const at = (x, y) => { const r = rows[y - 1]; const c = r && r[x - 1]; return c && c !== "." ? c : null; };
+  const out = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) {
+      const own = at(x, y);
+      if (own) { line += own; continue; }
+      let near = false;
+      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (at(x + i, y + j)) near = true;
+      line += near ? "K" : ".";
+    }
+    out.push(line);
+  }
+  return out;
+}
+const STRAW_HAT = outlined(STRAW), CAT_ART = outlined(CAT);
+const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+const shade = (c, k) => "#" + hex(c).map((v) => Math.round(v * k).toString(16).padStart(2, "0")).join("");
+
+function layer() {
+  const px = new Map();
+  return {
+    px,
+    set(u, r, c) { px.set(u + "," + r, PAL[c] || c); return this; },
+    art(rows, u0, r0, swap) {
+      rows.forEach((line, i) => [...line].forEach((ch, j) => {
+        if (ch === ".") return;
+        this.set(u0 + j, r0 + rows.length - 1 - i, (swap && swap[ch]) || ch);
+      }));
+      return this;
+    },
+    line(points) { for (const [u, r, c] of points) this.set(u, r, c); return this; },
+    outline() {
+      const add = [];
+      for (const key of px.keys()) {
+        const [u, r] = key.split(",").map(Number);
+        for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (!px.has(u + i + "," + (r + j))) add.push(u + i + "," + (r + j));
+      }
+      for (const k of add) px.set(k, PAL.K);
+      return this;
+    },
+  };
+}
+const L = layer;
+
+function tool(axis, diag, hand, dir) {
+  const l = L(), [hu, hr] = hand, [dx, dy] = dir;
+  if (dx !== 0 && dy !== 0) {
+    for (const [x, y, c] of diag) l.set(hu + x * dx, hr + y * dy, c);
+  } else {
+    for (const [j, k, c] of axis) l.set(hu + dx * k - dy * j, hr + dy * k + dx * j, c);
+  }
+  return l.outline();
+}
+function arc(p, from, to, peak, steps) {
+  const k = p / (steps - 1);
+  return [Math.round(from[0] + (to[0] - from[0]) * k), Math.round(from[1] + (to[1] - from[1]) * k + peak * 4 * k * (1 - k))];
+}
+function star(l, u, r, c1, c2) { return l.set(u, r, c1).set(u + 1, r, c2).set(u - 1, r, c2).set(u, r + 1, c2).set(u, r - 1, c2); }
+function plus(l, u, r) { return l.set(u, r, "L").set(u - 1, r, "L").set(u + 1, r, "L").set(u, r + 1, "L").set(u, r - 1, "L").outline(); }
+const CLOUD = [
+  [[0, 0], [1, 0]],
+  [[0, 0], [1, 0], [0, 1], [1, 1]],
+  [[-1, 0], [0, 0], [1, 0], [2, 0], [0, 1], [1, 1]],
+  [[-1, 0], [1, 0], [2, 0], [0, 1], [1, 1], [0, 2]],
+  [[-1, 1], [2, 0], [1, 2], [0, 1]],
+  [[-1, 2], [2, 1]],
+];
+function puff(l, u, r, k, c, fade) {
+  for (const [du, dr] of CLOUD[Math.min(k, CLOUD.length - 1)]) l.set(u + du, r + k + dr, k < 3 ? c : fade || "Z");
+  return l;
+}
+
+const HAMMER_AX = [[0, 0, "a"], [0, 1, "A"], [0, 2, "A"], [0, 3, "A"], [-1, 4, "Z"], [0, 4, "Z"], [1, 4, "t"], [-1, 5, "N"], [0, 5, "Z"], [1, 5, "Z"]];
+const HAMMER_DIAG = [[0, 0, "a"], [1, 1, "A"], [2, 2, "A"], [3, 3, "A"], [3, 5, "N"], [4, 4, "Z"], [5, 3, "Z"], [4, 5, "Z"], [5, 4, "Z"], [4, 6, "Z"], [5, 5, "Z"], [6, 4, "t"]];
+const hammer = (hand, dir) => tool(HAMMER_AX, HAMMER_DIAG, hand, dir);
+const WRENCH_AX = [[0, 0, "t"], [0, 1, "T"], [0, 2, "T"], [0, 3, "Z"], [-1, 4, "Z"], [1, 4, "Z"]];
+const WRENCH_DIAG = [[0, 0, "t"], [1, 1, "T"], [2, 2, "T"], [3, 3, "Z"], [3, 4, "Z"], [4, 3, "Z"]];
+const wrench = (hand, dir) => tool(WRENCH_AX, WRENCH_DIAG, hand, dir);
+function knife(hand, dir) {
+  const l = L(), [hu, hr] = hand, [dx, dy] = dir;
+  ["a", "a", "Z", "N", "W"].forEach((c, k) => l.set(hu + dx * k, hr + dy * k, c));
+  return l.outline();
+}
+
+// Set A: at the bench.
+
+const ANVIL_S = ["ZZZZZZZ", "tZZZZZt", "..TTt..", ".TTTTt."];
+const SMITH_UP = { body: "HOP", hand: [9, 14] };
+const SMITH_SWING = [
+  { ...SMITH_UP, dir: [-1, 1] }, { ...SMITH_UP, dir: [0, 1] }, { ...SMITH_UP, dir: [1, 1] },
+  { body: "SIT", hand: [9, 9], dir: [1, 0], hit: 0 }, { body: "SIT", hand: [9, 9], dir: [1, 0], hit: 1 },
+  { ...SMITH_UP, dir: [1, 1] },
+];
+const HEAT = ["YWY", "OYO", "ROR", "rRr"];
+function smithA(t, out) {
+  const f = SMITH_SWING[t % SMITH_SWING.length], heat = HEAT[Math.floor(t / SMITH_SWING.length) % HEAT.length];
+  out.body = f.body;
+  out.front.push(L().art(ANVIL_S, 9, 3).outline());
+  out.front.push(hammer(f.hand, f.dir));
+  out.front.push(L().line([...heat].map((c, i) => [12 + i, 7, c])));
+  if (f.hit === 0) out.front.push(L().set(15, 9, "Y").set(16, 10, "W").set(11, 9, "O"));
+  if (f.hit === 1) out.front.push(L().set(16, 11, "O").set(11, 11, "Y").set(16, 8, "R"));
+}
+
+const FLASK = ["..N..", "..N..", ".NxN.", "NxxxN", "NxxxN", ".NNN."];
+const BREWS = ["L", "X", "F", "V"];
+function alchemyA(t, out) {
+  out.body = "CROUCH";
+  const n = 24, p = t % n, brew = Math.floor(t / n), now = BREWS[(brew + (p >= 14 ? 1 : 0)) % BREWS.length];
+  const still = L().art(["T.f.T", "TTTTT"], 11, 3, { f: t % 2 ? "Y" : "O" }).art(FLASK, 11, 5, { x: p === 14 || p === 15 ? "W" : now }).outline();
+  if (p < 14) still.set(12 + (t % 3), 6 + (t % 2), "W");
+  out.front.push(still);
+  out.front.push(L().art(["N", "x", "x"], 10, 5, { x: BREWS[(brew + 1) % BREWS.length] }).outline());
+  if (p < 14) for (const k of [0, 2]) { const r = 12 + ((p + k) % 4); if (r < 15) out.front.push(L().set(13 + (k ? 0 : (p >> 1) % 2), r, "N")); }
+  if (p >= 14 && p < 16) out.front.push(star(L(), 13, 13, "W", "Y"));
+  if (p >= 16 && p < 22) out.front.push(puff(L(), 12, 12, p - 16, now));
+}
+
+const RUNE = [".VVVVV.", "V.....V", ".VVVVV."];
+function enchantA(t, out) {
+  out.body = "HOP";
+  const n = 18, p = t % n, glow = p >= 12;
+  out.front.push(L().art(RUNE, 10, 1, { V: (t >> 1) % 2 ? "V" : "I" }));
+  out.front.push(tool([], [[0, 0, "c"], [1, 1, "O"], [2, 2, "O"], [3, 3, p % 2 ? "W" : "I"]], [9, 14], [1, -1]));
+  const bob = (t >> 1) % 2;
+  const gem = p === 12 || p === 13 ? { I: "W", W: "W" } : glow ? { I: "V", W: "I" } : { I: "f", W: "F" };
+  out.front.push(L().art([".I.", "IWI", ".I."], 12, 7 + bob, gem).outline());
+  if (!glow) {
+    if (p % 2 === 0) out.front.push(L().set(13, 11, "I"));
+    for (const [u, k] of [[10, 0], [14, 3], [16, 5]]) { const r = 3 + ((p + k) % 6); out.front.push(L().set(u, r, (p + k) % 2 ? "I" : "W")); }
+  }
+  if (p === 12 || p === 13) out.front.push(L().set(11, 10, "W").set(15, 10, "W").set(11, 6, "W").set(15, 6, "W"));
+}
+
+const GADGET = ["ZZZZZ", "TggTT", "TggTZ", "ttttt"];
+function engineerA(t, out) {
+  const n = 24, p = t % n, bang = p >= 14 && p < 16;
+  out.body = bang ? "HOP" : "CROUCH";
+  const shake = bang ? 1 : 0;
+  const gear = (t >> 1) % 2 ? { g: "G" } : { g: "O" };
+  out.front.push(L().art(GADGET, 12 + shake, 3, gear).set(13 + shake, 5, (t >> 1) % 2 ? "O" : "G").set(14 + shake, 4, (t >> 1) % 2 ? "O" : "G").line([[15 + shake, 7, "t"], [15 + shake, 8, "t"], [15 + shake, 9, p % 6 < 3 ? "R" : "L"]]).outline());
+  if (!bang) out.front.push(wrench([8, 5 + ((p >> 1) % 2)], [1, 0]));
+  if (bang) out.front.push(star(L(), 14, 11, "W", "Y"));
+  if (p >= 16 && p < 22) out.front.push(puff(L(), 13, 9, p - 16, "T", "t"));
+}
+
+const FRAME = ["BBBBBBB", "b.....b", "b.....b", "b.....b", "b.....b", "b.....b", "b.....b", "b.....b", "BBBBBBB", "b.....b", "b.....b"];
+const HIDE = [".AeA.", "AAAaA", "AaAAA", "AAAAa", "AAaAA", "eAAAA", ".AAA."];
+function leatherA(t, out) {
+  out.body = "CROUCH";
+  const n = 10, p = t % n, down = p < 5 ? p : null;
+  const hide = L().art(FRAME, 11, 3).art(HIDE, 12, 6);
+  if (down !== null) for (let k = 0; k <= down; k++) hide.set(14, 12 - k, "e");
+  out.front.push(hide.outline());
+  if (down !== null) {
+    out.front.push(L().line([[10, 12 - down, "a"], [11, 12 - down, "a"], [12, 12 - down, "a"], [13, 12 - down, "Z"], [14, 12 - down, "N"], [15, 12 - down, "Z"]]).outline());
+    if (down > 1) out.front.push(L().set(16 + (t % 2), 12 - down - 1, "e"));
+  }
+}
+
+const WHEEL = ["..BBB..", ".B...B.", "B.....B", "B.....B", "B.....B", ".B...B.", "..BBB.."];
+const SPOKES = [[0, 1], [1, 1], [1, 0], [1, -1]];
+function tailorA(t, out) {
+  out.body = "CROUCH";
+  const [cu, cr] = [14, 9], [dx, dy] = SPOKES[t % 4];
+  const w = L().art(WHEEL, cu - 3, cr - 3).line([[cu, cr, "b"], [cu + dx, cr + dy, "a"], [cu - dx, cr - dy, "a"], [cu + 2 * dx, cr + 2 * dy, "a"], [cu - 2 * dx, cr - 2 * dy, "a"]]);
+  w.line([[12, 4, "b"], [12, 5, "b"], [16, 4, "b"], [16, 5, "b"], ...[11, 12, 13, 14, 15, 16, 17].map((u) => [u, 3, "b"])]).outline();
+  out.front.push(w);
+  out.front.push(L().line([[9, 6, "N"], [10, 6, "N"], [10, 5, "Z"]]).outline().line([[11, 7, "N"], [12, 8, "N"]]));
+}
+
+const POT = ["ZccccccZ", "TTTTTTTT", "TTTTTTTt", ".TTTTTt.", "..tttt.."];
+function cookA(t, out) {
+  out.body = "CROUCH";
+  const s = [0, 1, 2, 1][(t >> 1) % 4];
+  const fl = t % 2 ? "ROYOR" : "OYROY";
+  out.front.push(L().line([[11 + s, 10, "a"], [12 + s, 9, "A"], [13 + s, 8, "A"]]).outline());
+  out.front.push(L().line([...fl].map((c, i) => [12 + i, 3, c])).art(POT, 10, 4).set(12 + ((t >> 1) % 4), 8, "e").outline());
+  out.front.push(L().set(13 + s, 8, "A"));
+  for (const [u, k] of [[13, 0], [15, 3]]) { const q = (t + k) % 6; out.front.push(L().set(u + (q >> 1) % 2, 8 + q, q % 2 ? "Z" : "N")); }
+}
+
+const KIT = [".t.t.", "NNXNN", "NXXXN", "NNXNN"];
+function aidA(t, out) {
+  out.body = "CROUCH";
+  const n = 24, p = t % n, left = p < 18 ? 6 - Math.floor(p / 3) : 0;
+  out.back.push(L().art(KIT, -5, 3).outline());
+  if (left) out.front.push(L().line(Array.from({ length: left }, (_, i) => [12 + i, 3, i % 3 === 2 ? "Z" : "N"])).set(11, 4, "N").outline());
+  out.front.push(L().art(t % 2 ? ["NZ", "ZN"] : ["ZN", "NZ"], 10, 5).outline());
+  if (p >= 18) out.front.push(plus(L(), 5, 17 + (p - 18) / 2 | 0));
+}
+
+// Set B: in the lap. Seated on the seat, hands at row 7.
+
+function smithB(t, out) {
+  const n = 8, p = t % n, at = p < 4 ? p : null;
+  out.front.push(L().line([[10, 8, "G"], [11, 7, "G"], [9, 9, "G"], [11, 9, "W"], [12, 10, "W"], [13, 11, "N"], [12, 9, "Z"], [13, 10, "Z"]]).outline());
+  if (at !== null) {
+    out.front.push(L().line([[12 + at, 9 + at, "T"], [13 + at, 10 + at, "Z"], [11 + at, 10 + at, "t"]]));
+    if (at > 0) out.front.push(L().set(13 + at, 9 + at - (t % 2), t % 2 ? "Y" : "O"));
+  }
+  if (p === 6) out.front.push(L().set(13, 12, "W").set(14, 11, "W"));
+}
+
+const FLASK_S = [".N.", ".N.", "NxN", "xxx", "NxN"];
+function alchemyB(t, out) {
+  const n = 18, p = t % n, brew = Math.floor(t / n), now = BREWS[(brew + (p >= 12 ? 1 : 0)) % BREWS.length];
+  const sway = p < 10 ? t % 2 : 0;
+  out.front.push(L().art(FLASK_S, 10 + sway, 7, { x: p === 12 ? "W" : now }).outline());
+  if (p >= 10 && p < 12) out.front.push(L().set(11, 13 + (p - 10), "N"));
+  if (p === 12) out.front.push(star(L(), 11, 13, "W", "Y"));
+  if (p >= 13) out.front.push(puff(L(), 11, 13, p - 13, now));
+}
+
+const ORBIT = [[11, 12], [13, 11], [14, 9], [13, 7], [11, 6], [9, 7], [8, 9], [9, 11]];
+function enchantB(t, out) {
+  const n = 16, p = t % n;
+  const core = [p % 4 < 2 ? "V" : "I", p >= 12 && p < 14 ? "W" : "I"];
+  out.front.push(L().art([".I.", "IWI", ".I."], 10, 8, { I: core[0], W: core[1] }).outline());
+  for (const k of [0, 4]) { const [u, r] = ORBIT[(t + k) % ORBIT.length]; out.front.push(L().set(u, r, k ? "I" : "W")); }
+  if (p >= 12) out.front.push(L().line([[11, 13 + (p - 12), "V"], [12, 14 + (p - 12), "I"]]));
+}
+
+const GIZMO = ["TTTt", "TgZt", "tttt"];
+function engineerB(t, out) {
+  const n = 18, p = t % n, pop = p >= 12;
+  const shake = p < 12 && p % 3 === 0 ? 1 : 0;
+  out.front.push(L().art(GIZMO, 10, 7 + shake, { g: (t >> 1) % 2 ? "G" : "O" }).line([[12, 10 + shake, "t"], [12, 11 + shake, p % 6 < 3 ? "R" : "L"]]).outline());
+  if (p >= 12 && p < 14) out.front.push(star(L(), 12, 13, "W", "Y"));
+  if (p >= 14) out.front.push(puff(L(), 12, 12, p - 14, "T", "t"));
+  if (pop) out.front.push(L().set(14, 8 + (p - 12), "Z"));
+}
+
+function leatherB(t, out) {
+  const n = 18, p = t % n, done = Math.min(5, Math.floor(p / 3)), pull = t % 3 === 2;
+  const piece = L().art(["AAAa", "AeAA", "AAAA", "aAAe", "AAAA", "AAaA"], 10, 5);
+  for (let i = 0; i < done; i++) piece.set(11, 10 - i, "b");
+  out.front.push(piece.outline());
+  const at = 10 - Math.min(done, 4);
+  const needle = pull ? [[14, at + 1, "Z"], [15, at + 2, "N"]] : [[13, at, "Z"], [14, at, "N"]];
+  out.front.push(L().line(needle).outline().line(pull ? [[12, at, "N"], [13, at + 1, "N"]] : [[12, at, "N"]]));
+}
+
+function tailorB(t, out) {
+  const n = 30, p = t % n, rows = Math.min(6, Math.floor(p / 4) + 1), click = t % 2;
+  const scarf = L();
+  for (let k = 0; k < rows; k++) for (const u of [10, 11, 12]) scarf.set(u, 8 - k, k % 2 ? "u" : "P");
+  if (rows === 6) scarf.set(10, 2, "P").set(12, 2, "P");
+  out.front.push(scarf.outline());
+  out.front.push(L().line([[9, 8, "Z"], [10, 9, "Z"], [11, 10 + click, "Z"], [12, 11 + click, "N"], [14, 8, "Z"], [13, 9, "Z"], [12, 10 + (1 - click), "Z"], [11, 11 + (1 - click), "N"]]));
+  out.front.push(L().art([".P.", "PuP", ".P."], 12 + (p % 5 === 0 ? 1 : 0), 0).outline());
+}
+
+const MEAT = [["v", "u"], ["M", "m"], ["m", "n"]];
+function cookB(t, out) {
+  const n = 30, p = t % n, done = MEAT[Math.min(2, Math.floor(p / 9))], turn = (t >> 1) % 2;
+  out.front.push(L().line([[10, 8, "a"], [11, 9, "A"], [15, 13, "A"]]).line([[12, 10, done[turn]], [13, 10, done[1 - turn]], [12, 11, done[1 - turn]], [13, 11, done[turn]], [14, 11, done[1 - turn]], [13, 12, done[turn]], [14, 12, done[turn]], [12, 12, done[1 - turn]]]).outline());
+  for (const k of [0, 3]) { const q = (t + k) % 6; out.front.push(L().set(13 + (q >> 1) % 2, 13 + q, q % 2 ? "Z" : "N")); }
+  if (p >= 27) out.front.push(L().set(14, 13, "W").set(15, 12, "W"));
+}
+
+function aidB(t, out) {
+  const n = 24, p = t % n, left = p < 16 ? 4 - Math.floor(p / 4) : 0;
+  if (left) out.front.push(L().line(Array.from({ length: left }, (_, i) => [11, 6 - i, i === left - 1 ? "Z" : "N"])).outline());
+  out.front.push(L().art(t % 2 ? ["NZ", "ZN"] : ["ZN", "NZ"], 10, 7).outline());
+  if (p >= 16) out.front.push(plus(L(), 5, 18 + ((p - 16) >> 1)));
+}
+
+// Today, roughly: a hammer held up, an anvil at the feet, for every crafting line.
+const ANVIL = ["ZZZZZZZZZ", "TZZZZZZZt", ".TTTTTtt.", "...TTt...", "..TTTTt..", ".TTTTTTt."];
+function today(t, out) {
+  out.body = "HOP";
+  out.front.push(L().art(ANVIL, 6, 2).outline());
+  out.front.push(hammer([9, 14], [0, 1]));
+}
+
+const PROFS = [
+  { key: "alchemy", name: "Alchemy", A: alchemyA, B: alchemyB },
+  { key: "blacksmithing", name: "Blacksmithing", A: smithA, B: smithB },
+  { key: "enchanting", name: "Enchanting", A: enchantA, B: enchantB },
+  { key: "engineering", name: "Engineering", A: engineerA, B: engineerB },
+  { key: "leatherworking", name: "Leatherworking", A: leatherA, B: leatherB },
+  { key: "tailoring", name: "Tailoring", A: tailorA, B: tailorB },
+  { key: "cooking", name: "Cooking", A: cookA, B: cookB },
+  { key: "firstAid", name: "First Aid", A: aidA, B: aidB },
+];
+const SETS = {
+  A: { name: "At the bench", blurb: {
+    alchemy: "kneels at a flask on a burner, bubbling; adds a reagent, it flashes and puffs, and changes colour",
+    blacksmithing: "swings a hammer onto a bar on an anvil, sparks on each hit; the bar cools from white to red",
+    enchanting: "stands, arms up, a rod pointed at a gem over a rune; sparkles rise, then the gem flashes and glows",
+    engineering: "kneels and ratchets a wrench on a gadget with a blinking light, until it bangs and smokes",
+    leatherworking: "kneels and scrapes a hide over a log, shavings flicking off",
+    tailoring: "kneels at a spinning wheel, wool in hand",
+    cooking: "kneels and stirs a pot over its own little fire, steam rising",
+    firstAid: "kneels and winds a bandage up off the ground, a green + when it's done; a kit behind",
+  } },
+  B: { name: "In the lap", blurb: {
+    alchemy: "shakes a flask held out, bubbles, then a flash and a puff, a new colour",
+    blacksmithing: "sharpens a blade with a whetstone, sparks dropping, a glint at the end",
+    enchanting: "holds a glowing gem, two sparkles circling it, a rune rising",
+    engineering: "tinkers with a gizmo with a blinking light, until it pops and smokes",
+    leatherworking: "stitches a piece of leather across the knees, a stitch at a time",
+    tailoring: "knits a scarf that grows down over the knees, the yarn ball on the ground",
+    cooking: "holds out a skewer of meat that turns and browns, steam rising",
+    firstAid: "rolls up a bandage hanging to the ground, a green + when it's done",
+  } },
+  now: { name: "Today (roughly)", blurb: {} },
+};
+const SET_KEYS = Object.keys(SETS);
+const SEATED = { B: true };
+
+const COLS = 144, MARGIN_X = 16, MARGIN_Y = 8, ROWS = 36;
+const W = COLS + 2 * MARGIN_X, H = ROWS + MARGIN_Y + 4;
+const CX = MARGIN_X + COLS / 2, BASE = H - 4;
+const CAST = [
+  { id: "you", name: "You", cls: "HUNTER", x: -21, hat: true, pet: -33 },
+  { id: "mira", name: "Mira", cls: "DRUID", x: -51 },
+  { id: "odo", name: "Odo", cls: "WARRIOR", x: 9 },
+  { id: "kesh", name: "Kesh", cls: "MAGE", x: 25 },
+];
+
+const params = new URLSearchParams(location.search);
+const state = {
+  set: SETS[params.get("set")] ? params.get("set") : "A",
+  who: params.get("who") || "all", prof: params.get("prof") || "mixed1", season: params.get("season") || "none",
+  world: params.get("world") || "forest", opacity: +(params.get("opacity") || 60), zoom: +(params.get("zoom") || 3),
+};
+let tick = +(params.get("tick") || 0), paused = params.get("paused") === "1";
+const CRAFTERS = { all: ["mira", "you", "odo", "kesh"], you: ["you"], kesh: ["kesh"], both: ["you", "odo"], neighbours: ["odo", "kesh"] };
+const MIXED = {
+  mixed1: { mira: "alchemy", you: "blacksmithing", odo: "tailoring", kesh: "cooking" },
+  mixed2: { mira: "enchanting", you: "engineering", odo: "leatherworking", kesh: "firstAid" },
+};
+const profFor = (m) => (MIXED[state.prof] ? MIXED[state.prof][m.id] : state.prof);
+const OFFSET = { you: 0, kesh: 5, odo: 11, mira: 3 };
+
+function parts(prof, t) {
+  const out = { body: "SIT", back: [], front: [] };
+  const p = PROFS.find((x) => x.key === prof);
+  if (state.set === "now") today(t, out);
+  else p[state.set](t, out);
+  out.seated = SEATED[state.set] && state.set !== "now";
+  return out;
+}
+
+function rng(seed) { return () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); }
+const WORLDS = {
+  forest: { sky: ["#25352f", "#2f4434"], ground: ["#33402a", "#3c4a2e"], trees: "#1a2619", treesFar: "#223122" },
+  meadow: { sky: ["#8fb9d4", "#b7d3df"], ground: ["#6e9a46", "#86ad55"], trees: "#3e6a35", treesFar: "#5c8a48" },
+  snow: { sky: ["#b9c9d8", "#d8e2ea"], ground: ["#e6edf2", "#f3f6f8"], trees: "#4a5a58", treesFar: "#8a9a9c" },
+};
+function mix(a, b, k) { const A = hex(a), B = hex(b); return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * k).toString(16).padStart(2, "0")).join(""); }
+function drawWorld(ctx, key, w0, h0) {
+  const w = WORLDS[key], r = rng(5), horizon = Math.round(h0 * 0.55);
+  for (let y = 0; y < h0; y++) {
+    const pair = y < horizon ? w.sky : w.ground;
+    ctx.fillStyle = mix(pair[0], pair[1], y < horizon ? y / horizon : (y - horizon) / (h0 - horizon));
+    ctx.fillRect(0, y, w0, 1);
+  }
+  for (const [color, count, tall] of [[w.treesFar, 22, 9], [w.trees, 14, 15]]) {
+    ctx.fillStyle = color;
+    for (let i = 0; i < count; i++) {
+      const x = Math.floor(r() * w0), h = tall + Math.floor(r() * 8), base = horizon + Math.floor(r() * 4);
+      for (let j = 0; j < h; j++) { const half = Math.floor((j / h) * 4); ctx.fillRect(x - half, base - h + j, half * 2 + 1, 1); }
+    }
+  }
+}
+
+const images = {};
+function loadImages() {
+  return Promise.all(Object.entries(BD).map(([k, b64]) => new Promise((ok) => { const i = new Image(); i.onload = () => { images[k] = i; ok(); }; i.src = "data:image/png;base64," + b64; })));
+}
+
+function painter(ctx, w0, h0, cx, base) {
+  const out = ctx.getImageData(0, 0, w0, h0);
+  const owner = new Array(w0 * h0).fill(null);
+  const hits = {};
+  const put = (col, row, color, who, craft) => {
+    const x = cx + col, y = base - 1 - row;
+    if (x < 0 || x >= w0 || y < 0 || y >= h0) return;
+    const i = y * w0 + x;
+    if (craft && owner[i] && owner[i] !== who && !owner[i].startsWith(who + ":")) {
+      const h = (hits[who] = hits[who] || {});
+      const o = owner[i].split(":")[0];
+      h[o] = (h[o] || 0) + 1;
+    }
+    const [r, g, b] = hex(color);
+    out.data.set([r, g, b, 255], i * 4);
+    owner[i] = craft ? who + ":craft" : who;
+  };
+  const stamp = (rows, x, row, pal, who, mirror) => rows.forEach((line, i) => [...line].forEach((ch, j) => {
+    if (ch === ".") return;
+    const c = ch === "K" ? PAL.K : pal[ch];
+    if (c) put(mirror ? x + line.length - 1 - j : x + j, row + rows.length - 1 - i, c, who);
+  }));
+  const commit = (l, m, stats) => {
+    const mirror = m.x > 0;
+    for (const [k, c] of l.px) {
+      const [u, r] = k.split(",").map(Number);
+      put(mirror ? m.x + 11 - u : m.x + u, r, c, m.id, true);
+      if (stats) { stats.min = Math.min(stats.min, u); stats.max = Math.max(stats.max, u); }
+    }
+  };
+  const figure = (m, pp, stats) => {
+    const pal = { ...PAL, C: CLASS[m.cls], D: shade(CLASS[m.cls], 0.62) };
+    const mirror = m.x > 0;
+    const body = BODY[pp.body], base0 = pp.seated ? 4 : 3;
+    for (const l of pp.back) commit(l, m, stats);
+    stamp(body, m.x, base0, pal, m.id, mirror);
+    if (m.hat) stamp(STRAW_HAT, m.x - 1, base0 + body.length - 2 + 4 + 2 - STRAW_HAT.length, PAL, m.id);
+  };
+  return { out, hits, put, stamp, commit, figure };
+}
+
+function render(id, phase) {
+  const canvas = document.getElementById(id), ctx = canvas.getContext("2d");
+  canvas.width = W; canvas.height = H;
+  canvas.style.width = W * state.zoom + "px"; canvas.style.height = H * state.zoom + "px";
+  drawWorld(ctx, state.world, W, H);
+  ctx.globalAlpha = state.opacity / 100;
+  ctx.drawImage(images[phase + (state.season === "winter" ? "Winter" : "")], CX - COLS / 2, BASE - ROWS);
+  ctx.globalAlpha = 1;
+  const P = painter(ctx, W, H, CX, BASE);
+
+  const crafters = CRAFTERS[state.who];
+  const planned = CAST.map((m) => {
+    const crafting = crafters.includes(m.id);
+    return { m, crafting, parts: crafting ? parts(profFor(m), tick + OFFSET[m.id] * 3) : null };
+  });
+  const stats = {};
+  for (const { m, crafting } of planned) if (crafting) stats[m.id] = { min: 0, max: 11 };
+
+  P.stamp(LOGS, -7, 3, PAL, "fire");
+  P.stamp(FIRE[Math.floor(tick / 2) % 3], -5, 5, PAL, "fire");
+  for (const { m, crafting, parts: pp } of planned) {
+    if (m.pet != null) P.stamp(CAT_ART, m.pet, 3, PAL, "cat", false);
+    if (!crafting || pp.seated) P.stamp(SEAT, m.x - 1, 3, PAL, m.id);
+  }
+  for (const { m, crafting, parts: pp } of planned) {
+    if (!crafting) { P.figure(m, { body: "SIT", back: [], seated: true }); continue; }
+    P.figure(m, pp, stats[m.id]);
+  }
+  for (const { m, crafting, parts: pp } of planned) if (crafting) for (const l of pp.front) P.commit(l, m, stats[m.id]);
+  ctx.putImageData(P.out, 0, 0);
+
+  const name = (o) => (o === "fire" ? "the fire/logs" : o === "cat" ? "your cat" : CAST.find((c) => c.id === o)?.name || o);
+  const lines = [`<b>${phase}</b> · set ${state.set} · tick ${tick}`];
+  for (const { m, crafting } of planned) {
+    if (!crafting) continue;
+    const s = stats[m.id], h = P.hits[m.id] || {};
+    const over = Object.entries(h).map(([o, n]) => `${name(o)} ${n}px`);
+    lines.push(`<b>${m.name}</b> ${PROFS.find((x) => x.key === profFor(m)).name}: reaches ${Math.max(0, s.max - 11)} toward the fire, ${Math.max(0, -s.min)} away · ` +
+      (over.length ? `<span class="warn">draws over ${over.join(", ")}</span>` : `<span class="ok">draws over nothing</span>`));
+  }
+  document.getElementById(id + "-out").innerHTML = lines.join("<br>");
+}
+
+const TW = 40, TH = 30, TZ = 3, TCX = 20;
+const reachSeen = {};
+function renderTile(canvas, prof) {
+  const ctx = canvas.getContext("2d");
+  canvas.width = TW; canvas.height = TH;
+  canvas.style.width = TW * TZ + "px"; canvas.style.height = TH * TZ + "px";
+  drawWorld(ctx, state.world, TW, TH);
+  const P = painter(ctx, TW, TH, TCX, TH - 2);
+  const m = { id: "t", cls: "MAGE", x: 12, hat: false };
+  const mm = { ...m, x: -1 };
+  const pp = parts(prof, tick);
+  const stats = { min: 0, max: 11 };
+  const left = { ...m, x: -15 };
+  if (pp.seated) P.stamp(SEAT, left.x - 1, 3, PAL, "t");
+  P.figure(left, pp, stats);
+  for (const l of pp.front) P.commit(l, left, stats);
+  ctx.putImageData(P.out, 0, 0);
+  ctx.fillStyle = "rgba(255,209,74,.5)";
+  ctx.fillRect(TCX + left.x + 12, TH - 1, 1, 1);
+  const seen = (reachSeen[state.set + prof] = reachSeen[state.set + prof] || { fore: 0, aft: 0 });
+  seen.fore = Math.max(seen.fore, stats.max - 11); seen.aft = Math.max(seen.aft, -stats.min);
+  return seen;
+}
+
+function buildGallery() {
+  const host = document.getElementById("gallery");
+  host.innerHTML = "";
+  for (const p of PROFS) {
+    const btn = document.createElement("button");
+    btn.className = "tile" + (state.prof === p.key ? " on" : "");
+    const c = document.createElement("canvas");
+    const caption = document.createElement("div"); caption.textContent = p.name;
+    const small = document.createElement("small"); small.dataset.prof = p.key;
+    btn.append(c, caption, small);
+    btn.onclick = () => { state.prof = state.prof === p.key ? "mixed1" : p.key; sync(); buildGallery(); buildToggles(); draw(); };
+    btn.title = SETS[state.set].blurb[p.key] || "";
+    host.append(btn);
+  }
+}
+function drawGallery() {
+  document.querySelectorAll("#gallery .tile").forEach((btn, i) => {
+    const p = PROFS[i], seen = renderTile(btn.querySelector("canvas"), p.key);
+    btn.querySelector("small").textContent = `reach ${seen.fore} toward fire, ${seen.aft} away`;
+  });
+}
+
+function draw() { drawGallery(); render("night", "night"); render("day", "day"); }
+
+function buildToggles() {
+  const host = document.getElementById("toggles");
+  host.innerHTML = "";
+  const group = (label, key, options) => {
+    const g = document.createElement("div"); g.className = "group"; g.append(label + " ");
+    for (const [value, text] of options) {
+      const b = document.createElement("button"); b.textContent = text; b.className = String(state[key]) === String(value) ? "on" : "";
+      b.onclick = () => { state[key] = value; sync(); buildGallery(); buildToggles(); draw(); };
+      g.append(b);
+    }
+    host.append(g);
+  };
+  group("Crafting", "who", [["all", "Everyone"], ["you", "You"], ["kesh", "Kesh"], ["both", "Both sides of the fire"], ["neighbours", "Neighbours"]]);
+  group("Profession", "prof", [["mixed1", "Mix 1"], ["mixed2", "Mix 2"], ...PROFS.map((p) => [p.key, p.name])]);
+  group("Season", "season", [["none", "None"], ["winter", "Winter"]]);
+  group("World", "world", [["forest", "Forest"], ["meadow", "Meadow"], ["snow", "Snow"]]);
+  group("Zoom", "zoom", [[2, "2x"], [3, "3x"], [5, "5x"]]);
+  const g = document.createElement("div"); g.className = "group"; g.append("Backdrop ");
+  const r = document.createElement("input"); r.type = "range"; r.min = 0; r.max = 100; r.value = state.opacity;
+  const val = document.createElement("span"); val.textContent = state.opacity + "%";
+  r.oninput = () => { state.opacity = +r.value; val.textContent = r.value + "%"; sync(); draw(); };
+  g.append(r, val); host.append(g);
+}
+function describe() {
+  const s = SETS[state.set];
+  document.getElementById("label").textContent = `${state.set} (${s.name})`;
+  document.getElementById("title").textContent = `Crafting in the Pocket Camp: ${state.set === "now" ? "today" : "set " + state.set}, ${s.name.toLowerCase()}`;
+  document.getElementById("blurb").textContent = state.set === "A"
+    ? "Each profession kneels or stands at a prop on the ground toward the fire, as gathering does. Hover a tile for what it does. Each needs room past the figure."
+    : state.set === "B" ? "Each profession stays on its seat by the fire and works on something in its hands. Hover a tile for what it does. Little or no extra room."
+    : "Today every crafting line holds up a hammer over an anvil, the same for all eight.";
+}
+function sync() { history.replaceState(null, "", "?" + new URLSearchParams(state)); }
+function cycle(step) {
+  state.set = SET_KEYS[(SET_KEYS.indexOf(state.set) + step + SET_KEYS.length) % SET_KEYS.length];
+  sync(); describe(); buildGallery(); draw();
+}
+document.getElementById("prev").onclick = () => cycle(-1);
+document.getElementById("next").onclick = () => cycle(1);
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest("input, textarea, [contenteditable]")) return;
+  if (e.key === "ArrowLeft") cycle(-1);
+  if (e.key === "ArrowRight") cycle(1);
+});
+document.getElementById("pause").onclick = (e) => { paused = !paused; e.target.textContent = paused ? "Play" : "Pause"; };
+document.getElementById("step").onclick = () => { tick++; draw(); };
+function strip() {
+  document.body.innerHTML = "";
+  document.body.style.padding = "8px";
+  const from = +(params.get("from") || 0), count = +(params.get("count") || 30);
+  for (const p of PROFS.filter((x) => !params.get("only") || params.get("only").split(",").includes(x.key))) {
+    const row = document.createElement("div"); row.style.cssText = "display:flex;gap:2px;margin:2px 0;align-items:center";
+    const label = document.createElement("div"); label.textContent = p.name; label.style.cssText = "width:110px;font:12px system-ui;color:#ccc";
+    row.append(label);
+    for (let k = from; k < from + count; k++) { tick = k; const c = document.createElement("canvas"); renderTile(c, p.key); const z = +(params.get("z") || 2); c.style.width = TW * z + "px"; c.style.height = TH * z + "px"; row.append(c); }
+    document.body.append(row);
+  }
+}
+loadImages().then(() => { if (params.get("strip")) { strip(); return; } describe(); buildGallery(); buildToggles(); sync(); draw(); setInterval(() => { if (paused) return; tick++; draw(); }, 1000 / 6); });
+</script>
+</body>
+</html>
