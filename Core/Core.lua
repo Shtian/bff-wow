@@ -1618,6 +1618,7 @@ local function switchSlot(self, id, carryFrom)
   self.generationFrom = "saved"
   if self.whatsNewState.version then self.ledger:writeOwn({ bff = self.whatsNewState.version }) end
   if self.character then self.ledger:updateOwn(self.character) end
+  self.linkUp = false
   updateLink(self)
 end
 
@@ -1856,6 +1857,7 @@ function stepOut(self)
   local name = self.ledger:displayName()
   switchSlot(self, (ns.Slots.blank(self.account, self.rulesetKey, self.random)))
   if name then self.ledger:writeOwn({ displayName = name }) end
+  traceRuleset(self, "stepped out to start or join another Crew")
   return true
 end
 

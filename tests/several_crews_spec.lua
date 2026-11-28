@@ -190,6 +190,21 @@ describe("Several Crews on one Ruleset and faction", function()
       assert.same({ nil, "leaving" }, { ann.core:joinCrew(codeA, "Ann") })
     end)
 
+    it("sends nothing to the old channel on the way out", function()
+      local sent = #net.wire
+      ann:switchCrew(idOf(ann, "Bob"))
+      assert.equal(sent, #net.wire)
+      net:run(20)
+      assert.is_true(#net.wire > sent)
+    end)
+
+    it("sends nothing to the old channel when starting or joining another", function()
+      local sent = #net.wire
+      ann.core:startCrew("Ann")
+      ann.core:joinCrew(codeA, "Ann")
+      assert.equal(sent, #net.wire)
+    end)
+
     it("refuses a Crew that isn't yours here", function()
       assert.same({ nil, "unknownCrew" }, { ann.core:switchCrew("nope") })
     end)
