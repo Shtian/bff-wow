@@ -45,7 +45,7 @@ end
 local MEMBERS = {
   { name = "Simone", characters = {
     { name = "Simone", classFilename = "MAGE", levelOffset = 2, zone = "Westfall",
-      professions = professions("herbalism", 300, 300, "alchemy", 287, 300, "cooking", 300, 300) },
+      professions = professions("herbalism", 280, 300, "alchemy", 287, 300, "cooking", 300, 300) },
     { name = "Simonette", classFilename = "PRIEST", levelOffset = -8, zone = "Darkshore", ago = 2 * DAY,
       professions = professions("tailoring", 140, 150, "firstAid", 150, 150) },
   } },
@@ -53,7 +53,7 @@ local MEMBERS = {
     { name = "Simbad", classFilename = "ROGUE", levelOffset = 10, zone = "Redridge Mountains",
       professions = professions("skinning", 120, 150, "fishing", 211, 225) },
     { name = "Simbadsson", classFilename = "WARRIOR", levelOffset = -1, zone = "Wetlands", ago = DAY,
-      professions = professions("mining", 300, 300, "blacksmithing", 262, 300) },
+      professions = professions("mining", 290, 300, "blacksmithing", 262, 300) },
   } },
   { name = "Simba", offline = true, characters = {
     { name = "Simba", classFilename = "DRUID", levelOffset = 6, zone = "Teldrassil",

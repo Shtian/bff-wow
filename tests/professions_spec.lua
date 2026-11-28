@@ -119,6 +119,39 @@ describe("Professions", function()
     end)
   end)
 
+  describe("practised", function()
+    local SKINNING = 393
+
+    local function stored(skills)
+      local list = {}
+      for i, pair in ipairs(skills) do
+        list[i] = { id = pair[1], n = "Profession " .. pair[1], k = pair[2], m = 300 }
+      end
+      return list
+    end
+
+    local function practised(before, after)
+      return load().Professions.practised(stored(before), stored(after))
+    end
+
+    it("names the gathering profession whose skill rose", function()
+      assert.equal("mining", practised({ { MINING, 10 } }, { { MINING, 11 } }))
+      assert.equal("herbalism", practised({ { HERBALISM, 10 } }, { { HERBALISM, 11 } }))
+      assert.equal("skinning", practised({ { SKINNING, 10 } }, { { SKINNING, 11 } }))
+    end)
+
+    it("is crafting for another line, the first gathering line found when several rose", function()
+      assert.equal("crafting", practised({ { ALCHEMY, 10 } }, { { ALCHEMY, 11 } }))
+      assert.equal("skinning", practised({ { ALCHEMY, 10 }, { SKINNING, 5 }, { MINING, 5 } },
+        { { ALCHEMY, 11 }, { SKINNING, 6 }, { MINING, 6 } }))
+    end)
+
+    it("ignores fishing, and is nothing when no skill rose", function()
+      assert.is_nil(practised({ { FISHING, 10 } }, { { FISHING, 11 } }))
+      assert.is_nil(practised({ { MINING, 10 } }, { { MINING, 10 } }))
+    end)
+  end)
+
   describe("in records", function()
     it("reach the rest of the Crew on the right Character, shown and Alt", function()
       local net, clients = crew({ "Ann", "Bob" })

@@ -326,11 +326,208 @@ for (const [key, pet] of Object.entries(PETS)) {
 
 // What a Member is doing, for the Pocket Camp (docs/design/pocket-camp.md).
 // Held in a standing figure's raised hand: a blade (fighting), a torch (in
-// a dungeon or raid), a hammer (crafting) and a pick (gathering).
+// a dungeon or raid) and a hammer (crafting).
 const BLADE = outlined(["..W..", ".WZt.", ".WZt.", ".WZt.", ".WZt.", ".WZt.", ".WZt.", "GGGGG", "..B..", "..G.."]);
 const TORCH = outlined(["..R..", ".RO..", ".ROR.", "ROYOR", "ROYOR", ".OGO.", ".aAa.", "..A..", "..A..", "..a.."]);
 const HAMMER = outlined(["ZZZZZt", "ZNZZZt", "ZZZZZt", "..Aa..", "..Aa..", "..Aa..", "..Aa..", "..Aa.."]);
-const PICK = outlined(["..ZZZZZZ..", ".ZZtAatZZ.", "ZZ..Aa..ZZ", "Z...Aa...Z", "....Aa....", "....Aa....", "....Aa....", "....Aa...."]);
+// Gathering (set B of prototypes/camp-gathering.html, on the
+// t3/prototype-animated-gathering-sprites branch), one looping animation
+// per profession. Mining swings a straight pick with pale points down onto
+// an ore node; chips fly on each hit and every 4th swing a piece of ore
+// arcs up and twinkles. Herbalism kneels by three flowers, picks them one
+// at a time into a basket behind it, then the patch grows back from buds.
+// Skinning kneels by a boar, head toward the fire, and cuts it with a
+// short knife, a drop of blood on each hit and a stain under it.
+// The art is drawn as the prototype drew it, in a figure's columns (0 to
+// 11, the fire beyond 11) and rows up from the ground, its figure standing
+// on row 3. Every tick of each cycle becomes a frame: the figure's body
+// and the sprite in each of CampScene's slots (back, behind the figure;
+// node, held, fleck and find over it, in that order), each sprite at the
+// column and row of its bottom-left pixel. Sprites that differ only in
+// where they are drawn share a name. CampSheet.gathering carries the
+// frames and how far each animation reaches past the figure, toward the
+// fire and away; Core's LAYOUT gives each that much room.
+const CROUCH = [...SIT.slice(0, 9), ".KSCDDDDCSK.", "KDDDDKKDDDDK", "KKKKK..KKKKK"];
+const GATHER_PAL = {
+  ...PAL, h: "#468a46", g: "#2c5a33", i: "#9bd47a", c: "#c8682c", e: "#f2a868", p: "#e7e1f0",
+  m: "#7a3e24", M: "#a8643a", n: "#4e2818", j: "#2a1410", u: "#c46a78", v: "#e89aa8", q: "#4a1c24",
+  X: "#b8141e",
+};
+const FIGURE_COLUMNS = 12;
+const ORE = ["..tTTt..", ".tTeTct.", "tTcTTTTt", "tTTTeTcT", "ttTtTTtt"];
+const ORE_FIND = ["ec", "cc"];
+const ORE_CHIPS = ["W", "Y", "t"];
+const ORE_U = 7;
+const PICK_UP = [[0, 0, "a"], [0, 1, "A"], [0, 2, "A"], [0, 3, "A"], [-3, 4, "N"], [-2, 4, "Z"], [-1, 4, "Z"], [0, 4, "t"], [1, 4, "Z"], [2, 4, "Z"], [3, 4, "N"], [-1, 5, "Z"], [0, 5, "Z"], [1, 5, "Z"]];
+const PICK_DIAG = [[0, 0, "a"], [1, 1, "A"], [2, 2, "A"], [3, 3, "A"], [4, 4, "t"], [3, 5, "Z"], [2, 6, "N"], [5, 3, "Z"], [6, 2, "N"], [5, 5, "Z"]];
+const RAISED = { body: "hop", hand: [9, 14] };
+const STRIKE = [9, 9];
+const SWING = [
+  { ...RAISED, dir: [-1, 1], pick: "pickBack" }, { ...RAISED, dir: [-1, 1], pick: "pickBack" },
+  { ...RAISED, dir: [0, 1], pick: "pickUp" }, { ...RAISED, dir: [1, 1], pick: "pickFore" },
+  { body: "seated", hand: STRIKE, dir: [1, 0], pick: "pickStrike", hit: 0 },
+  { body: "seated", hand: STRIKE, dir: [1, 0], pick: "pickStrike", hit: 1 },
+  { body: "seated", hand: STRIKE, dir: [1, 0], pick: "pickStrike", hit: 2 },
+  { ...RAISED, dir: [1, 1], pick: "pickFore" },
+];
+const FIND_EVERY = 4;
+const BASKET = [".aaa.", "a...a", "AaAaA", "aAaAa", ".AaA."];
+const FLOWERS = [{ u: 1, h: 4, c: "P" }, { u: 4, h: 5, c: "p" }, { u: 7, h: 4, c: "F" }];
+const PATCH_U = 8;
+const BASKET_U = -4;
+const PER_FLOWER = 10;
+const BOAR = [".....j.j.jj.....", "...jjjjjjjnj....", "..jmMMmmjmnmj...", ".jmMmnnmjmmmmj.N", "jmmmmmmmjmjNvvvN", "jmmnnmmjmmmNquqN", ".jnnnnnjnnnjuuuj", "..jnjjnjjnjjjjj."];
+const BOAR_U = 6;
+const CUT = [[1, 1], [1, 1], [1, 1], [1, 0], [1, 0], [1, 0]];
+const KNIFE_HAND = [9, 4];
+
+function layer() {
+  const px = new Map();
+  return {
+    px,
+    set(u, r, ch) { px.set(u + "," + r, ch); return this; },
+    art(rows, u0, r0) {
+      rows.forEach((line, i) => [...line].forEach((ch, j) => {
+        if (ch !== ".") this.set(u0 + j, r0 + rows.length - 1 - i, ch);
+      }));
+      return this;
+    },
+    outline() {
+      const add = [];
+      for (const key of px.keys()) {
+        const [u, r] = key.split(",").map(Number);
+        for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (!px.has(u + i + "," + (r + j))) add.push(u + i + "," + (r + j));
+      }
+      for (const k of add) px.set(k, "K");
+      return this;
+    },
+  };
+}
+
+// A layer as a sprite grid, top row first, and where its bottom-left sits.
+function asSprite(l) {
+  const cells = [...l.px].map(([k, ch]) => [...k.split(",").map(Number), ch]);
+  const us = cells.map((c) => c[0]), rs = cells.map((c) => c[1]);
+  const u = Math.min(...us), row = Math.min(...rs);
+  const w = Math.max(...us) - u + 1, h = Math.max(...rs) - row + 1;
+  const grid = Array.from({ length: h }, () => Array(w).fill(null));
+  for (const [cu, cr, ch] of cells) grid[h - 1 - (cr - row)][cu - u] = GATHER_PAL[ch];
+  return { grid, u, row };
+}
+
+function pick(hand, dir) {
+  const l = layer(), [hu, hr] = hand, [dx, dy] = dir;
+  if (dx !== 0 && dy !== 0) {
+    const flip = dx < 0 ? -1 : 1;
+    for (const [x, y, c] of PICK_DIAG) l.set(hu + x * flip, hr + y, c);
+  } else {
+    for (const [j, k, c] of PICK_UP) l.set(hu + dx * k - dy * j, hr + dy * k + dx * j, c);
+  }
+  return l.outline();
+}
+function knife(hand, dir) {
+  const l = layer(), [hu, hr] = hand, [dx, dy] = dir;
+  ["a", "a", "Z", "N", "W"].forEach((c, k) => l.set(hu + dx * k, hr + dy * k, c));
+  return l.outline();
+}
+function chips(at, hit) {
+  const l = layer(), [u, r] = at, [c1, c2, c3] = ORE_CHIPS;
+  if (hit === 0) l.set(u + 1, r + 1, c1).set(u + 2, r + 2, c2).set(u - 1, r + 2, c1);
+  if (hit === 1) l.set(u + 2, r + 3, c2).set(u + 3, r + 2, c1).set(u - 1, r + 4, c3);
+  if (hit === 2) l.set(u + 3, r + 1, c3).set(u - 2, r + 3, c3);
+  return l;
+}
+function arc(p, from, to, peak, steps) {
+  const k = p / (steps - 1);
+  return [Math.round(from[0] + (to[0] - from[0]) * k), Math.round(from[1] + (to[1] - from[1]) * k + peak * 4 * k * (1 - k))];
+}
+function twinkle(u, r, n) {
+  const c = n % 2 ? "Y" : "W";
+  return layer().set(u, r + 1, c).set(u, r - 1, c).set(u - 1, r, c).set(u + 1, r, c);
+}
+function flower(l, u, r, c) { return l.set(u, r, "Y").set(u - 1, r, c).set(u + 1, r, c).set(u, r + 1, c).set(u, r - 1, c); }
+function patch(u0, r0, looks) {
+  const l = layer();
+  for (let x = 0; x < 9; x++) l.set(u0 + x, r0, x % 3 === 1 ? "g" : "h");
+  for (const x of [0, 2, 6, 8]) l.set(u0 + x, r0 + 1, "h");
+  FLOWERS.forEach((f, k) => {
+    const look = looks[k], u = u0 + f.u;
+    if (look === "gone") return;
+    if (look === "bud") {
+      for (let r = r0 + 1; r <= r0 + f.h - 3; r++) l.set(u, r, "i");
+      l.set(u, r0 + f.h - 2, "h");
+      return;
+    }
+    const top = r0 + f.h - 1 + (look === "lift" ? 1 : 0);
+    for (let r = r0 + 1; r <= top - 2; r++) l.set(u, r, "i");
+    flower(l, u, top, f.c);
+  });
+  return l.outline();
+}
+
+function mining(t) {
+  const f = SWING[t % SWING.length];
+  const frame = { body: f.body, node: ["ore", layer().art(ORE, ORE_U, 3).outline()], held: [f.pick, pick(f.hand, f.dir)] };
+  if (f.hit != null) frame.fleck = [`oreChips${f.hit + 1}`, chips([12, STRIKE[1] + 1], f.hit)];
+  const p = t % (SWING.length * FIND_EVERY) - 4;
+  if (p >= 0 && p < 6) frame.find = ["oreFind", layer().art(ORE_FIND, ...arc(p, [10, 7], [9, 19], 3, 6)).outline()];
+  else if (p >= 6 && p < 9) frame.find = [`oreTwinkle${p % 2 + 1}`, twinkle(10, 20, p)];
+  return frame;
+}
+const LOOK_KEY = { full: "F", lift: "L", gone: "G", bud: "B" };
+function herbalism(t) {
+  const p = t % (PER_FLOWER * 3 + 6);
+  const k = Math.min(3, Math.floor(p / PER_FLOWER)), q = p % PER_FLOWER, done = p >= PER_FLOWER * 3;
+  const looks = FLOWERS.map((_, i) => done ? (p - PER_FLOWER * 3 < 3 ? "gone" : "bud") : i < k ? "gone" : i > k ? "full" : q < 4 ? "full" : q === 4 ? "lift" : "gone");
+  const landed = done ? 3 : k + (q >= 9 ? 1 : 0);
+  const basket = layer().art(BASKET, BASKET_U, 3).outline();
+  for (let i = 0; i < landed; i++) basket.set(BASKET_U + 1 + i, 6, FLOWERS[i].c);
+  const frame = {
+    body: "crouch",
+    back: [`basket${landed}`, basket],
+    node: ["patch" + looks.map((look) => LOOK_KEY[look]).join(""), patch(PATCH_U, 3, looks)],
+  };
+  if (!done && q >= 5 && q < 9) {
+    const at = arc(q - 5, [PATCH_U + FLOWERS[k].u, 7], [BASKET_U + 2, 8], 7, 4);
+    frame.find = [`herb${k + 1}`, flower(layer(), ...at, FLOWERS[k].c).outline()];
+  }
+  return frame;
+}
+function skinning(t) {
+  const n = t % CUT.length, dir = CUT[n], hit = n - 3;
+  const boar = layer().art(BOAR, BOAR_U, 3).outline();
+  boar.set(BOAR_U + 7, 2, "X").set(BOAR_U + 8, 2, "X");
+  const frame = { body: "crouch", back: ["boar", boar], held: [dir[1] ? "knifeDown" : "knifeLevel", knife(KNIFE_HAND, dir)] };
+  const tip = [KNIFE_HAND[0] + dir[0] * 4, KNIFE_HAND[1] + dir[1] * 4];
+  const drop = [[tip[0] + 1, tip[1] + 1], [tip[0] + 1, tip[1]], [tip[0] + 2, tip[1] - 1]][hit];
+  if (drop) frame.fleck = ["blood", layer().set(...drop, "X")];
+  return frame;
+}
+
+const GATHER_SLOTS = ["back", "node", "held", "fleck", "find"];
+const GATHER_POSES = { mining: [mining, SWING.length * FIND_EVERY], herbalism: [herbalism, PER_FLOWER * 3 + 6], skinning: [skinning, CUT.length] };
+const GATHER_SPRITES = new Map();
+const GATHER_REACH = {};
+const GATHER_FRAMES = Object.fromEntries(Object.entries(GATHER_POSES).map(([pose, [draw, ticks]]) => {
+  let min = 0, max = FIGURE_COLUMNS - 1;
+  const frames = [];
+  for (let t = 0; t < ticks; t++) {
+    const drawn = draw(t), frame = { body: drawn.body };
+    for (const slot of GATHER_SLOTS) {
+      if (!drawn[slot]) continue;
+      const [name, l] = drawn[slot], { grid, u, row } = asSprite(l);
+      const known = GATHER_SPRITES.get(name);
+      if (known && JSON.stringify(known) !== JSON.stringify(grid)) throw new Error(`${name} has two looks`);
+      GATHER_SPRITES.set(name, grid);
+      frame[slot] = [name, u, row];
+      min = Math.min(min, u);
+      max = Math.max(max, u + grid[0].length - 1);
+    }
+    frames.push(frame);
+  }
+  GATHER_REACH[pose] = { fore: max - (FIGURE_COLUMNS - 1), aft: -min };
+  return [pose, frames];
+}));
 // An anvil at a crafter's feet.
 const ANVIL = outlined(["ZZZZZZZZZ", "TZZZZZZZt", ".TTTTTtt.", "...TTt...", "..TTTTt..", ".TTTTTTt."]);
 // A doorway of stone behind a figure in a dungeon, and a raid's with a
@@ -755,7 +952,7 @@ const SPRITES = [
   ["smoke1", skin(SMOKE[0])], ["smoke2", skin(SMOKE[1])], ["skeleton", skin(SKELETON)],
   ["flare1", paint(flare(FIRE[0]), FLARE_PAL)], ["flare2", paint(flare(FIRE[1]), FLARE_PAL)],
   ["flare3", paint(flare(FIRE[2]), FLARE_PAL)],
-  ["blade", skin(BLADE)], ["torch", skin(TORCH)], ["hammer", skin(HAMMER)], ["pick", skin(PICK)], ["anvil", skin(ANVIL)],
+  ["blade", skin(BLADE)], ["torch", skin(TORCH)], ["hammer", skin(HAMMER)], ["anvil", skin(ANVIL)],
   ["arch", skin(ARCH)], ["archRaid", skin(ARCH_RAID)],
   ["bag", skin(BAG)], ["coins", skin(COINS)], ["innSign", skin(INN_SIGN)], ["quest", skin(QUEST)], ["crate", skin(CRATE)], ["trophyCup", skin(TROPHY_CUP)], ["cupSparkle1", skin(CUP_SPARKLE[0])], ["cupSparkle2", skin(CUP_SPARKLE[1])],
   ["griffin", skin(GRIFFIN)], ["griffinWing", skin(GRIFFIN_WING)], ["griffinWingUp", skin(GRIFFIN_WING_UP)],
@@ -789,6 +986,8 @@ const SPRITES = [
   ...RIPPLES.map((ripple, i) => [`ripple${i + 1}`, paint([ripple], POND_PAL)]),
   ["fishLine1", skin(FISH_LINE[0])], ["fishLine2", skin(FISH_LINE[1])],
   ["leapFish", skin(LEAP_FISH)], ["splash", paint(SPLASH, { ...PAL, ...POND_PAL })],
+  ["crouchCloth", cloth(CROUCH, CLOTH)], ["crouch", skin(CROUCH)],
+  ...GATHER_SPRITES,
 ];
 
 function hex(color) {
@@ -1379,6 +1578,15 @@ ${Object.keys(PETS).map((key) => `    ${key} = { awake = "${petSprite(key)}", id
     line = ${FISH_LINE_X},
     ripple = { x = ${FISH_LINE_X - (RIPPLES[0].length - 1) / 2}, row = 1 },
     ripples = ${RIPPLES.length},
+  },
+  gathering = {
+${Object.entries(GATHER_FRAMES).map(([pose, frames]) => `    ${pose} = {
+      reach = { fore = ${GATHER_REACH[pose].fore}, aft = ${GATHER_REACH[pose].aft} },
+${frames.map((frame) => `      { body = "${frame.body}"${GATHER_SLOTS.filter((slot) => frame[slot]).map((slot) => {
+    const [name, u, row] = frame[slot];
+    return `, ${slot} = { "${name}", ${u}, ${row} }`;
+  }).join("")} },`).join("\n")}
+    },`).join("\n")}
   },
   winter = {
     bedSnow = ${BED_SNOW.x},

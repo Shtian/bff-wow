@@ -40,7 +40,7 @@ local function poseOf(viewer, client)
   return actor and actor.pose
 end
 
-local ALCHEMY, MINING, FISHING = 171, 186, 356
+local ALCHEMY, HERBALISM, MINING, SKINNING, FISHING = 171, 182, 186, 393, 356
 
 local function profession(skillLine, name, skill)
   return { skillLine = skillLine, name = name, icon = 1000 + skillLine, skill = skill, max = 300 }
@@ -371,8 +371,39 @@ describe("What a Member is doing", function()
 
       b:play({ professions = { profession(ALCHEMY, "Alchemy", 12), profession(MINING, "Mining", 11),
         profession(FISHING, "Fishing", 10) }, level = 13 })
+      assert.same({ "mining", "mining" }, shown(b, b))
       net:run(3)
-      assert.same({ "gathering", "gathering" }, shown(a, b))
+      assert.same({ "mining", "mining" }, shown(a, b))
+    end)
+
+    it("names the gathering, yours and a Member's, for 60 s after its skill is seen to grow", function()
+      local net, clients = withProfessions()
+      local a, b = clients[1], clients[2]
+      local gathered = { [HERBALISM] = 10, [SKINNING] = 10 }
+      local function gather(skillLine)
+        gathered[skillLine] = gathered[skillLine] + 1
+        b:play({ professions = { profession(HERBALISM, "Herbalism", gathered[HERBALISM]),
+          profession(SKINNING, "Skinning", gathered[SKINNING]) }, level = b.character.level + 1 })
+      end
+      b:play({ professions = { profession(HERBALISM, "Herbalism", 10), profession(SKINNING, "Skinning", 10) },
+        level = 12 })
+      net:run(70)
+
+      gather(HERBALISM)
+      assert.same({ "herbalism", "picking herbs" }, shown(b, b))
+      net:run(3)
+      assert.same({ "herbalism", "picking herbs" }, shown(a, b))
+      net:run(54)
+      assert.equal("herbalism", poseOf(a, b))
+      net:run(6)
+      assert.equal("seated", poseOf(a, b))
+
+      gather(SKINNING)
+      assert.same({ "skinning", "skinning" }, shown(b, b))
+      net:run(3)
+      assert.same({ "skinning", "skinning" }, shown(a, b))
+      net:run(60)
+      assert.equal("seated", poseOf(a, b))
     end)
 
     it("makes nothing of fishing skill, a first share or a login's catch-up", function()
@@ -571,6 +602,50 @@ describe("What a Member is doing", function()
       net:run(15)
       local bob = actorFor(a.core:pocketCamp(), b)
       assert.same({ "adventuring", "in Molten Core", true }, { bob.pose, bob.status, bob.raid })
+    end)
+
+    it("gives a gatherer its animation's room: clear of the fire and of its neighbours", function()
+      local net, clients, ns = crew({ "Ann", "Bob", "Cid", "Dee" })
+      local a = clients[1]
+      local layout = ns.Core.CAMP_LAYOUT
+      local function seats()
+        local xs = {}
+        for _, actor in ipairs(a.core:pocketCamp().actors) do xs[actor.memberId] = actor.x end
+        return xs
+      end
+      local before = seats()
+      local skills = {}
+      for i, skillLine in ipairs({ SKINNING, HERBALISM, MINING }) do
+        local client = clients[i + 1]
+        skills[i] = skillLine
+        client:play({ professions = { profession(skillLine, "Gathering", 10) }, level = 11 })
+      end
+      net:run(70)
+      for i = 1, 3 do clients[i + 1]:play({ professions = { profession(skills[i], "Gathering", 11) }, level = 12 }) end
+      net:run(3)
+      local view = a.core:pocketCamp()
+      assert.equal(4, #view.actors)
+      local function span(actor)
+        local room = layout.gathering[actor.pose] or { fore = 0, aft = 0 }
+        if actor.x > 0 then return actor.x - room.fore, actor.x + actor.width + room.aft end
+        return actor.x - room.aft, actor.x + actor.width + room.fore
+      end
+      local half = view.columns / 2
+      local poses = {}
+      for i, actor in ipairs(view.actors) do
+        poses[#poses + 1] = actor.pose
+        local from, to = span(actor)
+        assert.is_true(from >= -half and to <= half)
+        assert.is_true(to <= -layout.fire or from >= layout.fire)
+        for j = i + 1, #view.actors do
+          local otherFrom, otherTo = span(view.actors[j])
+          assert.is_true(to <= otherFrom or otherTo <= from)
+        end
+      end
+      table.sort(poses)
+      assert.same({ "herbalism", "mining", "seated", "skinning" }, poses)
+      local skinner = actorFor(view, clients[2])
+      assert.is_true(math.abs(skinner.x) > math.abs(before[clients[2].memberId]))
     end)
 
     it("gives a flying figure its griffin's room: clear of the fire and of its neighbours", function()
