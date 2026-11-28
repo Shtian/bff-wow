@@ -113,8 +113,9 @@ local FISHING = {
 local SMOKE = { x = 2, row = -4, rise = 6 }
 local BURST = { x = 4, row = 5, reach = 9,
   ways = { { -1, 1 }, { 1, 1 }, { -1, 0 }, { 1, 0 }, { 0, 1 }, { -1, -1 }, { 1, -1 } } }
-local SLEEP = { { x = 7, row = 0 }, { x = 12, row = 3 }, { x = 6, row = 5 } }
+local SLEEP = { { x = 4, row = 0 }, { x = 9, row = 3 }, { x = 3, row = 5 } }
 local SLEEP_STEP = 4
+local BREATH = { ticks = 6, stagger = 7, frames = { "", "2" } }
 local AWAY = { x = -1, row = 1, every = 6 }
 local ALT = { x = -1, row = 1 }
 local SPARK_ROW = { seated = 13, asleep = 4 }
@@ -919,13 +920,14 @@ local function drawActor(scene, parts, actor, f)
     parts.seat:Hide()
     parts.hat:Hide()
     hideExtras(parts)
-    setSprite(parts.cloth, "asleepCloth", scene.unit)
-    setSprite(parts.skin, "asleep", scene.unit)
+    local breath = BREATH.frames[math.floor((f + actor.x * BREATH.stagger) / BREATH.ticks) % #BREATH.frames + 1]
+    setSprite(parts.cloth, "asleepCloth" .. breath, scene.unit)
+    setSprite(parts.skin, "asleep" .. breath, scene.unit)
     put(scene, parts.cloth, x, ROW.asleep)
     put(scene, parts.skin, x, ROW.asleep)
     local bed = ROW.asleep + Sheet.sprites.asleep[4]
     if seasonArt(scene.view).snow then
-      setSprite(parts.snow, "bedSnow", scene.unit)
+      setSprite(parts.snow, "bedSnow" .. breath, scene.unit)
       put(scene, parts.snow, x + Sheet.winter.bedSnow, bed - 1)
     end
     local shown = math.floor(f / SLEEP_STEP) % 5
