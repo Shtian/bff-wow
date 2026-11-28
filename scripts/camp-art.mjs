@@ -830,6 +830,33 @@ const GRIFFIN_WING = outlined(["NNNNNNNNNNNNNNNNN", "...ZNNNNNNNNNNNNN", "......
 const GRIFFIN_WING_UP = outlined([
   "NNNN.............", "ZNNNNNNNN........", "...ZNNNNNNNNNNNNN", "......ZNNNNNZNNNN", ".........ZNNNNNNN", "............ZNNNN",
 ]);
+// The Horde's wind rider, drawn in the griffin's place when the viewer is
+// Horde (chosen as C2 in prototypes/windrider-mounts.html on the
+// prototype/windrider-mounts branch): a tawny lion with a dark mane, swept
+// horns and a fang, its plated scorpion tail arched up behind the rider and
+// the stinger hooking down at their back. The rider sits on its columns 5 to
+// 16, their bottom row on its eleventh, so it keeps to the griffin's room (8
+// columns towards the fire, 6 away) with the tail in the 6, and its top stays
+// below the rider's head. Its wing is a bat's: tawny arm and finger bones,
+// a wrist claw, and a grey-rose membrane. It sits a row lower than the
+// griffin's so the rider's lap shows, and the raised frame, 3 rows taller,
+// lifts its tips up behind the rider.
+const WIND_RIDER_PAL = {
+  ...PAL, A: "#d39a48", a: "#9a6428", N: "#f0d398", B: "#7a4a26", b: "#4a2c16", E: "#ffd14a", H: "#ece8d8",
+  W: "#fff3c4", t: "#6e3626", u: "#a8644c", p: "#d8a08a", M: "#c4aab0", m: "#866a72",
+};
+const WIND_RIDER = outlined([
+  "..uttu..................", ".ut..tu.................", "ut...pp.................", "tu...pp.................",
+  "ut....W...........H..H..", "tu...............bHBBH..", "ut..............bBBBBAA.", ".tu............bBBBBAEAN",
+  ".ut............bBBBBAANN", "..tu..........bBBBBBBNWK", "...ut.AAAAAAAAbBBBBBBNN.", "....tAAAAAAAAAAbBBBBb...",
+  "....aAAAAAAAAAAAAa......", "...aaAAANNNNNNAAAAA.....", ".aaAAa.aNNNNNa.AAA......", "aWa...........aAW.......",
+  "W...............W.......",
+]);
+const WIND_RIDER_WING = outlined(["aAAAAAAAAAAAAAH", ".MMMMMMMMAMMAM.", "...mMMMMAMMAMM.", ".....m.mA.mA.m."]);
+const WIND_RIDER_WING_UP = outlined([
+  "M..............", "MA.............", "mMA............", ".mMAA..........", "..mMMAAAAAAAAAH", "....mMMAMMAMM..",
+  "......m.mA.m...",
+]);
 // The fire flaring for a Crew goal: each flame frame with its upper rows
 // doubled, so it stands taller on the same logs, and burning purple: the
 // flame's reds to yellows as deep purple to pale lilac.
@@ -1179,6 +1206,8 @@ const SPRITES = [
   ["arch", skin(ARCH)], ["archRaid", skin(ARCH_RAID)],
   ["bag", skin(BAG)], ["coins", skin(COINS)], ["innSign", skin(INN_SIGN)], ["quest", skin(QUEST)], ["crate", skin(CRATE)], ["trophyCup", skin(TROPHY_CUP)], ["cupSparkle1", skin(CUP_SPARKLE[0])], ["cupSparkle2", skin(CUP_SPARKLE[1])],
   ["griffin", skin(GRIFFIN)], ["griffinWing", skin(GRIFFIN_WING)], ["griffinWingUp", skin(GRIFFIN_WING_UP)],
+  ["windRider", paint(WIND_RIDER, WIND_RIDER_PAL)], ["windRiderWing", paint(WIND_RIDER_WING, WIND_RIDER_PAL)],
+  ["windRiderWingUp", paint(WIND_RIDER_WING_UP, WIND_RIDER_PAL)],
   ["afk", skin(AFK)],
   ["walkCloth1", cloth(WALK[0], CLOTH)], ["walk1", skin(WALK[0])],
   ["walkCloth2", cloth(WALK[1], CLOTH)], ["walk2", skin(WALK[1])],

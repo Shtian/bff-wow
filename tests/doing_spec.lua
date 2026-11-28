@@ -854,7 +854,7 @@ describe("What a Member is doing", function()
       assert.equal(3, #poses)
     end)
 
-    it("gives a flying figure its griffin's room: clear of the fire and of its neighbours", function()
+    it("gives a flying figure its mount's room: clear of the fire and of its neighbours", function()
       local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay" }
       local net, clients, ns = crew(names)
       local a = clients[1]
@@ -869,8 +869,8 @@ describe("What a Member is doing", function()
       assert.equal(layout.seated, bob.width)
       local function span(actor)
         if actor.pose ~= "flying" then return actor.x, actor.x + actor.width end
-        if actor.x > 0 then return actor.x - layout.griffinFore, actor.x + actor.width + layout.griffinAft end
-        return actor.x - layout.griffinAft, actor.x + actor.width + layout.griffinFore
+        if actor.x > 0 then return actor.x - layout.mountFore, actor.x + actor.width + layout.mountAft end
+        return actor.x - layout.mountAft, actor.x + actor.width + layout.mountFore
       end
       local half = layout.pocketColumns / 2
       for i, actor in ipairs(view.actors) do
