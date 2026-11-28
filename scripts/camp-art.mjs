@@ -342,16 +342,16 @@ const HAMMER = outlined(["ZZZZZt", "ZNZZZt", "ZZZZZt", "..Aa..", "..Aa..", "..Aa
 // 11, the fire beyond 11) and rows up from the ground, its figure standing
 // on row 3. Every tick of each cycle becomes a frame: the figure's body
 // and the sprite in each of CampScene's slots (back, behind the figure;
-// node, held, fleck and find over it, in that order), each sprite at the
-// column and row of its bottom-left pixel. Sprites that differ only in
-// where they are drawn share a name. CampSheet.gathering carries the
-// frames and how far each animation reaches past the figure, toward the
-// fire and away; Core's LAYOUT gives each that much room.
+// node, held, fleck and find over it, each over the one before), each
+// sprite at the column and row of its bottom-left pixel. Sprites that
+// differ only in where they are drawn share a name. CampSheet.working
+// carries the frames and how far each animation reaches past the figure,
+// toward the fire and away; Core's LAYOUT gives each that much room.
 const CROUCH = [...SIT.slice(0, 9), ".KSCDDDDCSK.", "KDDDDKKDDDDK", "KKKKK..KKKKK"];
-const GATHER_PAL = {
+const WORK_PAL = {
   ...PAL, h: "#468a46", g: "#2c5a33", i: "#9bd47a", c: "#c8682c", e: "#f2a868", p: "#e7e1f0",
   m: "#7a3e24", M: "#a8643a", n: "#4e2818", j: "#2a1410", u: "#c46a78", v: "#e89aa8", q: "#4a1c24",
-  X: "#b8141e",
+  X: "#b8141e", E: "#d42a2a", V: "#9a5ce0", I: "#d6b4ff",
 };
 const FIGURE_COLUMNS = 12;
 const ORE = ["..tTTt..", ".tTeTct.", "tTcTTTTt", "tTTTeTcT", "ttTtTTtt"];
@@ -386,9 +386,9 @@ function layer() {
   return {
     px,
     set(u, r, ch) { px.set(u + "," + r, ch); return this; },
-    art(rows, u0, r0) {
+    art(rows, u0, r0, swap = {}) {
       rows.forEach((line, i) => [...line].forEach((ch, j) => {
-        if (ch !== ".") this.set(u0 + j, r0 + rows.length - 1 - i, ch);
+        if (ch !== ".") this.set(u0 + j, r0 + rows.length - 1 - i, swap[ch] || ch);
       }));
       return this;
     },
@@ -411,7 +411,7 @@ function asSprite(l) {
   const u = Math.min(...us), row = Math.min(...rs);
   const w = Math.max(...us) - u + 1, h = Math.max(...rs) - row + 1;
   const grid = Array.from({ length: h }, () => Array(w).fill(null));
-  for (const [cu, cr, ch] of cells) grid[h - 1 - (cr - row)][cu - u] = GATHER_PAL[ch];
+  for (const [cu, cr, ch] of cells) grid[h - 1 - (cr - row)][cu - u] = WORK_PAL[ch];
   return { grid, u, row };
 }
 
@@ -504,28 +504,251 @@ function skinning(t) {
   return frame;
 }
 
-const GATHER_SLOTS = ["back", "node", "held", "fleck", "find"];
-const GATHER_POSES = { mining: [mining, SWING.length * FIND_EVERY], herbalism: [herbalism, PER_FLOWER * 3 + 6], skinning: [skinning, CUT.length] };
-const GATHER_SPRITES = new Map();
-const GATHER_REACH = {};
-const GATHER_FRAMES = Object.fromEntries(Object.entries(GATHER_POSES).map(([pose, [draw, ticks]]) => {
+// Crafting ("at the bench" in prototypes/camp-crafting.html, on the
+// prototype/animated-crafting branch), one looping animation per
+// profession, drawn and framed exactly as gathering is. Alchemy kneels at
+// a flask bubbling on a burner that flashes, puffs and changes colour.
+// Blacksmithing stands at an anvil and swings a hammer with its near arm
+// only, the hot bar cooling a step each swing. Enchanting stands, a rod in
+// its near hand, at a gem floating over a rune until it glows. Engineering
+// ratchets a wrench on a gadget until it bangs, the figure jumps and it
+// smokes. Leatherworking scrapes a hide on a frame, tailoring kneels at a
+// spinning wheel, cooking stirs a pot over its own fire, and first aid
+// winds a bandage up off the ground, a green + when it's done, a kit
+// behind. A hop hides the held and fleck slots, so fleck is only ever
+// what the tool throws off. Their sprites are named by what they are and
+// numbered by look, so one drawn in several places is one sprite.
+const STAND = [...SIT.slice(0, 10), "..KCCCCCCK..", "..KDDKKDDK..", "..KKK..KKK.."];
+const STAND_RAISED = [STAND[0], STAND[1], "..KCCCCCCKK.", "..KCSSSSCKSK", "..KSKSSKSKCK", "..KSSSSSsKCK", "...KCCCCKCK.", "..KCCDDCCCK.", ".KCCCDDCCK..", ".KSCCDDCCK..", ...STAND.slice(10)];
+const STAND_STRIKE = [...STAND.slice(0, 5), "..KSSSSSsKK.", "...KCCCCCCSK", "..KCCDDCCKK.", ".KCCCDDCCK..", ".KSCCDDCCK..", ...STAND.slice(10)];
+const STAND_JUMP = [...STAND, "............"];
+const CLOUD = [
+  [[0, 0], [1, 0]],
+  [[0, 0], [1, 0], [0, 1], [1, 1]],
+  [[-1, 0], [0, 0], [1, 0], [2, 0], [0, 1], [1, 1]],
+  [[-1, 0], [1, 0], [2, 0], [0, 1], [1, 1], [0, 2]],
+  [[-1, 1], [2, 0], [1, 2], [0, 1]],
+  [[-1, 2], [2, 1]],
+];
+const HAMMER_AXIS = [[0, 0, "a"], [0, 1, "A"], [0, 2, "A"], [0, 3, "A"], [-1, 4, "Z"], [0, 4, "Z"], [1, 4, "t"], [-1, 5, "N"], [0, 5, "Z"], [1, 5, "Z"]];
+const HAMMER_DIAG = [[0, 0, "a"], [1, 1, "A"], [2, 2, "A"], [3, 3, "A"], [3, 5, "N"], [4, 4, "Z"], [5, 3, "Z"], [4, 5, "Z"], [5, 4, "Z"], [4, 6, "Z"], [5, 5, "Z"], [6, 4, "t"]];
+const WRENCH = [[0, 0, "t"], [0, 1, "T"], [0, 2, "T"], [0, 3, "Z"], [-1, 4, "Z"], [1, 4, "Z"]];
+const FLASK = ["..N..", "..N..", ".NxN.", "NxxxN", "NxxxN", ".NNN."];
+const BURNER = ["T.f.T", "TTTTT"];
+const BREWS = ["L", "E", "F", "V"];
+const BREW_FOR = 24;
+const ANVIL_SMALL = ["ZZZZZZZ", "tZZZZZt", "..TTt..", ".TTTTt."];
+const SMITH_RAISED = { body: "raise", hand: [10, 12] };
+const SMITH_STRIKE = { body: "strike", hand: [10, 9], dir: [1, 0] };
+const SMITH_SWING = [
+  { ...SMITH_RAISED, dir: [0, 1] }, { ...SMITH_RAISED, dir: [0, 1] }, { ...SMITH_RAISED, dir: [1, 1] },
+  { ...SMITH_STRIKE, hit: 0 }, { ...SMITH_STRIKE, hit: 1 }, { ...SMITH_RAISED, dir: [1, 1] },
+];
+const HEAT = ["YWY", "OYO", "ROR", "rRr"];
+const RUNE = [".VVVVV.", "V.....V", ".VVVVV."];
+const GEM = [".I.", "IWI", ".I."];
+const ENCHANT_FOR = 18;
+const GADGET = ["ZZZZZ", "TggTT", "TggTZ", "ttttt"];
+const TINKER_FOR = 24;
+const HIDE_FRAME = ["BBBBBBB", "b.....b", "b.....b", "b.....b", "b.....b", "b.....b", "b.....b", "b.....b", "BBBBBBB", "b.....b", "b.....b"];
+const HIDE = [".AeA.", "AAAaA", "AaAAA", "AAAAa", "AAaAA", "eAAAA", ".AAA."];
+const SCRAPE_FOR = 10;
+const WHEEL = ["..BBB..", ".B...B.", "B.....B", "B.....B", "B.....B", ".B...B.", "..BBB.."];
+const SPOKES = [[0, 1], [1, 1], [1, 0], [1, -1]];
+const POT = ["ZccccccZ", "TTTTTTTT", "TTTTTTTt", ".TTTTTt.", "..tttt.."];
+const STIR = [0, 1, 2, 1];
+const KIT = [".t.t.", "NNENN", "NEEEN", "NNENN"];
+const BANDAGE_FOR = 24;
+
+function merge(...layers) {
+  const l = layer();
+  for (const part of layers) for (const [k, ch] of part.px) l.px.set(k, ch);
+  return l;
+}
+function named(prefix) {
+  const looks = new Map();
+  return (l) => {
+    const look = JSON.stringify(asSprite(l).grid);
+    if (!looks.has(look)) looks.set(look, prefix + (looks.size + 1));
+    return [looks.get(look), l];
+  };
+}
+function tool(axis, diag, hand, dir) {
+  const l = layer(), [hu, hr] = hand, [dx, dy] = dir;
+  if (dx !== 0 && dy !== 0) for (const [x, y, c] of diag) l.set(hu + x * dx, hr + y * dy, c);
+  else for (const [j, k, c] of axis) l.set(hu + dx * k - dy * j, hr + dy * k + dx * j, c);
+  return l.outline();
+}
+function star(u, r, c1, c2) { return layer().set(u, r, c1).set(u + 1, r, c2).set(u - 1, r, c2).set(u, r + 1, c2).set(u, r - 1, c2); }
+function puff(u, r, k, c, fade) {
+  const l = layer();
+  for (const [du, dr] of CLOUD[k]) l.set(u + du, r + k + dr, k < 3 ? c : fade);
+  return l;
+}
+
+const ALCHEMY = { node: named("brewNode"), held: named("brewVial"), find: named("brewPuff") };
+function alchemy(t) {
+  const p = t % BREW_FOR, brew = Math.floor(t / BREW_FOR), now = BREWS[(brew + (p >= 14 ? 1 : 0)) % BREWS.length];
+  const frame = {
+    body: "crouch",
+    node: ALCHEMY.node(layer().art(BURNER, 11, 3, { f: t % 2 ? "Y" : "O" }).art(FLASK, 11, 5, { x: p === 14 || p === 15 ? "W" : now }).outline()),
+    held: ALCHEMY.held(layer().art(["N", "x", "x"], 10, 5, { x: BREWS[(brew + 1) % BREWS.length] }).outline()),
+  };
+  if (p < 14) {
+    const bubbles = layer().set(12 + (t % 3), 6 + (t % 2), "W");
+    for (const k of [0, 2]) {
+      const r = 12 + ((p + k) % 4);
+      if (r < 15) bubbles.set(13 + (k ? 0 : (p >> 1) % 2), r, "N");
+    }
+    frame.find = ALCHEMY.find(bubbles);
+  }
+  if (p === 14 || p === 15) frame.find = ALCHEMY.find(star(13, 13, "W", "Y"));
+  if (p >= 16 && p < 16 + CLOUD.length) frame.find = ALCHEMY.find(puff(12, 12, p - 16, now, "Z"));
+  return frame;
+}
+
+const SMITHING = { held: named("smithHammer"), fleck: named("smithSparks"), find: named("smithBar") };
+function blacksmithing(t) {
+  const f = SMITH_SWING[t % SMITH_SWING.length], heat = HEAT[Math.floor(t / SMITH_SWING.length) % HEAT.length];
+  const frame = {
+    body: f.body,
+    node: ["anvilSmall", layer().art(ANVIL_SMALL, 9, 3).outline()],
+    held: SMITHING.held(tool(HAMMER_AXIS, HAMMER_DIAG, f.hand, f.dir)),
+    find: SMITHING.find(merge(...[...heat].map((c, i) => layer().set(13 + i, 7, c)))),
+  };
+  if (f.hit === 0) frame.fleck = SMITHING.fleck(layer().set(16, 9, "Y").set(17, 10, "W").set(12, 9, "O"));
+  if (f.hit === 1) frame.fleck = SMITHING.fleck(layer().set(17, 11, "O").set(12, 11, "Y").set(17, 8, "R"));
+  return frame;
+}
+
+const ENCHANTING = { back: named("rune"), node: named("enchantGem"), held: named("enchantRod"), find: named("enchantSparkles") };
+function enchanting(t) {
+  const p = t % ENCHANT_FOR, glow = p >= 12, flash = p === 12 || p === 13;
+  const gem = flash ? { I: "W", W: "W" } : glow ? { I: "V", W: "I" } : { I: "f", W: "F" };
+  const frame = {
+    body: "stand",
+    back: ENCHANTING.back(layer().art(RUNE, 11, 1, { V: (t >> 1) % 2 ? "V" : "I" })),
+    node: ENCHANTING.node(layer().art(GEM, 13, 9 + ((t >> 1) % 2), gem).outline()),
+    held: ENCHANTING.held(layer().set(10, 7, "c").set(11, 8, "O").set(12, 9, p % 2 ? "W" : "I").outline()),
+  };
+  const sparkles = layer();
+  if (!glow) {
+    if (p % 2 === 0) sparkles.set(13, 8, "I");
+    for (const [u, k] of [[12, 0], [15, 3], [17, 5]]) sparkles.set(u, 3 + ((p + k) % 6), (p + k) % 2 ? "I" : "W");
+  }
+  if (flash) sparkles.set(12, 12, "W").set(16, 12, "W").set(12, 8, "W").set(16, 8, "W");
+  if (sparkles.px.size) frame.find = ENCHANTING.find(sparkles);
+  return frame;
+}
+
+const TINKERING = { node: named("gadget"), find: named("gadgetBang") };
+function engineering(t) {
+  const p = t % TINKER_FOR, bang = p === 14 || p === 15, shake = bang ? 1 : 0;
+  const turned = (t >> 1) % 2;
+  const gadget = layer().art(GADGET, 12 + shake, 3, { g: turned ? "G" : "O" })
+    .set(13 + shake, 5, turned ? "O" : "G").set(14 + shake, 4, turned ? "O" : "G")
+    .set(15 + shake, 7, "t").set(15 + shake, 8, "t").set(15 + shake, 9, p % 6 < 3 ? "R" : "L").outline();
+  const frame = { body: p === 14 ? "jump" : bang ? "stand" : "crouch", node: TINKERING.node(gadget) };
+  if (!bang) frame.held = ["wrench", tool(WRENCH, [], [8, 5 + ((p >> 1) % 2)], [1, 0])];
+  if (bang) frame.find = TINKERING.find(star(14, 11, "W", "Y"));
+  if (p >= 16 && p < 16 + CLOUD.length) frame.find = TINKERING.find(puff(13, 9, p - 16, "T", "t"));
+  return frame;
+}
+
+const SCRAPING = { node: named("hide") };
+function leatherworking(t) {
+  const p = t % SCRAPE_FOR, down = p < 5 ? p : null;
+  const hide = layer().art(HIDE_FRAME, 11, 3).art(HIDE, 12, 6);
+  if (down !== null) for (let k = 0; k <= down; k++) hide.set(14, 12 - k, "e");
+  const frame = { body: "crouch", node: SCRAPING.node(hide.outline()) };
+  if (down !== null) {
+    const r = 12 - down;
+    frame.held = ["scraper", layer().set(10, r, "a").set(11, r, "a").set(12, r, "a").set(13, r, "Z").set(14, r, "N").set(15, r, "Z").outline()];
+    if (down > 1) frame.fleck = ["shaving", layer().set(16 + (t % 2), r - 1, "e")];
+  }
+  return frame;
+}
+
+function tailoring(t) {
+  const [cu, cr] = [14, 9], [dx, dy] = SPOKES[t % SPOKES.length];
+  const wheel = layer().art(WHEEL, cu - 3, cr - 3)
+    .set(cu, cr, "b").set(cu + dx, cr + dy, "a").set(cu - dx, cr - dy, "a").set(cu + 2 * dx, cr + 2 * dy, "a").set(cu - 2 * dx, cr - 2 * dy, "a")
+    .set(12, 4, "b").set(12, 5, "b").set(16, 4, "b").set(16, 5, "b");
+  for (let u = 11; u <= 17; u++) wheel.set(u, 3, "b");
+  return {
+    body: "crouch",
+    node: [`wheel${t % SPOKES.length + 1}`, wheel.outline()],
+    held: ["wool", layer().set(9, 6, "N").set(10, 6, "N").set(10, 5, "Z").outline().set(11, 7, "N").set(12, 8, "N")],
+  };
+}
+
+const COOKING = { back: named("ladle"), node: named("pot"), find: named("potSteam") };
+function cooking(t) {
+  const s = STIR[(t >> 1) % STIR.length];
+  const flames = t % 2 ? "ROYOR" : "OYROY";
+  const pot = layer();
+  [...flames].forEach((c, i) => pot.set(12 + i, 3, c));
+  pot.art(POT, 10, 4).set(12 + ((t >> 1) % 4), 8, "e");
+  const steam = layer().set(13 + s, 8, "A");
+  for (const [u, k] of [[13, 0], [15, 3]]) {
+    const q = (t + k) % 6;
+    steam.set(u + ((q >> 1) % 2), 8 + q, q % 2 ? "Z" : "N");
+  }
+  return {
+    body: "crouch",
+    back: COOKING.back(layer().set(11 + s, 10, "a").set(12 + s, 9, "A").set(13 + s, 8, "A").outline()),
+    node: COOKING.node(pot.outline()),
+    find: COOKING.find(steam),
+  };
+}
+
+const BANDAGING = { node: named("bandage") };
+function firstAid(t) {
+  const p = t % BANDAGE_FOR, left = p < 18 ? 6 - Math.floor(p / 3) : 0;
+  const frame = {
+    body: "crouch",
+    back: ["kit", layer().art(KIT, -5, 3).outline()],
+    held: [`roll${t % 2 + 1}`, layer().art(t % 2 ? ["NZ", "ZN"] : ["ZN", "NZ"], 10, 5).outline()],
+  };
+  if (left) {
+    const strip = layer().set(11, 4, "N");
+    for (let i = 0; i < left; i++) strip.set(12 + i, 3, i % 3 === 2 ? "Z" : "N");
+    frame.node = BANDAGING.node(strip.outline());
+  }
+  if (p >= 18) {
+    const r = 17 + ((p - 18) >> 1);
+    frame.find = ["heal", layer().set(5, r, "L").set(4, r, "L").set(6, r, "L").set(5, r + 1, "L").set(5, r - 1, "L").outline()];
+  }
+  return frame;
+}
+
+const WORK_SLOTS = ["back", "node", "held", "fleck", "find"];
+const WORK_POSES = {
+  mining: [mining, SWING.length * FIND_EVERY], herbalism: [herbalism, PER_FLOWER * 3 + 6], skinning: [skinning, CUT.length],
+  alchemy: [alchemy, BREW_FOR * BREWS.length], blacksmithing: [blacksmithing, SMITH_SWING.length * HEAT.length],
+  enchanting: [enchanting, ENCHANT_FOR], engineering: [engineering, TINKER_FOR], leatherworking: [leatherworking, SCRAPE_FOR],
+  tailoring: [tailoring, SPOKES.length], cooking: [cooking, STIR.length * 2 * 3], firstAid: [firstAid, BANDAGE_FOR],
+};
+const WORK_SPRITES = new Map();
+const WORK_REACH = {};
+const WORK_FRAMES = Object.fromEntries(Object.entries(WORK_POSES).map(([pose, [draw, ticks]]) => {
   let min = 0, max = FIGURE_COLUMNS - 1;
   const frames = [];
   for (let t = 0; t < ticks; t++) {
     const drawn = draw(t), frame = { body: drawn.body };
-    for (const slot of GATHER_SLOTS) {
+    for (const slot of WORK_SLOTS) {
       if (!drawn[slot]) continue;
       const [name, l] = drawn[slot], { grid, u, row } = asSprite(l);
-      const known = GATHER_SPRITES.get(name);
+      const known = WORK_SPRITES.get(name);
       if (known && JSON.stringify(known) !== JSON.stringify(grid)) throw new Error(`${name} has two looks`);
-      GATHER_SPRITES.set(name, grid);
+      WORK_SPRITES.set(name, grid);
       frame[slot] = [name, u, row];
       min = Math.min(min, u);
       max = Math.max(max, u + grid[0].length - 1);
     }
     frames.push(frame);
   }
-  GATHER_REACH[pose] = { fore: max - (FIGURE_COLUMNS - 1), aft: -min };
+  WORK_REACH[pose] = { fore: max - (FIGURE_COLUMNS - 1), aft: -min };
   return [pose, frames];
 }));
 // An anvil at a crafter's feet.
@@ -987,7 +1210,11 @@ const SPRITES = [
   ["fishLine1", skin(FISH_LINE[0])], ["fishLine2", skin(FISH_LINE[1])],
   ["leapFish", skin(LEAP_FISH)], ["splash", paint(SPLASH, { ...PAL, ...POND_PAL })],
   ["crouchCloth", cloth(CROUCH, CLOTH)], ["crouch", skin(CROUCH)],
-  ...GATHER_SPRITES,
+  ["standCloth", cloth(STAND, CLOTH)], ["stand", skin(STAND)],
+  ["raiseCloth", cloth(STAND_RAISED, CLOTH)], ["raise", skin(STAND_RAISED)],
+  ["strikeCloth", cloth(STAND_STRIKE, CLOTH)], ["strike", skin(STAND_STRIKE)],
+  ["jumpCloth", cloth(STAND_JUMP, CLOTH)], ["jump", skin(STAND_JUMP)],
+  ...WORK_SPRITES,
 ];
 
 function hex(color) {
@@ -1579,10 +1806,10 @@ ${Object.keys(PETS).map((key) => `    ${key} = { awake = "${petSprite(key)}", id
     ripple = { x = ${FISH_LINE_X - (RIPPLES[0].length - 1) / 2}, row = 1 },
     ripples = ${RIPPLES.length},
   },
-  gathering = {
-${Object.entries(GATHER_FRAMES).map(([pose, frames]) => `    ${pose} = {
-      reach = { fore = ${GATHER_REACH[pose].fore}, aft = ${GATHER_REACH[pose].aft} },
-${frames.map((frame) => `      { body = "${frame.body}"${GATHER_SLOTS.filter((slot) => frame[slot]).map((slot) => {
+  working = {
+${Object.entries(WORK_FRAMES).map(([pose, frames]) => `    ${pose} = {
+      reach = { fore = ${WORK_REACH[pose].fore}, aft = ${WORK_REACH[pose].aft} },
+${frames.map((frame) => `      { body = "${frame.body}"${WORK_SLOTS.filter((slot) => frame[slot]).map((slot) => {
     const [name, u, row] = frame[slot];
     return `, ${slot} = { "${name}", ${u}, ${row} }`;
   }).join("")} },`).join("\n")}
