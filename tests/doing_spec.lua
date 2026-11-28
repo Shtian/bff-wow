@@ -854,7 +854,7 @@ describe("What a Member is doing", function()
       assert.equal(3, #poses)
     end)
 
-    it("gives a flying figure its griffin's room: clear of the fire and of its neighbours", function()
+    it("gives a flying figure its mount's room: clear of the fire and of its neighbours", function()
       local names = { "Ann", "Bob", "Cid", "Dee", "Eve", "Fay" }
       local net, clients, ns = crew(names)
       local a = clients[1]

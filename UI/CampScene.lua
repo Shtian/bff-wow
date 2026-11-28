@@ -85,11 +85,9 @@ local POSE = {
   resting = { back = { "innSign", -1, -1, true } },
   afk = { away = true },
   flying = { lift = 9, back = { "griffin", -4, -7, true }, front = { "griffinWing", -6, -3, true },
-    flap = "griffinWingUp" },
-}
-local HORDE_POSE = {
-  flying = { lift = 9, back = { "windRider", -6, -7, true }, front = { "windRiderWing", -4, -4, true },
-    flap = "windRiderWingUp" },
+    flap = "griffinWingUp",
+    horde = { back = { "windRider", -6, -7, true }, front = { "windRiderWing", -4, -4, true },
+      flap = "windRiderWingUp" } },
 }
 local WORKING = { stagger = 3, slots = { "back", "node", "held", "fleck", "find" },
   overFigure = { "node", "held", "fleck", "find" },
@@ -869,7 +867,8 @@ local function drawActor(scene, parts, actor, f)
     end
     parts.skin:SetAlpha(alpha)
   elseif actor.pose ~= "asleep" then
-    local pose = not dead and (scene.horde and HORDE_POSE[actor.pose] or POSE[actor.pose]) or {}
+    local pose = not dead and POSE[actor.pose] or {}
+    local mount = scene.horde and pose.horde or pose
     local standing = pose.standing == true
     local hop = not dead and celebrating(scene, actor, f)
     local row = (standing and ROW.standing or ROW.seated) + (pose.lift or 0) + (hop and ROW.hop - ROW.seated or 0)
@@ -899,14 +898,14 @@ local function drawActor(scene, parts, actor, f)
     local markTop = top + (hatTop and HAT_MARK_LIFT or 0)
     if pose.tool then posePart(scene, parts.tool, actor, pose.tool, row) else parts.tool:Hide() end
     if pose.pond then drawFishing(scene, parts, actor, f, row) else hideFishing(parts) end
-    if pose.back then
-      posePart(scene, parts.back, actor, pose.back, row)
+    if mount.back then
+      posePart(scene, parts.back, actor, mount.back, row)
     else
       parts.back:Hide()
     end
-    if pose.front then
-      local flapping = pose.flap and math.floor(f / FLAP_TICKS) % 3 == 0
-      posePart(scene, parts.front, actor, pose.front, row, flapping and pose.flap or nil)
+    if mount.front then
+      local flapping = mount.flap and math.floor(f / FLAP_TICKS) % 3 == 0
+      posePart(scene, parts.front, actor, mount.front, row, flapping and mount.flap or nil)
     else
       parts.front:Hide()
     end
@@ -914,7 +913,7 @@ local function drawActor(scene, parts, actor, f)
     drawCheer(scene, parts, actor, top, not dead and hopping(scene, actor))
     local marked = drawAnimations(scene, parts, actor, f, row, markTop, pose.away)
     if actor.onAlt and not dead and not marked then
-      drawAlt(scene, parts, actor, math.max(markTop, partTop(pose.tool, row) - ALT.row, partTop(pose.back, row) - ALT.row,
+      drawAlt(scene, parts, actor, math.max(markTop, partTop(pose.tool, row) - ALT.row, partTop(mount.back, row) - ALT.row,
         (work and HELD_TOP[actor.pose] or 0) - ALT.row))
     else
       parts.alt:Hide()
