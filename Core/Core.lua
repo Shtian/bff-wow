@@ -1528,10 +1528,6 @@ function Core:rulesetNamed(name)
   self.listener("changed")
 end
 
-function Core:displayName()
-  return self.ledger:displayName()
-end
-
 local LEAVING = "Leaving the Crew. It finishes once BFF's channel is reachable."
 local PAUSED = "You appear offline: the others don't see you. Change it in Settings."
 local WAITING = "Waiting for your Crew. Members show up when they or someone who has seen them is online."
@@ -1600,6 +1596,17 @@ local function validName(name)
   local length = utf8Length(name)
   if length < MIN_NAME or length > MAX_NAME then return nil end
   return name
+end
+
+local function nameInLeftCrew(self, code)
+  code = code and ns.CrewCode.normalise(code)
+  if not code then return nil end
+  local id, wasLeft = ns.Slots.withCode(self.account, self.rulesetKey, code)
+  return wasLeft and validName(ns.Slots.ownDisplayName(self.account.crews[id])) or nil
+end
+
+function Core:displayName(code)
+  return nameInLeftCrew(self, code) or self.ledger:displayName()
 end
 
 local function nameOrCurrent(self, displayName)

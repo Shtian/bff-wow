@@ -57,7 +57,7 @@ A partial break, where some Members can use the channel and some can't, heals th
 
 ## One Crew at a time
 
-A player is in **at most one Crew per Ruleset and faction** (ADR 0009). A Character on another Ruleset or faction has a Crew of its own, or none. You can be in several Crews on the same Ruleset and faction, and play with one at a time (ADR 0010). `/bff start` and `/bff join <code>` from inside a Crew start or join another and switch to it, keeping the one you were in. Joining the Crew you are already in does nothing; joining the code of another of your Crews switches to it. Both are refused during messaging lockdown and while a leave is pending.
+A player is in **at most one Crew per Ruleset and faction** (ADR 0009). A Character on another Ruleset or faction has a Crew of its own, or none. You can be in several Crews on the same Ruleset and faction, and play with one at a time (ADR 0010). `/bff start` and `/bff join <code>` from inside a Crew start or join another and switch to it, keeping the one you were in. Joining the Crew you are already in does nothing; joining the code of another of your Crews switches to it. `/bff join` with the code of a Crew you left uses the display name you had there (`core:displayName(code)`); the panel uses the name in its box. Both are refused during messaging lockdown and while a leave is pending.
 
 Why:
 

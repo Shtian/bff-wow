@@ -303,8 +303,8 @@ function ns.confirmLeave()
 end
 
 -- WoW: a Forever Character's name can be "First Last".
-function ns.defaultDisplayName()
-  return ns.core:displayName() or (UnitName("player") or ""):match("^%S*")
+function ns.defaultDisplayName(code)
+  return ns.core:displayName(code) or (UnitName("player") or ""):match("^%S*")
 end
 local defaultName = ns.defaultDisplayName
 
@@ -320,7 +320,7 @@ function commands.start()
 end
 
 function commands.join(code)
-  local crew, reason = ns.core:joinCrew(code, defaultName())
+  local crew, reason = ns.core:joinCrew(code, defaultName(code))
   if crew then say("you're in the Crew " .. crew.code .. ".") else say(MESSAGES[reason]) end
 end
 
