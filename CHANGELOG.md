@@ -52,6 +52,15 @@
 
 
 
+
+## 2.23.0
+<sub>2026-11-28</sub>
+
+- *(minor)*
+  Horde flyers ride a wind rider
+
+  On a Horde character, friends on a flight path in the Camp now ride a wind rider instead of a griffin, scorpion tail and all.
+
 ## 2.22.0
 <sub>2026-11-28</sub>
 
