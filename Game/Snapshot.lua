@@ -231,6 +231,7 @@ function Snapshot.requiredLevel(link)
 end
 
 local windows = { vendor = false, auction = false }
+local professionWindows = {}
 local function flag(ask, ...)
   if not ask then return false end
   local value = ask(...)
@@ -272,6 +273,33 @@ local function form(inCombat)
   return found
 end
 
+local function lineNamed(name)
+  return ns.Professions.lineNamed(professions, readable(name))
+end
+
+-- WoW: the profession window can show someone else's linked or guild profession.
+local function someoneElses()
+  local ui = C_TradeSkillUI
+  if not ui then return false end
+  return askSafely(ui.IsTradeSkillLinked) == true or askSafely(ui.IsTradeSkillGuild) == true
+end
+
+-- WoW: Midnight names the open profession by C_TradeSkillUI.GetBaseProfessionInfo's
+-- professionID; classic only by its localised name, GetTradeSkillLine's, or
+-- GetCraftDisplaySkillLine's for the craft window (enchanting).
+local function openProfession(window)
+  if window == "craft" then return lineNamed((askSafely(GetCraftDisplaySkillLine))) or true end
+  if someoneElses() then return nil end
+  local info = C_TradeSkillUI and askSafely(C_TradeSkillUI.GetBaseProfessionInfo)
+  if type(info) == "table" then
+    local id = readable(info.professionID)
+    if ns.Professions.workOf(id) then return id end
+    local named = lineNamed(info.professionName)
+    if named then return named end
+  end
+  return lineNamed((askSafely(GetTradeSkillLine))) or true
+end
+
 function Snapshot.doing()
   local inCombat = flag(InCombatLockdown)
   return {
@@ -282,6 +310,7 @@ function Snapshot.doing()
     resting = flag(IsResting),
     flying = flag(UnitOnTaxi, "player") or flag(IsFlying),
     form = form(inCombat),
+    profession = professionWindows.trade or professionWindows.craft or nil,
   }
 end
 
@@ -291,9 +320,14 @@ function Snapshot.daylight()
   return nil, GetGameTime()
 end
 
+-- WoW: registering an event the client doesn't have is an error.
+local function knownEvent(event)
+  return C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid(event) or false
+end
+
 local function watchDaylight(core)
   local event = "DIEL_CYCLE_CHANGED"
-  if not (C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid(event)) then return end
+  if not knownEvent(event) then return end
   local frame = CreateFrame("Frame")
   frame:RegisterEvent(event)
   frame:SetScript("OnEvent", function() core:daylightChanged() end)
@@ -303,6 +337,20 @@ local WINDOW_EVENTS = {
   MERCHANT_SHOW = { "vendor", true }, MERCHANT_CLOSED = { "vendor", false },
   AUCTION_HOUSE_SHOW = { "auction", true }, AUCTION_HOUSE_CLOSED = { "auction", false },
 }
+local PROFESSION_WINDOW_EVENTS = {
+  TRADE_SKILL_SHOW = { "trade", "open" }, TRADE_SKILL_CLOSE = { "trade", "close" },
+  TRADE_SKILL_LIST_UPDATE = { "trade", "update" }, TRADE_SKILL_DATA_SOURCE_CHANGED = { "trade", "update" },
+  CRAFT_SHOW = { "craft", "open" }, CRAFT_CLOSE = { "craft", "close" },
+}
+
+local function professionWindow(event)
+  local window, change = event[1], event[2]
+  if change == "close" then
+    professionWindows[window] = nil
+  elseif change == "open" or professionWindows[window] ~= nil then
+    professionWindows[window] = openProfession(window) or false
+  end
+end
 
 local function watchGroup(core)
   local function tell()
@@ -318,13 +366,21 @@ end
 local function watchDoing(core)
   local frame = CreateFrame("Frame")
   for event in pairs(WINDOW_EVENTS) do frame:RegisterEvent(event) end
+  for event in pairs(PROFESSION_WINDOW_EVENTS) do
+    if knownEvent(event) then frame:RegisterEvent(event) end
+  end
   frame:RegisterEvent("QUEST_TURNED_IN")
-  frame:SetScript("OnEvent", function(_, event)
+  if knownEvent("UNIT_SPELLCAST_SUCCEEDED") then frame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player") end
+  frame:SetScript("OnEvent", function(_, event, ...)
     local window = WINDOW_EVENTS[event]
     if window then
       windows[window[1]] = window[2]
+    elseif PROFESSION_WINDOW_EVENTS[event] then
+      professionWindow(PROFESSION_WINDOW_EVENTS[event])
     elseif event == "QUEST_TURNED_IN" then
       core:questHandedIn()
+    elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+      core:gathered(readable((select(3, ...))))
     end
   end)
 end

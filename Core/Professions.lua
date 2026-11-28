@@ -135,6 +135,36 @@ local WORK = {}
 for _, profession in ipairs(Professions.ALL) do WORK[profession.skillLine] = profession.work end
 local FISHING = 356
 
+Professions.WORK_STATES = { crafting = true }
+for _, work in pairs(WORK) do Professions.WORK_STATES[work] = true end
+
+function Professions.workOf(skillLine)
+  return WORK[skillLine]
+end
+
+-- WoW: Forever's gathering casts, one spell per rank (wowhead.com/forever).
+local GATHERING_SPELLS = {
+  mining = { 2575, 2576, 3564, 10248 },
+  herbalism = { 2366, 2368, 3570, 11993 },
+  skinning = { 8613, 8617, 8618, 10768 },
+}
+local GATHERED_BY = {}
+for work, spells in pairs(GATHERING_SPELLS) do
+  for _, spell in ipairs(spells) do GATHERED_BY[spell] = work end
+end
+
+function Professions.gatheredBy(spellId)
+  return GATHERED_BY[spellId]
+end
+
+function Professions.lineNamed(professions, name)
+  if type(name) ~= "string" then return nil end
+  for _, profession in ipairs(professions or {}) do
+    if profession.name == name then return profession.skillLine end
+  end
+  return nil
+end
+
 function Professions.practised(before, after)
   if not valid(before) or not valid(after) then return nil end
   local had = {}

@@ -4,15 +4,15 @@ local Doing = {}
 Doing.__index = Doing
 ns.Doing = Doing
 
-local ORDER = { "flying", "auction", "vendor", "fighting", "afk", "resting" }
-local KNOWN = {}
-for _, state in ipairs(ORDER) do KNOWN[state] = true end
+local KNOWN = { flying = true, auction = true, vendor = true, fighting = true, afk = true, resting = true }
+for work in pairs(ns.Professions.WORK_STATES) do KNOWN[work] = true end
 
 local FORMS = { wolf = "now", bear = "now", cat = "now", moonkin = "now", travel = "held", seal = "held" }
 local TRAVEL_HOLD = 30
 local FORM_EXPIRES = 150
 
 local FIGHTING_HOLD = 20
+local GATHERING_HOLD = 60
 local EVERY_MIN = 15
 local EVERY_PER_MEMBER = 5
 local REFRESH = 2 * 60
@@ -28,6 +28,8 @@ function Doing.new(now)
     formSince = -math.huge,
     sentForm = nil,
     fightingUntil = -math.huge,
+    gatheringWork = nil,
+    gatheringUntil = -math.huge,
     sent = false,
     sentAt = -math.huge,
     unheard = false,
@@ -38,14 +40,21 @@ function Doing.new(now)
   }, Doing)
 end
 
+local function workAt(profession)
+  if profession == true then return "crafting" end
+  if type(profession) ~= "number" then return nil end
+  return ns.Professions.workOf(profession) or "crafting"
+end
+
 function Doing:set(facts)
   local was, wasForm = self.facts.combat, self.facts.form
   self.facts = {
     combat = facts.combat == true, vendor = facts.vendor == true, auction = facts.auction == true,
     afk = facts.afk == true, resting = facts.resting == true, flying = facts.flying == true,
-    form = FORMS[facts.form] and facts.form or nil,
+    form = FORMS[facts.form] and facts.form or nil, work = workAt(facts.profession),
   }
   if was and not self.facts.combat then self.fightingUntil = self.now() + FIGHTING_HOLD end
+  if self.facts.combat then self.gatheringUntil = -math.huge end
   if self.facts.form ~= wasForm then self.formSince = self.now() end
 end
 
@@ -64,19 +73,31 @@ local function tellable(self)
   return form, since
 end
 
+function Doing:gathered(spellId)
+  local work = ns.Professions.gatheredBy(spellId)
+  if work then self.gatheringWork, self.gatheringUntil = work, self.now() + GATHERING_HOLD end
+  return work ~= nil
+end
+
+local function gathering(self)
+  return self.now() < self.gatheringUntil and self.gatheringWork or nil
+end
+
 function Doing:fighting()
   return self.facts.combat or self.now() < self.fightingUntil
 end
 
 function Doing:state()
   local facts = self.facts
-  local on = {
-    flying = facts.flying, auction = facts.auction, vendor = facts.vendor, afk = facts.afk, resting = facts.resting,
-    fighting = self:fighting(),
-  }
-  for _, state in ipairs(ORDER) do
-    if on[state] then return state end
-  end
+  if facts.flying then return "flying" end
+  if facts.auction then return "auction" end
+  if facts.vendor then return "vendor" end
+  if facts.work then return facts.work end
+  local work = gathering(self)
+  if work then return work end
+  if self:fighting() then return "fighting" end
+  if facts.afk then return "afk" end
+  if facts.resting then return "resting" end
   return nil
 end
 
