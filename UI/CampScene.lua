@@ -87,6 +87,10 @@ local POSE = {
   flying = { lift = 9, back = { "griffin", -4, -7, true }, front = { "griffinWing", -6, -3, true },
     flap = "griffinWingUp" },
 }
+local HORDE_POSE = {
+  flying = { lift = 9, back = { "windRider", -6, -7, true }, front = { "windRiderWing", -4, -4, true },
+    flap = "windRiderWingUp" },
+}
 local WORKING = { stagger = 3, slots = { "back", "node", "held", "fleck", "find" },
   overFigure = { "node", "held", "fleck", "find" },
   inHand = { held = true, fleck = true } }
@@ -865,7 +869,7 @@ local function drawActor(scene, parts, actor, f)
     end
     parts.skin:SetAlpha(alpha)
   elseif actor.pose ~= "asleep" then
-    local pose = not dead and POSE[actor.pose] or {}
+    local pose = not dead and (scene.horde and HORDE_POSE[actor.pose] or POSE[actor.pose]) or {}
     local standing = pose.standing == true
     local hop = not dead and celebrating(scene, actor, f)
     local row = (standing and ROW.standing or ROW.seated) + (pose.lift or 0) + (hop and ROW.hop - ROW.seated or 0)

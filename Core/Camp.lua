@@ -22,8 +22,8 @@ local LAYOUT = {
   pocketMaxColumns = 304,
   pocketStep = 32,
   pocketRows = 34,
-  griffinFore = 8,
-  griffinAft = 6,
+  mountFore = 8,
+  mountAft = 6,
   working = {
     mining = { fore = 5, aft = 0 },
     herbalism = { fore = 6, aft = 5 },
@@ -570,7 +570,7 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
     lanternCount = shown.lanternCount,
     room = function(row)
       local pose = poses[row.memberId]
-      if pose == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
+      if pose == "flying" then return LAYOUT.mountFore, LAYOUT.mountAft end
       local working = LAYOUT.working[pose]
       if working then return working.fore, working.aft end
       local form = forms[row.memberId]
