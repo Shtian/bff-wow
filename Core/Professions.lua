@@ -12,20 +12,28 @@ Professions.CAP = 300
 Professions.KINDS = { newProfession = true, professionSkill = true, professionMaxed = true }
 local RANKS = { { 300, "Artisan" }, { 225, "Expert" }, { 150, "Journeyman" }, { 75, "Apprentice" } }
 Professions.ALL = {
-  { skillLine = 171, name = "Alchemy", noun = "an Alchemist", icon = "Interface\\Icons\\Trade_Alchemy" },
-  { skillLine = 164, name = "Blacksmithing", noun = "a Blacksmith", icon = "Interface\\Icons\\Trade_BlackSmithing" },
-  { skillLine = 333, name = "Enchanting", noun = "an Enchanter", icon = "Interface\\Icons\\Trade_Engraving" },
-  { skillLine = 202, name = "Engineering", noun = "an Engineer", icon = "Interface\\Icons\\Trade_Engineering" },
-  { skillLine = 182, name = "Herbalism", noun = "a Herbalist", icon = "Interface\\Icons\\Trade_Herbalism" },
-  { skillLine = 165, name = "Leatherworking", noun = "a Leatherworker",
+  { skillLine = 171, name = "Alchemy", work = "alchemy", noun = "an Alchemist",
+    icon = "Interface\\Icons\\Trade_Alchemy" },
+  { skillLine = 164, name = "Blacksmithing", work = "blacksmithing", noun = "a Blacksmith",
+    icon = "Interface\\Icons\\Trade_BlackSmithing" },
+  { skillLine = 333, name = "Enchanting", work = "enchanting", noun = "an Enchanter",
+    icon = "Interface\\Icons\\Trade_Engraving" },
+  { skillLine = 202, name = "Engineering", work = "engineering", noun = "an Engineer",
+    icon = "Interface\\Icons\\Trade_Engineering" },
+  { skillLine = 182, name = "Herbalism", work = "herbalism", noun = "a Herbalist",
+    icon = "Interface\\Icons\\Trade_Herbalism" },
+  { skillLine = 165, name = "Leatherworking", work = "leatherworking", noun = "a Leatherworker",
     icon = "Interface\\Icons\\Trade_LeatherWorking" },
-  { skillLine = 186, name = "Mining", noun = "a Miner", icon = "Interface\\Icons\\Trade_Mining" },
-  { skillLine = 393, name = "Skinning", noun = "a Skinner", icon = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01" },
-  { skillLine = 197, name = "Tailoring", noun = "a Tailor", icon = "Interface\\Icons\\Trade_Tailoring" },
-  { skillLine = 185, name = "Cooking", noun = "a Cook", icon = "Interface\\Icons\\INV_Misc_Food_15", secondary = true },
+  { skillLine = 186, name = "Mining", work = "mining", noun = "a Miner", icon = "Interface\\Icons\\Trade_Mining" },
+  { skillLine = 393, name = "Skinning", work = "skinning", noun = "a Skinner",
+    icon = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01" },
+  { skillLine = 197, name = "Tailoring", work = "tailoring", noun = "a Tailor",
+    icon = "Interface\\Icons\\Trade_Tailoring" },
+  { skillLine = 185, name = "Cooking", work = "cooking", noun = "a Cook",
+    icon = "Interface\\Icons\\INV_Misc_Food_15", secondary = true },
   { skillLine = 356, name = "Fishing", noun = "an Angler", icon = "Interface\\Icons\\Trade_Fishing", secondary = true },
-  { skillLine = 129, name = "First Aid", noun = "a First Aider", icon = "Interface\\Icons\\Spell_Holy_SealOfSacrifice",
-    secondary = true },
+  { skillLine = 129, name = "First Aid", work = "firstAid", noun = "a First Aider",
+    icon = "Interface\\Icons\\Spell_Holy_SealOfSacrifice", secondary = true },
 }
 
 -- WoW: skill lines 185 cooking, 356 fishing, 129 first aid.
@@ -123,8 +131,8 @@ function Professions.same(a, b)
   return true
 end
 
--- WoW: skill lines 182 herbalism, 186 mining, 393 skinning.
-local GATHERING = { [182] = "herbalism", [186] = "mining", [393] = "skinning" }
+local WORK = {}
+for _, profession in ipairs(Professions.ALL) do WORK[profession.skillLine] = profession.work end
 local FISHING = 356
 
 function Professions.practised(before, after)
@@ -134,7 +142,7 @@ function Professions.practised(before, after)
   local found
   for _, entry in ipairs(after) do
     if entry.id ~= FISHING and had[entry.id] and entry.k > had[entry.id] then
-      if GATHERING[entry.id] then return GATHERING[entry.id] end
+      if WORK[entry.id] then return WORK[entry.id] end
       found = "crafting"
     end
   end

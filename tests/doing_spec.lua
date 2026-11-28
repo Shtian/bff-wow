@@ -41,6 +41,7 @@ local function poseOf(viewer, client)
 end
 
 local ALCHEMY, HERBALISM, MINING, SKINNING, FISHING = 171, 182, 186, 393, 356
+local BLACKSMITHING, TAILORING, COOKING, FIRST_AID = 164, 197, 185, 129
 
 local function profession(skillLine, name, skill)
   return { skillLine = skillLine, name = name, icon = 1000 + skillLine, skill = skill, max = 300 }
@@ -361,19 +362,49 @@ describe("What a Member is doing", function()
       assert.equal("seated", poseOf(a, b))
       b:play({ professions = { profession(ALCHEMY, "Alchemy", 11), profession(MINING, "Mining", 10),
         profession(FISHING, "Fishing", 10) }, level = 12 })
-      assert.same({ "crafting", "crafting" }, shown(b, b))
+      assert.same({ "alchemy", "brewing potions" }, shown(b, b))
       net:run(3)
-      assert.same({ "crafting", "crafting" }, shown(a, b))
+      assert.same({ "alchemy", "brewing potions" }, shown(a, b))
       net:run(54)
-      assert.equal("crafting", poseOf(a, b))
+      assert.equal("alchemy", poseOf(a, b))
       net:run(6)
       assert.equal("seated", poseOf(a, b))
 
-      b:play({ professions = { profession(ALCHEMY, "Alchemy", 12), profession(MINING, "Mining", 11),
+      b:play({ professions = { profession(ALCHEMY, "Alchemy", 11), profession(MINING, "Mining", 11),
         profession(FISHING, "Fishing", 10) }, level = 13 })
       assert.same({ "mining", "mining" }, shown(b, b))
       net:run(3)
       assert.same({ "mining", "mining" }, shown(a, b))
+    end)
+
+    it("names the crafting, yours and a Member's, for 60 s after its skill is seen to grow", function()
+      local net, clients = withProfessions()
+      local a, b = clients[1], clients[2]
+      local made = { [TAILORING] = 10, [FIRST_AID] = 10 }
+      local function make(skillLine)
+        made[skillLine] = made[skillLine] + 1
+        b:play({ professions = { profession(TAILORING, "Tailoring", made[TAILORING]),
+          profession(FIRST_AID, "First Aid", made[FIRST_AID]) }, level = b.character.level + 1 })
+      end
+      b:play({ professions = { profession(TAILORING, "Tailoring", 10), profession(FIRST_AID, "First Aid", 10) },
+        level = 12 })
+      net:run(70)
+
+      make(TAILORING)
+      assert.same({ "tailoring", "tailoring" }, shown(b, b))
+      net:run(3)
+      assert.same({ "tailoring", "tailoring" }, shown(a, b))
+      net:run(60)
+      assert.equal("seated", poseOf(a, b))
+
+      make(FIRST_AID)
+      assert.same({ "firstAid", "making bandages" }, shown(b, b))
+      net:run(3)
+      assert.same({ "firstAid", "making bandages" }, shown(a, b))
+      net:run(54)
+      assert.equal("firstAid", poseOf(a, b))
+      net:run(6)
+      assert.equal("seated", poseOf(a, b))
     end)
 
     it("names the gathering, yours and a Member's, for 60 s after its skill is seen to grow", function()
@@ -604,7 +635,7 @@ describe("What a Member is doing", function()
       assert.same({ "adventuring", "in Molten Core", true }, { bob.pose, bob.status, bob.raid })
     end)
 
-    it("gives a gatherer its animation's room: clear of the fire and of its neighbours", function()
+    local function working(skillLines)
       local net, clients, ns = crew({ "Ann", "Bob", "Cid", "Dee" })
       local a = clients[1]
       local layout = ns.Core.CAMP_LAYOUT
@@ -614,19 +645,18 @@ describe("What a Member is doing", function()
         return xs
       end
       local before = seats()
-      local skills = {}
-      for i, skillLine in ipairs({ SKINNING, HERBALISM, MINING }) do
-        local client = clients[i + 1]
-        skills[i] = skillLine
-        client:play({ professions = { profession(skillLine, "Gathering", 10) }, level = 11 })
+      for i, skillLine in ipairs(skillLines) do
+        clients[i + 1]:play({ professions = { profession(skillLine, "Work", 10) }, level = 11 })
       end
       net:run(70)
-      for i = 1, 3 do clients[i + 1]:play({ professions = { profession(skills[i], "Gathering", 11) }, level = 12 }) end
+      for i, skillLine in ipairs(skillLines) do
+        clients[i + 1]:play({ professions = { profession(skillLine, "Work", 11) }, level = 12 })
+      end
       net:run(3)
       local view = a.core:pocketCamp()
-      assert.equal(4, #view.actors)
+      assert.equal(4, #view.actors + (view.more or 0))
       local function span(actor)
-        local room = layout.gathering[actor.pose] or { fore = 0, aft = 0 }
+        local room = layout.working[actor.pose] or { fore = 0, aft = 0 }
         if actor.x > 0 then return actor.x - room.fore, actor.x + actor.width + room.aft end
         return actor.x - room.aft, actor.x + actor.width + room.fore
       end
@@ -643,9 +673,27 @@ describe("What a Member is doing", function()
         end
       end
       table.sort(poses)
+      local function moved(i)
+        return math.abs(actorFor(view, clients[i + 1]).x) - math.abs(before[clients[i + 1].memberId])
+      end
+      return poses, moved
+    end
+
+    it("gives a gatherer its animation's room: clear of the fire and of its neighbours", function()
+      local poses, moved = working({ SKINNING, HERBALISM, MINING })
       assert.same({ "herbalism", "mining", "seated", "skinning" }, poses)
-      local skinner = actorFor(view, clients[2])
-      assert.is_true(math.abs(skinner.x) > math.abs(before[clients[2].memberId]))
+      assert.is_true(moved(1) > 0)
+    end)
+
+    it("gives a crafter its animation's room: clear of the fire and of its neighbours", function()
+      local poses, moved = working({ FIRST_AID, BLACKSMITHING })
+      assert.same({ "blacksmithing", "firstAid", "seated", "seated" }, poses)
+      assert.is_true(moved(1) > 0)
+    end)
+
+    it("leaves a figure out rather than crowd crafters that need more room than the Pocket Camp has", function()
+      local poses = working({ FIRST_AID, COOKING, BLACKSMITHING })
+      assert.equal(3, #poses)
     end)
 
     it("gives a flying figure its griffin's room: clear of the fire and of its neighbours", function()

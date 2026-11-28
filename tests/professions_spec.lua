@@ -134,16 +134,22 @@ describe("Professions", function()
       return load().Professions.practised(stored(before), stored(after))
     end
 
-    it("names the gathering profession whose skill rose", function()
-      assert.equal("mining", practised({ { MINING, 10 } }, { { MINING, 11 } }))
-      assert.equal("herbalism", practised({ { HERBALISM, 10 } }, { { HERBALISM, 11 } }))
-      assert.equal("skinning", practised({ { SKINNING, 10 } }, { { SKINNING, 11 } }))
+    it("names the profession whose skill rose", function()
+      local lines = {
+        mining = MINING, herbalism = HERBALISM, skinning = SKINNING, alchemy = ALCHEMY, blacksmithing = 164,
+        enchanting = 333, engineering = 202, leatherworking = 165, tailoring = TAILORING, cooking = COOKING,
+        firstAid = FIRST_AID,
+      }
+      for work, skillLine in pairs(lines) do
+        assert.equal(work, practised({ { skillLine, 10 } }, { { skillLine, 11 } }), work)
+      end
     end)
 
-    it("is crafting for another line, the first gathering line found when several rose", function()
-      assert.equal("crafting", practised({ { ALCHEMY, 10 } }, { { ALCHEMY, 11 } }))
-      assert.equal("skinning", practised({ { ALCHEMY, 10 }, { SKINNING, 5 }, { MINING, 5 } },
-        { { ALCHEMY, 11 }, { SKINNING, 6 }, { MINING, 6 } }))
+    it("is the first named line when several rose, and crafting for a line it doesn't know", function()
+      assert.equal("alchemy", practised({ { 755, 10 }, { ALCHEMY, 10 }, { SKINNING, 5 } },
+        { { 755, 11 }, { ALCHEMY, 11 }, { SKINNING, 6 } }))
+      assert.equal("skinning", practised({ { ALCHEMY, 10 }, { SKINNING, 5 } }, { { ALCHEMY, 10 }, { SKINNING, 6 } }))
+      assert.equal("crafting", practised({ { 755, 10 } }, { { 755, 11 } }))
     end)
 
     it("ignores fishing, and is nothing when no skill rose", function()

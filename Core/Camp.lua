@@ -24,10 +24,18 @@ local LAYOUT = {
   pocketRows = 34,
   griffinFore = 8,
   griffinAft = 6,
-  gathering = {
+  working = {
     mining = { fore = 5, aft = 0 },
     herbalism = { fore = 6, aft = 5 },
     skinning = { fore = 11, aft = 0 },
+    alchemy = { fore = 5, aft = 0 },
+    blacksmithing = { fore = 6, aft = 0 },
+    enchanting = { fore = 6, aft = 0 },
+    engineering = { fore = 7, aft = 0 },
+    leatherworking = { fore = 7, aft = 0 },
+    tailoring = { fore = 7, aft = 0 },
+    cooking = { fore = 7, aft = 0 },
+    firstAid = { fore = 7, aft = 6 },
   },
   formFore = 3,
   formAft = 3,
@@ -385,6 +393,8 @@ end
 local STATUS = {
   seated = "by the fire", fishing = "fishing", crafting = "crafting",
   mining = "mining", herbalism = "picking herbs", skinning = "skinning",
+  alchemy = "brewing potions", blacksmithing = "smithing", enchanting = "enchanting", engineering = "tinkering",
+  leatherworking = "working leather", tailoring = "tailoring", cooking = "cooking", firstAid = "making bandages",
   fighting = "fighting", vendor = "at a vendor", auction = "at the auction house", resting = "resting",
   afk = "away", flying = "flying",
 }
@@ -558,8 +568,8 @@ function Camp.pocket(rows, entries, now, doing, bedrolls, maxColumns, group, sho
     room = function(row)
       local pose = poses[row.memberId]
       if pose == "flying" then return LAYOUT.griffinFore, LAYOUT.griffinAft end
-      local gathering = LAYOUT.gathering[pose]
-      if gathering then return gathering.fore, gathering.aft end
+      local working = LAYOUT.working[pose]
+      if working then return working.fore, working.aft end
       local form = forms[row.memberId]
       if form then return LAYOUT.formFore, LAYOUT.formAft + (TROTS[form] and LAYOUT.formTrot or 0) end
     end,
