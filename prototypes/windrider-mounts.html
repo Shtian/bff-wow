@@ -1,0 +1,373 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Question: what should a Horde flyer ride in the Camp instead of the griffin?
+  Today everyone flies a griffin (scripts/camp-art.mjs GRIFFIN, CampScene POSE.flying). A Crew lives in one
+  ruleset slot, which is per faction, so the viewer's faction (scene.horde, as the druid's cat form uses)
+  decides the mount for the whole band.
+  Four takes, switch with the bar at the bottom, ← / →, or ?variant=A, B, C, C2, D:
+    A  Griffin: today's sprite, the baseline (and what Alliance keeps).
+    B  Drop-in wind rider: the griffin's exact footprint and offsets (24×14 body, 19×7 wing, fore 8 / aft 6),
+       a maned lion head, leather bat wing with finger bones, a short segmented tail. No layout change.
+    C  Scorpion tail: the classic tawny wind rider; the tail arcs up behind the rider with a pale stinger,
+       pale membrane wings. The silhouette that says "wind rider" most, still inside the griffin's room.
+    C2 Scorpion tail, refined: C with a 2-pixel plated tail and stinger bulb, shaggier mane, swept horns and a fang,
+       a pale belly, legs trailing and reaching, and a slimmer bat wing with finger bones and a wrist claw.
+    D  Horned, wings high: the modern look; a far wing raised behind the rider in red-orange, the near wing
+       on the down-stroke, horns, a flap that swaps them. Taller; read the stats panel for what it costs.
+  Grids use camp-art.mjs's rules: fill-only grids, outlined in K, painted from a palette, mirrored right of the fire.
+  Run: open the file in a browser.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wind rider mounts</title>
+<style>
+  :root { --bg:#14131c; --panel:#1d1c28; --text:#e8e6e3; --muted:#adabb8; --gold:#ffd14a; --line:#2f2d3d; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui, sans-serif; padding:16px 16px 96px; }
+  h1 { font-size:18px; margin:0 0 4px; color:var(--gold); font-weight:600; }
+  .sub { color:var(--muted); margin:0 0 16px; max-width:70ch; }
+  .row { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:12px; max-width:100%; }
+  .card h2 { font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 8px; font-weight:600; }
+  canvas { image-rendering: pixelated; display:block; max-width:100%; }
+  .controls { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; }
+  .controls button { background:#2a2838; color:var(--text); border:1px solid #3d3a50; border-radius:4px; padding:4px 10px; cursor:pointer; font:inherit; }
+  .controls button[aria-pressed="true"] { background:var(--gold); color:#1a1408; border-color:var(--gold); }
+  pre { margin:0; font:12px/1.5 ui-monospace, Menlo, monospace; color:var(--muted); white-space:pre-wrap; }
+  pre b { color:var(--text); font-weight:600; }
+  .bad { color:#ff8a6a; } .ok { color:#7fd47f; }
+  #pitch { color:var(--text); max-width:62ch; margin:0 0 8px; }
+  .switcher { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); display:flex; align-items:center; gap:4px;
+    background:#fff; color:#111; border-radius:999px; padding:4px; box-shadow:0 6px 24px rgba(0,0,0,.5); z-index:10; font:600 13px system-ui; }
+  .switcher button { border:0; background:#111; color:#fff; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:16px; }
+  .switcher span { padding:0 12px; white-space:nowrap; }
+</style>
+</head>
+<body>
+<h1>Horde flyer: wind rider takes</h1>
+<p class="sub">PROTOTYPE. The Camp's flying pose, with each take on the mount. Left of the fire faces right, right of the fire is mirrored, a seated friend for scale.</p>
+<p id="pitch"></p>
+<div class="controls" id="controls"></div>
+<div class="row">
+  <div class="card"><h2>Camp band</h2><canvas id="scene"></canvas></div>
+  <div class="card"><h2>Sprites, 10×, both frames</h2><canvas id="zoom"></canvas></div>
+  <div class="card"><h2>State</h2><pre id="state"></pre></div>
+</div>
+<div class="row" style="margin-top:16px">
+  <div class="card"><h2>All takes side by side, game size ×3</h2><canvas id="lineup"></canvas></div>
+</div>
+<div class="switcher" role="toolbar" aria-label="Variant">
+  <button id="prev" aria-label="Previous variant">←</button><span id="label"></span><button id="next" aria-label="Next variant">→</button>
+</div>
+
+<script id="art">
+const PAL = {
+  K: "#0b0a12", S: "#e8b890", s: "#b98465", W: "#fff3c4", Y: "#ffe9a0", G: "#ffd14a", O: "#f0a21c",
+  R: "#c9481c", B: "#5a3a24", b: "#3a2518", T: "#8c8796", t: "#5d5966", L: "#70e370", P: "#f2b8d0",
+  Z: "#adabb8", F: "#7fc4ee", f: "#3f7fb8", N: "#ece8d8", A: "#c89a5a", a: "#8f6a3a", r: "#5a1620",
+};
+const CLOTH = { C: "#ffffff", D: "#9e9e9e" };
+
+function outlined(raw) {
+  const rows = raw.map((r) => r.padEnd(Math.max(...raw.map((x) => x.length)), "."));
+  const w = rows[0].length + 2, h = rows.length + 2;
+  const at = (x, y) => (rows[y - 1] && rows[y - 1][x - 1] && rows[y - 1][x - 1] !== "." ? rows[y - 1][x - 1] : null);
+  const out = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) {
+      const own = at(x, y);
+      if (own) { line += own; continue; }
+      let near = false;
+      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (at(x + i, y + j)) near = true;
+      line += near ? "K" : ".";
+    }
+    out.push(line);
+  }
+  return out;
+}
+const paint = (rows, palette) => rows.map((row) => [...row].map((ch) => palette[ch] || null));
+
+const SIT = ["....KKKK....", "...KCCCCK...", "..KCCCCCCK..", "..KCSSSSCK..", "..KSKSSKSK..", "..KSSSSSsK..", "...KCCCCK...", "..KCCDDCCK..", ".KCCCDDCCCK.", ".KSCCDDCCSK.", ".KKCCCCCCKK.", "..KDDKKDDK..", "..KKK..KKK.."];
+const FIRE = [
+  [".....R.....", "....RR.....", "....ROR..R.", "...ROOR.RR.", ".R.ROOORRR.", ".RRROGGORR.", ".RROOGGOOR.", "RROOGYYGOOR", "ROOGGYYGGOR", "ROGGYYYYGOR", ".ROGYYWYGO.", "..ROGGGGO.."],
+  [".........R.", "..R..R.....", "..RR.RR....", ".RORROR..R.", ".ROORROR.R.", ".ROOOOORRR.", ".ROGGOOGOR.", "RROGYGOGOOR", "ROOGYYGGGOR", "ROGGYYYYGOR", ".ROGYWYYGO.", "..ROGGGGO.."],
+  ["...R.......", "...RR...R..", "..RORR..R..", "..ROOR.RR..", ".RROOORRO..", ".ROOGOOROR.", ".ROGGGOOOR.", "RROGGYGGOOR", "ROOGYYYGGOR", "ROGGYYYYGOR", ".ROGYYWYGO.", "..ROGGGGO.."],
+];
+const LOGS = ["..BB.......BB..", ".BBBBb...bBBBB.", "bbBBBBBBBBBBBbb", "..bbbbbbbbbbb.."];
+const SEAT = ["BBBBBBBBBBBBBB", "bbbbbbbbbbbbbb", "bbbbbbbbbbbbbb"];
+
+// A: today's griffin, copied from scripts/camp-art.mjs.
+const GRIFFIN = [
+  "...............NNNNN..", "................NKNOO.", "................NNNOR.", "...............NNNNN..", "................NNNN..",
+  "......AAAAAAAAAaNNNN..", ".aaa.AAAAAAAAAAAaNNA..", "a...aAAAAAAAAAAAAAAA..", "a....AAAaAAAAAAAAAA...", ".a..aAAa.....aAAAa....",
+  "..aa.AAa......OO......", ".....AAAa.....OOO.....",
+];
+const GRIFFIN_WING = ["NNNNNNNNNNNNNNNNN", "...ZNNNNNNNNNNNNN", "......ZNNNNNZNNNN", ".........ZNNNNNNN", "............ZNNNN"];
+const GRIFFIN_WING_UP = ["NNNN.............", "ZNNNNNNNN........", "...ZNNNNNNNNNNNNN", "......ZNNNNNZNNNN", ".........ZNNNNNNN", "............ZNNNN"];
+
+// Wind rider palette: lion tawny body, dark mane, plated tail, bone horns and stinger.
+const WR = {
+  A: "#d39a48", a: "#9a6428", N: "#f0d398", B: "#7a4a26", b: "#4a2c16", E: "#ffd14a", H: "#ece8d8", W: "#fff3c4",
+  t: "#6e3626", u: "#a8644c", s: "#ece8d8", p: "#d8a08a",
+  M: "#c4aab0", m: "#866a72", f: "#d39a48",
+};
+const WR_RED = { ...WR, M: "#d8582a", m: "#8e2e18", f: "#e8a040", B: "#6a3a1e", b: "#3e2210" };
+
+// B: drop-in. Same 22×12 body grid and 17×5 / 17×6 wing grids as the griffin.
+const DROP = [
+  "................H..H..", "..............bBBBBH..", ".............bBBBAEAN.", ".............bBBBAANNN", "..............bBBBNWK.",
+  "......AAAAAAAAbBBBNN..", "s.tu.AAAAAAAAAAbBBA...", ".utuAAAAAAAAAAAAAAAA..", ".....AAAaAAAAAAAAAA...", "....aAAa.....aAAAa....",
+  ".....AAa......AAA.....", ".....aWa......aWW.....",
+];
+const DROP_WING = ["fffffffffffffffff", "..MfMMMMfMMMMMMMM", "....MmMMMfMMMMMMM", ".......mM.MMMfMMM", "...........mMMMMM"];
+const DROP_WING_UP = ["fff..............", "MMfff............", "..MMMffffffffffff", "....MmMMMfMMMMMMM", ".......mM.MMMfMMM", "...........mMMMMM"];
+
+// C: scorpion tail arched up behind the rider. Body as B, tail rows above.
+const SCORP = [
+  "..usu...................", ".t..s...................", "t.......................", "u.......................", "t.......................",
+  "u.................H..H..", ".t..............bBBBBH..", "..u............bBBBAEAN.", "...t...........bBBBAANNN", "....tu..........bBBBNWK.",
+  "......tAAAAAAAAAbBBBNN..", ".......AAAAAAAAAAbBBA...", ".....AAAAAAAAAAAAAAAAA..", ".......AAAaAAAAAAAAAA...", "......aAAa.....aAAAa....",
+  ".......AAa......AAA.....", ".......aWa......aWW.....",
+];
+const SCORP_WING = ["fffffffffffff", "..MMfMMMMfMMM", "....mMMMMMfMM", ".......mMMMMM", ".........mMMM"];
+const SCORP_WING_UP = ["ff...........", "MMff.........", "..MMMfffffff.", "....mMMMMMfMM", ".......mMMMMM", ".........mMMM"];
+
+// C refined: a 2-pixel plated tail with a stinger bulb hooking at the rider's back, a shaggier mane and horns,
+// a pale belly, hind legs trailing and forepaws reaching, a bat wing with finger bones, a wrist claw and a scalloped edge.
+const SCORP2 = [
+  "..uttu..................", ".ut..tu.................", "ut...pp.................", "tu...pp.................", "ut....W...........H..H..",
+  "tu...............bHBBH..", "ut..............bBBBBAA.", ".tu............bBBBBAEAN", ".ut............bBBBBAANN", "..tu..........bBBBBBBNWK",
+  "...ut.AAAAAAAAbBBBBBBNN.", "....tAAAAAAAAAAbBBBBb...", "....aAAAAAAAAAAAAa......", "...aaAAANNNNNNAAAAA.....", ".aaAAa.aNNNNNa.AAA......",
+  "aWa...........aAW.......", "W...............W.......",
+];
+const SCORP2_WING = [
+  "afffffffffffffH", ".MMMMMMMMfMMfM.", "...mMMMMfMMfMM.", ".....m.mf.mf.m.",
+];
+const SCORP2_WING_UP = [
+  "M..............", "Mf.............", "mMf............", ".mMff..........", "..mMMfffffffffH",
+  "....mMMfMMfMM..", "......m.mf.m...",
+];
+
+// D: horned, wings high. A far wing raised behind the rider; the near wing on the down-stroke.
+const HORNED = [
+  "..............HH..HH..", "...............HBBBH..", ".............bBBBAEAN.", ".............bBBBAANNN", "..............bBBBNWK.",
+  "......AAAAAAAAbBBBNN..", "ss...AAAAAAAAAAbBBA...", ".uttuAAAAAAAAAAAAAAA..", ".....AAAaAAAAAAAAAA...", "....aAAa.....aAAAa....",
+  ".....AAa......AAA.....", ".....aWa......aWW.....",
+];
+const FAR_WING = [
+  "f...............", "ff..............", "MfF.............", "MMff............", ".MMfff..........", ".MMMMff.........",
+  "..mMMMfff.......", "..mMMMMMfff.....", "...mMMMMMMfff...", "....mMMMMMMMMff.", "......mMMMMMMMf",
+];
+const FAR_WING_DOWN = [
+  "fffff..........", ".MMMfffff......", "..mMMMMMffff...", "....mMMMMMMfff.", "......mmMMMMMf.",
+];
+const NEAR_WING = ["fffffffffffffffff", ".MMMfMMMMMfMMMMMM", "..mMMMfMMMMMfMMMM", "....mM.MMMMMfMMMM", "......m...mMMMMMM", "...........m.mMMM"];
+const NEAR_WING_UP = ["ff...............", "MMfff............", ".mMMMfff.........", "..mMMMMMffffffff.", "....mMMMMMMMMMfff"];
+
+const VARIANTS = {
+  A: { name: "Griffin (today)", pitch: "Today's griffin, for everyone. Alliance keeps this whatever wins.",
+    back: [paint(outlined(GRIFFIN), PAL), -4, -7], front: [paint(outlined(GRIFFIN_WING), PAL), -6, -3],
+    flap: { front: paint(outlined(GRIFFIN_WING_UP), PAL) } },
+  B: { name: "Drop-in wind rider", pitch: "The griffin's exact footprint and offsets: swap the grids, set the sprite by faction, nothing else moves. A maned head with horn nubs, a leather wing with finger bones, a short tail with a pale stinger.",
+    back: [paint(outlined(DROP), WR), -4, -7], front: [paint(outlined(DROP_WING), WR), -6, -3],
+    flap: { front: paint(outlined(DROP_WING_UP), WR) } },
+  C: { name: "Scorpion tail", pitch: "The tail that makes it a wind rider: arched up behind the rider with the stinger curling forward. Shorter, paler wings so the tail reads. Taller back sprite, but its top stays below the rider's head.",
+    back: [paint(outlined(SCORP), WR), -6, -7], front: [paint(outlined(SCORP_WING), WR), -2, -3],
+    flap: { front: paint(outlined(SCORP_WING_UP), WR) } },
+  C2: { name: "Scorpion tail, refined", pitch: "C, refined: a thicker plated tail with a stinger bulb hooking down at the rider's back, a shaggy mane with swept horns and a fang, a pale belly, hind legs trailing and forepaws reaching, and a slimmer bat wing with finger bones and a wrist claw, so the rider's lap shows. The flap lifts the wingtips up behind the rider.",
+    back: [paint(outlined(SCORP2), WR), -6, -7], front: [paint(outlined(SCORP2_WING), WR), -4, -4],
+    flap: { front: paint(outlined(SCORP2_WING_UP), WR) } },
+  D: { name: "Horned, wings high", pitch: "The modern wind rider: horns, red-orange membrane, a far wing raised behind the rider and the near wing on the down-stroke. The flap swaps them. The far wing pokes out round the rider, so the figure gets a frame.",
+    behind: [paint(outlined(FAR_WING), WR_RED), -4, 3],
+    back: [paint(outlined(HORNED), WR_RED), -4, -7], front: [paint(outlined(NEAR_WING), WR_RED), -6, -4],
+    flap: { behind: [paint(outlined(FAR_WING_DOWN), WR_RED), -3, 3], front: paint(outlined(NEAR_WING_UP), WR_RED), frontDy: -1 } },
+};
+</script>
+
+<script>
+const KEYS = Object.keys(VARIANTS);
+const FIGURE_W = 12, ROW = { seat: 3, seated: 4, logs: 3, fire: 5 }, LIFT = 9, BAND_ROWS = 40, COLS = 150;
+const TODAY = { fore: 8, aft: 6 };
+const CLASSES = [["Warrior", "#c69b6d"], ["Shaman", "#0070dd"], ["Hunter", "#aad372"], ["Warlock", "#8788ee"]];
+const BACKDROPS = { night: { sky: "#141528", ground: "#1e1c2a", glow: "rgba(240,162,28,.10)" }, day: { sky: "#6f9fc9", ground: "#3f5a33", glow: "rgba(240,162,28,.0)" } };
+const params = new URLSearchParams(location.search);
+let variant = KEYS.includes(params.get("variant")) ? params.get("variant") : "A";
+let scale = 4, backdrop = "night", flapOn = true, tick = 0, klass = 0;
+
+const tinted = (rows, tint) => rows.map((row) => [...row].map((ch) => (CLOTH[ch] ? mul(CLOTH[ch], tint) : null)));
+function mul(a, b) {
+  const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return "#" + x.map((v, i) => Math.round((v * y[i]) / 255).toString(16).padStart(2, "0")).join("");
+}
+const SKIN = paint(SIT, PAL);
+const mirror = (sprite) => sprite.map((row) => [...row].reverse());
+const width = (s) => s[0].length, height = (s) => s.length;
+
+function blit(ctx, sprite, col, rowFromBottom, unit, alpha = 1) {
+  const h = height(sprite);
+  ctx.globalAlpha = alpha;
+  sprite.forEach((line, y) => line.forEach((c, x) => {
+    if (!c) return;
+    ctx.fillStyle = c;
+    ctx.fillRect((col + x) * unit, (BAND_ROWS - rowFromBottom - h + y) * unit, unit, unit);
+  }));
+  ctx.globalAlpha = 1;
+}
+
+function partsFor(v, flapping) {
+  const parts = [];
+  const behind = flapping && v.flap.behind ? v.flap.behind : v.behind;
+  if (behind) parts.push({ layer: "behind", sprite: behind[0], dx: behind[1], dy: behind[2] });
+  parts.push({ layer: "back", sprite: v.back[0], dx: v.back[1], dy: v.back[2] });
+  parts.push({ layer: "front", sprite: flapping && v.flap.front ? v.flap.front : v.front[0], dx: v.front[1], dy: v.front[2] + (flapping && v.flap.frontDy || 0) });
+  return parts;
+}
+
+function drawFlyer(ctx, unit, x, mirrored, v, flapping, tint) {
+  const row = ROW.seated + LIFT;
+  const parts = partsFor(v, flapping);
+  const place = (p) => {
+    const s = mirrored ? mirror(p.sprite) : p.sprite;
+    const dx = mirrored ? FIGURE_W - p.dx - width(p.sprite) : p.dx;
+    blit(ctx, s, x + dx, row + p.dy, unit);
+  };
+  parts.filter((p) => p.layer !== "front").forEach(place);
+  blit(ctx, mirrored ? mirror(tinted(SIT, tint)) : tinted(SIT, tint), x, row, unit);
+  blit(ctx, mirrored ? mirror(SKIN) : SKIN, x, row, unit);
+  parts.filter((p) => p.layer === "front").forEach(place);
+}
+
+function drawSeated(ctx, unit, x, mirrored, tint) {
+  blit(ctx, paint(SEAT, PAL), x - 1, ROW.seat, unit);
+  blit(ctx, mirrored ? mirror(tinted(SIT, tint)) : tinted(SIT, tint), x, ROW.seated, unit);
+  blit(ctx, mirrored ? mirror(SKIN) : SKIN, x, ROW.seated, unit);
+}
+
+function drawBand(ctx, unit, v, cols, key) {
+  const b = BACKDROPS[backdrop];
+  ctx.fillStyle = b.sky; ctx.fillRect(0, 0, cols * unit, BAND_ROWS * unit);
+  ctx.fillStyle = b.ground; ctx.fillRect(0, (BAND_ROWS - 6) * unit, cols * unit, 6 * unit);
+  const fire = Math.floor(cols / 2);
+  const g = ctx.createRadialGradient(fire * unit, (BAND_ROWS - 6) * unit, 0, fire * unit, (BAND_ROWS - 6) * unit, 40 * unit);
+  g.addColorStop(0, b.glow); g.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = g; ctx.fillRect(0, 0, cols * unit, BAND_ROWS * unit);
+  blit(ctx, paint(LOGS, PAL), fire - 7, ROW.logs, unit);
+  blit(ctx, paint(FIRE[Math.floor(tick / 2) % 3], PAL), fire - 5, ROW.fire, unit);
+  const flapping = flapOn && Math.floor(tick / 3) % 3 === 0;
+  const flapping2 = flapOn && Math.floor((tick + 4) / 3) % 3 === 0;
+  const near = 8, gap = 8;
+  drawFlyer(ctx, unit, fire - near - FIGURE_W - TODAY.fore, false, v, flapping, CLASSES[klass][1]);
+  drawSeated(ctx, unit, fire - near - FIGURE_W - TODAY.fore - TODAY.aft - gap - FIGURE_W, false, CLASSES[(klass + 2) % 4][1]);
+  drawFlyer(ctx, unit, fire + near + TODAY.fore, true, v, flapping2, CLASSES[(klass + 1) % 4][1]);
+  drawSeated(ctx, unit, fire + near + TODAY.fore + FIGURE_W + TODAY.aft + gap, true, CLASSES[(klass + 3) % 4][1]);
+  if (key) { ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(0, 0, 14 * unit, 8 * unit); ctx.fillStyle = "#ffd14a"; ctx.font = `bold ${5 * unit}px system-ui`; ctx.fillText(key, 2 * unit, 6 * unit); }
+}
+
+function extents(v) {
+  let left = 0, right = FIGURE_W, top = height(SIT), bottom = 0;
+  for (const flapping of [false, true]) for (const p of partsFor(v, flapping)) {
+    left = Math.min(left, p.dx); right = Math.max(right, p.dx + width(p.sprite));
+    top = Math.max(top, p.dy + height(p.sprite)); bottom = Math.min(bottom, p.dy);
+  }
+  return { aft: -left, fore: right - FIGURE_W, top, bottom };
+}
+
+function render() {
+  const v = VARIANTS[variant];
+  const scene = document.getElementById("scene");
+  scene.width = COLS * scale; scene.height = BAND_ROWS * scale;
+  drawBand(scene.getContext("2d"), scale, v, COLS);
+
+  const zoom = document.getElementById("zoom"), Z = 10, pad = 2;
+  const ext = extents(v);
+  const w = ext.aft + ext.fore + FIGURE_W, h = ext.top - ext.bottom;
+  zoom.width = (w * 2 + pad * 3) * Z; zoom.height = (h + pad * 2) * Z;
+  const zc = zoom.getContext("2d");
+  zc.fillStyle = BACKDROPS[backdrop].sky; zc.fillRect(0, 0, zoom.width, zoom.height);
+  [false, true].forEach((flapping, i) => {
+    const ox = pad + i * (w + pad) + ext.aft;
+    const parts = partsFor(v, flapping);
+    const base = pad + ext.top;
+    const put = (s, col, r) => s.forEach((line, y) => line.forEach((c, x) => {
+      if (!c) return; zc.fillStyle = c; zc.fillRect((col + x) * Z, (base - r - height(s) + y) * Z, Z, Z);
+    }));
+    const offset = 0;
+    parts.filter((p) => p.layer !== "front").forEach((p) => put(p.sprite, ox + p.dx, offset + p.dy));
+    put(tinted(SIT, CLASSES[klass][1]), ox, offset); put(SKIN, ox, offset);
+    parts.filter((p) => p.layer === "front").forEach((p) => put(p.sprite, ox + p.dx, offset + p.dy));
+    zc.strokeStyle = "rgba(255,255,255,.06)";
+    for (let x = 0; x <= zoom.width; x += Z) { zc.beginPath(); zc.moveTo(x + .5, 0); zc.lineTo(x + .5, zoom.height); zc.stroke(); }
+    for (let y = 0; y <= zoom.height; y += Z) { zc.beginPath(); zc.moveTo(0, y + .5); zc.lineTo(zoom.width, y + .5); zc.stroke(); }
+  });
+
+  const lineup = document.getElementById("lineup"), L = 3, cols = 80;
+  lineup.width = cols * L * 2; lineup.height = BAND_ROWS * L * Math.ceil(KEYS.length / 2);
+  const lc = lineup.getContext("2d");
+  KEYS.forEach((k, i) => {
+    lc.save(); lc.translate((i % 2) * cols * L, Math.floor(i / 2) * BAND_ROWS * L);
+    lc.beginPath(); lc.rect(0, 0, cols * L, BAND_ROWS * L); lc.clip();
+    lc.translate(-35 * L, 0);
+    drawBand(lc, L, VARIANTS[k], cols + 70, "");
+    lc.restore();
+    lc.fillStyle = "#ffd14a"; lc.font = "bold 13px system-ui";
+    lc.fillText(`${k}  ${VARIANTS[k].name}`, (i % 2) * cols * L + 6, Math.floor(i / 2) * BAND_ROWS * L + 16);
+  });
+
+  const sprites = partsFor(v, false).map((p) => `${p.layer.padEnd(6)} ${width(p.sprite)}×${height(p.sprite)} at (${p.dx}, ${p.dy})`);
+  const flapSprites = partsFor(v, true).map((p) => `${p.layer.padEnd(6)} ${width(p.sprite)}×${height(p.sprite)} at (${p.dx}, ${p.dy})`);
+  const mark = (n, today) => (n > today ? `<span class="bad">${n} (today ${today}, +${n - today})</span>` : `<span class="ok">${n} (today ${today})</span>`);
+  const headTop = height(SIT);
+  document.getElementById("state").innerHTML = [
+    `<b>variant</b>   ${variant} · ${v.name}`,
+    `<b>faction</b>   ${variant === "A" ? "everyone (today) / Alliance" : "Horde (scene.horde)"}`,
+    `<b>frame</b>     ${flapOn && Math.floor(tick / 3) % 3 === 0 ? "flap" : "glide"}  (FLAP_TICKS 3, flap 1 in 3, 6 fps)`,
+    ``,
+    `<b>sprites, glide</b>`, ...sprites.map((s) => "  " + s),
+    `<b>sprites, flap</b>`, ...flapSprites.map((s) => "  " + s),
+    ``,
+    `<b>room</b>  (Core.CAMP_LAYOUT griffinFore / griffinAft)`,
+    `  fore  ${mark(ext.fore, TODAY.fore)}`,
+    `  aft   ${mark(ext.aft, TODAY.aft)}`,
+    `<b>height</b> above rider's feet`,
+    `  ${ext.top > headTop ? `<span class="bad">${ext.top} rows, ${ext.top - headTop} over the head (name tag and lanterns move)</span>` : `<span class="ok">${ext.top} rows, under the head (${headTop})</span>`}`,
+    `<b>new sprites</b> ${variant === "A" ? "none" : partsFor(v, false).length + (v.flap.behind ? 1 : 0) + 1 + " in CampSprites"}`,
+  ].join("\n");
+
+  document.getElementById("label").textContent = `${variant} (${v.name})`;
+  document.getElementById("pitch").textContent = v.pitch;
+}
+
+function setVariant(k) {
+  variant = k;
+  const u = new URL(location.href); u.searchParams.set("variant", k); history.replaceState(null, "", u);
+  render();
+}
+const step = (d) => setVariant(KEYS[(KEYS.indexOf(variant) + d + KEYS.length) % KEYS.length]);
+document.getElementById("prev").onclick = () => step(-1);
+document.getElementById("next").onclick = () => step(1);
+addEventListener("keydown", (e) => {
+  if (e.target.closest("input, textarea, [contenteditable]")) return;
+  if (e.key === "ArrowLeft") step(-1);
+  if (e.key === "ArrowRight") step(1);
+});
+
+const controls = document.getElementById("controls");
+function toggle(label, get, set) {
+  const b = document.createElement("button");
+  const sync = () => { b.textContent = label(); b.setAttribute("aria-pressed", String(get())); };
+  b.onclick = () => { set(); sync(); render(); };
+  sync(); controls.append(b);
+}
+toggle(() => `Scale ×${scale}`, () => false, () => { scale = scale === 4 ? 2 : scale === 2 ? 3 : 4; });
+toggle(() => (backdrop === "night" ? "Night" : "Day"), () => backdrop === "day", () => { backdrop = backdrop === "night" ? "day" : "night"; });
+toggle(() => (flapOn ? "Flapping" : "Gliding (frozen)"), () => !flapOn, () => { flapOn = !flapOn; });
+toggle(() => `Rider: ${CLASSES[klass][0]}`, () => false, () => { klass = (klass + 1) % 4; });
+
+setInterval(() => { tick++; render(); }, 1000 / 6);
+render();
+</script>
+</body>
+</html>
