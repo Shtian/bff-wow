@@ -370,7 +370,8 @@ local function watchDoing(core)
     if knownEvent(event) then frame:RegisterEvent(event) end
   end
   frame:RegisterEvent("QUEST_TURNED_IN")
-  frame:SetScript("OnEvent", function(_, event)
+  if knownEvent("UNIT_SPELLCAST_SUCCEEDED") then frame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player") end
+  frame:SetScript("OnEvent", function(_, event, ...)
     local window = WINDOW_EVENTS[event]
     if window then
       windows[window[1]] = window[2]
@@ -378,6 +379,8 @@ local function watchDoing(core)
       professionWindow(PROFESSION_WINDOW_EVENTS[event])
     elseif event == "QUEST_TURNED_IN" then
       core:questHandedIn()
+    elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+      core:gathered(readable((select(3, ...))))
     end
   end)
 end

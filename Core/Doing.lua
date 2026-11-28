@@ -12,6 +12,7 @@ local TRAVEL_HOLD = 30
 local FORM_EXPIRES = 150
 
 local FIGHTING_HOLD = 20
+local GATHERING_HOLD = 60
 local EVERY_MIN = 15
 local EVERY_PER_MEMBER = 5
 local REFRESH = 2 * 60
@@ -27,6 +28,7 @@ function Doing.new(now)
     formSince = -math.huge,
     sentForm = nil,
     fightingUntil = -math.huge,
+    gathering = nil,
     sent = false,
     sentAt = -math.huge,
     unheard = false,
@@ -69,6 +71,18 @@ local function tellable(self)
   return form, since
 end
 
+function Doing:gathered(spellId)
+  local work = ns.Professions.gatheredBy(spellId)
+  if work then self.gathering = { work = work, at = self.now() } end
+  return work ~= nil
+end
+
+local function gatheringNow(self)
+  local gathering = self.gathering
+  if gathering and self.now() - gathering.at < GATHERING_HOLD then return gathering.work end
+  return nil
+end
+
 function Doing:fighting()
   return self.facts.combat or self.now() < self.fightingUntil
 end
@@ -79,6 +93,8 @@ function Doing:state()
   if facts.auction then return "auction" end
   if facts.vendor then return "vendor" end
   if facts.work then return facts.work end
+  local gathering = gatheringNow(self)
+  if gathering then return gathering end
   if self:fighting() then return "fighting" end
   if facts.afk then return "afk" end
   if facts.resting then return "resting" end

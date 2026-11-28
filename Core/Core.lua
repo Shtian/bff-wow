@@ -513,6 +513,10 @@ function Core:doing(facts)
   if self.doings:noteState() and self.pocket:on() then self.listener("changed") end
 end
 
+function Core:gathered(spellId)
+  if self.doings:gathered(spellId) and self.doings:noteState() and self.pocket:on() then self.listener("changed") end
+end
+
 function Core:group(party)
   self.pocket:group(party)
 end

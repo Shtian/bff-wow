@@ -43,6 +43,7 @@ end
 local ALCHEMY, HERBALISM, MINING, SKINNING, FISHING = 171, 182, 186, 393, 356
 local BLACKSMITHING, TAILORING, COOKING, FIRST_AID = 164, 197, 185, 129
 local SMALLFISH = 6291
+local MINING_SPELL, HERBALISM_SPELL, SKINNING_SPELL = 2576, 11993, 8613
 
 local function profession(skillLine, name, skill)
   return { skillLine = skillLine, name = name, icon = 1000 + skillLine, skill = skill, max = 300 }
@@ -388,6 +389,59 @@ describe("What a Member is doing", function()
     net:run(20)
     b.core:doing({})
     assert.equal(quiet, b:count("changed"))
+  end)
+
+  describe("a gathering cast", function()
+    it("shows the profession on your figure at once and on a Member's with the next DOING, for 60 s", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a, b = clients[1], clients[2]
+      local mark = #net.wire
+      b.core:gathered(MINING_SPELL)
+      assert.same({ "mining", "mining" }, shown(b, b))
+      net:run(3)
+      assert.same({ "mining", "mining" }, shown(a, b))
+      assert.equal("mining", doings(net, mark, "Bob")[1].doing)
+      net:run(56)
+      assert.equal("mining", poseOf(b, b))
+      net:run(1)
+      assert.same({ "seated", "by the fire" }, shown(b, b))
+      net:run(20)
+      assert.same({ "seated", "by the fire" }, shown(a, b))
+    end)
+
+    it("lasts 60 s from the latest cast", function()
+      local net, clients = crew({ "Ann", "Bob" })
+      local a = clients[1]
+      a.core:gathered(HERBALISM_SPELL)
+      net:run(40)
+      a.core:gathered(HERBALISM_SPELL)
+      net:run(40)
+      assert.equal("herbalism", poseOf(a, a))
+    end)
+
+    it("knows every rank and leaves other spells alone", function()
+      local _, clients = crew({ "Ann", "Bob" })
+      local a = clients[1]
+      a.core:gathered(1299348)
+      assert.equal("seated", poseOf(a, a))
+      a.core:gathered(10768)
+      assert.equal("skinning", poseOf(a, a))
+      a.core:gathered(nil)
+      assert.equal("skinning", poseOf(a, a))
+    end)
+
+    it("comes after a profession's window and before fighting, so skinning a kill shows", function()
+      local _, clients = crew({ "Ann", "Bob" })
+      local a = clients[1]
+      a.core:doing({ combat = true })
+      a.core:doing({})
+      a.core:gathered(SKINNING_SPELL)
+      assert.equal("skinning", poseOf(a, a))
+      a.core:doing({ profession = COOKING })
+      assert.equal("cooking", poseOf(a, a))
+      a.core:doing({ vendor = true })
+      assert.equal("vendor", poseOf(a, a))
+    end)
   end)
 
   describe("a quest handed in", function()

@@ -142,6 +142,21 @@ function Professions.workOf(skillLine)
   return WORK[skillLine]
 end
 
+-- WoW: Forever's gathering casts, one spell per rank (wowhead.com/forever).
+local GATHERING_SPELLS = {
+  mining = { 2575, 2576, 3564, 10248 },
+  herbalism = { 2366, 2368, 3570, 11993 },
+  skinning = { 8613, 8617, 8618, 10768 },
+}
+local GATHERED_BY = {}
+for work, spells in pairs(GATHERING_SPELLS) do
+  for _, spell in ipairs(spells) do GATHERED_BY[spell] = work end
+end
+
+function Professions.gatheredBy(spellId)
+  return GATHERED_BY[spellId]
+end
+
 function Professions.lineNamed(professions, name)
   if type(name) ~= "string" then return nil end
   for _, profession in ipairs(professions or {}) do
